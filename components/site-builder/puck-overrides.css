@@ -1,0 +1,85 @@
+[class*="Puck"] {
+  --puck-color-azure-03: #1e293b;
+  --puck-color-azure-04: #0f172a;
+  --puck-color-azure-05: #1e293b;
+  --puck-color-azure-06: #334155;
+  --puck-color-azure-09: #60a5fa;
+  --puck-color-azure-12: #e2e8f0;
+  --puck-color-grey-01: #0f172a;
+  --puck-color-grey-02: #1e293b;
+  --puck-color-grey-03: #334155;
+  --puck-color-grey-04: #475569;
+  --puck-color-grey-05: #64748b;
+  --puck-color-grey-08: #94a3b8;
+  --puck-color-grey-09: #cbd5e1;
+  --puck-color-grey-10: #e2e8f0;
+  --puck-color-grey-11: #f1f5f9;
+  --puck-color-grey-12: #f8fafc;
+  --puck-color-white: #0f172a;
+  --puck-color-black: #f8fafc;
+  --puck-color-rose-07: #fb7185;
+  --puck-color-rose-09: #fda4af;
+  --puck-color-rose-12: #fecdd3;
+}
+
+[class*="Puck-header"],
+[class*="Puck-leftSideBar"],
+[class*="Puck-rightSideBar"] {
+  background-color: #0f172a !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+[class*="Puck-frame"] {
+  background-color: #1e293b !important;
+}
+
+[class*="Puck"] input,
+[class*="Puck"] textarea,
+[class*="Puck"] select {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #e2e8f0 !important;
+}
+
+[class*="Puck"] input::placeholder,
+[class*="Puck"] textarea::placeholder {
+  color: #475569 !important;
+}
+
+[class*="Puck"] input:focus,
+[class*="Puck"] textarea:focus,
+[class*="Puck"] select:focus {
+  border-color: rgba(59, 130, 246, 0.5) !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+}
+
+[class*="Puck"] label {
+  color: #94a3b8 !important;
+}
+
+[class*="Puck"] button {
+  color: #cbd5e1;
+}
+
+[class*="Puck"] button:hover {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+[class*="ComponentList-componentList"] button {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: #e2e8f0 !important;
+}
+
+[class*="ComponentList-componentList"] button:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+}
+
+[class*="DraggableComponent--isDragging"] {
+  box-shadow: 0 20px 60px rgba(59, 130, 246, 0.15) !important;
+}
+
+[class*="DraggableComponent-overlay"] {
+  border-color: rgba(59, 130, 246, 0.4) !important;
+}

@@ -1,0 +1,987 @@
+/**
+ * In-memory mock DB for front-end iteration. No Supabase/DB required.
+ * Data resets on server restart. Replace with real DB when ready.
+ */
+
+import type { LodgeSiteSection } from "@/lib/db/types";
+import { DEFAULT_LODGE_SLUG } from "@/lib/tenant";
+
+function uuid() {
+  return crypto.randomUUID();
+}
+
+type LodgeScoped = {
+  lodge_slug: string;
+};
+
+function withLodgeSlug(slug?: string): string {
+  return (slug ?? DEFAULT_LODGE_SLUG).trim().toLowerCase();
+}
+
+// --- Lodges and lodge websites ---
+export type MockLodge = {
+  id: string;
+  slug: string;
+  name: string;
+  city: string | null;
+  country: string | null;
+  tagline: string | null;
+  logo_url: string | null;
+  primary_color: string | null;
+  secondary_color: string | null;
+  support_email: string | null;
+  support_phone: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MockLodgeSite = LodgeScoped & {
+  id: string;
+  page_title: string;
+  page_description: string | null;
+  sections: LodgeSiteSection[];
+  updated_at: string;
+};
+
+const lodges: MockLodge[] = [
+  {
+    id: uuid(),
+    slug: DEFAULT_LODGE_SLUG,
+    name: "Covenant Lodge No. 4344",
+    city: "London",
+    country: "United Kingdom",
+    tagline: "Brotherhood, charity, and timeless tradition.",
+    logo_url: null,
+    primary_color: "#111827",
+    secondary_color: "#b45309",
+    support_email: "secretary@covenantlodge4344.org",
+    support_phone: null,
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+];
+
+const lodgeSites: MockLodgeSite[] = [
+  {
+    id: uuid(),
+    lodge_slug: DEFAULT_LODGE_SLUG,
+    page_title: "Covenant Lodge No. 4344",
+    page_description: "A London lodge rooted in fellowship, service, and meaningful ritual.",
+    sections: [
+      {
+        id: uuid(),
+        type: "hero",
+        heading: "Welcome to Covenant Lodge No. 4344",
+        body: "Join a modern brotherhood with deep heritage in the heart of London.",
+        cta_label: "Express Interest",
+        cta_href: "/join",
+        visible: true,
+        order: 1,
+      },
+      {
+        id: uuid(),
+        type: "meeting_details",
+        heading: "Meetings at Mark Masons' Hall",
+        body: "Regular meetings, social dining, and charity events throughout the year.",
+        cta_label: "View Events",
+        cta_href: "/events",
+        visible: true,
+        order: 2,
+      },
+      {
+        id: uuid(),
+        type: "charity",
+        heading: "Charity and Community",
+        body: "We support local and national causes through regular giving and fundraising.",
+        cta_label: "Our Charity Work",
+        cta_href: "/charity",
+        visible: true,
+        order: 3,
+      },
+      {
+        id: uuid(),
+        type: "contact",
+        heading: "Speak With Our Team",
+        body: "If you are interested in joining or visiting, we are happy to hear from you.",
+        cta_label: "Contact Us",
+        cta_href: "/contact",
+        visible: true,
+        order: 4,
+      },
+    ],
+    updated_at: new Date().toISOString(),
+  },
+];
+
+export function listLodges(): MockLodge[] {
+  return [...lodges].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function getLodgeBySlug(slug: string): MockLodge | null {
+  const safeSlug = withLodgeSlug(slug);
+  return lodges.find((l) => l.slug === safeSlug && l.is_active) ?? null;
+}
+
+export function upsertLodge(
+  input: Partial<Omit<MockLodge, "id" | "created_at" | "updated_at">> & Pick<MockLodge, "slug" | "name">
+): MockLodge {
+  const safeSlug = withLodgeSlug(input.slug);
+  const now = new Date().toISOString();
+  const existing = lodges.find((l) => l.slug === safeSlug);
+  if (existing) {
+    Object.assign(existing, input, { slug: safeSlug, updated_at: now });
+    return existing;
+  }
+  const lodge: MockLodge = {
+    id: uuid(),
+    slug: safeSlug,
+    name: input.name,
+    city: input.city ?? null,
+    country: input.country ?? null,
+    tagline: input.tagline ?? null,
+    logo_url: input.logo_url ?? null,
+    primary_color: input.primary_color ?? null,
+    secondary_color: input.secondary_color ?? null,
+    support_email: input.support_email ?? null,
+    support_phone: input.support_phone ?? null,
+    is_active: input.is_active ?? true,
+    created_at: now,
+    updated_at: now,
+  };
+  lodges.push(lodge);
+  return lodge;
+}
+
+export function getLodgeSite(lodgeSlug?: string): MockLodgeSite {
+  const safeSlug = withLodgeSlug(lodgeSlug);
+  const existing = lodgeSites.find((s) => s.lodge_slug === safeSlug);
+  if (existing) return existing;
+  const site: MockLodgeSite = {
+    id: uuid(),
+    lodge_slug: safeSlug,
+    page_title: "Lodge Homepage",
+    page_description: null,
+    sections: [],
+    updated_at: new Date().toISOString(),
+  };
+  lodgeSites.push(site);
+  return site;
+}
+
+export function updateLodgeSite(
+  lodgeSlug: string,
+  updates: Partial<Pick<MockLodgeSite, "page_title" | "page_description" | "sections">>
+): MockLodgeSite {
+  const site = getLodgeSite(lodgeSlug);
+  Object.assign(site, updates, { updated_at: new Date().toISOString() });
+  return site;
+}
+
+// --- Leads ---
+export type MockLead = LodgeScoped & {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string | null;
+  location: string | null;
+  source: string | null;
+  how_heard_about_us: string | null;
+  initial_message: string | null;
+  stage: string;
+  assigned_to: string | null;
+  created_at: string;
+  updated_at: string;
+  stage_changed_at: string;
+};
+
+const leads: MockLead[] = [];
+
+export function getLeads(opts?: { lodge_slug?: string }): MockLead[] {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return [...leads]
+    .filter((lead) => lead.lodge_slug === lodgeSlug)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
+export function getLeadById(id: string, opts?: { lodge_slug?: string }): MockLead | null {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return leads.find((l) => l.id === id && l.lodge_slug === lodgeSlug) ?? null;
+}
+
+export function addLead(
+  data: Omit<MockLead, "id" | "created_at" | "updated_at" | "stage_changed_at" | "lodge_slug"> & { lodge_slug?: string }
+): MockLead {
+  const now = new Date().toISOString();
+  const lead: MockLead = {
+    id: uuid(),
+    ...data,
+    lodge_slug: withLodgeSlug(data.lodge_slug),
+    created_at: now,
+    updated_at: now,
+    stage_changed_at: now,
+  };
+  leads.push(lead);
+  return lead;
+}
+
+export function updateLead(
+  id: string,
+  updates: Partial<Pick<MockLead, "stage" | "assigned_to">>,
+  opts?: { lodge_slug?: string }
+): MockLead | null {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  const i = leads.findIndex((l) => l.id === id && l.lodge_slug === lodgeSlug);
+  if (i === -1) return null;
+  const now = new Date().toISOString();
+  if (updates.stage) leads[i].stage_changed_at = now;
+  Object.assign(leads[i], updates, { updated_at: now });
+  return leads[i];
+}
+
+// --- Lead activities ---
+export type MockLeadActivity = LodgeScoped & {
+  id: string;
+  lead_id: string;
+  activity_type: string;
+  title: string | null;
+  description: string | null;
+  meeting_date: string | null;
+  attendees: string[] | null;
+  due_date: string | null;
+  completed: boolean;
+  created_by: string | null;
+  created_at: string;
+};
+
+const leadActivities: MockLeadActivity[] = [];
+
+export function getLeadActivities(leadId: string, opts?: { lodge_slug?: string }): MockLeadActivity[] {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return leadActivities
+    .filter((a) => a.lead_id === leadId && a.lodge_slug === lodgeSlug)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
+export function addLeadActivity(
+  data: Omit<MockLeadActivity, "id" | "created_at" | "lodge_slug"> & { lodge_slug?: string }
+): MockLeadActivity {
+  const activity: MockLeadActivity = {
+    id: uuid(),
+    ...data,
+    lodge_slug: withLodgeSlug(data.lodge_slug),
+    created_at: new Date().toISOString(),
+  };
+  leadActivities.push(activity);
+  return activity;
+}
+
+// --- Events ---
+export type MockEvent = LodgeScoped & {
+  id: string;
+  title: string;
+  slug: string;
+  description: string | null;
+  event_type: string;
+  event_date: string;
+  event_time: string | null;
+  location: string | null;
+  temple_room: string | null;
+  dress_code: string | null;
+  enable_rsvp: boolean;
+  rsvp_deadline: string | null;
+  max_attendees: number | null;
+  enable_payments: boolean;
+  enable_dining_rsvp: boolean;
+  dining_price: number | null;
+  dining_description: string | null;
+  enable_charity_donation: boolean;
+  charity_name: string | null;
+  charity_description: string | null;
+  charity_suggested_amounts: number[] | null;
+  charity_allow_custom: boolean;
+  enable_raffle_donation: boolean;
+  raffle_description: string | null;
+  raffle_suggested_amounts: number[] | null;
+  raffle_allow_custom: boolean;
+  enable_meeting_fee: boolean;
+  meeting_fee_amount: number | null;
+  meeting_fee_description: string | null;
+  enable_guest_tickets: boolean;
+  guest_ticket_price: number | null;
+  guest_ticket_description: string | null;
+  featured_image_url: string | null;
+  published: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+const events: MockEvent[] = [];
+
+export function getEvents(opts?: { published?: boolean; upcoming?: boolean; lodge_slug?: string }): MockEvent[] {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  let list = [...events];
+  list = list.filter((event) => event.lodge_slug === lodgeSlug);
+  if (opts?.published !== undefined) list = list.filter((e) => e.published === opts.published);
+  if (opts?.upcoming) list = list.filter((e) => new Date(e.event_date) >= new Date());
+  return list.sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime());
+}
+
+export function getEventById(id: string, opts?: { lodge_slug?: string }): MockEvent | null {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return events.find((e) => e.id === id && e.lodge_slug === lodgeSlug) ?? null;
+}
+
+export function getEventBySlug(slug: string, opts?: { lodge_slug?: string }): MockEvent | null {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return events.find((e) => e.slug === slug && e.published && e.lodge_slug === lodgeSlug) ?? null;
+}
+
+export function addEvent(
+  data: Omit<MockEvent, "id" | "created_at" | "updated_at" | "lodge_slug"> & { lodge_slug?: string }
+): MockEvent {
+  const now = new Date().toISOString();
+  const event: MockEvent = {
+    id: uuid(),
+    ...data,
+    lodge_slug: withLodgeSlug(data.lodge_slug),
+    created_at: now,
+    updated_at: now,
+  };
+  events.push(event);
+  return event;
+}
+
+export function updateEvent(id: string, updates: Partial<MockEvent>, opts?: { lodge_slug?: string }): MockEvent | null {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  const i = events.findIndex((e) => e.id === id && e.lodge_slug === lodgeSlug);
+  if (i === -1) return null;
+  Object.assign(events[i], updates, { updated_at: new Date().toISOString() });
+  return events[i];
+}
+
+// --- RSVPs ---
+export type MockRsvp = LodgeScoped & {
+  id: string;
+  event_id: string;
+  user_name: string;
+  user_email: string;
+  user_phone: string | null;
+  attending_ceremony: boolean;
+  attending_dining: boolean;
+  number_of_guests: number;
+  dietary_requirements: string | null;
+  special_requests: string | null;
+  payment_required: boolean;
+  payment_completed: boolean;
+  payment_id: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+
+const rsvps: MockRsvp[] = [];
+
+export function getRsvpsByEventId(eventId: string, opts?: { lodge_slug?: string }): MockRsvp[] {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return rsvps.filter((r) => r.event_id === eventId && r.lodge_slug === lodgeSlug);
+}
+
+export function addRsvp(
+  data: Omit<MockRsvp, "id" | "created_at" | "updated_at" | "lodge_slug"> & { lodge_slug?: string }
+): MockRsvp {
+  const now = new Date().toISOString();
+  const rsvp: MockRsvp = {
+    id: uuid(),
+    ...data,
+    lodge_slug: withLodgeSlug(data.lodge_slug),
+    created_at: now,
+    updated_at: now,
+  };
+  rsvps.push(rsvp);
+  return rsvp;
+}
+
+export function updateRsvp(
+  id: string,
+  updates: Partial<Pick<MockRsvp, "payment_id" | "payment_completed" | "status">>,
+  opts?: { lodge_slug?: string }
+): MockRsvp | null {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  const i = rsvps.findIndex((r) => r.id === id && r.lodge_slug === lodgeSlug);
+  if (i === -1) return null;
+  Object.assign(rsvps[i], updates, { updated_at: new Date().toISOString() });
+  return rsvps[i];
+}
+
+export function getRsvpById(id: string, opts?: { lodge_slug?: string }): MockRsvp | null {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return rsvps.find((r) => r.id === id && r.lodge_slug === lodgeSlug) ?? null;
+}
+
+// --- Payments ---
+export type MockPayment = LodgeScoped & {
+  id: string;
+  rsvp_id: string | null;
+  event_id: string | null;
+  user_email: string;
+  user_name: string | null;
+  stripe_payment_intent_id: string | null;
+  dining_amount: number;
+  charity_amount: number;
+  raffle_amount: number;
+  meeting_fee_amount: number;
+  guest_ticket_amount: number;
+  total_amount: number;
+  currency: string;
+  charity_name: string | null;
+  status: string;
+  refund_amount: number;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+};
+
+const payments: MockPayment[] = [];
+
+export function getPayments(opts?: { lodge_slug?: string }): MockPayment[] {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return [...payments]
+    .filter((payment) => payment.lodge_slug === lodgeSlug)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
+export function addPayment(
+  data: Omit<MockPayment, "id" | "created_at" | "updated_at" | "lodge_slug"> & { lodge_slug?: string }
+): MockPayment {
+  const now = new Date().toISOString();
+  const payment: MockPayment = {
+    id: uuid(),
+    ...data,
+    lodge_slug: withLodgeSlug(data.lodge_slug),
+    created_at: now,
+    updated_at: now,
+  };
+  payments.push(payment);
+  return payment;
+}
+
+// --- Event Guests ---
+export type MockEventGuest = LodgeScoped & {
+  id: string;
+  rsvp_id: string | null;
+  event_id: string;
+  guest_name: string;
+  dietary_requirements: string | null;
+  created_at: string;
+};
+
+const eventGuests: MockEventGuest[] = [];
+
+export function addEventGuests(
+  guests: Omit<MockEventGuest, "id" | "created_at" | "lodge_slug">[] & { lodge_slug?: string }[],
+  lodgeSlug?: string
+): MockEventGuest[] {
+  const slug = withLodgeSlug(lodgeSlug);
+  return guests.map((g) => {
+    const guest: MockEventGuest = {
+      id: uuid(),
+      ...g,
+      lodge_slug: slug,
+      created_at: new Date().toISOString(),
+    };
+    eventGuests.push(guest);
+    return guest;
+  });
+}
+
+export function getGuestsByRsvp(rsvpId: string, opts?: { lodge_slug?: string }): MockEventGuest[] {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return eventGuests.filter((g) => g.rsvp_id === rsvpId && g.lodge_slug === lodgeSlug);
+}
+
+export function getGuestsByEvent(eventId: string, opts?: { lodge_slug?: string }): MockEventGuest[] {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return eventGuests.filter((g) => g.event_id === eventId && g.lodge_slug === lodgeSlug);
+}
+
+// --- Members ---
+export type MockMember = LodgeScoped & {
+  id: string;
+  auth_user_id: string | null;
+  email: string;
+  full_name: string;
+  phone: string | null;
+  rank: string | null;
+  dietary_requirements: string | null;
+  date_of_initiation: string | null;
+  initiation_email_sent: boolean;
+  membership_status: 'active' | 'suspended' | 'resigned' | 'excluded';
+  stripe_customer_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+const members: MockMember[] = [];
+
+export function getMembers(opts?: { lodge_slug?: string; status?: string; search?: string }): MockMember[] {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  let list = members.filter((m) => m.lodge_slug === lodgeSlug);
+  if (opts?.status) list = list.filter((m) => m.membership_status === opts.status);
+  if (opts?.search) {
+    const q = opts.search.toLowerCase();
+    list = list.filter((m) => m.full_name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q));
+  }
+  return list.sort((a, b) => a.full_name.localeCompare(b.full_name));
+}
+
+export function getMemberById(id: string, opts?: { lodge_slug?: string }): MockMember | null {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return members.find((m) => m.id === id && m.lodge_slug === lodgeSlug) ?? null;
+}
+
+export function getMemberByEmail(email: string, opts?: { lodge_slug?: string }): MockMember | null {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return members.find((m) => m.email.toLowerCase() === email.toLowerCase() && m.lodge_slug === lodgeSlug) ?? null;
+}
+
+export function createMember(
+  data: Omit<MockMember, "id" | "created_at" | "updated_at" | "lodge_slug"> & { lodge_slug?: string }
+): MockMember {
+  const now = new Date().toISOString();
+  const member: MockMember = {
+    id: uuid(),
+    ...data,
+    lodge_slug: withLodgeSlug(data.lodge_slug),
+    created_at: now,
+    updated_at: now,
+  };
+  members.push(member);
+  return member;
+}
+
+export function updateMember(
+  id: string,
+  updates: Partial<Omit<MockMember, "id" | "lodge_slug" | "created_at">>,
+  opts?: { lodge_slug?: string }
+): MockMember | null {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  const i = members.findIndex((m) => m.id === id && m.lodge_slug === lodgeSlug);
+  if (i === -1) return null;
+  Object.assign(members[i], updates, { updated_at: new Date().toISOString() });
+  return members[i];
+}
+
+export function getRsvpDietaryByEmail(email: string, opts?: { lodge_slug?: string }): Array<{ event_id: string; dietary_requirements: string | null; created_at: string }> {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return rsvps
+    .filter((r) => r.user_email.toLowerCase() === email.toLowerCase() && r.lodge_slug === lodgeSlug && r.dietary_requirements)
+    .map((r) => ({ event_id: r.event_id, dietary_requirements: r.dietary_requirements, created_at: r.created_at }));
+}
+
+export function getPaymentsByEmail(email: string, opts?: { lodge_slug?: string }): MockPayment[] {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return payments
+    .filter((p) => p.user_email.toLowerCase() === email.toLowerCase() && p.lodge_slug === lodgeSlug)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
+// --- Blog posts ---
+export type MockBlogPost = LodgeScoped & {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  content: string;
+  featured_image_url: string | null;
+  category: string | null;
+  author_name: string | null;
+  published: boolean;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+const blogPosts: MockBlogPost[] = [];
+
+export function getBlogPosts(opts?: { published?: boolean; lodge_slug?: string }): MockBlogPost[] {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  let list = [...blogPosts];
+  list = list.filter((post) => post.lodge_slug === lodgeSlug);
+  if (opts?.published !== undefined) {
+    list = list.filter((p) => p.published && p.published_at && new Date(p.published_at) <= new Date());
+  }
+  return list.sort((a, b) => new Date((b.published_at ?? b.created_at)).getTime() - new Date((a.published_at ?? a.created_at)).getTime());
+}
+
+export function getBlogPostById(id: string, opts?: { lodge_slug?: string }): MockBlogPost | null {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return blogPosts.find((p) => p.id === id && p.lodge_slug === lodgeSlug) ?? null;
+}
+
+export function getBlogPostBySlug(slug: string, opts?: { lodge_slug?: string }): MockBlogPost | null {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return blogPosts.find((p) => p.slug === slug && p.published && p.lodge_slug === lodgeSlug) ?? null;
+}
+
+export function addBlogPost(
+  data: Omit<MockBlogPost, "id" | "created_at" | "updated_at" | "lodge_slug"> & { lodge_slug?: string }
+): MockBlogPost {
+  const now = new Date().toISOString();
+  const post: MockBlogPost = {
+    id: uuid(),
+    ...data,
+    lodge_slug: withLodgeSlug(data.lodge_slug),
+    created_at: now,
+    updated_at: now,
+  };
+  blogPosts.push(post);
+  return post;
+}
+
+export function updateBlogPost(id: string, updates: Partial<MockBlogPost>, opts?: { lodge_slug?: string }): MockBlogPost | null {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  const i = blogPosts.findIndex((p) => p.id === id && p.lodge_slug === lodgeSlug);
+  if (i === -1) return null;
+  Object.assign(blogPosts[i], updates, { updated_at: new Date().toISOString() });
+  return blogPosts[i];
+}
+
+// --- Charity Campaigns ---
+export type MockCharityCampaign = LodgeScoped & {
+  id: string;
+  name: string;
+  description: string | null;
+  target_amount: number;
+  raised_amount: number;
+  status: "active" | "completed" | "paused";
+  start_date: string;
+  end_date: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+const charityCampaigns: MockCharityCampaign[] = [];
+
+export function getCharityCampaigns(opts?: { lodge_slug?: string }): MockCharityCampaign[] {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return [...charityCampaigns]
+    .filter((c) => c.lodge_slug === lodgeSlug)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
+export function addCharityCampaign(
+  data: Omit<MockCharityCampaign, "id" | "created_at" | "updated_at" | "lodge_slug"> & { lodge_slug?: string }
+): MockCharityCampaign {
+  const now = new Date().toISOString();
+  const campaign: MockCharityCampaign = {
+    id: uuid(),
+    ...data,
+    lodge_slug: withLodgeSlug(data.lodge_slug),
+    created_at: now,
+    updated_at: now,
+  };
+  charityCampaigns.push(campaign);
+  return campaign;
+}
+
+// --- Donations ---
+export type MockDonation = LodgeScoped & {
+  id: string;
+  donor_name: string;
+  donor_email: string;
+  amount: number;
+  currency: string;
+  source: "event" | "direct" | "campaign";
+  campaign_id: string | null;
+  event_id: string | null;
+  payment_id: string | null;
+  gift_aid_eligible: boolean;
+  gift_aid_declared: boolean;
+  status: "completed" | "pending" | "refunded";
+  created_at: string;
+};
+
+const donations: MockDonation[] = [];
+
+export function getDonations(opts?: { lodge_slug?: string }): MockDonation[] {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return [...donations]
+    .filter((d) => d.lodge_slug === lodgeSlug)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
+export function addDonation(
+  data: Omit<MockDonation, "id" | "created_at" | "lodge_slug"> & { lodge_slug?: string }
+): MockDonation {
+  const donation: MockDonation = {
+    id: uuid(),
+    ...data,
+    lodge_slug: withLodgeSlug(data.lodge_slug),
+    created_at: new Date().toISOString(),
+  };
+  donations.push(donation);
+  return donation;
+}
+
+// --- Gift Aid Declarations ---
+export type MockGiftAidDeclaration = LodgeScoped & {
+  id: string;
+  donor_name: string;
+  donor_email: string;
+  donor_address: string;
+  declaration_date: string;
+  status: "active" | "expired" | "revoked";
+  total_donations: number;
+  reclaimable_amount: number;
+  created_at: string;
+};
+
+const giftAidDeclarations: MockGiftAidDeclaration[] = [];
+
+export function getGiftAidDeclarations(opts?: { lodge_slug?: string }): MockGiftAidDeclaration[] {
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return [...giftAidDeclarations]
+    .filter((g) => g.lodge_slug === lodgeSlug)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
+export function addGiftAidDeclaration(
+  data: Omit<MockGiftAidDeclaration, "id" | "created_at" | "lodge_slug"> & { lodge_slug?: string }
+): MockGiftAidDeclaration {
+  const declaration: MockGiftAidDeclaration = {
+    id: uuid(),
+    ...data,
+    lodge_slug: withLodgeSlug(data.lodge_slug),
+    created_at: new Date().toISOString(),
+  };
+  giftAidDeclarations.push(declaration);
+  return declaration;
+}
+
+// --- Seed data ---
+function seedData() {
+  const now = new Date();
+  const daysAgo = (d: number) => new Date(now.getTime() - d * 86400000).toISOString();
+  const daysFromNow = (d: number) => new Date(now.getTime() + d * 86400000).toISOString();
+
+  if (leads.length > 0) return;
+
+  const seedLeads = [
+    { first_name: "James", last_name: "Harrison", email: "james.h@example.com", phone: "07700 100001", location: "London", source: "website", how_heard_about_us: "Google", initial_message: "Interested in Freemasonry", stage: "expression_of_interest", assigned_to: null },
+    { first_name: "Robert", last_name: "Mitchell", email: "r.mitchell@example.com", phone: "07700 100002", location: "Surrey", source: "referral", how_heard_about_us: "A friend", initial_message: "Would like to visit", stage: "initial_contact", assigned_to: "WM" },
+    { first_name: "William", last_name: "Clarke", email: "w.clarke@example.com", phone: "07700 100003", location: "Kent", source: "event", how_heard_about_us: "Open day", initial_message: null, stage: "meeting_scheduled", assigned_to: "SW" },
+    { first_name: "David", last_name: "Thompson", email: "d.thompson@example.com", phone: null, location: "London", source: "website", how_heard_about_us: "UGLE website", initial_message: "What does membership involve?", stage: "approved", assigned_to: "WM" },
+    { first_name: "Michael", last_name: "Wright", email: "m.wright@example.com", phone: "07700 100005", location: "Essex", source: "referral", how_heard_about_us: "Brother in lodge", initial_message: "Ready to join", stage: "initiated", assigned_to: "WM" },
+    { first_name: "Andrew", last_name: "Baker", email: "a.baker@example.com", phone: null, location: "London", source: "website", how_heard_about_us: null, initial_message: "General enquiry", stage: "expression_of_interest", assigned_to: null },
+    { first_name: "Thomas", last_name: "Evans", email: "t.evans@example.com", phone: "07700 100007", location: "Hertfordshire", source: "social_media", how_heard_about_us: "Facebook", initial_message: null, stage: "initial_contact", assigned_to: "JW" },
+    { first_name: "Philip", last_name: "Grant", email: "p.grant@example.com", phone: "07700 100008", location: "London", source: "referral", how_heard_about_us: "Existing member", initial_message: "Recommended by a friend", stage: "proposal_lodge", assigned_to: "WM" },
+    { first_name: "Stephen", last_name: "Ward", email: "s.ward@example.com", phone: null, location: "Buckinghamshire", source: "website", how_heard_about_us: "Google", initial_message: null, stage: "on_hold", assigned_to: null },
+    { first_name: "Daniel", last_name: "Scott", email: "d.scott@example.com", phone: "07700 100010", location: "London", source: "event", how_heard_about_us: "Open day 2025", initial_message: "Not for me at this time", stage: "declined", assigned_to: "SW" },
+  ];
+
+  seedLeads.forEach((l, i) => {
+    const lead = addLead({ ...l, lodge_slug: DEFAULT_LODGE_SLUG });
+    leads[leads.length - 1].created_at = daysAgo(i * 3 + 1);
+    leads[leads.length - 1].updated_at = daysAgo(i * 2);
+    if (i < 5) {
+      addLeadActivity({
+        lead_id: lead.id,
+        activity_type: "note",
+        title: "Initial contact made",
+        description: `Called ${l.first_name} to discuss lodge membership.`,
+        meeting_date: null,
+        attendees: null,
+        due_date: null,
+        completed: true,
+        created_by: "Admin",
+        lodge_slug: DEFAULT_LODGE_SLUG,
+      });
+      leadActivities[leadActivities.length - 1].created_at = daysAgo(i * 3 + 2);
+    }
+    if (i < 3) {
+      addLeadActivity({
+        lead_id: lead.id,
+        activity_type: "meeting",
+        title: "Informal meeting at lodge",
+        description: `${l.first_name} attended an informal meeting with the WM and SW.`,
+        meeting_date: daysAgo(i * 2),
+        attendees: ["WM", "SW", `${l.first_name} ${l.last_name}`],
+        due_date: null,
+        completed: true,
+        created_by: "WM",
+        lodge_slug: DEFAULT_LODGE_SLUG,
+      });
+      leadActivities[leadActivities.length - 1].created_at = daysAgo(i * 2);
+    }
+    if (i === 0) {
+      addLeadActivity({
+        lead_id: lead.id,
+        activity_type: "email",
+        title: "Follow-up email sent",
+        description: "Sent information pack and lodge history booklet.",
+        meeting_date: null,
+        attendees: null,
+        due_date: null,
+        completed: true,
+        created_by: "Secretary",
+        lodge_slug: DEFAULT_LODGE_SLUG,
+      });
+      leadActivities[leadActivities.length - 1].created_at = daysAgo(1);
+      addLeadActivity({
+        lead_id: lead.id,
+        activity_type: "phone_call",
+        title: "Phone conversation",
+        description: "Discussed next steps and answered questions about the initiation process.",
+        meeting_date: null,
+        attendees: null,
+        due_date: null,
+        completed: true,
+        created_by: "WM",
+        lodge_slug: DEFAULT_LODGE_SLUG,
+      });
+      leadActivities[leadActivities.length - 1].created_at = daysAgo(4);
+      addLeadActivity({
+        lead_id: lead.id,
+        activity_type: "task",
+        title: "Arrange second informal meeting",
+        description: null,
+        meeting_date: null,
+        attendees: null,
+        due_date: daysFromNow(7),
+        completed: false,
+        created_by: "SW",
+        lodge_slug: DEFAULT_LODGE_SLUG,
+      });
+      leadActivities[leadActivities.length - 1].created_at = daysAgo(0);
+    }
+  });
+
+  const guestMeetingDefaults = { enable_meeting_fee: false, meeting_fee_amount: null, meeting_fee_description: null, enable_guest_tickets: false, guest_ticket_price: null, guest_ticket_description: null };
+  const seedEvents: Array<Omit<MockEvent, "id" | "created_at" | "updated_at" | "lodge_slug">> = [
+    { title: "Regular Meeting – April", slug: "regular-meeting-april", description: "Monthly regular meeting with ceremony.", event_type: "regular_meeting", event_date: daysFromNow(5), event_time: "18:30", location: "Mark Masons' Hall", temple_room: "Temple 1", dress_code: "Dark lounge suit", enable_rsvp: true, rsvp_deadline: daysFromNow(3), max_attendees: 60, enable_payments: true, enable_dining_rsvp: true, dining_price: 45, dining_description: "Three course festive board", enable_charity_donation: true, charity_name: "Masonic Charitable Foundation", charity_description: "Support MCF", charity_suggested_amounts: [5, 10, 20], charity_allow_custom: true, enable_raffle_donation: true, raffle_description: "Charity raffle", raffle_suggested_amounts: [2, 5, 10], raffle_allow_custom: true, ...guestMeetingDefaults, enable_guest_tickets: true, guest_ticket_price: 45, guest_ticket_description: "Guest dining ticket", featured_image_url: null, published: true },
+    { title: "Installation Meeting", slug: "installation-meeting", description: "Annual installation of the new Worshipful Master.", event_type: "installation", event_date: daysFromNow(30), event_time: "16:00", location: "Mark Masons' Hall", temple_room: "Grand Temple", dress_code: "Morning dress", enable_rsvp: true, rsvp_deadline: daysFromNow(25), max_attendees: 120, enable_payments: true, enable_dining_rsvp: true, dining_price: 65, dining_description: "Four course installation banquet", enable_charity_donation: true, charity_name: "London Grand Rank Benevolent Fund", charity_description: null, charity_suggested_amounts: [10, 25, 50], charity_allow_custom: true, enable_raffle_donation: true, raffle_description: "Grand raffle", raffle_suggested_amounts: [5, 10], raffle_allow_custom: false, ...guestMeetingDefaults, enable_guest_tickets: true, guest_ticket_price: 65, guest_ticket_description: "Guest banquet ticket", featured_image_url: null, published: true },
+    { title: "Summer Social Evening", slug: "summer-social", description: "Annual summer social for brethren and guests.", event_type: "social", event_date: daysFromNow(60), event_time: "19:00", location: "The Ivy, London", temple_room: null, dress_code: "Smart casual", enable_rsvp: true, rsvp_deadline: daysFromNow(55), max_attendees: 40, enable_payments: true, enable_dining_rsvp: false, dining_price: null, dining_description: null, enable_charity_donation: false, charity_name: null, charity_description: null, charity_suggested_amounts: null, charity_allow_custom: false, enable_raffle_donation: false, raffle_description: null, raffle_suggested_amounts: null, raffle_allow_custom: false, ...guestMeetingDefaults, featured_image_url: null, published: true },
+    { title: "Regular Meeting – March", slug: "regular-meeting-march", description: "Monthly regular meeting.", event_type: "regular_meeting", event_date: daysAgo(15), event_time: "18:30", location: "Mark Masons' Hall", temple_room: "Temple 1", dress_code: "Dark lounge suit", enable_rsvp: true, rsvp_deadline: daysAgo(17), max_attendees: 60, enable_payments: true, enable_dining_rsvp: true, dining_price: 45, dining_description: "Three course festive board", enable_charity_donation: true, charity_name: "MCF", charity_description: null, charity_suggested_amounts: [5, 10, 20], charity_allow_custom: true, enable_raffle_donation: true, raffle_description: "Charity raffle", raffle_suggested_amounts: [2, 5], raffle_allow_custom: true, ...guestMeetingDefaults, featured_image_url: null, published: true },
+    { title: "Committee of General Purposes", slug: "cgp-meeting-april", description: "Pre-meeting committee.", event_type: "committee", event_date: daysFromNow(3), event_time: "17:00", location: "Mark Masons' Hall", temple_room: "Committee Room", dress_code: "Lounge suit", enable_rsvp: false, rsvp_deadline: null, max_attendees: 12, enable_payments: false, enable_dining_rsvp: false, dining_price: null, dining_description: null, enable_charity_donation: false, charity_name: null, charity_description: null, charity_suggested_amounts: null, charity_allow_custom: false, enable_raffle_donation: false, raffle_description: null, raffle_suggested_amounts: null, raffle_allow_custom: false, ...guestMeetingDefaults, featured_image_url: null, published: true },
+  ];
+
+  seedEvents.forEach((e) => addEvent(e));
+
+  const memberNames = [
+    ["John", "Smith", "john.smith@example.com"],
+    ["Peter", "Brown", "peter.brown@example.com"],
+    ["Richard", "Taylor", "richard.taylor@example.com"],
+    ["George", "Wilson", "george.wilson@example.com"],
+    ["Edward", "Davis", "edward.davis@example.com"],
+    ["Charles", "Jones", "charles.jones@example.com"],
+    ["Henry", "Miller", "henry.miller@example.com"],
+    ["Philip", "Anderson", "philip.anderson@example.com"],
+  ];
+
+  memberNames.forEach(([first, last, email], i) => {
+    createMember({
+      auth_user_id: null,
+      email,
+      full_name: `${first} ${last}`,
+      phone: i % 2 === 0 ? `07700 20000${i}` : null,
+      rank: ["EA", "FC", "MM", "MM", "MM", "MM", "MM", "MM"][i],
+      dietary_requirements: ["Vegetarian", null, "Gluten-free", null, null, "Vegan", null, "No nuts"][i],
+      date_of_initiation: daysAgo(365 + i * 90),
+      initiation_email_sent: true,
+      membership_status: i === 7 ? "resigned" : "active",
+      stripe_customer_id: null,
+    });
+  });
+
+  const paymentStatuses = ["succeeded", "succeeded", "succeeded", "succeeded", "succeeded", "pending", "succeeded", "refunded"];
+  memberNames.forEach(([first, last, email], i) => {
+    const dining = [45, 45, 65, 45, 45, 45, 65, 45][i];
+    const charity = [10, 20, 25, 5, 15, 10, 50, 0][i];
+    const raffle = [5, 10, 10, 5, 0, 5, 10, 5][i];
+    const p = addPayment({
+      rsvp_id: null,
+      event_id: events[i % events.length]?.id ?? null,
+      user_email: email,
+      user_name: `${first} ${last}`,
+      stripe_payment_intent_id: `pi_mock_${i}`,
+      dining_amount: dining,
+      charity_amount: charity,
+      raffle_amount: raffle,
+      meeting_fee_amount: 0,
+      guest_ticket_amount: 0,
+      total_amount: dining + charity + raffle,
+      currency: "gbp",
+      charity_name: "Masonic Charitable Foundation",
+      status: paymentStatuses[i],
+      refund_amount: paymentStatuses[i] === "refunded" ? dining + charity + raffle : 0,
+      completed_at: paymentStatuses[i] === "succeeded" ? daysAgo(i * 2 + 1) : null,
+    });
+    payments[payments.length - 1].created_at = daysAgo(i * 2 + 1);
+  });
+
+  const seedBlogPosts = [
+    { title: "Welcome to Covenant Lodge", slug: "welcome", excerpt: "A warm welcome to all visitors.", content: "We are delighted to welcome you to Covenant Lodge No. 4344.", category: "news", author_name: "Secretary", published: true, published_at: daysAgo(10), featured_image_url: null },
+    { title: "Spring Charity Drive Results", slug: "spring-charity", excerpt: "Our spring charity drive raised over £2,000.", content: "Thanks to the generosity of our brethren...", category: "charity", author_name: "Charity Steward", published: true, published_at: daysAgo(5), featured_image_url: null },
+    { title: "Installation Preview", slug: "installation-preview", excerpt: "Looking ahead to the installation.", content: "The upcoming installation meeting...", category: "events", author_name: "WM", published: false, published_at: null, featured_image_url: null },
+  ];
+  seedBlogPosts.forEach((b) => addBlogPost(b));
+
+  addCharityCampaign({ name: "MCF Festival 2026", description: "Lodge festival contribution to the Masonic Charitable Foundation.", target_amount: 5000, raised_amount: 3250, status: "active", start_date: daysAgo(90), end_date: daysFromNow(270) });
+  addCharityCampaign({ name: "Local Food Bank Appeal", description: "Supporting our local community food bank through the winter months.", target_amount: 1500, raised_amount: 1500, status: "completed", start_date: daysAgo(180), end_date: daysAgo(30) });
+  addCharityCampaign({ name: "Blood Bikes Sponsorship", description: "Sponsoring a blood bike for the volunteer service.", target_amount: 3000, raised_amount: 850, status: "active", start_date: daysAgo(30), end_date: daysFromNow(150) });
+
+  const donationData = [
+    { donor_name: "John Smith", donor_email: "john.smith@example.com", amount: 50, source: "campaign" as const, gift_aid_eligible: true, gift_aid_declared: true },
+    { donor_name: "Peter Brown", donor_email: "peter.brown@example.com", amount: 100, source: "campaign" as const, gift_aid_eligible: true, gift_aid_declared: true },
+    { donor_name: "Richard Taylor", donor_email: "richard.taylor@example.com", amount: 25, source: "event" as const, gift_aid_eligible: true, gift_aid_declared: false },
+    { donor_name: "George Wilson", donor_email: "george.wilson@example.com", amount: 200, source: "direct" as const, gift_aid_eligible: false, gift_aid_declared: false },
+    { donor_name: "Edward Davis", donor_email: "edward.davis@example.com", amount: 75, source: "campaign" as const, gift_aid_eligible: true, gift_aid_declared: true },
+    { donor_name: "Charles Jones", donor_email: "charles.jones@example.com", amount: 30, source: "event" as const, gift_aid_eligible: true, gift_aid_declared: true },
+    { donor_name: "Henry Miller", donor_email: "henry.miller@example.com", amount: 150, source: "direct" as const, gift_aid_eligible: true, gift_aid_declared: false },
+    { donor_name: "Philip Anderson", donor_email: "philip.anderson@example.com", amount: 40, source: "campaign" as const, gift_aid_eligible: false, gift_aid_declared: false },
+  ];
+  donationData.forEach((d, i) => {
+    addDonation({
+      ...d,
+      currency: "gbp",
+      campaign_id: charityCampaigns[i % charityCampaigns.length]?.id ?? null,
+      event_id: i % 2 === 0 ? events[0]?.id ?? null : null,
+      payment_id: payments[i]?.id ?? null,
+      status: "completed",
+    });
+    donations[donations.length - 1].created_at = daysAgo(i * 3 + 1);
+  });
+
+  addGiftAidDeclaration({ donor_name: "John Smith", donor_email: "john.smith@example.com", donor_address: "12 High Street, London, EC1A 1BB", declaration_date: daysAgo(365), status: "active", total_donations: 250, reclaimable_amount: 62.5 });
+  addGiftAidDeclaration({ donor_name: "Peter Brown", donor_email: "peter.brown@example.com", donor_address: "5 Oak Lane, Surrey, GU1 2AB", declaration_date: daysAgo(200), status: "active", total_donations: 400, reclaimable_amount: 100 });
+  addGiftAidDeclaration({ donor_name: "Edward Davis", donor_email: "edward.davis@example.com", donor_address: "8 Park Road, Kent, ME1 3CD", declaration_date: daysAgo(150), status: "active", total_donations: 175, reclaimable_amount: 43.75 });
+  addGiftAidDeclaration({ donor_name: "Charles Jones", donor_email: "charles.jones@example.com", donor_address: "22 Church Street, Essex, CM1 4EF", declaration_date: daysAgo(500), status: "expired", total_donations: 120, reclaimable_amount: 30 });
+
+  events.forEach((event) => {
+    if (event.enable_rsvp) {
+      const attendees = memberNames.slice(0, Math.min(4, memberNames.length));
+      attendees.forEach(([first, last, email]) => {
+        addRsvp({
+          event_id: event.id,
+          user_name: `${first} ${last}`,
+          user_email: email,
+          user_phone: null,
+          attending_ceremony: true,
+          attending_dining: event.enable_dining_rsvp,
+          number_of_guests: Math.random() > 0.7 ? 1 : 0,
+          dietary_requirements: null,
+          special_requests: null,
+          payment_required: event.enable_payments,
+          payment_completed: Math.random() > 0.3,
+          payment_id: null,
+          status: "confirmed",
+        });
+      });
+    }
+  });
+}
+
+seedData();
