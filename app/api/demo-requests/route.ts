@@ -1,4 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  lodgePayFromEmail,
+  renderNotificationEmail,
+  renderSimpleMessageEmail,
+} from "@/lib/email/templates";
+
+const CONTACT_NOTIFICATION_EMAIL = "ag@experrt.com";
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,23 +28,68 @@ export async function POST(request: NextRequest) {
     if (resendKey) {
       const { Resend } = await import("resend");
       const resend = new Resend(resendKey);
-      const to = process.env.CONTACT_EMAIL ?? "hello@lodgepay.com";
-      await resend.emails.send({
-        from: process.env.EMAIL_FROM ?? "LodgePay <noreply@lodgepay.com>",
-        to,
-        replyTo: work_email,
-        subject: `[LodgePay Demo Request] ${lodge_name}`,
-        text: [
-          `Name: ${full_name}`,
-          `Email: ${work_email}`,
-          `Lodge: ${lodge_name}`,
-          `Role: ${role}`,
-          `Lodges managed: ${Number.isFinite(lodge_count) ? lodge_count : 1}`,
-          "",
-          "Priorities:",
-          priorities || "Not provided",
-        ].join("\n"),
-      });
+      const from = lodgePayFromEmail(process.env.EMAIL_FROM);
+      const safeLodgeCount = String(Number.isFinite(lodge_count) ? lodge_count : 1);
+
+      await Promise.all([
+        resend.emails.send({
+          from,
+          to: CONTACT_NOTIFICATION_EMAIL,
+          replyTo: work_email,
+          subject: `[LodgePay demo request] ${lodge_name}`,
+          html: renderNotificationEmail({
+            eyebrow: "Demo request",
+            title: "New demo request",
+            preview: `New demo request from ${full_name}.`,
+            intro: "A new LodgePay demo request has been submitted.",
+            rows: [
+              { label: "Name", value: full_name },
+              { label: "Email", value: work_email },
+              { label: "Lodge", value: lodge_name },
+              { label: "Role", value: role },
+              {
+                label: "Lodges managed",
+                value: safeLodgeCount,
+              },
+            ],
+            message: priorities || "No priorities provided.",
+          }),
+          text: [
+            `Name: ${full_name}`,
+            `Email: ${work_email}`,
+            `Lodge: ${lodge_name}`,
+            `Role: ${role}`,
+            `Lodges managed: ${safeLodgeCount}`,
+            "",
+            "Priorities:",
+            priorities || "Not provided",
+          ].join("\n"),
+        }),
+        resend.emails.send({
+          from,
+          to: work_email,
+          replyTo: CONTACT_NOTIFICATION_EMAIL,
+          subject: "We have received your LodgePay demo request",
+          html: renderSimpleMessageEmail({
+            eyebrow: "Demo request received",
+            title: "Thanks for booking time with LodgePay",
+            preview: "We have received your walkthrough request.",
+            greeting: `Hello ${full_name},`,
+            paragraphs: [
+              "Thank you for requesting a LodgePay walkthrough. We have your details and will reply with the next step shortly.",
+              "The session will focus on your lodge or group, including the website, meetings, payments, candidates, reporting, and the officer workflows that matter most.",
+            ],
+            note: `Request received for ${lodge_name}. Role: ${role}. Lodges managed: ${safeLodgeCount}.`,
+          }),
+          text: [
+            `Hello ${full_name},`,
+            "",
+            "Thank you for requesting a LodgePay walkthrough. We have your details and will reply with the next step shortly.",
+            "",
+            `Request received for ${lodge_name}.`,
+          ].join("\n"),
+        }),
+      ]);
     }
 
     return NextResponse.json({ success: true });

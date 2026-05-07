@@ -2,6 +2,7 @@ import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
 import { GiftAidClient } from "./gift-aid-client";
+import { isSuccessfulPaymentStatus } from "@/lib/reports";
 
 export default async function GiftAidPage() {
   const ctx = await getAdminReadContext();
@@ -13,6 +14,25 @@ export default async function GiftAidPage() {
     : lodgeId
       ? await db.getGiftAidDeclarations(lodgeId)
       : [];
+  const donations = useMock || !lodgeId ? [] : await db.getDonations(lodgeId);
+  const donationsByDeclaration = new Map<
+    string,
+    { total: number; reclaimable: number }
+  >();
+  for (const donation of donations) {
+    if (!donation.gift_aid_declaration_id) continue;
+    if (!isSuccessfulPaymentStatus(donation.status)) continue;
+    const current =
+      donationsByDeclaration.get(donation.gift_aid_declaration_id) ?? {
+        total: 0,
+        reclaimable: 0,
+      };
+    current.total += donation.amount;
+    if (donation.gift_aid_status !== "declined") {
+      current.reclaimable += donation.amount * 0.25;
+    }
+    donationsByDeclaration.set(donation.gift_aid_declaration_id, current);
+  }
 
   const serialized = declarations.map((d) => {
     const isMock = "donor_address" in d;
@@ -39,10 +59,12 @@ export default async function GiftAidPage() {
           : "active") as "active" | "expired" | "revoked",
       total_donations: isMock
         ? (d as unknown as { total_donations: number }).total_donations
-        : 0,
+        : (donationsByDeclaration.get(d.id)?.total ?? 0),
       reclaimable_amount: isMock
         ? (d as unknown as { reclaimable_amount: number }).reclaimable_amount
-        : 0,
+        : (d as db.GiftAidDeclaration).revoked_at
+          ? 0
+          : (donationsByDeclaration.get(d.id)?.reclaimable ?? 0),
       created_at: d.created_at,
     };
   });

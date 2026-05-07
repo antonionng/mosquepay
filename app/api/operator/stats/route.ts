@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { listLodges, getLodgeSubscription, getPayments } from "@/lib/db";
+import { requireOperatorApiAuth } from "@/lib/auth/api";
 
 export async function GET() {
+  const unauthorized = await requireOperatorApiAuth();
+  if (unauthorized) return unauthorized;
+
   if (!isSupabaseConfigured()) {
     return NextResponse.json({
       lodgeCount: 0,

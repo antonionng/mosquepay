@@ -84,6 +84,13 @@ const config: Config = {
           muted: "hsl(var(--dash-text-muted) / <alpha-value>)",
           faint: "hsl(var(--dash-text-faint) / <alpha-value>)",
           ring: "hsl(var(--dash-ring) / <alpha-value>)",
+          "ring-dark": "hsl(var(--dash-ring-dark) / <alpha-value>)",
+          "ring-soft": "hsl(var(--dash-ring-soft) / <alpha-value>)",
+        },
+        brand: {
+          DEFAULT: "#0B43B8",
+          dark: "#082E7D",
+          light: "#3B6FE0",
         },
       },
       ringOffsetColor: {

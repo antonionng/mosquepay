@@ -1,0 +1,39 @@
+{
+  "name": "Lodge Member Portal",
+  "short_name": "Lodge",
+  "description": "Summons, RSVPs, dues, donations, and your digital lodge card.",
+  "start_url": "/member",
+  "scope": "/member",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#1d4ed8",
+  "icons": [
+    {
+      "src": "/brand/lodgepay-logo-mark.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/brand/lodgepay-logo-mark.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Summons",
+      "short_name": "Summons",
+      "url": "/member?focus=summons",
+      "icons": [{ "src": "/brand/lodgepay-logo-mark.png", "sizes": "1024x1024" }]
+    },
+    {
+      "name": "Member card",
+      "short_name": "Card",
+      "url": "/member/card",
+      "icons": [{ "src": "/brand/lodgepay-logo-mark.png", "sizes": "1024x1024" }]
+    }
+  ]
+}

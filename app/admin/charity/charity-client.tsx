@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { formatDate, cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -14,6 +15,8 @@ import {
   Pause,
   Gift,
   ArrowRight,
+  Download,
+  Users,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +41,7 @@ type Donation = {
   donor_email: string;
   amount: number;
   source: string;
+  event_id?: string | null;
   campaign_id?: string | null;
   gift_aid_declared?: boolean;
   status: string;
@@ -94,7 +98,14 @@ export function AdminCharityClient({
   donations: Donation[];
   giftAidDeclarations: GiftAidDeclaration[];
 }) {
+  const router = useRouter();
   const [showForm, setShowForm] = useState(false);
+  const [campaignName, setCampaignName] = useState("");
+  const [targetAmount, setTargetAmount] = useState("");
+  const [description, setDescription] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const activeCampaigns = campaigns.filter((c) => c.status === "active");
   const totalRaised = campaigns.reduce((s, c) => s + c.raised_amount, 0);
@@ -103,6 +114,24 @@ export function AdminCharityClient({
   const totalGiftAid = giftAidDeclarations
     .filter((g) => g.status === "active")
     .reduce((s, g) => s + (g.reclaimable_amount ?? 0), 0);
+  const meetingLinkedDonations = donations.filter((d) => Boolean(d.event_id));
+  const donorRows = [...donations.reduce((map, donation) => {
+    const key = donation.donor_email.toLowerCase();
+    const current = map.get(key) ?? {
+      email: donation.donor_email,
+      name: donation.donor_name ?? "Anonymous",
+      total: 0,
+      count: 0,
+      giftAidCount: 0,
+    };
+    current.total += donation.amount;
+    current.count += 1;
+    if (donation.gift_aid_declared) current.giftAidCount += 1;
+    map.set(key, current);
+    return map;
+  }, new Map<string, { email: string; name: string; total: number; count: number; giftAidCount: number }>()).values()]
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 6);
 
   const kpis: Array<{
     label: string;
@@ -142,6 +171,104 @@ export function AdminCharityClient({
       valueClass: "text-emerald-700",
     },
   ];
+
+  async function handleCreateCampaign(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setFormError(null);
+    setSaving(true);
+    try {
+      const res = await fetch("/api/charity-campaigns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: campaignName,
+          target_amount: Number(targetAmount),
+          description,
+          end_date: endDate || null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error ?? "Failed to create campaign");
+      }
+      setCampaignName("");
+      setTargetAmount("");
+      setDescription("");
+      setEndDate("");
+      setShowForm(false);
+      router.refresh();
+    } catch (error) {
+      setFormError(
+        error instanceof Error ? error.message : "Could not create campaign."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function downloadCsv(filename: string, headers: string[], rows: Array<Array<string | number | null>>) {
+    const csv = [headers, ...rows]
+      .map((row) =>
+        row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(",")
+      )
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportDonorRecords() {
+    downloadCsv(
+      "charity-donor-records.csv",
+      ["Name", "Email", "Total donated", "Donation count", "Gift Aid donations"],
+      donorRows.map((donor) => [
+        donor.name,
+        donor.email,
+        donor.total,
+        donor.count,
+        donor.giftAidCount,
+      ])
+    );
+  }
+
+  function exportCampaignTotals() {
+    downloadCsv(
+      "charity-campaign-totals.csv",
+      ["Campaign", "Status", "Target", "Raised", "Donation count", "Start date", "End date"],
+      campaigns.map((campaign) => {
+        const campaignDonations = donations.filter((d) => d.campaign_id === campaign.id);
+        return [
+          campaign.name,
+          campaign.status,
+          campaign.target_amount,
+          campaign.raised_amount,
+          campaignDonations.length,
+          campaign.start_date,
+          campaign.end_date,
+        ];
+      })
+    );
+  }
+
+  function exportMeetingCollections() {
+    downloadCsv(
+      "meeting-linked-charity-collections.csv",
+      ["Date", "Donor", "Email", "Amount", "Source", "Event ID", "Gift Aid"],
+      meetingLinkedDonations.map((donation) => [
+        donation.created_at,
+        donation.donor_name,
+        donation.donor_email,
+        donation.amount,
+        donation.source,
+        donation.event_id ?? "",
+        donation.gift_aid_declared ? "yes" : "no",
+      ])
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -209,15 +336,70 @@ export function AdminCharityClient({
         </Button>
       </div>
 
+      <Card variant="panel" className="p-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-dash-text">Charity Reporting</h2>
+            <p className="mt-1 text-sm text-dash-muted">
+              Donor records, campaign totals, Gift Aid readiness, and meeting-linked charity collections.
+            </p>
+            <p className="mt-2 text-xs text-dash-faint">
+              {donorRows.length} donors · {meetingLinkedDonations.length} meeting collections · £{totalGiftAid.toFixed(2)} Gift Aid reclaimable
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="dashboard" size="sm" onClick={exportDonorRecords}>
+              <Users className="mr-1.5 h-4 w-4" />
+              Donor Records
+            </Button>
+            <Button type="button" variant="dashboard" size="sm" onClick={exportCampaignTotals}>
+              <Download className="mr-1.5 h-4 w-4" />
+              Campaign Totals
+            </Button>
+            <Button type="button" variant="dashboard" size="sm" onClick={exportMeetingCollections}>
+              <Download className="mr-1.5 h-4 w-4" />
+              Meeting Collections
+            </Button>
+          </div>
+        </div>
+        {donorRows.length > 0 && (
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            {donorRows.slice(0, 3).map((donor) => (
+              <div
+                key={donor.email}
+                className="rounded-xl border border-dash-border bg-dash-surface-subtle p-4"
+              >
+                <p className="text-sm font-semibold text-dash-text">{donor.name}</p>
+                <p className="mt-1 truncate text-xs text-dash-muted">{donor.email}</p>
+                <p className="mt-3 text-lg font-semibold text-dash-text">
+                  £{donor.total.toFixed(2)}
+                </p>
+                <p className="text-xs text-dash-muted">
+                  {donor.count} donation{donor.count === 1 ? "" : "s"}, {donor.giftAidCount} Gift Aid
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
       {showForm && (
         <Card variant="panel" className="overflow-hidden border-dash-ring/30 bg-dash-surface-subtle p-0">
           <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
             <h2 className="dash-panel-header-title">New charity campaign</h2>
             <p className="dash-panel-header-description">
-              Draft details — wire to your backend when ready.
+              Create a target-led campaign for this lodge.
             </p>
           </div>
-          <div className="space-y-4 border-t border-dash-border p-5 md:p-6">
+          <form
+            onSubmit={handleCreateCampaign}
+            className="space-y-4 border-t border-dash-border p-5 md:p-6"
+          >
+            {formError && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                {formError}
+              </div>
+            )}
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-dash-text-muted">
@@ -226,6 +408,9 @@ export function AdminCharityClient({
                 <input
                   type="text"
                   placeholder="e.g. MCF Festival 2026"
+                  value={campaignName}
+                  onChange={(event) => setCampaignName(event.target.value)}
+                  required
                   className="w-full rounded-xl border border-dash-border bg-dash-surface px-4 py-2.5 text-sm text-dash-text placeholder:text-dash-faint focus:border-dash-ring focus:outline-none focus:ring-2 focus:ring-dash-ring/20"
                 />
               </div>
@@ -236,6 +421,11 @@ export function AdminCharityClient({
                 <input
                   type="number"
                   placeholder="5000"
+                  min={0}
+                  step="0.01"
+                  value={targetAmount}
+                  onChange={(event) => setTargetAmount(event.target.value)}
+                  required
                   className="w-full rounded-xl border border-dash-border bg-dash-surface px-4 py-2.5 text-sm text-dash-text placeholder:text-dash-faint focus:border-dash-ring focus:outline-none focus:ring-2 focus:ring-dash-ring/20"
                 />
               </div>
@@ -245,7 +435,9 @@ export function AdminCharityClient({
                 </label>
                 <textarea
                   rows={3}
-                  placeholder="Describe the campaign purpose…"
+                  placeholder="Describe the campaign purpose..."
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
                   className="w-full resize-none rounded-xl border border-dash-border bg-dash-surface px-4 py-2.5 text-sm text-dash-text placeholder:text-dash-faint focus:border-dash-ring focus:outline-none focus:ring-2 focus:ring-dash-ring/20"
                 />
               </div>
@@ -255,19 +447,21 @@ export function AdminCharityClient({
                 </label>
                 <input
                   type="date"
+                  value={endDate}
+                  onChange={(event) => setEndDate(event.target.value)}
                   className="w-full rounded-xl border border-dash-border bg-dash-surface px-4 py-2.5 text-sm text-dash-text focus:border-dash-ring focus:outline-none focus:ring-2 focus:ring-dash-ring/20"
                 />
               </div>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Button type="button" variant="primary">
-                Create Campaign
+              <Button type="submit" variant="primary" disabled={saving}>
+                {saving ? "Creating..." : "Create Campaign"}
               </Button>
               <Button type="button" variant="dashboard" onClick={() => setShowForm(false)}>
                 Cancel
               </Button>
             </div>
-          </div>
+          </form>
         </Card>
       )}
 
@@ -288,9 +482,10 @@ export function AdminCharityClient({
             );
             const campaignDonations = donations.filter((d) => d.campaign_id === campaign.id);
             return (
-              <div
+              <Link
                 key={campaign.id}
-                className="rounded-xl border border-dash-border bg-dash-surface-subtle/50 p-5 shadow-sm"
+                href={`/admin/charity/${campaign.id}`}
+                className="block rounded-xl border border-dash-border bg-dash-surface-subtle/50 p-5 shadow-sm transition-colors hover:border-dash-border-strong hover:bg-dash-surface"
               >
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
@@ -334,12 +529,15 @@ export function AdminCharityClient({
                   </div>
                 </div>
 
-                <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-xs text-dash-text-muted">
+                <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-dash-text-muted">
                   <span>Started {formatDate(campaign.start_date)}</span>
                   {campaign.end_date && <span>Ends {formatDate(campaign.end_date)}</span>}
                   <span>{campaignDonations.length} donations</span>
+                  <span className="ml-auto inline-flex items-center gap-1 text-dash-ring">
+                    Open <ArrowRight className="h-3.5 w-3.5" />
+                  </span>
                 </div>
-              </div>
+              </Link>
             );
           })}
           {campaigns.length === 0 && (
@@ -416,7 +614,7 @@ export function AdminCharityClient({
                   <div>
                     <p className="text-sm font-medium text-dash-text">{g.donor_name}</p>
                     <p className="text-xs text-dash-text-muted">
-                      Declared {g.declaration_date ? formatDate(g.declaration_date) : "—"}
+                      Declared {g.declaration_date ? formatDate(g.declaration_date) : "Not recorded"}
                     </p>
                   </div>
                   <div className="text-right">

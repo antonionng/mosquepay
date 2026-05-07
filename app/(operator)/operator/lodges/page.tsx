@@ -16,12 +16,16 @@ export default function LodgesListPage() {
   const [lodges, setLodges] = useState<Lodge[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/lodges")
       .then((r) => r.json())
       .then((data) => setLodges(Array.isArray(data) ? data : []))
-      .catch(() => setLodges([]))
+      .catch(() => {
+        setError("Could not load lodges. Try refreshing the page.");
+        setLodges([]);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -63,6 +67,12 @@ export default function LodgesListPage() {
         </div>
       </div>
 
+      {error && (
+        <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          {error}
+        </div>
+      )}
+
       {loading ? (
         <div className="admin-surface p-10 text-center text-slate-500">
           <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-slate-600 border-t-blue-400" />
@@ -81,7 +91,7 @@ export default function LodgesListPage() {
               href="/operator/lodges/new"
               className="mt-3 inline-block text-sm text-blue-400 hover:text-blue-300"
             >
-              Onboard your first lodge →
+              Onboard your first lodge
             </Link>
           )}
         </div>
@@ -120,7 +130,7 @@ export default function LodgesListPage() {
                   <td className="hidden sm:table-cell">
                     <div className="flex items-center gap-1.5 text-slate-400">
                       <MapPin className="h-3.5 w-3.5" />
-                      {lodge.city ?? "—"}
+                      {lodge.city ?? "Not recorded"}
                     </div>
                   </td>
                   <td>

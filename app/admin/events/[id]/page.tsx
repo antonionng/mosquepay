@@ -108,9 +108,9 @@ export default async function EditEventPage({
     <div>
       <div className="mb-8 flex flex-wrap items-center gap-3">
         <Button asChild variant="secondary" size="sm">
-          <Link href="/admin/events">
+          <Link href="/admin/meetings">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to events
+            Back to meetings
           </Link>
         </Button>
         {event.enable_payments && (
@@ -191,7 +191,7 @@ export default async function EditEventPage({
               {atCapacity && (
                 <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-700">
                   <AlertTriangle className="h-3 w-3" />
-                  At capacity — waitlist active
+                  At capacity. Waitlist active
                 </div>
               )}
             </>

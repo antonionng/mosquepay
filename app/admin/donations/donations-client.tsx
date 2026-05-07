@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import { formatDate, cn } from "@/lib/utils";
 import { DASH_TABLE } from "@/lib/admin-dash-table";
 import { Card } from "@/components/ui/card";
@@ -31,6 +32,7 @@ import {
   AlertCircle,
   Banknote,
   Filter,
+  Plus,
 } from "lucide-react";
 
 type Donation = {
@@ -163,6 +165,36 @@ export function AdminDonationsClient({
     },
   ];
 
+  function exportDonationsCsv() {
+    const csv = [
+      ["Donor", "Email", "Source", "Amount", "Gift Aid", "Status", "Date"],
+      ...filteredDonations.map((donation) => [
+        donation.donor_name ?? "",
+        donation.donor_email,
+        donation.source,
+        donation.amount.toFixed(2),
+        donation.gift_aid_declared
+          ? "declared"
+          : donation.gift_aid_eligible
+            ? "eligible"
+            : "not eligible",
+        donation.status,
+        donation.created_at,
+      ]),
+    ]
+      .map((row) =>
+        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
+      )
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "donations.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="space-y-8">
       <div className="admin-page-head">
@@ -172,10 +204,18 @@ export function AdminDonationsClient({
             Track all donations, Gift Aid status, and export records.
           </p>
         </div>
-        <Button variant="dashboard" className="gap-2">
-          <Download className="h-4 w-4" />
-          Export CSV
-        </Button>
+        <div className="admin-action-row">
+          <Button variant="outline" className="gap-2" onClick={exportDonationsCsv}>
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+          <Button asChild variant="dashboard" className="gap-2">
+            <Link href="/admin/donations/new">
+              <Plus className="h-4 w-4" />
+              Add donation
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -259,7 +299,7 @@ export function AdminDonationsClient({
           <div>
             <h2 className="dash-panel-header-title">All donations</h2>
             <p className="dash-panel-header-description">
-              Filtered by source and Gift Aid — amounts in GBP.
+              Filtered by source and Gift Aid. Amounts in GBP.
             </p>
           </div>
         </div>
@@ -335,7 +375,7 @@ export function AdminDonationsClient({
           <div>
             <h2 className="dash-panel-header-title">Gift Aid declarations</h2>
             <p className="dash-panel-header-description">
-              Active declarations linked to donors — 25p reclaim per £1 for eligible taxpayers.
+              Active declarations linked to donors. 25p reclaim per £1 for eligible taxpayers.
             </p>
           </div>
         </div>

@@ -34,7 +34,10 @@ import {
   Calendar,
   FileText,
   CheckCircle2,
+  Flag,
+  UserCheck,
 } from "lucide-react";
+import { PROMPT_CLASSES } from "@/lib/leads/next-action";
 
 type Lead = {
   id: string;
@@ -47,11 +50,15 @@ type Lead = {
   created_at: string;
   updated_at: string;
   stage_changed_at: string;
+  converted_at: string | null;
   daysInStage: number;
   daysSinceActivity: number;
   lastActivityType: string | null;
   lastActivityTitle: string | null;
   lastActivityDate: string | null;
+  promptLabel: string;
+  promptReason: string;
+  promptSeverity: "info" | "warn" | "urgent" | "ok";
 };
 
 const STAGE_BADGE_LIGHT: Record<string, string> = {
@@ -92,6 +99,7 @@ export function LeadsListClient({
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
+  const [attentionFilter, setAttentionFilter] = useState("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkStage, setBulkStage] = useState("");
 
@@ -106,9 +114,14 @@ export function LeadsListClient({
         stageFilter === "all" || lead.stage === stageFilter;
       const matchesSource =
         sourceFilter === "all" || lead.source === sourceFilter;
-      return matchesSearch && matchesStage && matchesSource;
+      const matchesAttention =
+        attentionFilter === "all" ||
+        (attentionFilter === "needs_attention" &&
+          (lead.promptSeverity === "warn" || lead.promptSeverity === "urgent")) ||
+        (attentionFilter === "converted" && Boolean(lead.converted_at));
+      return matchesSearch && matchesStage && matchesSource && matchesAttention;
     });
-  }, [initialLeads, search, stageFilter, sourceFilter]);
+  }, [initialLeads, search, stageFilter, sourceFilter, attentionFilter]);
 
   const allSelected =
     filteredLeads.length > 0 &&
@@ -209,6 +222,16 @@ export function LeadsListClient({
               ))}
             </SelectContent>
           </Select>
+          <Select value={attentionFilter} onValueChange={setAttentionFilter}>
+            <SelectTrigger variant="dashboard" className="w-full sm:w-40">
+              <SelectValue placeholder="All leads" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All leads</SelectItem>
+              <SelectItem value="needs_attention">Needs attention</SelectItem>
+              <SelectItem value="converted">Converted to member</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {selected.size > 0 && (
@@ -270,6 +293,7 @@ export function LeadsListClient({
               </TableHead>
               <TableHead>Candidate</TableHead>
               <TableHead>Stage</TableHead>
+              <TableHead>Next action</TableHead>
               <TableHead className="hidden lg:table-cell">Source</TableHead>
               <TableHead className="hidden md:table-cell">Last activity</TableHead>
               <TableHead className="hidden lg:table-cell">Days in stage</TableHead>
@@ -343,8 +367,28 @@ export function LeadsListClient({
                       {stageLabels[lead.stage] ?? lead.stage}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    <div
+                      className={cn(
+                        "inline-flex flex-col gap-0.5 rounded-lg border px-2.5 py-1.5 text-xs",
+                        PROMPT_CLASSES[lead.promptSeverity]
+                      )}
+                    >
+                      <span className="flex items-center gap-1.5 font-medium">
+                        {lead.converted_at ? (
+                          <UserCheck className="h-3 w-3" />
+                        ) : (
+                          <Flag className="h-3 w-3" />
+                        )}
+                        {lead.promptLabel}
+                      </span>
+                      <span className="text-[10px] opacity-80">
+                        {lead.promptReason}
+                      </span>
+                    </div>
+                  </TableCell>
                   <TableCell className="hidden text-slate-600 lg:table-cell">
-                    {SOURCE_LABELS[lead.source ?? ""] ?? lead.source ?? "—"}
+                    {SOURCE_LABELS[lead.source ?? ""] ?? lead.source ?? "Not recorded"}
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
                     {lead.lastActivityDate ? (

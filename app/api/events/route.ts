@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
+import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
+import { writeAuditLog } from "@/lib/audit";
 
 export async function GET(request: NextRequest) {
   const lodgeSlug = getLodgeSlugFromRequest(request);
@@ -12,16 +15,27 @@ export async function GET(request: NextRequest) {
     if (!lodgeId) {
       return NextResponse.json([]);
     }
-    const events = await db.getEvents(lodgeId);
+    const events = await db.getEvents(lodgeId, { published: true });
     return NextResponse.json(events);
   }
 
-  const events = mockDb.getEvents({ lodge_slug: lodgeSlug });
+  const _rejectMock = rejectIfMockDisabled();
+  if (_rejectMock) return _rejectMock;
+
+  const events = mockDb
+    .getEvents({ lodge_slug: lodgeSlug })
+    .filter((event) => event.published);
   return NextResponse.json(events);
 }
 
 export async function POST(request: NextRequest) {
+  const _rejectMock = rejectIfMockDisabled();
+  if (_rejectMock) return _rejectMock;
+
   try {
+    const unauthorized = await requireAdminApiAuth();
+    if (unauthorized) return unauthorized;
+
     const lodgeSlug = getLodgeSlugFromRequest(request);
     const body = await request.json();
     const title = body.title?.trim();
@@ -46,8 +60,10 @@ export async function POST(request: NextRequest) {
       temple_room: body.temple_room?.trim() ?? null,
       dress_code: body.dress_code?.trim() ?? null,
       enable_rsvp: body.enable_rsvp !== false,
-      rsvp_deadline: null,
-      max_attendees: null,
+      rsvp_deadline: body.rsvp_deadline ? new Date(body.rsvp_deadline).toISOString() : null,
+      max_attendees: body.max_attendees != null && body.max_attendees !== ""
+        ? Number(body.max_attendees)
+        : null,
       enable_payments: body.enable_payments === true,
       enable_dining_rsvp: body.enable_dining_rsvp === true,
       dining_price: body.dining_price != null ? Number(body.dining_price) : null,
@@ -77,7 +93,16 @@ export async function POST(request: NextRequest) {
       if (!lodgeId) {
         return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
       }
+      const forbidden = await requireAdminApiPermission("meetings:write", lodgeId);
+      if (forbidden) return forbidden;
       const event = await db.addEvent(lodgeId, eventData);
+      await writeAuditLog({
+        lodgeId,
+        action: "created",
+        entityType: "meeting",
+        entityId: event.id,
+        summary: `Created meeting ${event.title}`,
+      });
       return NextResponse.json({ id: event.id, success: true });
     }
 

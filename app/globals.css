@@ -48,18 +48,22 @@
     --accent-violet: 247 84% 67%;
     --accent-rose: 346 77% 49%;
 
-    /* Admin-light dashboard (Figma-inspired); use with .admin-dashboard-light or dash-* utilities */
-    --dash-bg: 220 20% 97%;
+    /* LodgePay admin dashboard (flat white theme).
+       Brand: #0B43B8 primary, #082E7D dark, #3B6FE0 accent.
+       Surfaces: #FFFFFF surface, #F5F7FB background, #111827 text. */
+    --dash-bg: 220 30% 97%;
     --dash-surface: 0 0% 100%;
-    --dash-surface-subtle: 220 23% 98%;
-    --dash-border: 220 13% 90%;
-    --dash-border-strong: 220 14% 84%;
+    --dash-surface-subtle: 220 33% 98%;
+    --dash-border: 220 22% 92%;
+    --dash-border-strong: 220 20% 86%;
     --dash-text: 222 47% 11%;
     --dash-text-muted: 215 16% 42%;
     --dash-text-faint: 215 14% 52%;
-    --dash-ring: 221 83% 53%;
-    --dash-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 4px 12px rgb(15 23 42 / 0.06);
-    --dash-shadow-raised: 0 1px 2px rgb(15 23 42 / 0.06), 0 12px 28px rgb(15 23 42 / 0.08);
+    --dash-ring: 221 89% 38%;
+    --dash-ring-dark: 222 88% 26%;
+    --dash-ring-soft: 221 71% 56%;
+    --dash-shadow: 0 1px 2px rgb(8 46 125 / 0.04);
+    --dash-shadow-raised: 0 1px 2px rgb(8 46 125 / 0.05), 0 8px 20px rgb(8 46 125 / 0.06);
   }
 }
 
@@ -190,12 +194,20 @@
     @apply flex flex-col gap-4 border-b border-[hsl(var(--dash-border))] pb-6 md:flex-row md:items-end md:justify-between;
   }
 
+  .admin-action-row {
+    @apply flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end;
+  }
+
+  .admin-action-row > * {
+    @apply w-full sm:w-auto;
+  }
+
   .admin-page-title {
-    @apply text-3xl font-semibold tracking-tight text-[hsl(var(--dash-text))];
+    @apply text-2xl font-semibold tracking-tight text-[hsl(var(--dash-text))] sm:text-3xl;
   }
 
   .admin-page-copy {
-    @apply mt-1 text-sm text-[hsl(var(--dash-text-muted))];
+    @apply mt-1 max-w-3xl text-sm text-[hsl(var(--dash-text-muted))];
   }
 
   .admin-surface {
@@ -204,6 +216,15 @@
 
   .admin-table-shell {
     @apply overflow-hidden rounded-[1.25rem] border border-[hsl(var(--dash-border))] bg-[hsl(var(--dash-surface))] shadow-[var(--dash-shadow)];
+  }
+
+  .admin-table-scroll {
+    @apply w-full overflow-x-auto overscroll-x-contain;
+  }
+
+  .admin-table-scroll > table,
+  .admin-table-scroll table {
+    @apply min-w-[44rem];
   }
 
   .admin-table {
@@ -243,6 +264,10 @@
     @apply flex flex-col gap-1 border-b border-[hsl(var(--dash-border))] bg-[hsl(var(--dash-surface-subtle))] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4;
   }
 
+  .dash-panel-actions {
+    @apply flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end;
+  }
+
   .dash-panel-header-title {
     @apply text-base font-semibold tracking-tight text-[hsl(var(--dash-text))];
   }
@@ -253,6 +278,26 @@
 
   .dash-filter-bar {
     @apply flex flex-col gap-3 rounded-xl border border-[hsl(var(--dash-border))] bg-[hsl(var(--dash-surface))] p-4 shadow-sm sm:flex-row sm:flex-wrap sm:items-end sm:gap-3;
+  }
+
+  .admin-modal-backdrop {
+    @apply fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4;
+  }
+
+  .admin-modal-panel {
+    @apply max-h-[calc(100dvh-1rem)] w-full overflow-y-auto rounded-t-2xl bg-white p-4 shadow-2xl sm:max-h-[min(42rem,calc(100dvh-2rem))] sm:rounded-2xl sm:p-5;
+  }
+
+  .admin-modal-panel-sm {
+    @apply max-h-[calc(100dvh-1rem)] w-full overflow-y-auto rounded-t-2xl bg-white p-4 shadow-2xl sm:max-h-[min(42rem,calc(100dvh-2rem))] sm:max-w-md sm:rounded-2xl sm:p-5;
+  }
+
+  .admin-modal-panel-md {
+    @apply max-h-[calc(100dvh-1rem)] w-full overflow-y-auto rounded-t-2xl bg-white p-4 shadow-2xl sm:max-h-[min(42rem,calc(100dvh-2rem))] sm:max-w-lg sm:rounded-2xl sm:p-5;
+  }
+
+  .admin-golden-grid {
+    @apply grid gap-6 lg:grid-cols-[minmax(0,1.618fr)_minmax(18rem,1fr)];
   }
 
   .dash-ranking-item {

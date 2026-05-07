@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import * as db from "@/lib/db";
 
 export async function GET() {
   try {
@@ -15,137 +16,256 @@ export async function GET() {
     }
 
     const memberEmail = user.email;
-    const now = new Date().toISOString();
+    if (!memberEmail) {
+      return NextResponse.json({ error: "Member email missing" }, { status: 400 });
+    }
 
-    const [eventsResult, paymentsResult, donationsResult] = await Promise.allSettled([
-      supabase
-        .from("events")
-        .select("id")
-        .gte("date", now)
-        .limit(100),
-      supabase
-        .from("payments")
-        .select("*")
-        .eq("email", memberEmail)
-        .order("created_at", { ascending: false })
-        .limit(50),
-      supabase
-        .from("donations")
-        .select("*")
-        .eq("email", memberEmail)
-        .order("created_at", { ascending: false })
-        .limit(50),
+    const member =
+      (await db.getMemberByAuthUserId(user.id)) ??
+      (await db.getMemberByEmailAcrossLodges(memberEmail));
+
+    if (!member) {
+      return NextResponse.json({
+        user: {
+          full_name: user.user_metadata?.full_name ?? null,
+          email: user.email,
+        },
+        upcomingEvents: 0,
+        outstandingDues: 0,
+        recentPaymentsTotal: 0,
+        donationTotal: 0,
+        recentActivity: [],
+        dues: null,
+        payments: [],
+        donationData: {
+          totalThisYear: 0,
+          giftAidDeclared: false,
+          donations: [],
+        },
+      });
+    }
+
+    const [upcomingEventRows, allEvents, payments, donations, duesRecords, lodgeDues, rsvps, summonsLinks] = await Promise.all([
+      db.getEvents(member.lodge_id, { published: true, upcoming: true }),
+      db.getEvents(member.lodge_id, { published: true }),
+      db.getPaymentsByEmail(member.email, member.lodge_id),
+      db.getDonationsByEmail(member.email, member.lodge_id),
+      db.getMemberDues(member.lodge_id, { memberEmail: member.email }),
+      db.getLodgeDues(member.lodge_id),
+      db.getRsvpsByEmail(member.email, member.lodge_id),
+      db.getSummonsAccessLinksByEmail(member.email, member.lodge_id),
     ]);
 
-    const upcomingEvents =
-      eventsResult.status === "fulfilled" && eventsResult.value.data
-        ? eventsResult.value.data.length
-        : 0;
-
-    const payments =
-      paymentsResult.status === "fulfilled" && paymentsResult.value.data
-        ? paymentsResult.value.data
-        : [];
-
-    const donations =
-      donationsResult.status === "fulfilled" && donationsResult.value.data
-        ? donationsResult.value.data
-        : [];
+    const eventById = new Map(allEvents.map((event) => [event.id, event]));
+    const upcomingEvents = upcomingEventRows.length;
+    const rsvpsByEventId = new Map(rsvps.map((r) => [r.event_id, r]));
+    const sortedUpcoming = upcomingEventRows
+      .slice()
+      .sort(
+        (a, b) =>
+          new Date(a.event_date).getTime() - new Date(b.event_date).getTime()
+      );
+    const nextEvent = sortedUpcoming[0] ?? null;
+    const nextEventRsvp = nextEvent ? rsvpsByEventId.get(nextEvent.id) : null;
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const recentPaymentsTotal = payments
       .filter(
-        (p: { created_at?: string; amount?: number }) =>
+        (p) =>
           p.created_at && new Date(p.created_at) >= thirtyDaysAgo
       )
-      .reduce((sum: number, p: { amount?: number }) => sum + (p.amount ?? 0), 0);
+      .reduce((sum, p) => sum + (p.total_amount ?? 0), 0);
 
     const currentYear = new Date().getFullYear();
     const donationTotal = donations
       .filter(
-        (d: { created_at?: string }) =>
+        (d) =>
           d.created_at && new Date(d.created_at).getFullYear() === currentYear
       )
-      .reduce((sum: number, d: { amount?: number }) => sum + (d.amount ?? 0), 0);
+      .reduce((sum, d) => sum + (d.amount ?? 0), 0);
 
-    const outstandingDues = 0;
+    const unpaidDues = duesRecords.filter((d) => d.status !== "paid");
+    const paidDues = duesRecords.filter((d) => d.status === "paid");
+    const outstandingDues = unpaidDues.reduce((sum, d) => sum + (d.amount ?? 0), 0);
+    const currentDues = unpaidDues[0] ?? duesRecords[0] ?? null;
+    const duesConfig = lodgeDues[0] ?? null;
+    const paidAmount = paidDues.reduce((sum, d) => sum + (d.amount ?? 0), 0);
 
     type ActivityItem = {
       id: string;
-      type: "payment" | "donation";
+      type: "payment" | "event" | "donation";
       description: string;
       date: string;
       amount?: number;
+      sortDate: string;
     };
+
+    function formatDate(value: string | null): string {
+      return value
+        ? new Date(value).toLocaleDateString("en-GB", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          })
+        : "Unknown";
+    }
 
     const recentActivity: ActivityItem[] = [];
 
-    payments.slice(0, 3).forEach((p: { id?: string; description?: string; created_at?: string; amount?: number }) => {
+    payments.slice(0, 3).forEach((p) => {
       recentActivity.push({
-        id: p.id ?? crypto.randomUUID(),
+        id: p.id,
         type: "payment",
-        description: p.description ?? "Payment",
-        date: p.created_at
-          ? new Date(p.created_at).toLocaleDateString("en-GB", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            })
-          : "Unknown",
-        amount: p.amount,
+        description: p.event_id ? "Event payment" : "Payment",
+        date: formatDate(p.created_at),
+        amount: p.total_amount,
+        sortDate: p.created_at,
       });
     });
 
-    donations.slice(0, 3).forEach((d: { id?: string; fund?: string; created_at?: string; amount?: number }) => {
+    donations.slice(0, 3).forEach((d) => {
       recentActivity.push({
-        id: d.id ?? crypto.randomUUID(),
+        id: d.id,
         type: "donation",
-        description: `Donation to ${d.fund ?? "General Fund"}`,
-        date: d.created_at
-          ? new Date(d.created_at).toLocaleDateString("en-GB", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            })
-          : "Unknown",
+        description: "Donation",
+        date: formatDate(d.created_at),
         amount: d.amount,
+        sortDate: d.created_at,
+      });
+    });
+
+    rsvps.slice(0, 3).forEach((rsvp) => {
+      const event = eventById.get(rsvp.event_id);
+      recentActivity.push({
+        id: rsvp.id,
+        type: "event",
+        description: `RSVP ${rsvp.status} for ${event?.title ?? "meeting"}`,
+        date: formatDate(rsvp.created_at),
+        sortDate: rsvp.created_at,
       });
     });
 
     recentActivity.sort((a, b) => {
-      const da = new Date(a.date).getTime() || 0;
-      const db = new Date(b.date).getTime() || 0;
+      const da = new Date(a.sortDate).getTime() || 0;
+      const db = new Date(b.sortDate).getTime() || 0;
       return db - da;
     });
 
     return NextResponse.json({
       user: {
-        full_name: user.user_metadata?.full_name ?? null,
-        email: user.email,
+        full_name: member.full_name,
+        email: member.email,
+        phone: member.phone,
+        dietary_requirements: member.dietary_requirements,
+        rank: member.rank,
+        membership_status: member.membership_status,
+        portal_token: member.portal_token,
       },
+      nextEvent: nextEvent
+        ? {
+            id: nextEvent.id,
+            title: nextEvent.title,
+            slug: nextEvent.slug,
+            event_date: nextEvent.event_date,
+            event_time: nextEvent.event_time,
+            location: nextEvent.location,
+            dress_code: nextEvent.dress_code,
+            enable_rsvp: nextEvent.enable_rsvp,
+            enable_dining_rsvp: nextEvent.enable_dining_rsvp,
+            dining_price: nextEvent.dining_price,
+            current_rsvp: nextEventRsvp
+              ? {
+                  id: nextEventRsvp.id,
+                  status: nextEventRsvp.status,
+                  attending_ceremony: nextEventRsvp.attending_ceremony,
+                  attending_dining: nextEventRsvp.attending_dining,
+                }
+              : null,
+          }
+        : null,
       upcomingEvents,
       outstandingDues,
       recentPaymentsTotal,
       donationTotal,
-      recentActivity: recentActivity.slice(0, 5),
-      payments: payments.map((p: { id?: string; created_at?: string; description?: string; amount?: number; status?: string; type?: string }) => ({
+      recentActivity: recentActivity.slice(0, 5).map((item) => ({
+        id: item.id,
+        type: item.type,
+        description: item.description,
+        date: item.date,
+        amount: item.amount,
+      })),
+      summonsLinks: summonsLinks.slice(0, 6).map((link) => {
+        const event = eventById.get(link.event_id);
+        return {
+          id: link.id,
+          eventId: link.event_id,
+          title: event?.title ?? "Meeting summons",
+          eventDate: event?.event_date ?? null,
+          sentAt: link.created_at,
+          accessedAt: link.accessed_at,
+          accessCount: link.access_count,
+        };
+      }),
+      rsvps: rsvps.slice(0, 8).map((rsvp) => {
+        const event = eventById.get(rsvp.event_id);
+        return {
+          id: rsvp.id,
+          eventId: rsvp.event_id,
+          eventTitle: event?.title ?? "Meeting",
+          eventDate: event?.event_date ?? null,
+          status: rsvp.status,
+          attendingDining: rsvp.attending_dining,
+          guests: rsvp.number_of_guests,
+          dietary: rsvp.dietary_requirements,
+          paymentRequired: rsvp.payment_required,
+          paymentCompleted: rsvp.payment_completed,
+        };
+      }),
+      notices: upcomingEventRows.slice(0, 4).map((event) => ({
+        id: event.id,
+        title: event.title,
+        date: event.event_date,
+        text: event.description ?? "Upcoming lodge meeting.",
+      })),
+      dues: currentDues
+        ? {
+            annualAmount: currentDues.amount,
+            status: currentDues.status,
+            paidAmount: currentDues.status === "paid" ? currentDues.amount : paidAmount,
+            dueDate: currentDues.period_end,
+            duesId: currentDues.id,
+            memberEmail: currentDues.member_email,
+            memberName: currentDues.member_name ?? member.full_name,
+            allowInstalments: duesConfig?.allow_instalments ?? false,
+            instalmentCount: duesConfig?.instalment_count ?? 12,
+            instalmentFrequency: duesConfig?.instalment_frequency ?? "monthly",
+            history: paidDues.map((d) => ({
+              id: d.id,
+              date: d.paid_at ?? d.updated_at,
+              amount: d.amount,
+              period: `${d.period_start} to ${d.period_end}`,
+              method: d.stripe_subscription_id ? "Instalment" : "Card",
+            })),
+          }
+        : null,
+      payments: payments.map((p) => ({
         id: p.id,
         date: p.created_at,
-        description: p.description ?? "Payment",
-        amount: p.amount ?? 0,
+        description: p.event_id ? "Event payment" : "Payment",
+        amount: p.total_amount ?? 0,
         status: p.status ?? "completed",
-        type: p.type ?? "event",
+        type: "event",
       })),
       donationData: {
         totalThisYear: donationTotal,
         giftAidDeclared: false,
-        donations: donations.map((d: { id?: string; created_at?: string; amount?: number; fund?: string }) => ({
+        donations: donations.map((d) => ({
           id: d.id,
           date: d.created_at,
           amount: d.amount ?? 0,
-          fund: d.fund ?? "General Fund",
+          fund: d.source ?? "General Fund",
           giftAid: false,
         })),
       },

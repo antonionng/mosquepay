@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 
 export const DEFAULT_LODGE_SLUG = "covenant-4344";
+export const ADMIN_LODGE_COOKIE = "covenant_admin_lodge_slug";
 const TENANT_HEADER = "x-lodge-slug";
 const RESERVED_SUBDOMAINS = new Set(["www", "app", "admin", "api", "localhost"]);
 
@@ -44,6 +45,10 @@ export function getLodgeSlugFromRequest(request: NextRequest): string {
   const hostSlug = getLodgeSlugFromHost(request.headers.get("host"));
   if (hostSlug) return hostSlug;
 
+  const adminCookieSlug = normalizeSlug(request.cookies.get(ADMIN_LODGE_COOKIE)?.value);
+  if (adminCookieSlug) return adminCookieSlug;
+
   return DEFAULT_LODGE_SLUG;
 }
+
 

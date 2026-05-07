@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
+import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { sendWebsiteNotification } from "@/lib/email/website-notifications";
 
 const leadSchema = {
   first_name: (v: unknown) => typeof v === "string" && v.trim().length > 0,
@@ -15,6 +17,9 @@ const leadSchema = {
 };
 
 export async function POST(request: NextRequest) {
+  const _rejectMock = rejectIfMockDisabled();
+  if (_rejectMock) return _rejectMock;
+
   try {
     const lodgeSlug = getLodgeSlugFromRequest(request);
     const body = await request.json();
@@ -38,11 +43,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (isSupabaseConfigured()) {
-      const lodgeId = await db.resolveLodgeId(lodgeSlug);
-      if (!lodgeId) {
+      const lodge = await db.getLodgeBySlug(lodgeSlug);
+      if (!lodge) {
         return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
       }
-      const lead = await db.addLead(lodgeId, {
+      const lead = await db.addLead(lodge.id, {
         first_name: first_name!,
         last_name: last_name!,
         email: email!,
@@ -53,10 +58,42 @@ export async function POST(request: NextRequest) {
         initial_message: message,
         stage: "expression_of_interest",
         assigned_to: null,
+        proposer_member_id: null,
+        proposer_name: null,
+        seconder_member_id: null,
+        seconder_name: null,
+        next_step: null,
+        next_step_due_date: null,
+        proposal_date: null,
+        ballot_date: null,
+        interview_completed_at: null,
+        consent_given_at: null,
+        notes: null,
+        converted_member_id: null,
+        converted_at: null,
+      });
+      await sendWebsiteNotification({
+        lodge,
+        replyTo: email,
+        subject: `[Lead intake] ${first_name} ${last_name}`,
+        eyebrow: "Lead intake",
+        title: "New membership lead",
+        preview: `New lead from ${first_name} ${last_name}.`,
+        intro: "A prospective member has submitted the lodge website lead intake form.",
+        rows: [
+          { label: "Name", value: `${first_name} ${last_name}` },
+          { label: "Email", value: email },
+          { label: "Phone", value: phone },
+          { label: "Location", value: location },
+          { label: "How heard", value: how_heard },
+          { label: "CRM lead ID", value: lead.id },
+        ],
+        message,
       });
       return NextResponse.json({ id: lead.id, success: true });
     }
 
+    const lodge = mockDb.getLodgeBySlug(lodgeSlug);
     const lead = mockDb.addLead({
       lodge_slug: lodgeSlug,
       first_name: first_name!,
@@ -69,6 +106,25 @@ export async function POST(request: NextRequest) {
       initial_message: message,
       stage: "expression_of_interest",
       assigned_to: null,
+    });
+
+    await sendWebsiteNotification({
+      lodge,
+      replyTo: email,
+      subject: `[Lead intake] ${first_name} ${last_name}`,
+      eyebrow: "Lead intake",
+      title: "New membership lead",
+      preview: `New lead from ${first_name} ${last_name}.`,
+      intro: "A prospective member has submitted the lodge website lead intake form.",
+      rows: [
+        { label: "Name", value: `${first_name} ${last_name}` },
+        { label: "Email", value: email },
+        { label: "Phone", value: phone },
+        { label: "Location", value: location },
+        { label: "How heard", value: how_heard },
+        { label: "CRM lead ID", value: lead.id },
+      ],
+      message,
     });
 
     return NextResponse.json({ id: lead.id, success: true });

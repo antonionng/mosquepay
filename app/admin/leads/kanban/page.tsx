@@ -5,7 +5,8 @@ import { LeadsKanban } from "@/components/crm/leads-kanban";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
-import { List } from "lucide-react";
+import { List, Plus } from "lucide-react";
+import { getLeadPrompt } from "@/lib/leads/next-action";
 
 const STAGES = [
   "expression_of_interest",
@@ -58,6 +59,16 @@ export default async function LeadsKanbanPage() {
       (NOW_TS - new Date(l.stage_changed_at).getTime()) / 86400000
     );
 
+    const prompt = getLeadPrompt({
+      stage: l.stage,
+      daysSinceActivity,
+      daysInStage,
+      hasActivity: Boolean(lastActivity),
+      next_step: l.next_step ?? null,
+      next_step_due_date: l.next_step_due_date ?? null,
+      converted_at: l.converted_at ?? null,
+    });
+
     return {
       id: l.id,
       first_name: l.first_name,
@@ -68,6 +79,10 @@ export default async function LeadsKanbanPage() {
       daysInStage,
       daysSinceActivity,
       lastActivityType: lastActivity?.activity_type ?? null,
+      converted_at: l.converted_at ?? null,
+      promptLabel: prompt.label,
+      promptReason: prompt.reason,
+      promptSeverity: prompt.severity,
     };
   }));
 
@@ -80,12 +95,20 @@ export default async function LeadsKanbanPage() {
             Drag candidates between stages to update their progression.
           </p>
         </div>
-        <Button asChild variant="secondary" size="sm">
-          <Link href="/admin/leads" className="flex items-center gap-2">
-            <List className="h-4 w-4" />
-            List View
-          </Link>
-        </Button>
+        <div className="admin-action-row">
+          <Button asChild variant="outline" size="sm">
+            <Link href="/admin/leads" className="flex items-center gap-2">
+              <List className="h-4 w-4" />
+              List View
+            </Link>
+          </Button>
+          <Button asChild variant="dashboard" size="sm">
+            <Link href="/admin/leads/new" className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              New lead
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <Card variant="panel" className="overflow-hidden p-0">

@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
+import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { resolveLodgeSlug } from "@/lib/tenant";
 import Stripe from "stripe";
 
 export async function POST(request: NextRequest) {
+  const _rejectMock = rejectIfMockDisabled();
+  if (_rejectMock) return _rejectMock;
+
   const stripeSecret = process.env.STRIPE_SECRET_KEY;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!stripeSecret || !webhookSecret) {
@@ -319,10 +323,10 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 
   if (!subscriptionId) return;
 
-  const metadata = (invoice as Record<string, unknown>).subscription_details as
-    | { metadata?: Record<string, string> }
-    | undefined;
-  const subMeta = metadata?.metadata;
+  const subscriptionDetails = (invoice as unknown as {
+    subscription_details?: { metadata?: Record<string, string> };
+  }).subscription_details;
+  const subMeta = subscriptionDetails?.metadata;
 
   if (subMeta?.type !== "dues_subscription") return;
 

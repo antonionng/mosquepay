@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import { getLodgeSlugFromRequest, getDefaultLodgeSlug } from "@/lib/tenant";
+import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 
 export async function GET(request: NextRequest) {
   try {
+    const unauthorized = await requireAdminApiAuth();
+    if (unauthorized) return unauthorized;
+
     if (!isSupabaseConfigured()) {
       return NextResponse.json({ donations: [] });
     }
@@ -14,6 +18,8 @@ export async function GET(request: NextRequest) {
     if (!lodgeId) {
       return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
     }
+    const forbidden = await requireAdminApiPermission("charity:write", lodgeId);
+    if (forbidden) return forbidden;
 
     const donations = await db.getDonations(lodgeId);
     return NextResponse.json({ donations });

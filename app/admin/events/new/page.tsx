@@ -7,11 +7,11 @@ export default function NewEventPage() {
     <div>
       <div className="mb-8">
         <Button asChild variant="secondary" size="sm">
-          <Link href="/admin/events">Back to events</Link>
+          <Link href="/admin/meetings">Back to meetings</Link>
         </Button>
       </div>
-      <h1 className="mb-2 text-3xl font-semibold tracking-tight text-dash-text">New event</h1>
-      <p className="mb-8 text-dash-muted">Create a new lodge event.</p>
+      <h1 className="mb-2 text-3xl font-semibold tracking-tight text-dash-text">New calendar item</h1>
+      <p className="mb-8 text-dash-muted">Create a new lodge meeting or public calendar item.</p>
       <EventForm />
     </div>
   );

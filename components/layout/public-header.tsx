@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
-import { Menu, X, Facebook, Instagram, Linkedin, Twitter } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { resolveLodgeSlug } from "@/lib/tenant";
@@ -20,7 +21,7 @@ const marketingNavLinks = [
   { href: "/product", label: "Product" },
   { href: "/features", label: "Features" },
   { href: "/pricing", label: "Pricing" },
-  { href: "/case-studies", label: "Case Studies" },
+  { href: "/contact", label: "Contact" },
 ];
 
 type LodgeBranding = {
@@ -28,9 +29,6 @@ type LodgeBranding = {
   city: string | null;
   tagline: string | null;
 };
-
-const FIGMA_LOGO_UNION_A = "https://www.figma.com/api/mcp/asset/ef598919-60f8-44ed-b2d2-0b9728871181";
-const FIGMA_LOGO_UNION_B = "https://www.figma.com/api/mcp/asset/cd781fc9-aac4-47a8-b5e9-e39fe0614889";
 
 function initialsFromName(name: string) {
   const words = name.split(" ").filter(Boolean);
@@ -40,15 +38,6 @@ function initialsFromName(name: string) {
     .map((word) => word.charAt(0))
     .join("")
     .toUpperCase();
-}
-
-function LodgePayFigmaMark({ className = "" }: { className?: string }) {
-  return (
-    <div className={`relative h-7 w-8 ${className}`} aria-hidden="true">
-      <img src={FIGMA_LOGO_UNION_A} alt="" className="absolute bottom-0 left-0 h-6 w-5 object-contain" />
-      <img src={FIGMA_LOGO_UNION_B} alt="" className="absolute right-0 top-0 h-6 w-5 object-contain" />
-    </div>
-  );
 }
 
 export function PublicHeader() {
@@ -100,6 +89,94 @@ export function PublicHeader() {
 
   const solidHeader = scrolled || !isHome;
 
+  if (!isTenantMode) {
+    return (
+      <header className="sticky top-0 z-50 border-b border-dash-border bg-dash-surface/95 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-6 px-5 lg:h-[4.25rem] lg:px-8">
+          <Link href="/" className="flex shrink-0 items-center gap-3">
+            <Image
+              src="/brand/lodgepay-sidebar-logo.png"
+              alt="LodgePay"
+              width={1032}
+              height={245}
+              className="h-9 w-auto max-w-[11.5rem] object-contain lg:h-10"
+              priority
+            />
+          </Link>
+
+          <nav className="hidden items-center gap-8 md:flex" aria-label="Primary">
+            {marketingNavLinks.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="text-sm font-medium text-dash-muted transition-colors hover:text-dash-text"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+
+          <div className="hidden items-center gap-3 md:flex">
+            <Link
+              href="/book-demo"
+              className="rounded-lg border border-dash-border-strong bg-dash-surface px-4 py-2.5 text-sm font-semibold text-dash-text shadow-sm transition-colors hover:border-dash-text/20 hover:bg-dash-surface-subtle"
+            >
+              Book a demo
+            </Link>
+            <Link
+              href="/admin/login"
+              className="rounded-lg bg-dash-ring px-4 py-2.5 text-sm font-semibold text-white shadow-dash transition-colors hover:bg-dash-ring-dark"
+            >
+              Login
+            </Link>
+          </div>
+
+          <button
+            type="button"
+            className="rounded-md border border-dash-border bg-dash-surface px-3 py-2 text-xs font-semibold uppercase tracking-wide text-dash-text md:hidden"
+            aria-expanded={mobileOpen}
+            onClick={() => setMobileOpen(!mobileOpen)}
+          >
+            {mobileOpen ? "Close" : "Menu"}
+          </button>
+        </div>
+
+        {mobileOpen && (
+          <div className="border-t border-dash-border bg-dash-surface px-5 py-4 md:hidden">
+            <nav className="flex flex-col gap-1" aria-label="Mobile">
+              {marketingNavLinks.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="rounded-md px-3 py-2.5 text-sm font-medium text-dash-text hover:bg-dash-surface-subtle"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  {item.label}
+                </Link>
+              ))}
+              <div className="mt-3 flex flex-col gap-2 border-t border-dash-border pt-4">
+                <Link
+                  href="/book-demo"
+                  className="rounded-lg border border-dash-border px-3 py-2.5 text-center text-sm font-semibold"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  Book a demo
+                </Link>
+                <Link
+                  href="/admin/login"
+                  className="rounded-lg bg-dash-ring py-2.5 text-center text-sm font-semibold text-white"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  Login
+                </Link>
+              </div>
+            </nav>
+          </div>
+        )}
+      </header>
+    );
+  }
+
   return (
     <header
       className={cn(
@@ -108,28 +185,15 @@ export function PublicHeader() {
           ? solidHeader
             ? "border-b border-slate-200 bg-white/90 backdrop-blur-xl"
             : "bg-transparent"
-          : "border-b border-slate-200 bg-white"
+          : "border-b border-dash-border bg-dash-surface/95 backdrop-blur-md"
       )}
     >
-      {!isTenantMode ? (
-        <div className="hidden border-b border-slate-200 bg-white lg:block">
-          <div className="container-full flex h-10 items-center justify-between text-xs text-slate-600">
-            <div className="flex items-center gap-3">
-              <span>Phone: +44 20 7946 0987</span>
-              <span className="text-slate-300">|</span>
-              <span>Email: team@lodgepay.co.uk</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <Facebook className="h-3.5 w-3.5" />
-              <Instagram className="h-3.5 w-3.5" />
-              <Twitter className="h-3.5 w-3.5" />
-              <Linkedin className="h-3.5 w-3.5" />
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="container-full flex h-18 items-center justify-between py-3 lg:h-20">
+      <div
+        className={cn(
+          "flex h-16 items-center justify-between py-3 lg:h-[4.25rem]",
+          isTenantMode ? "container-full" : "mx-auto max-w-6xl px-5 lg:px-8"
+        )}
+      >
         <Link href={withTenantQuery("/")} className="flex items-center gap-3">
           {isTenantMode ? (
             <>
@@ -163,10 +227,14 @@ export function PublicHeader() {
               </div>
             </>
           ) : (
-            <div className="flex items-center gap-2">
-              <LodgePayFigmaMark />
-              <span className="text-lg font-semibold tracking-tight text-slate-950">LodgePay</span>
-            </div>
+            <Image
+              src="/brand/lodgepay-sidebar-logo.png"
+              alt="LodgePay"
+              width={1032}
+              height={245}
+              className="h-9 w-auto max-w-[11.5rem] object-contain lg:h-10"
+              priority
+            />
           )}
         </Link>
 
@@ -179,13 +247,13 @@ export function PublicHeader() {
                 "rounded-full px-4 py-2 text-sm font-medium transition-colors",
                 isTenantMode && !solidHeader
                   ? "text-slate-200 hover:bg-white/10 hover:text-white"
-                  : "text-slate-700 hover:bg-slate-100 hover:text-slate-950"
+                  : "text-dash-muted hover:bg-dash-surface-subtle hover:text-dash-text"
               )}
             >
               {link.label}
             </Link>
           ))}
-          <div className="ml-4 border-l pl-4 border-slate-200/20">
+          <div className="ml-4 flex items-center gap-3 border-l border-dash-border pl-4">
             <Button
               asChild
               size="sm"
@@ -193,13 +261,22 @@ export function PublicHeader() {
               className={cn(
                 isTenantMode && !solidHeader
                   ? "border-white/10 bg-white text-slate-950 hover:bg-slate-100"
-                  : "bg-slate-950 text-white hover:bg-slate-800"
+                  : "bg-dash-ring text-white hover:bg-dash-ring-dark"
               )}
             >
               <Link href={withTenantQuery(isTenantMode ? "/join" : "/book-demo")}>
-                {isTenantMode ? "Join Us" : "Book Demo"}
+                {isTenantMode ? "Join Us" : "Book a demo"}
               </Link>
             </Button>
+            {!isTenantMode ? (
+              <Button
+                asChild
+                size="sm"
+                className="bg-dash-ring text-white hover:bg-dash-ring-dark"
+              >
+                <Link href="/admin/login">Login</Link>
+              </Button>
+            ) : null}
           </div>
         </nav>
 
@@ -208,7 +285,7 @@ export function PublicHeader() {
             "rounded-xl p-2 transition-colors lg:hidden",
             isTenantMode && !solidHeader
               ? "text-white hover:bg-white/10"
-              : "text-slate-700 hover:bg-slate-100"
+              : "text-dash-muted hover:bg-dash-surface-subtle"
           )}
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label={mobileOpen ? "Close menu" : "Open menu"}
@@ -219,36 +296,53 @@ export function PublicHeader() {
 
       <div
         className={cn(
-          "fixed inset-x-0 top-[72px] overflow-hidden border-b border-slate-200 bg-white transition-all duration-300 lg:hidden",
+          "fixed inset-x-0 top-16 overflow-hidden border-b border-dash-border bg-dash-surface transition-all duration-300 lg:hidden",
           mobileOpen ? "max-h-[420px] opacity-100" : "max-h-0 opacity-0"
         )}
       >
-        <nav className="container-full flex flex-col gap-1 py-4">
+        <nav
+          className={cn(
+            "flex flex-col gap-1 py-4",
+            isTenantMode ? "container-full" : "mx-auto max-w-6xl px-5 lg:px-8"
+          )}
+        >
           {!isTenantMode ? (
-            <div className="mb-2 flex items-center gap-2 px-3 py-2 text-sm font-semibold text-slate-900">
-              <LodgePayFigmaMark />
-              <span>LodgePay</span>
+            <div className="mb-2 flex items-center gap-2 px-3 py-2">
+              <Image
+                src="/brand/lodgepay-sidebar-logo.png"
+                alt="LodgePay"
+                width={1032}
+                height={245}
+                className="h-8 w-auto max-w-[10rem] object-contain"
+              />
             </div>
           ) : null}
           {navLinks.map((link) => (
             <Link
               key={link.href}
               href={withTenantQuery(link.href)}
-              className="rounded-xl px-3 py-3 text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-950"
+              className="rounded-xl px-3 py-3 text-dash-muted transition-colors hover:bg-dash-surface-subtle hover:text-dash-text"
               onClick={() => setMobileOpen(false)}
             >
               {link.label}
             </Link>
           ))}
-          <div className="mt-3 border-t border-slate-200 pt-4">
+          <div className="mt-3 border-t border-dash-border pt-4">
             <Button asChild className="w-full" variant="primary">
               <Link
                 href={withTenantQuery(isTenantMode ? "/join" : "/book-demo")}
                 onClick={() => setMobileOpen(false)}
               >
-                {isTenantMode ? "Join Us" : "Book Demo"}
+                {isTenantMode ? "Join Us" : "Book a demo"}
               </Link>
             </Button>
+            {!isTenantMode ? (
+              <Button asChild className="mt-2 w-full bg-dash-ring text-white hover:bg-dash-ring-dark">
+                <Link href="/admin/login" onClick={() => setMobileOpen(false)}>
+                  Login
+                </Link>
+              </Button>
+            ) : null}
           </div>
         </nav>
       </div>

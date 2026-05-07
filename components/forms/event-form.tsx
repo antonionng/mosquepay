@@ -105,7 +105,7 @@ export function EventForm({ eventId, defaultValues }: { eventId?: string; defaul
         throw new Error(body.error ?? "Failed to save event");
       }
       const result = await res.json().catch(() => ({}));
-      router.push(result.id ? `/admin/events/${result.id}` : "/admin/events");
+      router.push(result.id ? `/admin/events/${result.id}` : "/admin/meetings");
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");

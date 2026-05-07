@@ -1,21 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import {
-  Sparkles,
-  ChevronDown,
-  ChevronRight,
   Save,
-  Check,
   X,
-  Palette,
-  ExternalLink,
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -23,8 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PuckEditor } from "@/components/site-builder/puck-editor";
-import type { LodgeSiteSection } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -40,59 +31,25 @@ type Lodge = {
   support_email: string | null;
   support_phone: string | null;
   logo_url: string | null;
+  lodge_number: string | null;
+  consecrated_at: string | null;
+  governing_body: string | null;
+  meeting_schedule: string | null;
+  secretary_name: string | null;
+  secretary_address: string | null;
+  secretary_phone: string | null;
+  data_protection_notice: string | null;
+  visiting_notice: string | null;
+  loi_contact: string | null;
   primary_color: string | null;
   secondary_color: string | null;
   is_active: boolean;
 };
 
-type SiteSection = LodgeSiteSection;
-
-type LodgeSite = {
-  page_title: string;
-  page_description: string | null;
-  sections: SiteSection[];
+type AdminLodgeContext = {
+  selectedSlug: string;
+  lodges: Lodge[];
 };
-
-
-// ---------------------------------------------------------------------------
-// Color Swatch Input
-// ---------------------------------------------------------------------------
-
-function ColorInput({
-  value,
-  onChange,
-  label,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  label: string;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <label className="text-xs font-medium text-dash-muted">{label}</label>
-      <div className="flex items-center gap-2">
-        <div className="relative">
-          <div
-            className="h-9 w-9 rounded-lg border border-dash-border shadow-inner"
-            style={{ backgroundColor: value || "#3b82f6" }}
-          />
-          <input
-            type="color"
-            value={value || "#3b82f6"}
-            onChange={(e) => onChange(e.target.value)}
-            className="absolute inset-0 cursor-pointer opacity-0"
-          />
-        </div>
-        <Input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="#3b82f6"
-          className="h-9 border-dash-border bg-dash-surface text-sm text-dash-text placeholder:text-dash-faint focus-visible:border-blue-500/50 focus-visible:ring-blue-500/20"
-        />
-      </div>
-    </div>
-  );
-}
 
 
 // ---------------------------------------------------------------------------
@@ -103,12 +60,10 @@ export function LodgePlatformSettings() {
   const [lodges, setLodges] = useState<Lodge[]>([]);
   const [selectedSlug, setSelectedSlug] = useState<string>("");
   const [lodgeForm, setLodgeForm] = useState<Partial<Lodge>>({});
-  const [site, setSite] = useState<LodgeSite | null>(null);
   const [status, setStatus] = useState<string>("");
   const [statusType, setStatusType] = useState<"info" | "error" | "success">("info");
   const [loading, setLoading] = useState(true);
   const [savingLodge, setSavingLodge] = useState(false);
-  const [showTheme, setShowTheme] = useState(false);
 
   const selectedLodge = useMemo(
     () => lodges.find((lodge) => lodge.slug === selectedSlug) ?? null,
@@ -123,18 +78,36 @@ export function LodgePlatformSettings() {
     []
   );
 
+  const syncAdminLodgeContext = useCallback(async (lodgeSlug: string) => {
+    await fetch("/api/admin/lodge-context", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lodge_slug: lodgeSlug }),
+    });
+  }, []);
+
   useEffect(() => {
     async function loadLodges() {
       setLoading(true);
       flash("");
       try {
-        const res = await fetch("/api/lodges");
+        const res = await fetch("/api/admin/lodge-context");
         if (!res.ok) throw new Error("Failed to load lodges");
-        const data = (await res.json()) as Lodge[];
-        setLodges(data);
-        if (data[0]) {
-          setSelectedSlug(data[0].slug);
-          setLodgeForm(data[0]);
+        const data = (await res.json()) as AdminLodgeContext;
+        const requestedSlug = new URLSearchParams(window.location.search).get("lodge");
+        const requestedLodge = requestedSlug
+          ? data.lodges.find((lodge) => lodge.slug === requestedSlug)
+          : null;
+        const selected = requestedLodge?.slug ?? data.selectedSlug;
+        setLodges(data.lodges);
+        if (selected) {
+          const lodge =
+            data.lodges.find((item) => item.slug === selected) ?? data.lodges[0];
+          setSelectedSlug(lodge.slug);
+          setLodgeForm(lodge);
+          if (requestedLodge && requestedLodge.slug !== data.selectedSlug) {
+            await syncAdminLodgeContext(requestedLodge.slug);
+          }
         }
       } catch {
         flash("Could not load lodges.", "error");
@@ -143,26 +116,13 @@ export function LodgePlatformSettings() {
       }
     }
     loadLodges();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [flash, syncAdminLodgeContext]);
 
   useEffect(() => {
     if (!selectedSlug) return;
     const lodge = lodges.find((item) => item.slug === selectedSlug);
     if (lodge) setLodgeForm(lodge);
-
-    async function loadSite() {
-      flash("");
-      try {
-        const res = await fetch(`/api/lodges/${selectedSlug}/site`);
-        if (!res.ok) throw new Error("Failed to load lodge site");
-        const data = await res.json();
-        setSite(data.site as LodgeSite);
-      } catch {
-        flash("Could not load lodge website settings.", "error");
-      }
-    }
-    loadSite();
-  }, [selectedSlug, lodges]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedSlug, lodges]);
 
   async function saveLodge() {
     if (!selectedSlug || !lodgeForm.name?.trim()) {
@@ -181,6 +141,16 @@ export function LodgePlatformSettings() {
         support_email: lodgeForm.support_email?.trim() || null,
         support_phone: lodgeForm.support_phone?.trim() || null,
         logo_url: lodgeForm.logo_url?.trim() || null,
+        lodge_number: lodgeForm.lodge_number?.trim() || null,
+        consecrated_at: lodgeForm.consecrated_at?.trim() || null,
+        governing_body: lodgeForm.governing_body?.trim() || null,
+        meeting_schedule: lodgeForm.meeting_schedule?.trim() || null,
+        secretary_name: lodgeForm.secretary_name?.trim() || null,
+        secretary_address: lodgeForm.secretary_address?.trim() || null,
+        secretary_phone: lodgeForm.secretary_phone?.trim() || null,
+        data_protection_notice: lodgeForm.data_protection_notice?.trim() || null,
+        visiting_notice: lodgeForm.visiting_notice?.trim() || null,
+        loi_contact: lodgeForm.loi_contact?.trim() || null,
         primary_color: lodgeForm.primary_color?.trim() || null,
         secondary_color: lodgeForm.secondary_color?.trim() || null,
         is_active: lodgeForm.is_active !== false,
@@ -207,11 +177,10 @@ export function LodgePlatformSettings() {
 
   return (
     <div className="space-y-8">
-      {/* Lodge Profile */}
       <div className="admin-surface p-6">
         <h2 className="text-lg font-semibold text-dash-text">Lodge Profile</h2>
         <p className="mt-1 text-sm text-dash-muted">
-          Manage lodge identity, contact details, and brand settings.
+          Manage lodge identity, contact details, and formal summons information.
         </p>
 
         {loading ? (
@@ -227,9 +196,10 @@ export function LodgePlatformSettings() {
               </label>
               <Select
                 value={selectedSlug}
-                onValueChange={(value) => {
+                onValueChange={async (value) => {
                   setSelectedSlug(value);
                   flash("");
+                  await syncAdminLodgeContext(value);
                 }}
               >
                 <SelectTrigger className="border-dash-border bg-dash-surface text-dash-text">
@@ -308,54 +278,97 @@ export function LodgePlatformSettings() {
               />
             </div>
 
-            {/* Theme controls */}
-            <div>
-              <button
-                onClick={() => setShowTheme((v) => !v)}
-                className="flex items-center gap-2 text-sm font-medium text-dash-text transition-colors hover:text-dash-ring"
-              >
-                <Palette className="h-4 w-4 text-blue-600" />
-                Brand Colors
-                {showTheme ? (
-                  <ChevronDown className="h-3.5 w-3.5" />
-                ) : (
-                  <ChevronRight className="h-3.5 w-3.5" />
-                )}
-              </button>
-              <AnimatePresence>
-                {showTheme && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="mt-3 grid gap-4 rounded-xl border border-dash-border bg-dash-surface-subtle p-4 sm:grid-cols-2">
-                      <ColorInput
-                        label="Primary Color"
-                        value={lodgeForm.primary_color ?? ""}
-                        onChange={(v) =>
-                          setLodgeForm((prev) => ({
-                            ...prev,
-                            primary_color: v,
-                          }))
-                        }
-                      />
-                      <ColorInput
-                        label="Secondary Color"
-                        value={lodgeForm.secondary_color ?? ""}
-                        onChange={(v) =>
-                          setLodgeForm((prev) => ({
-                            ...prev,
-                            secondary_color: v,
-                          }))
-                        }
-                      />
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+            <div className="rounded-xl border border-dash-border bg-dash-surface-subtle p-4">
+              <h3 className="text-sm font-semibold text-dash-text">
+                Formal lodge and summons details
+              </h3>
+              <p className="mt-1 text-xs leading-5 text-dash-muted">
+                These details are used on summons previews, member summons pages,
+                and formal lodge communications.
+              </p>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <Input
+                  placeholder="Lodge number"
+                  value={lodgeForm.lodge_number ?? ""}
+                  onChange={(e) =>
+                    setLodgeForm((prev) => ({ ...prev, lodge_number: e.target.value }))
+                  }
+                  className="border-dash-border bg-dash-surface text-dash-text placeholder:text-dash-faint"
+                />
+                <Input
+                  placeholder="Governing body"
+                  value={lodgeForm.governing_body ?? ""}
+                  onChange={(e) =>
+                    setLodgeForm((prev) => ({ ...prev, governing_body: e.target.value }))
+                  }
+                  className="border-dash-border bg-dash-surface text-dash-text placeholder:text-dash-faint"
+                />
+                <Input
+                  placeholder="Consecrated date"
+                  type="date"
+                  value={lodgeForm.consecrated_at?.slice(0, 10) ?? ""}
+                  onChange={(e) =>
+                    setLodgeForm((prev) => ({ ...prev, consecrated_at: e.target.value }))
+                  }
+                  className="border-dash-border bg-dash-surface text-dash-text placeholder:text-dash-faint"
+                />
+                <Input
+                  placeholder="Secretary name"
+                  value={lodgeForm.secretary_name ?? ""}
+                  onChange={(e) =>
+                    setLodgeForm((prev) => ({ ...prev, secretary_name: e.target.value }))
+                  }
+                  className="border-dash-border bg-dash-surface text-dash-text placeholder:text-dash-faint"
+                />
+                <Input
+                  placeholder="Secretary phone"
+                  value={lodgeForm.secretary_phone ?? ""}
+                  onChange={(e) =>
+                    setLodgeForm((prev) => ({ ...prev, secretary_phone: e.target.value }))
+                  }
+                  className="border-dash-border bg-dash-surface text-dash-text placeholder:text-dash-faint"
+                />
+                <Input
+                  placeholder="Lodge of Instruction contact"
+                  value={lodgeForm.loi_contact ?? ""}
+                  onChange={(e) =>
+                    setLodgeForm((prev) => ({ ...prev, loi_contact: e.target.value }))
+                  }
+                  className="border-dash-border bg-dash-surface text-dash-text placeholder:text-dash-faint"
+                />
+                <Textarea
+                  placeholder="Meeting schedule"
+                  value={lodgeForm.meeting_schedule ?? ""}
+                  onChange={(e) =>
+                    setLodgeForm((prev) => ({ ...prev, meeting_schedule: e.target.value }))
+                  }
+                  className="min-h-24 border-dash-border bg-dash-surface text-dash-text placeholder:text-dash-faint"
+                />
+                <Textarea
+                  placeholder="Secretary address"
+                  value={lodgeForm.secretary_address ?? ""}
+                  onChange={(e) =>
+                    setLodgeForm((prev) => ({ ...prev, secretary_address: e.target.value }))
+                  }
+                  className="min-h-24 border-dash-border bg-dash-surface text-dash-text placeholder:text-dash-faint"
+                />
+                <Textarea
+                  placeholder="Visiting notice"
+                  value={lodgeForm.visiting_notice ?? ""}
+                  onChange={(e) =>
+                    setLodgeForm((prev) => ({ ...prev, visiting_notice: e.target.value }))
+                  }
+                  className="min-h-24 border-dash-border bg-dash-surface text-dash-text placeholder:text-dash-faint"
+                />
+                <Textarea
+                  placeholder="Data protection notice"
+                  value={lodgeForm.data_protection_notice ?? ""}
+                  onChange={(e) =>
+                    setLodgeForm((prev) => ({ ...prev, data_protection_notice: e.target.value }))
+                  }
+                  className="min-h-24 border-dash-border bg-dash-surface text-dash-text placeholder:text-dash-faint"
+                />
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
@@ -372,88 +385,36 @@ export function LodgePlatformSettings() {
                 )}
                 {savingLodge ? "Saving…" : "Save Lodge Profile"}
               </Button>
-              {selectedSlug && (
-                <Button asChild variant="secondary">
-                  <Link
-                    href={`/?lodge=${selectedSlug}`}
-                    target="_blank"
-                    className="gap-2"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    Preview Lodge Site
-                  </Link>
-                </Button>
-              )}
               <span className="text-xs text-dash-muted">
-                Slug: {selectedSlug || "—"}
+                Slug: {selectedSlug || "Not selected"}
               </span>
             </div>
           </div>
         )}
       </div>
 
-      {/* Lodge One-Pager Builder */}
-      <div className="admin-surface overflow-hidden">
-        <div className="border-b border-dash-border p-6">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-dash-text">
-            <Sparkles className="h-5 w-5 text-amber-600" />
-            Lodge One-Pager Builder
-          </h2>
-          <p className="mt-1 text-sm text-dash-muted">
-            Visually edit your lodge homepage with drag-and-drop sections.
-          </p>
-        </div>
-        {!site ? (
-          <div className="flex items-center justify-center p-12 text-sm text-dash-muted">
-            {loading ? (
-              <span className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading site data…
-              </span>
-            ) : (
-              "Select a lodge to load page settings."
-            )}
-          </div>
-        ) : (
-          <PuckEditor
-            lodgeSlug={selectedSlug}
-            initialSections={site.sections}
-            pageTitle={site.page_title}
-            pageDescription={site.page_description}
-            primaryColor={lodgeForm.primary_color ?? "#3b82f6"}
-          />
-        )}
-      </div>
-
-      {/* Status toast */}
-      <AnimatePresence>
-        {status && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className={cn(
-              "fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm shadow-lg backdrop-blur-sm",
-              statusType === "success" &&
-                "border-emerald-200 bg-emerald-50 text-emerald-900",
-              statusType === "error" &&
-                "border-red-200 bg-red-50 text-red-900",
-              statusType === "info" &&
-                "border-dash-border bg-dash-surface text-dash-text shadow-dash"
-            )}
+      {status && (
+        <div
+          className={cn(
+            "fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm shadow-lg backdrop-blur-sm",
+            statusType === "success" &&
+              "border-emerald-200 bg-emerald-50 text-emerald-900",
+            statusType === "error" &&
+              "border-red-200 bg-red-50 text-red-900",
+            statusType === "info" &&
+              "border-dash-border bg-dash-surface text-dash-text shadow-dash"
+          )}
+        >
+          {status}
+          <button
+            type="button"
+            onClick={() => flash("")}
+            className="ml-1 rounded-md p-0.5 transition-colors hover:bg-dash-surface-subtle"
           >
-            {statusType === "success" && <Check className="h-4 w-4" />}
-            {statusType === "error" && <X className="h-4 w-4" />}
-            {status}
-            <button
-              onClick={() => flash("")}
-              className="ml-1 rounded-md p-0.5 transition-colors hover:bg-dash-surface-subtle"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

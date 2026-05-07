@@ -29,7 +29,7 @@ export function OperatorSidebar() {
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/admin/login");
+    router.push("/operator/login");
     router.refresh();
   }
 
@@ -40,6 +40,8 @@ export function OperatorSidebar() {
         size="icon"
         className="fixed top-3 left-3 z-50 lg:hidden"
         onClick={() => setMobileOpen(!mobileOpen)}
+        aria-label="Toggle operator navigation"
+        aria-expanded={mobileOpen}
       >
         {mobileOpen ? (
           <X className="h-5 w-5" />

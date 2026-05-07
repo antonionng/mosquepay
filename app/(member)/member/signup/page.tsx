@@ -15,6 +15,8 @@ export default function MemberSignupPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const passwordReady = password.length >= 6;
+  const passwordsMatch = confirmPassword.length === 0 || password === confirmPassword;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -84,10 +86,16 @@ export default function MemberSignupPage() {
             LP
           </div>
           <h1 className="text-2xl font-bold text-slate-900">Create your account</h1>
-          <p className="mt-2 text-sm text-slate-500">Join the member portal</p>
+          <p className="mt-2 text-sm text-slate-500">
+            Optional access for past summons, RSVPs, dues, and profile details
+          </p>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            You can still use secure email links without an account. Sign up if you want a permanent member dashboard.
+          </div>
+
           {error && (
             <div className="mb-6 flex items-center gap-2 rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700">
               <AlertCircle className="h-4 w-4 shrink-0" />
@@ -142,6 +150,16 @@ export default function MemberSignupPage() {
                   required
                 />
               </div>
+              <div className="flex items-center gap-2 text-xs">
+                <span
+                  className={`h-1.5 flex-1 rounded-full ${
+                    passwordReady ? "bg-emerald-500" : "bg-slate-200"
+                  }`}
+                />
+                <span className={passwordReady ? "text-emerald-700" : "text-slate-400"}>
+                  {passwordReady ? "Strong enough" : "At least 6 characters"}
+                </span>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -158,6 +176,9 @@ export default function MemberSignupPage() {
                   required
                 />
               </div>
+              {!passwordsMatch && (
+                <p className="text-xs text-red-600">Passwords do not match.</p>
+              )}
             </div>
 
             <Button

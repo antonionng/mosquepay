@@ -30,7 +30,7 @@ const causes = [
 const giftAidFacts = [
   "Gift Aid lets charities reclaim 25p for every £1 you donate",
   "You must be a UK taxpayer to qualify for Gift Aid",
-  "The charity claims the tax back from HMRC — it costs you nothing extra",
+  "The charity claims the tax back from HMRC. It costs you nothing extra",
   "You can declare Gift Aid on event donations, one-off gifts, and regular contributions",
   "Higher-rate taxpayers can also claim the difference on their Self Assessment",
 ];
@@ -202,7 +202,7 @@ export default async function CharityPage({
               <div className="mt-8 rounded-xl border border-blue-100 bg-blue-50/50 p-5">
                 <p className="text-sm leading-relaxed text-slate-700">
                   When you make a donation through our platform, you can opt in to Gift Aid
-                  at checkout. The declaration is managed digitally — no paper forms required.
+                  at checkout. The declaration is managed digitally, with no paper forms required.
                 </p>
               </div>
             </div>

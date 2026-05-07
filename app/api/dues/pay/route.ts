@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
               currency: duesRecord.currency,
               unit_amount: instalmentAmount,
               product_data: {
-                name: `Lodge Dues Instalment — ${lodgeDuesConfig.name}`,
+                name: `Lodge Dues Instalment: ${lodgeDuesConfig.name}`,
               },
               recurring: {
                 interval: interval as "month",
@@ -96,8 +96,8 @@ export async function POST(request: NextRequest) {
             instalment_count: String(instalmentCount),
           },
         },
-        success_url: `${siteUrl}/member/dues?session_id={CHECKOUT_SESSION_ID}&type=dues_subscription`,
-        cancel_url: `${siteUrl}/member/dues`,
+        success_url: `${siteUrl}/events/rsvp/success?session_id={CHECKOUT_SESSION_ID}&type=dues_subscription`,
+        cancel_url: `${siteUrl}/dues/${duesRecord.id}?email=${encodeURIComponent(member_email)}&lodge=${encodeURIComponent(lodgeSlug)}`,
         customer_email: member_email,
         metadata: {
           lodge_slug: lodgeSlug,
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
           price_data: {
             currency: duesRecord.currency,
             unit_amount: Math.round(duesRecord.amount * 100),
-            product_data: { name: `Lodge Dues — ${duesRecord.period_start} to ${duesRecord.period_end}` },
+            product_data: { name: `Lodge Dues: ${duesRecord.period_start} to ${duesRecord.period_end}` },
           },
           quantity: 1,
         },

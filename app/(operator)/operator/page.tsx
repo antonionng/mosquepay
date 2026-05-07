@@ -164,7 +164,7 @@ export default async function OperatorDashboard() {
                         {lodge.name}
                       </p>
                       <p className="text-xs text-slate-500">
-                        {lodge.city ?? "—"}{" "}
+                        {lodge.city ?? "Not recorded"}{" "}
                         {lodge.country ? `· ${lodge.country}` : ""}
                       </p>
                     </div>

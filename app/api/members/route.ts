@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
+import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
+import { writeAuditLog } from "@/lib/audit";
 
 export async function GET(request: NextRequest) {
+  const _rejectMock = rejectIfMockDisabled();
+  if (_rejectMock) return _rejectMock;
+
   try {
+    const unauthorized = await requireAdminApiAuth();
+    if (unauthorized) return unauthorized;
+
     const lodgeSlug = getLodgeSlugFromRequest(request);
     const search = request.nextUrl.searchParams.get("search") ?? undefined;
     const status = request.nextUrl.searchParams.get("status") ?? undefined;
@@ -15,6 +24,8 @@ export async function GET(request: NextRequest) {
       if (!lodgeId) {
         return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
       }
+      const forbidden = await requireAdminApiPermission("members:read", lodgeId);
+      if (forbidden) return forbidden;
       const members = await db.getMembers(lodgeId, { search, status });
       return NextResponse.json({ members });
     }
@@ -28,13 +39,31 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const _rejectMock = rejectIfMockDisabled();
+  if (_rejectMock) return _rejectMock;
+
   try {
+    const unauthorized = await requireAdminApiAuth();
+    if (unauthorized) return unauthorized;
+
     const lodgeSlug = getLodgeSlugFromRequest(request);
     const body = await request.json();
     const {
       email,
       full_name,
       phone,
+      address_line_1,
+      address_line_2,
+      city,
+      county,
+      postcode,
+      country,
+      country_list,
+      royal_arch,
+      honorary,
+      office_title,
+      officer_sort_order,
+      directory_sort_order,
       rank,
       dietary_requirements,
       date_of_initiation,
@@ -53,6 +82,8 @@ export async function POST(request: NextRequest) {
       if (!lodgeId) {
         return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
       }
+      const forbidden = await requireAdminApiPermission("members:write", lodgeId);
+      if (forbidden) return forbidden;
 
       const existing = await db.getMemberByEmail(email, lodgeId);
       if (existing) {
@@ -64,6 +95,18 @@ export async function POST(request: NextRequest) {
         email: email.trim().toLowerCase(),
         full_name,
         phone: phone ?? null,
+        address_line_1: address_line_1 ?? null,
+        address_line_2: address_line_2 ?? null,
+        city: city ?? null,
+        county: county ?? null,
+        postcode: postcode ?? null,
+        country: country ?? "United Kingdom",
+        country_list: country_list === true,
+        royal_arch: royal_arch === true,
+        honorary: honorary === true,
+        office_title: office_title ?? null,
+        officer_sort_order: officer_sort_order ?? null,
+        directory_sort_order: directory_sort_order ?? null,
         rank: rank ?? null,
         dietary_requirements: dietary_requirements ?? null,
         date_of_initiation: date_of_initiation ?? null,
@@ -98,6 +141,13 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      await writeAuditLog({
+        lodgeId,
+        action: "created",
+        entityType: "member",
+        entityId: member.id,
+        summary: `Created member ${member.full_name}`,
+      });
       return NextResponse.json({ member }, { status: 201 });
     }
 
@@ -111,6 +161,18 @@ export async function POST(request: NextRequest) {
       email: email.trim().toLowerCase(),
       full_name,
       phone: phone ?? null,
+      address_line_1: address_line_1 ?? null,
+      address_line_2: address_line_2 ?? null,
+      city: city ?? null,
+      county: county ?? null,
+      postcode: postcode ?? null,
+      country: country ?? "United Kingdom",
+      country_list: country_list === true,
+      royal_arch: royal_arch === true,
+      honorary: honorary === true,
+      office_title: office_title ?? null,
+      officer_sort_order: officer_sort_order ?? null,
+      directory_sort_order: directory_sort_order ?? null,
       rank: rank ?? null,
       dietary_requirements: dietary_requirements ?? null,
       date_of_initiation: date_of_initiation ?? null,

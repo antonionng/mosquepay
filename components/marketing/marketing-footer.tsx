@@ -13,7 +13,6 @@ const footerColumns = [
     title: "About LodgePay",
     links: [
       { href: "/about", label: "Company Overview" },
-      { href: "/case-studies", label: "Case Studies" },
       { href: "/news", label: "Press & News" },
       { href: "/contact", label: "Contact" },
     ],
@@ -24,7 +23,6 @@ const footerColumns = [
       { href: "/news", label: "Blog" },
       { href: "/faq", label: "Help Centre" },
       { href: "/events", label: "Webinars & Events" },
-      { href: "/case-studies", label: "Case Studies" },
     ],
   },
   {

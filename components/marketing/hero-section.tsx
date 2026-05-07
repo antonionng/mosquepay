@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Play, Sparkles } from "lucide-react";
+import { ArrowRight, Sparkles } from "lucide-react";
 import { FadeIn } from "@/components/motion";
 import { HeroFigmaPanel } from "@/components/marketing/hero-figma-panel";
 
@@ -30,7 +30,7 @@ export function HeroSection() {
         <FadeIn delay={0.3}>
           <p className="mx-auto mt-5 max-w-[700px] text-center text-base leading-relaxed text-mkt-text-secondary opacity-80 sm:text-lg">
             Build your lodge website, manage events and RSVPs, collect payments with Gift Aid,
-            and track candidate journeys — all from one modern, unified system.
+            and track candidate journeys in one modern, unified system.
           </p>
         </FadeIn>
 
@@ -47,13 +47,13 @@ export function HeroSection() {
               href="/product"
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-mkt-border bg-transparent px-7 py-3 font-heading text-base font-bold text-[#4b5162] transition-colors hover:border-mkt-text-secondary hover:text-white sm:w-auto"
             >
-              <Play className="h-5 w-5" />
-              Watch Video
+              Explore Product
+              <ArrowRight className="h-5 w-5" />
             </Link>
           </div>
         </FadeIn>
 
-        {/* Hero panel — Figma node 223:73053 (vector SVGs, matches Dev Mode) */}
+        {/* Hero panel from Figma node 223:73053 */}
         <FadeIn delay={0.5} className="mt-16 w-full">
           <HeroFigmaPanel />
         </FadeIn>

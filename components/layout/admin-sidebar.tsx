@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -7,8 +8,6 @@ import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard,
   Users,
-  Calendar,
-  FileText,
   CreditCard,
   Settings,
   LogOut,
@@ -17,30 +16,144 @@ import {
   Clock,
   Heart,
   Gift,
-  Globe,
   Sparkles,
   UserCheck,
+  ShieldCheck,
+  BarChart3,
+  Wallet,
+  HeartHandshake,
+  Megaphone,
+  GraduationCap,
+  MapPin,
+  Plug,
+  Shield,
+  Rocket,
+  Building2,
+  Globe,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const nav = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/leads", label: "Leads", icon: Users },
-  { href: "/admin/members", label: "Members", icon: UserCheck },
-  { href: "/admin/events", label: "Events", icon: Calendar },
-  { href: "/admin/meetings", label: "Meetings", icon: Clock },
-  { href: "/admin/blog", label: "Blog", icon: FileText },
-  { href: "/admin/payments", label: "Payments", icon: CreditCard },
-  { href: "/admin/charity", label: "Charity", icon: Heart },
-  { href: "/admin/donations", label: "Donations", icon: Gift },
-  { href: "/admin/settings", label: "Site Builder", icon: Globe },
-  { href: "/admin/settings", label: "Settings", icon: Settings },
+  { href: "/admin/onboarding", label: "Get started", icon: Rocket, permission: "admin:all" },
+  { href: "/admin/leads", label: "Candidates", icon: Users, permission: "meetings:write" },
+  { href: "/admin/members", label: "Members", icon: UserCheck, permission: "members:read" },
+  { href: "/admin/meetings", label: "Meetings", icon: Clock, permission: "meetings:write" },
+  { href: "/admin/communications", label: "Communications", icon: Megaphone, permission: "members:write" },
+  { href: "/admin/website", label: "Website", icon: Globe, permission: "website:write" },
+  { href: "/admin/payments", label: "Payments", icon: CreditCard, permission: "payments:write" },
+  { href: "/admin/treasurer", label: "Treasurer", icon: Wallet, permission: "payments:write" },
+  { href: "/admin/charity", label: "Charity", icon: Heart, permission: "charity:write", flag: "charity" },
+  { href: "/admin/donations", label: "Donations", icon: Gift, permission: "charity:write", flag: "charity" },
+  { href: "/admin/gift-aid", label: "Gift Aid", icon: Shield, permission: "charity:write", flag: "charity" },
+  { href: "/admin/almoner", label: "Almoner", icon: HeartHandshake, permission: "welfare:read", flag: "almoner" },
+  { href: "/admin/mentoring", label: "Mentoring", icon: GraduationCap, permission: "members:write", flag: "mentor" },
+  { href: "/admin/ai-assistant", label: "AI assistant", icon: Sparkles, permission: "members:write", flag: "ai" },
+  { href: "/admin/reports", label: "Reports", icon: BarChart3, permission: "audit:read" },
+  { href: "/admin/audit-compliance", label: "Audit & Compliance", icon: ShieldCheck, permission: "audit:read" },
+  { href: "/admin/platform", label: "Platform overview", icon: Building2, permission: "admin:all", platformOnly: true },
+  { href: "/admin/provinces", label: "Provinces", icon: MapPin, permission: "admin:all", platformOnly: true },
+  { href: "/admin/integrations", label: "Integrations", icon: Plug, permission: "admin:all", flag: "integrations", platformOnly: true },
+  { href: "/admin/settings", label: "Settings", icon: Settings, permission: "admin:all" },
 ];
+
+const rolePermissions: Record<string, string[]> = {
+  super_admin: ["admin:all"],
+  operator: ["admin:all"],
+  secretary: [
+    "members:read",
+    "members:write",
+    "meetings:write",
+    "summons:write",
+    "website:write",
+    "audit:read",
+    "welfare:read",
+  ],
+  treasurer: ["payments:write", "audit:read"],
+  charity_steward: ["charity:write", "audit:read"],
+  membership_officer: ["members:read", "members:write", "audit:read"],
+  almoner: ["members:read", "welfare:read", "welfare:write", "audit:read"],
+};
+
+function canSee(role: string, permission?: string) {
+  if (!permission) return true;
+  const permissions = rolePermissions[role] ?? rolePermissions.secretary;
+  return permissions.includes("admin:all") || permissions.includes(permission);
+}
+
+function flagAllows(flags: Record<string, boolean>, flag?: string) {
+  if (!flag) return true;
+  return flags[flag] !== false;
+}
 
 export function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [role, setRole] = useState("super_admin");
+  const [flags, setFlags] = useState<Record<string, boolean>>({});
+  const [scopeKind, setScopeKind] = useState<string>("none");
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/auth/session")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!active) return;
+        if (data.admin?.role) setRole(data.admin.role);
+        if (data.flags && typeof data.flags === "object") setFlags(data.flags);
+        if (data.scope?.kind) setScopeKind(data.scope.kind);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const canSeePlatformOnly = scopeKind === "platform" || scopeKind === "dummy";
+  const visibleNav = nav.filter(
+    (item) =>
+      canSee(role, item.permission) &&
+      flagAllows(flags, item.flag) &&
+      (!item.platformOnly || canSeePlatformOnly)
+  );
+  const mainNav = visibleNav.filter((item) =>
+    [
+      "/admin",
+      "/admin/onboarding",
+      "/admin/leads",
+      "/admin/members",
+      "/admin/meetings",
+      "/admin/communications",
+      "/admin/website",
+      "/admin/mentoring",
+      "/admin/almoner",
+    ].includes(item.href)
+  );
+  const financeNav = visibleNav.filter((item) =>
+    [
+      "/admin/payments",
+      "/admin/treasurer",
+      "/admin/charity",
+      "/admin/donations",
+      "/admin/gift-aid",
+    ].includes(item.href)
+  );
+  const manageNav = visibleNav.filter((item) =>
+    [
+      "/admin/ai-assistant",
+      "/admin/reports",
+      "/admin/audit-compliance",
+      "/admin/settings",
+    ].includes(item.href)
+  );
+  const platformNav = visibleNav.filter((item) =>
+    [
+      "/admin/platform",
+      "/admin/provinces",
+      "/admin/integrations",
+    ].includes(item.href)
+  );
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -49,11 +162,30 @@ export function AdminSidebar() {
   }
 
   const linkBase =
-    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dash-ring/30 focus-visible:ring-offset-2 focus-visible:ring-offset-dash-surface";
+    "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dash-ring/30 focus-visible:ring-offset-2 focus-visible:ring-offset-dash-surface";
   const linkIdle =
     "text-dash-muted hover:bg-dash-surface-subtle hover:text-dash-text";
   const linkActive =
-    "bg-dash-surface-subtle text-dash-text shadow-sm ring-1 ring-dash-border";
+    "bg-[hsl(var(--dash-ring)/0.08)] text-[hsl(var(--dash-ring))]";
+
+  function navLink(item: { href: string; label: string; icon: typeof LayoutDashboard }) {
+    const Icon = item.icon;
+    const active =
+      pathname === item.href ||
+      (item.href !== "/admin" && pathname.startsWith(item.href));
+    return (
+      <Link
+        key={item.href + item.label}
+        href={item.href}
+        onClick={() => setMobileOpen(false)}
+        aria-current={active ? "page" : undefined}
+        className={cn(linkBase, active ? linkActive : linkIdle)}
+      >
+        <Icon className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
+        {item.label}
+      </Link>
+    );
+  }
 
   return (
     <>
@@ -77,87 +209,51 @@ export function AdminSidebar() {
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex h-16 shrink-0 items-center border-b border-dash-border px-4 lg:h-[4.5rem]">
-          <Link href="/admin" className="flex min-w-0 items-center gap-3" onClick={() => setMobileOpen(false)}>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-dash-border bg-dash-surface-subtle text-[11px] font-semibold tracking-[0.18em] text-dash-text shadow-sm">
-              CL
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="truncate text-sm font-semibold text-dash-text">Covenant Lodge</p>
-                <span className="inline-flex shrink-0 items-center gap-0.5 rounded-md border border-dash-border bg-dash-surface-subtle px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-dash-ring">
-                  <Sparkles className="h-2.5 w-2.5" aria-hidden />
-                  Pro
-                </span>
-              </div>
-              <p className="text-xs text-dash-faint">No. 4344</p>
-            </div>
+        <div className="flex h-16 shrink-0 items-center border-b border-dash-border bg-dash-surface px-4 lg:h-[4.5rem]">
+          <Link
+            href="/admin"
+            className="flex min-w-0 items-center"
+            onClick={() => setMobileOpen(false)}
+            aria-label="LodgePay admin"
+          >
+            <Image
+              src="/brand/lodgepay-sidebar-logo.png"
+              alt="LodgePay"
+              width={1032}
+              height={245}
+              priority
+              className="h-11 w-auto max-w-[13.75rem] object-contain lg:h-12"
+            />
           </Link>
         </div>
 
-        <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-3">
+        <nav
+          aria-label="Admin"
+          className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-3"
+        >
           <p className="px-3 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-wider text-dash-faint">
             Main
           </p>
-          {nav.slice(0, 6).map((item) => {
-            const Icon = item.icon;
-            const active =
-              pathname === item.href ||
-              (item.href !== "/admin" && pathname.startsWith(item.href));
-            return (
-              <Link
-                key={item.href + item.label}
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={cn(linkBase, active ? linkActive : linkIdle)}
-              >
-                <Icon className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
-                {item.label}
-              </Link>
-            );
-          })}
+          {mainNav.map((item) => navLink(item))}
 
           <p className="px-3 pb-1.5 pt-4 text-[10px] font-semibold uppercase tracking-wider text-dash-faint">
             Finance
           </p>
-          {nav.slice(6, 9).map((item) => {
-            const Icon = item.icon;
-            const active =
-              pathname === item.href ||
-              (item.href !== "/admin" && pathname.startsWith(item.href));
-            return (
-              <Link
-                key={item.href + item.label}
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={cn(linkBase, active ? linkActive : linkIdle)}
-              >
-                <Icon className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
-                {item.label}
-              </Link>
-            );
-          })}
+          {financeNav.map((item) => navLink(item))}
 
           <p className="px-3 pb-1.5 pt-4 text-[10px] font-semibold uppercase tracking-wider text-dash-faint">
             Manage
           </p>
-          {nav.slice(9).map((item) => {
-            const Icon = item.icon;
-            const active =
-              pathname === item.href ||
-              (item.href !== "/admin" && pathname.startsWith(item.href));
-            return (
-              <Link
-                key={item.href + item.label}
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={cn(linkBase, active ? linkActive : linkIdle)}
-              >
-                <Icon className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
-                {item.label}
-              </Link>
-            );
-          })}
+          {manageNav.map((item) => navLink(item))}
+
+          {platformNav.length > 0 && (
+            <>
+              <p className="px-3 pb-1.5 pt-4 text-[10px] font-semibold uppercase tracking-wider text-dash-faint">
+                Platform
+              </p>
+              {platformNav.map((item) => navLink(item))}
+            </>
+          )}
 
           <button
             type="button"

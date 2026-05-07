@@ -10,7 +10,24 @@ export type Lodge = {
   secondary_color: string | null;
   support_email: string | null;
   support_phone: string | null;
+  lodge_number: string | null;
+  consecrated_at: string | null;
+  governing_body: string | null;
+  meeting_schedule: string | null;
+  secretary_name: string | null;
+  secretary_address: string | null;
+  secretary_phone: string | null;
+  charity_donation_url: string | null;
+  relief_chest_name: string | null;
+  data_protection_notice: string | null;
+  visiting_notice: string | null;
+  loi_contact: string | null;
+  wifi_details: string | null;
   is_active: boolean;
+  province_id: string | null;
+  custom_domain: string | null;
+  custom_domain_verified_at: string | null;
+  custom_domain_verification_token: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -21,6 +38,11 @@ export type LodgeSiteSectionStyle = {
   background_image_url?: string | null;
   overlay_opacity?: number | null;
   background_position?: string | null;
+  image_url?: string | null;
+  image_alt?: string | null;
+  image_position?: "left" | "right" | "top" | "bottom" | "full" | null;
+  image_shape?: "rounded" | "square" | "circle" | "arch" | null;
+  form_mode?: "none" | "contact" | "lead" | null;
 };
 
 export type LodgeSiteSection = {
@@ -62,10 +84,28 @@ export type AdminUser = {
   email: string;
   full_name: string;
   role: string;
+  permissions: string[];
   active: boolean;
   created_at: string;
   updated_at: string;
   last_login: string | null;
+  mfa_enabled: boolean;
+  mfa_secret: string | null;
+  mfa_backup_codes: string[] | null;
+  mfa_enrolled_at: string | null;
+};
+
+export type AuditLog = {
+  id: string;
+  lodge_id: string | null;
+  actor_email: string | null;
+  actor_role: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  summary: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
 };
 
 export type Lead = {
@@ -81,6 +121,19 @@ export type Lead = {
   initial_message: string | null;
   stage: string;
   assigned_to: string | null;
+  proposer_member_id: string | null;
+  proposer_name: string | null;
+  seconder_member_id: string | null;
+  seconder_name: string | null;
+  next_step: string | null;
+  next_step_due_date: string | null;
+  proposal_date: string | null;
+  ballot_date: string | null;
+  interview_completed_at: string | null;
+  consent_given_at: string | null;
+  notes: string | null;
+  converted_member_id: string | null;
+  converted_at: string | null;
   created_at: string;
   updated_at: string;
   stage_changed_at: string;
@@ -193,6 +246,7 @@ export type Donation = {
   lodge_id: string;
   event_id: string | null;
   payment_id: string | null;
+  campaign_id: string | null;
   donor_name: string | null;
   donor_email: string;
   amount: number;
@@ -200,6 +254,7 @@ export type Donation = {
   source: string;
   status: string;
   gift_aid_declaration_id: string | null;
+  gift_aid_status: "unknown" | "eligible" | "declared" | "declined";
   created_at: string;
 };
 
@@ -314,8 +369,403 @@ export type MemberDues = {
   stripe_payment_intent_id: string | null;
   stripe_subscription_id: string | null;
   paid_at: string | null;
+  reminder_sent_at: string | null;
+  reminder_count: number;
   created_at: string;
   updated_at: string;
+};
+
+export type MemberDuesInstalment = {
+  id: string;
+  lodge_id: string;
+  member_dues_id: string;
+  sequence: number;
+  due_date: string;
+  amount: number;
+  currency: string;
+  status: 'outstanding' | 'paid' | 'waived' | 'overdue';
+  paid_at: string | null;
+  reminder_sent_at: string | null;
+  payment_reference: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BankStatementImport = {
+  id: string;
+  lodge_id: string;
+  filename: string;
+  account_label: string | null;
+  total_rows: number;
+  matched_rows: number;
+  imported_by_admin_user_id: string | null;
+  notes: string | null;
+  created_at: string;
+};
+
+export type BankTransaction = {
+  id: string;
+  lodge_id: string;
+  import_id: string;
+  posted_date: string;
+  description: string;
+  amount: number;
+  direction: 'credit' | 'debit';
+  balance: number | null;
+  reference: string | null;
+  status: 'unmatched' | 'matched' | 'ignored';
+  matched_source_type: 'payment' | 'dues' | 'donation' | 'manual' | null;
+  matched_source_id: string | null;
+  matched_confidence: number | null;
+  matched_by_admin_user_id: string | null;
+  matched_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProgressionSignoff = {
+  id: string;
+  lodge_id: string;
+  member_id: string;
+  degree: 'initiation' | 'passing' | 'raising';
+  signed_off: boolean;
+  signed_off_by_admin_user_id: string | null;
+  signed_off_by_member_id: string | null;
+  notes: string | null;
+  created_at: string;
+};
+
+export type MentorAssignment = {
+  id: string;
+  lodge_id: string;
+  mentor_member_id: string;
+  mentee_member_id: string;
+  started_at: string;
+  ended_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MentorContact = {
+  id: string;
+  lodge_id: string;
+  assignment_id: string | null;
+  mentor_member_id: string | null;
+  mentee_member_id: string | null;
+  contacted_at: string;
+  contact_method: 'meeting' | 'phone' | 'video' | 'email' | 'visit';
+  topic: string | null;
+  notes: string | null;
+  created_at: string;
+};
+
+export type EventRitualRole = {
+  id: string;
+  lodge_id: string;
+  event_id: string;
+  role_title: string;
+  member_id: string | null;
+  notes: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type OfficerLadderRung = {
+  id: string;
+  lodge_id: string;
+  rung_label: string;
+  sort_order: number;
+  current_member_id: string | null;
+  successor_member_id: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Province = {
+  id: string;
+  slug: string;
+  name: string;
+  jurisdiction: string | null;
+  country: string;
+  contact_email: string | null;
+  contact_phone: string | null;
+  primary_color: string | null;
+  notes: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MemberRank = {
+  id: string;
+  lodge_id: string;
+  member_id: string;
+  scope: 'lodge' | 'provincial' | 'grand' | 'other';
+  rank_label: string;
+  conferred_on: string | null;
+  conferred_by: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LodgeVisit = {
+  id: string;
+  visiting_lodge_id: string;
+  host_lodge_id: string | null;
+  host_lodge_name: string | null;
+  member_id: string | null;
+  member_name: string | null;
+  visit_date: string;
+  occasion: string | null;
+  notes: string | null;
+  recorded_by_admin_user_id: string | null;
+  created_at: string;
+};
+
+export type ProvinceOfficerDirectoryEntry = {
+  province_id: string | null;
+  lodge_id: string;
+  lodge_name: string;
+  lodge_number: string | null;
+  member_id: string;
+  full_name: string;
+  office_title: string;
+  officer_sort_order: number | null;
+  email: string;
+  rank: string | null;
+};
+
+export type LodgeAnnualReturn = {
+  lodge_id: string;
+  province_id: string | null;
+  lodge_name: string;
+  lodge_number: string | null;
+  active_members: number;
+  resigned_members: number;
+  excluded_members: number;
+  initiations_ytd: number;
+  passings_ytd: number;
+  raisings_ytd: number;
+};
+
+export type MemberConsent = {
+  id: string;
+  lodge_id: string;
+  member_id: string;
+  consent_key: string;
+  granted: boolean;
+  granted_at: string;
+  revoked_at: string | null;
+  source: 'admin' | 'member' | 'import' | 'system';
+  ip_address: string | null;
+  user_agent: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DataRetentionSettings = {
+  id: string;
+  lodge_id: string;
+  resigned_member_retention_months: number;
+  deceased_member_retention_months: number;
+  lead_inactive_retention_months: number;
+  audit_log_retention_months: number;
+  archive_strategy: 'soft_delete' | 'anonymise' | 'hard_delete';
+  notes: string | null;
+  updated_by_admin_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SubjectAccessRequest = {
+  id: string;
+  lodge_id: string;
+  member_id: string | null;
+  requester_email: string;
+  requester_name: string | null;
+  status: 'received' | 'in_progress' | 'fulfilled' | 'rejected';
+  fulfilled_at: string | null;
+  fulfilled_by_admin_user_id: string | null;
+  delivery_method: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type JobStatus =
+  | 'queued'
+  | 'in_progress'
+  | 'succeeded'
+  | 'failed'
+  | 'cancelled';
+
+export type Job = {
+  id: string;
+  lodge_id: string | null;
+  job_type: string;
+  payload: Record<string, unknown>;
+  status: JobStatus;
+  scheduled_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  attempts: number;
+  max_attempts: number;
+  last_error: string | null;
+  created_by_admin_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type IntegrationProvider =
+  | 'google_calendar'
+  | 'outlook'
+  | 'mailchimp'
+  | 'brevo'
+  | 'xero'
+  | 'quickbooks';
+
+export type IntegrationCredentials = {
+  id: string;
+  lodge_id: string;
+  provider: IntegrationProvider;
+  access_token: string | null;
+  refresh_token: string | null;
+  expires_at: string | null;
+  metadata: Record<string, unknown>;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MessageTemplate = {
+  id: string;
+  lodge_id: string | null;
+  template_key: string;
+  name: string;
+  subject: string;
+  html_body: string;
+  channel: 'email' | 'sms';
+  merge_tags: string[];
+  is_system: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Message = {
+  id: string;
+  lodge_id: string;
+  channel: 'email' | 'sms';
+  template_key: string | null;
+  subject: string | null;
+  body_preview: string | null;
+  recipient_email: string | null;
+  recipient_name: string | null;
+  recipient_member_id: string | null;
+  recipient_lead_id: string | null;
+  audience_label: string | null;
+  status: 'queued' | 'sent' | 'failed' | 'skipped';
+  error_message: string | null;
+  metadata: Record<string, unknown>;
+  sent_by_admin_user_id: string | null;
+  sent_at: string | null;
+  created_at: string;
+};
+
+export type AutomationSetting = {
+  id: string;
+  lodge_id: string;
+  automation_key: string;
+  enabled: boolean;
+  last_run_at: string | null;
+  config: Record<string, unknown>;
+  updated_at: string;
+};
+
+export type WelfareCase = {
+  id: string;
+  lodge_id: string;
+  member_id: string | null;
+  contact_name: string;
+  contact_email: string | null;
+  contact_phone: string | null;
+  case_type: 'general' | 'illness' | 'bereavement' | 'financial' | 'family' | 'isolation';
+  severity: 'low' | 'standard' | 'high' | 'urgent';
+  status: 'open' | 'monitoring' | 'closed';
+  summary: string | null;
+  next_action: string | null;
+  next_action_due: string | null;
+  opened_at: string;
+  closed_at: string | null;
+  created_by_admin_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WelfareVisit = {
+  id: string;
+  lodge_id: string;
+  case_id: string;
+  visited_at: string;
+  contact_method: 'visit' | 'phone' | 'video' | 'email' | 'letter';
+  outcome: string | null;
+  notes: string | null;
+  visited_by_admin_user_id: string | null;
+  follow_up_due: string | null;
+  created_at: string;
+};
+
+export type WelfareRegisterEntry = {
+  id: string;
+  lodge_id: string;
+  member_id: string | null;
+  register_type: 'bereavement' | 'widow' | 'family';
+  full_name: string;
+  relationship: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  address: string | null;
+  date_of_event: string | null;
+  last_contact_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WelfareAlert = {
+  id: string;
+  lodge_id: string;
+  member_id: string | null;
+  alert_type: 'missed_meetings' | 'overdue_dues' | 'silent' | 'manual';
+  severity: 'low' | 'standard' | 'high' | 'urgent';
+  message: string;
+  metadata: Record<string, unknown>;
+  status: 'open' | 'snoozed' | 'acknowledged' | 'resolved';
+  acknowledged_by_admin_user_id: string | null;
+  acknowledged_at: string | null;
+  case_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LedgerEntry = {
+  source_id: string;
+  source_type: 'payment' | 'dues' | 'donation';
+  lodge_id: string;
+  occurred_at: string;
+  contact_email: string | null;
+  contact_name: string | null;
+  amount: number;
+  refund_amount: number;
+  currency: string;
+  status: string;
+  category: string;
+  metadata: Record<string, unknown>;
 };
 
 export type Settings = {
@@ -345,12 +795,87 @@ export type Member = {
   email: string;
   full_name: string;
   phone: string | null;
+  address_line_1: string | null;
+  address_line_2: string | null;
+  city: string | null;
+  county: string | null;
+  postcode: string | null;
+  country: string | null;
+  country_list: boolean;
+  royal_arch: boolean;
+  honorary: boolean;
+  office_title: string | null;
+  officer_sort_order: number | null;
+  directory_sort_order: number | null;
   rank: string | null;
   dietary_requirements: string | null;
   date_of_initiation: string | null;
+  date_of_birth: string | null;
+  date_of_passing: string | null;
+  date_of_raising: string | null;
+  progression_signed_off_initiation: boolean;
+  progression_signed_off_passing: boolean;
+  progression_signed_off_raising: boolean;
   initiation_email_sent: boolean;
   membership_status: 'active' | 'suspended' | 'resigned' | 'excluded';
   stripe_customer_id: string | null;
+  portal_token: string;
+  archived_at: string | null;
+  archived_reason: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EventSummons = {
+  id: string;
+  lodge_id: string;
+  event_id: string;
+  issue_date: string;
+  opening_text: string | null;
+  agenda_items: string[];
+  menu_items: string[];
+  dining_time: string | null;
+  notices: string[];
+  include_member_directory: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EventSummonsSend = {
+  id: string;
+  lodge_id: string;
+  event_id: string;
+  summons_id: string | null;
+  sent_by: string | null;
+  recipient_count: number;
+  sent_count: number;
+  failed_count: number;
+  failures: Array<{ email: string; message: string }>;
+  created_at: string;
+};
+
+export type EventSummonsAccessLink = {
+  id: string;
+  lodge_id: string;
+  event_id: string;
+  summons_id: string | null;
+  send_id: string | null;
+  recipient_email: string;
+  recipient_name: string | null;
+  token_hash: string;
+  expires_at: string | null;
+  accessed_at: string | null;
+  access_count: number;
+  created_at: string;
+};
+
+export type LodgeFeatureFlag = {
+  id: string;
+  lodge_id: string;
+  flag_key: string;
+  enabled: boolean;
+  notes: string | null;
+  updated_by_email: string | null;
   created_at: string;
   updated_at: string;
 };

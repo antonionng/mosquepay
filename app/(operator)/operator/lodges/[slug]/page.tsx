@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  Building2,
   MapPin,
   Mail,
   CreditCard,
@@ -10,9 +9,8 @@ import {
   Globe,
   ArrowLeft,
   ExternalLink,
-  Ban,
 } from "lucide-react";
-import { isSupabaseConfigured } from "@/lib/db/with-fallback";
+import { isSupabaseConfigured, shouldUseInMemoryMock } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { formatDate } from "@/lib/utils";
@@ -43,7 +41,7 @@ async function getLodgeData(slug: string) {
       const payments = await db.getPayments(lodge.id).catch(() => []);
       paymentsTotal = payments.reduce((sum, p) => sum + p.total_amount, 0);
     }
-  } else {
+  } else if (shouldUseInMemoryMock()) {
     const allLodges = mockDb.listLodges();
     lodge = allLodges.find((l: Lodge) => l.slug === slug) ?? null;
   }
@@ -126,9 +124,9 @@ export default async function LodgeDetailPage({ params }: Props) {
               {[
                 ["Name", lodge.name],
                 ["Slug", lodge.slug],
-                ["City", lodge.city ?? "—"],
-                ["Country", lodge.country ?? "—"],
-                ["Tagline", lodge.tagline ?? "—"],
+                ["City", lodge.city ?? "Not recorded"],
+                ["Country", lodge.country ?? "Not recorded"],
+                ["Tagline", lodge.tagline ?? "Not recorded"],
               ].map(([label, value]) => (
                 <div key={label}>
                   <p className="text-xs font-medium text-slate-500">{label}</p>
@@ -148,7 +146,7 @@ export default async function LodgeDetailPage({ params }: Props) {
                       <Mail className="h-3 w-3" /> {lodge.support_email}
                     </a>
                   ) : (
-                    "—"
+                    "Not recorded"
                   )}
                 </p>
               </div>

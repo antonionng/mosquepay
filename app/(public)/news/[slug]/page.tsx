@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
-import { isSupabaseConfigured } from "@/lib/db/with-fallback";
+import { isSupabaseConfigured, shouldUseInMemoryMock } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { ArrowLeft, User, Calendar } from "lucide-react";
@@ -26,8 +26,10 @@ export default async function NewsPostPage({
   if (useDb) {
     const lodgeId = await db.resolveLodgeId(lodgeSlug);
     post = lodgeId ? await db.getBlogPostBySlug(slug, lodgeId) : null;
-  } else {
+  } else if (shouldUseInMemoryMock()) {
     post = mockDb.getBlogPostBySlug(slug, { lodge_slug: lodgeSlug });
+  } else {
+    post = null;
   }
 
   if (!post) notFound();

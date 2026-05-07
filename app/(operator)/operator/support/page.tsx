@@ -56,7 +56,7 @@ async function getSupportData() {
         type: "payment" as const,
         lodge_name: (p as Payment & { lodge_name: string }).lodge_name,
         lodge_slug: (p as Payment & { lodge_slug: string }).lodge_slug,
-        description: `Payment of £${(p.total_amount / 100).toFixed(2)} — ${p.status}`,
+        description: `Payment of £${(p.total_amount / 100).toFixed(2)}: ${p.status}`,
         timestamp: p.created_at,
       })),
       ...allLeads.map((l) => ({
@@ -64,7 +64,7 @@ async function getSupportData() {
         type: "lead" as const,
         lodge_name: (l as Lead & { lodge_name: string }).lodge_name,
         lodge_slug: (l as Lead & { lodge_slug: string }).lodge_slug,
-        description: `New lead: ${l.first_name} ${l.last_name} — ${l.stage}`,
+        description: `New lead: ${l.first_name} ${l.last_name}: ${l.stage}`,
         timestamp: l.created_at,
       })),
     ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());

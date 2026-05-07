@@ -1,15 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
+import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
+import { writeAuditLog } from "@/lib/audit";
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const _rejectMock = rejectIfMockDisabled();
+  if (_rejectMock) return _rejectMock;
+
   const { id } = await params;
   try {
+    const unauthorized = await requireAdminApiAuth();
+    if (unauthorized) return unauthorized;
+
     const lodgeSlug = getLodgeSlugFromRequest(request);
     const body = await request.json();
 
@@ -24,6 +33,8 @@ export async function PATCH(
     if (body.temple_room != null) updates.temple_room = body.temple_room.trim() || null;
     if (body.dress_code != null) updates.dress_code = body.dress_code.trim() || null;
     if (typeof body.enable_rsvp === "boolean") updates.enable_rsvp = body.enable_rsvp;
+    if (body.rsvp_deadline != null) updates.rsvp_deadline = body.rsvp_deadline ? new Date(body.rsvp_deadline).toISOString() : null;
+    if (body.max_attendees != null) updates.max_attendees = body.max_attendees !== "" ? Number(body.max_attendees) : null;
     if (typeof body.enable_payments === "boolean") updates.enable_payments = body.enable_payments;
     if (typeof body.enable_dining_rsvp === "boolean") updates.enable_dining_rsvp = body.enable_dining_rsvp;
     if (body.dining_price != null) updates.dining_price = Number(body.dining_price);
@@ -46,10 +57,20 @@ export async function PATCH(
       if (!lodgeId) {
         return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
       }
+      const forbidden = await requireAdminApiPermission("meetings:write", lodgeId);
+      if (forbidden) return forbidden;
       const updated = await db.updateEvent(id, lodgeId, updates as Parameters<typeof db.updateEvent>[2]);
       if (!updated) {
         return NextResponse.json({ error: "Event not found." }, { status: 404 });
       }
+      await writeAuditLog({
+        lodgeId,
+        action: "updated",
+        entityType: "meeting",
+        entityId: updated.id,
+        summary: `Updated meeting ${updated.title}`,
+        metadata: { fields: Object.keys(updates) },
+      });
       return NextResponse.json({ success: true });
     }
 

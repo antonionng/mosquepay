@@ -1,16 +1,16 @@
 import { FadeIn } from "@/components/motion";
 
 const partners = [
-  { name: "Provincial Grand Lodge", style: "font-heading text-lg font-bold tracking-wide" },
-  { name: "lodge ipsum", style: "font-heading text-lg font-medium italic" },
-  { name: "Grand Chapter", style: "font-heading text-lg font-bold uppercase tracking-[0.2em]" },
-  { name: "lodge — mark", style: "font-heading text-base font-medium tracking-widest" },
-  { name: "DISTRICT LODGE", style: "font-heading text-sm font-bold uppercase tracking-[0.35em]" },
-  { name: "royal arch", style: "font-heading text-lg font-medium italic tracking-wide" },
-  { name: "LODGE", style: "font-heading text-2xl font-bold uppercase tracking-widest" },
-  { name: "Research Lodge", style: "font-heading text-base font-bold tracking-wide" },
-  { name: "Mark Province", style: "font-heading text-lg font-medium" },
-  { name: "LODGE IPSUM", style: "font-heading text-sm font-bold uppercase tracking-[0.25em] italic" },
+  { name: "Provincial Office", style: "font-heading text-lg font-bold tracking-wide" },
+  { name: "Craft Lodge", style: "font-heading text-lg font-medium italic" },
+  { name: "Chapter Teams", style: "font-heading text-lg font-bold uppercase tracking-[0.2em]" },
+  { name: "Dining Stewards", style: "font-heading text-base font-medium tracking-widest" },
+  { name: "DISTRICT TEAMS", style: "font-heading text-sm font-bold uppercase tracking-[0.35em]" },
+  { name: "charity stewards", style: "font-heading text-lg font-medium italic tracking-wide" },
+  { name: "SECRETARIES", style: "font-heading text-2xl font-bold uppercase tracking-widest" },
+  { name: "Research Lodges", style: "font-heading text-base font-bold tracking-wide" },
+  { name: "Membership Teams", style: "font-heading text-lg font-medium" },
+  { name: "TREASURERS", style: "font-heading text-sm font-bold uppercase tracking-[0.25em] italic" },
 ];
 
 export function SocialProofSection() {

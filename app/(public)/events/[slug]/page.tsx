@@ -1,12 +1,73 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { formatDate, formatDateTime } from "@/lib/utils";
-import { isSupabaseConfigured } from "@/lib/db/with-fallback";
+import { isSupabaseConfigured, shouldUseInMemoryMock } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { EventRsvpForm } from "@/components/forms/event-rsvp-form";
 import { ArrowLeft, Calendar, MapPin, Clock, Users } from "lucide-react";
 import { getDefaultLodgeSlug, resolveLodgeSlug } from "@/lib/tenant";
+
+function siteUrl(): string {
+  const url =
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ??
+    "https://lodgepayments.co.uk";
+  return url.startsWith("http") ? url : `https://${url}`;
+}
+
+async function loadEvent(slug: string, lodgeSlug: string) {
+  if (isSupabaseConfigured()) {
+    const lodgeId = await db.resolveLodgeId(lodgeSlug);
+    return lodgeId ? await db.getEventBySlug(slug, lodgeId) : null;
+  }
+  if (shouldUseInMemoryMock()) {
+    return mockDb.getEventBySlug(slug, { lodge_slug: lodgeSlug });
+  }
+  return null;
+}
+
+export async function generateMetadata({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ lodge?: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const { lodge } = await searchParams;
+  const lodgeSlug = resolveLodgeSlug(lodge);
+  const event = await loadEvent(slug, lodgeSlug);
+  if (!event) return { title: "Event not found" };
+  const description = (event.description ?? "").slice(0, 200) ||
+    `${event.title} - ${formatDate(event.event_date)}`;
+  const canonical = `${siteUrl()}/events/${slug}${
+    lodgeSlug !== getDefaultLodgeSlug() ? `?lodge=${encodeURIComponent(lodgeSlug)}` : ""
+  }`;
+  return {
+    title: event.title,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      type: "article",
+      title: event.title,
+      description,
+      url: canonical,
+      images: event.featured_image_url ? [event.featured_image_url] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: event.title,
+      description,
+    },
+  };
+}
+
+function eventDateTimeValue(date: string, time: string | null) {
+  if (!time) return date;
+  return `${new Date(date).toISOString().slice(0, 10)}T${time}`;
+}
 
 export default async function EventPage({
   params,
@@ -22,16 +83,26 @@ export default async function EventPage({
   const withLodgeQuery = (href: string) =>
     lodgeSlug === defaultSlug ? href : `${href}?lodge=${encodeURIComponent(lodgeSlug)}`;
 
-  const useDb = isSupabaseConfigured();
-  let event;
-  if (useDb) {
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    event = lodgeId ? await db.getEventBySlug(slug, lodgeId) : null;
-  } else {
-    event = mockDb.getEventBySlug(slug, { lodge_slug: lodgeSlug });
-  }
-
+  const event = await loadEvent(slug, lodgeSlug);
   if (!event) notFound();
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Event",
+    name: event.title,
+    description: event.description ?? undefined,
+    startDate: eventDateTimeValue(event.event_date, event.event_time),
+    eventStatus: "https://schema.org/EventScheduled",
+    eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+    location: event.location
+      ? {
+          "@type": "Place",
+          name: event.location,
+        }
+      : undefined,
+    image: event.featured_image_url ? [event.featured_image_url] : undefined,
+    url: `${siteUrl()}/events/${slug}`,
+  };
 
   const hasPayments =
     event.enable_payments &&
@@ -43,6 +114,10 @@ export default async function EventPage({
 
   return (
     <div className="public-page">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <section className="public-hero">
         <div className="container-full relative z-10 max-w-4xl px-6 pb-16 pt-32 md:pb-20 md:pt-40">
           <Link 
@@ -98,7 +173,7 @@ export default async function EventPage({
               <div>
                 <p className="mb-1 text-sm font-medium uppercase tracking-wider text-slate-500">Date & Time</p>
                 <p className="font-medium text-slate-950">
-                  {formatDateTime(event.event_date + (event.event_time ? `T${event.event_time}` : ""))}
+                  {formatDateTime(eventDateTimeValue(event.event_date, event.event_time))}
                 </p>
               </div>
               <div>

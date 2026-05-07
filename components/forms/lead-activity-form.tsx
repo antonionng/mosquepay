@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, KeyboardEvent } from "react";
+import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -39,7 +39,13 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-export function LeadActivityForm({ leadId }: { leadId: string }) {
+export function LeadActivityForm({
+  leadId,
+  defaultType = "note",
+}: {
+  leadId: string;
+  defaultType?: FormData["activity_type"];
+}) {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attendees, setAttendees] = useState<string[]>([]);
@@ -55,8 +61,30 @@ export function LeadActivityForm({ leadId }: { leadId: string }) {
     formState: { isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { activity_type: "note" },
+    defaultValues: { activity_type: defaultType },
   });
+
+  useEffect(() => {
+    function handleSelectType(event: Event) {
+      const detail = (event as CustomEvent<{ type?: string }>).detail;
+      const next = detail?.type;
+      if (
+        next === "note" ||
+        next === "meeting" ||
+        next === "phone_call" ||
+        next === "email" ||
+        next === "task"
+      ) {
+        setValue("activity_type", next);
+        document
+          .getElementById("activity-form")
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+    window.addEventListener("lead-activity:set-type", handleSelectType);
+    return () =>
+      window.removeEventListener("lead-activity:set-type", handleSelectType);
+  }, [setValue]);
 
   const activityType = watch("activity_type");
 

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { resolveLodgeSlug } from "@/lib/tenant";
@@ -27,10 +28,9 @@ const marketingLinks = {
     { href: "/book-demo", label: "Book Demo" },
   ],
   secondary: [
-    { href: "/case-studies", label: "Case Studies" },
+    { href: "/faq", label: "FAQs" },
+    { href: "/contact#contact-form", label: "Technical support" },
     { href: "/contact", label: "Contact" },
-    { href: "/?lodge=covenant-4344", label: "Covenant Showcase" },
-    { href: "/admin", label: "Platform Admin" },
   ],
 };
 
@@ -91,71 +91,59 @@ export function PublicFooter() {
       className={
         isTenantMode
           ? "border-t border-slate-800 bg-slate-950 text-white"
-          : "border-t border-stone-300 bg-stone-200 text-slate-900"
+          : "border-t border-dash-border bg-dash-surface text-dash-text"
       }
     >
-      <div className="container-full py-16 lg:py-20">
+      <div className={isTenantMode ? "container-full py-16 lg:py-20" : "mx-auto max-w-6xl px-5 py-16 lg:px-8 lg:py-20"}>
         <div className="grid gap-14 lg:grid-cols-12">
           <div className="lg:col-span-5">
             <div className="mb-5 flex items-center gap-3">
-              <div
-                className={
-                  isTenantMode
-                    ? "flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-[11px] font-semibold tracking-[0.2em]"
-                    : "flex h-10 w-10 items-center justify-center rounded-xl border border-slate-300 bg-white text-[11px] font-semibold tracking-[0.2em]"
-                }
-              >
-                {initialsFromName(isTenantMode ? branding?.name ?? "Covenant Lodge" : "LodgePay")}
-              </div>
-              <div>
-                <p className="text-base font-semibold tracking-tight">
-                  {isTenantMode ? branding?.name ?? "Covenant Lodge" : "LodgePay"}
-                </p>
-                <p className={isTenantMode ? "text-sm text-slate-400" : "text-sm text-slate-600"}>
-                  {isTenantMode
-                    ? `No. 4344 · ${branding?.city ?? "Mayfair, London"}`
-                    : "Lodge websites, payments, and candidate CRM"}
-                </p>
-              </div>
+              {isTenantMode ? (
+                <>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-[11px] font-semibold tracking-[0.2em]">
+                    {initialsFromName(branding?.name ?? "Covenant Lodge")}
+                  </div>
+                  <div>
+                    <p className="text-base font-semibold tracking-tight">
+                      {branding?.name ?? "Covenant Lodge"}
+                    </p>
+                    <p className="text-sm text-slate-400">
+                      {`No. 4344 · ${branding?.city ?? "Mayfair, London"}`}
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <Image
+                  src="/brand/lodgepay-sidebar-logo.png"
+                  alt="LodgePay"
+                  width={1032}
+                  height={245}
+                  className="h-9 w-auto max-w-[10rem] object-contain opacity-90"
+                />
+              )}
             </div>
             <p
               className={
                 isTenantMode
                   ? "max-w-md text-sm leading-relaxed text-slate-400"
-                  : "max-w-md text-sm leading-relaxed text-slate-600"
+                  : "max-w-md text-sm leading-relaxed text-dash-muted"
               }
             >
               {isTenantMode
                 ? branding?.tagline ??
                   "A lodge website powered by LodgePay, helping members and visitors navigate events and enquiries."
-                : "LodgePay is a multi-tenant platform for lodges to launch modern sites, collect payments, and nurture candidates from enquiry to initiation."}
+                : "Websites, meetings, summons, dues, charity, Gift Aid, member portal, digital card, candidate CRM, mentoring, Almoner, communications, Treasurer reconciliation, and reporting for Masonic lodges."}
             </p>
-            <div
-              className={
-                isTenantMode
-                  ? "mt-6 flex flex-wrap gap-3 text-xs text-slate-400"
-                  : "mt-6 flex flex-wrap gap-3 text-xs text-slate-600"
-              }
-            >
-              <span
-                className={
-                  isTenantMode
-                    ? "rounded-full border border-white/10 bg-white/5 px-3 py-1.5"
-                    : "rounded-full border border-slate-300 bg-white px-3 py-1.5"
-                }
-              >
-                Established 1922
-              </span>
-              <span
-                className={
-                  isTenantMode
-                    ? "rounded-full border border-white/10 bg-white/5 px-3 py-1.5"
-                    : "rounded-full border border-slate-300 bg-white px-3 py-1.5"
-                }
-              >
-                Mark Masons&apos; Hall
-              </span>
-            </div>
+            {isTenantMode ? (
+              <div className="mt-6 flex flex-wrap gap-3 text-xs text-slate-400">
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
+                  Established 1922
+                </span>
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
+                  Mark Masons&apos; Hall
+                </span>
+              </div>
+            ) : null}
           </div>
           
           <div className="lg:col-span-3">
@@ -163,7 +151,7 @@ export function PublicFooter() {
               className={
                 isTenantMode
                   ? "mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
-                  : "mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700"
+                  : "mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-dash-faint"
               }
             >
               Explore
@@ -176,7 +164,7 @@ export function PublicFooter() {
                   className={
                     isTenantMode
                       ? "text-sm text-slate-400 transition-colors hover:text-white"
-                      : "text-sm text-slate-700 transition-colors hover:text-slate-950"
+                      : "text-sm text-dash-muted transition-colors hover:text-dash-text"
                   }
                 >
                   {link.label}
@@ -190,7 +178,7 @@ export function PublicFooter() {
               className={
                 isTenantMode
                   ? "mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
-                  : "mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700"
+                  : "mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-dash-faint"
               }
             >
               More
@@ -203,7 +191,7 @@ export function PublicFooter() {
                   className={
                     isTenantMode
                       ? "text-sm text-slate-400 transition-colors hover:text-white"
-                      : "text-sm text-slate-700 transition-colors hover:text-slate-950"
+                      : "text-sm text-dash-muted transition-colors hover:text-dash-text"
                   }
                 >
                   {link.label}
@@ -217,26 +205,36 @@ export function PublicFooter() {
           className={
             isTenantMode
               ? "mt-16 border-t border-white/10 pt-8"
-              : "mt-16 border-t border-stone-300 pt-8"
+              : "mt-16 border-t border-dash-border pt-8"
           }
         >
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className={isTenantMode ? "text-xs text-slate-500" : "text-xs text-slate-600"}>
+            <p className={isTenantMode ? "text-xs text-slate-500" : "text-xs text-dash-faint"}>
               © {new Date().getFullYear()} {isTenantMode ? branding?.name ?? "Covenant Lodge No. 4344" : "LodgePay"}.
               {" "}All rights reserved.
             </p>
-            <p className={isTenantMode ? "text-xs text-slate-500" : "text-xs text-slate-600"}>
+            <div className={isTenantMode ? "flex flex-wrap gap-5 text-xs text-slate-500" : "flex flex-wrap gap-5 text-xs text-dash-faint"}>
               {isTenantMode ? (
-                <>
+                <p>
                   Powered by{" "}
                   <Link href="/" className="font-medium text-slate-400 transition-colors hover:text-white">
                     Covenant Platform
                   </Link>
-                </>
+                </p>
               ) : (
-                "Built for modern lodge operations"
+                <>
+                  <Link href="/privacy" className="transition-colors hover:text-dash-muted">
+                    Privacy
+                  </Link>
+                  <Link href="/terms" className="transition-colors hover:text-dash-muted">
+                    Terms
+                  </Link>
+                  <Link href="/gdpr" className="transition-colors hover:text-dash-muted">
+                    GDPR
+                  </Link>
+                </>
               )}
-            </p>
+            </div>
           </div>
         </div>
       </div>

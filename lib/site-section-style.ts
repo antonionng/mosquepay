@@ -35,6 +35,10 @@ const BG_POS = new Set([
   "center right",
 ]);
 
+const IMAGE_POS = new Set(["left", "right", "top", "bottom", "full"]);
+const IMAGE_SHAPE = new Set(["rounded", "square", "circle", "arch"]);
+const FORM_MODES = new Set(["none", "contact", "lead"]);
+
 function normalizeHex(color: string | null | undefined): string | null {
   if (!color || typeof color !== "string") return null;
   const t = color.trim();
@@ -53,6 +57,7 @@ function sanitizeImageUrl(url: string | null | undefined): string | null {
   if (!url || typeof url !== "string") return null;
   const t = url.trim();
   if (!t || t.length > MAX_IMAGE_URL_LENGTH) return null;
+  if (t.startsWith("data:image/")) return t;
   try {
     const u = new URL(t);
     if (u.protocol !== "https:") return null;
@@ -76,6 +81,30 @@ function sanitizeBackgroundPosition(pos: string | null | undefined): string | nu
   return BG_POS.has(t) ? t : null;
 }
 
+function sanitizeShortText(value: string | null | undefined): string | null {
+  if (!value || typeof value !== "string") return null;
+  const t = value.trim().replace(/\s+/g, " ");
+  return t.length > 0 ? t.slice(0, 160) : null;
+}
+
+function sanitizeImagePosition(value: string | null | undefined): LodgeSiteSectionStyle["image_position"] {
+  if (!value || typeof value !== "string") return null;
+  const t = value.trim().toLowerCase();
+  return IMAGE_POS.has(t) ? (t as NonNullable<LodgeSiteSectionStyle["image_position"]>) : null;
+}
+
+function sanitizeImageShape(value: string | null | undefined): LodgeSiteSectionStyle["image_shape"] {
+  if (!value || typeof value !== "string") return null;
+  const t = value.trim().toLowerCase();
+  return IMAGE_SHAPE.has(t) ? (t as NonNullable<LodgeSiteSectionStyle["image_shape"]>) : null;
+}
+
+function sanitizeFormMode(value: string | null | undefined): LodgeSiteSectionStyle["form_mode"] {
+  if (!value || typeof value !== "string") return null;
+  const t = value.trim().toLowerCase();
+  return FORM_MODES.has(t) ? (t as NonNullable<LodgeSiteSectionStyle["form_mode"]>) : null;
+}
+
 /** Server-safe normalization for persisted section.style */
 export function sanitizeSectionStyle(
   raw: unknown
@@ -97,6 +126,25 @@ export function sanitizeSectionStyle(
     typeof o.background_position === "string" ? o.background_position : null
   );
   if (bp) out.background_position = bp;
+
+  const image = sanitizeImageUrl(typeof o.image_url === "string" ? o.image_url : null);
+  if (image) out.image_url = image;
+
+  const imageAlt = sanitizeShortText(typeof o.image_alt === "string" ? o.image_alt : null);
+  if (imageAlt) out.image_alt = imageAlt;
+
+  const imagePosition = sanitizeImagePosition(
+    typeof o.image_position === "string" ? o.image_position : null
+  );
+  if (imagePosition) out.image_position = imagePosition;
+
+  const imageShape = sanitizeImageShape(
+    typeof o.image_shape === "string" ? o.image_shape : null
+  );
+  if (imageShape) out.image_shape = imageShape;
+
+  const formMode = sanitizeFormMode(typeof o.form_mode === "string" ? o.form_mode : null);
+  if (formMode) out.form_mode = formMode;
 
   return Object.keys(out).length > 0 ? out : undefined;
 }
@@ -138,6 +186,14 @@ export function heroBackgroundLayers(section: SiteSectionLike | null | undefined
     overlayOpacity,
     backgroundPosition: bp ?? "center",
   };
+}
+
+export function sectionBackgroundLayers(section: SiteSectionLike | null | undefined): {
+  imageUrl: string | null;
+  overlayOpacity: number;
+  backgroundPosition: string;
+} {
+  return heroBackgroundLayers(section);
 }
 
 function parseSectionType(v: unknown): LodgeSiteSection["type"] {

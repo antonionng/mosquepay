@@ -35,6 +35,7 @@ import {
   ArrowRight,
   Search,
   Shield,
+  Download,
 } from "lucide-react";
 
 type Payment = {
@@ -75,6 +76,17 @@ type GiftAidDeclaration = {
   status: string;
 };
 
+type DuesRecord = {
+  id: string;
+  member_name: string | null;
+  member_email: string;
+  amount: number;
+  status: string;
+  paid_at: string | null;
+  period_start: string;
+  period_end: string;
+};
+
 type Tab = "payments" | "giftaid" | "donations";
 
 type KpiAccent = "emerald" | "amber" | "blue" | "rose";
@@ -87,7 +99,7 @@ const kpiAccentIcon: Record<KpiAccent, { wrap: string; icon: string }> = {
 };
 
 function paymentStatusBadge(status: string) {
-  if (status === "succeeded")
+  if (status === "succeeded" || status === "completed" || status === "paid")
     return (
       <Badge variant="success" className="border-emerald-200 capitalize">
         {status}
@@ -99,7 +111,7 @@ function paymentStatusBadge(status: string) {
         {status}
       </Badge>
     );
-  if (status === "refunded")
+  if (status === "refunded" || status === "partially_refunded")
     return (
       <Badge variant="destructive" className="capitalize">
         {status}
@@ -142,22 +154,33 @@ export function AdminPaymentsClient({
   payments,
   donations,
   giftAidDeclarations,
+  duesRecords,
 }: {
   payments: Payment[];
   donations: Donation[];
   giftAidDeclarations: GiftAidDeclaration[];
+  duesRecords: DuesRecord[];
 }) {
   const [activeTab, setActiveTab] = useState<Tab>("payments");
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
-  const succeeded = payments.filter((p) => p.status === "succeeded");
+  const succeeded = payments.filter(
+    (p) => p.status === "succeeded" || p.status === "completed" || p.status === "paid"
+  );
   const pending = payments.filter((p) => p.status === "pending");
-  const refunded = payments.filter((p) => p.status === "refunded");
+  const refunded = payments.filter(
+    (p) => p.status === "refunded" || p.status === "partially_refunded"
+  );
   const totalRevenue = succeeded.reduce((s, p) => s + p.total_amount, 0);
   const pendingAmount = pending.reduce((s, p) => s + p.total_amount, 0);
   const refundedAmount = refunded.reduce((s, p) => s + p.refund_amount, 0);
+  const diningIncome = succeeded.reduce((s, p) => s + (p.dining_amount ?? 0), 0);
+  const charityIncome = succeeded.reduce((s, p) => s + (p.charity_amount ?? 0), 0);
+  const duesOutstanding = duesRecords
+    .filter((d) => d.status === "outstanding")
+    .reduce((s, d) => s + d.amount, 0);
 
   const totalGiftAidReclaimable = giftAidDeclarations
     .filter((g) => g.status === "active")
@@ -220,6 +243,127 @@ export function AdminPaymentsClient({
     { key: "donations", label: "Donations", icon: Gift },
   ];
 
+  function downloadCsv(filename: string, headers: string[], rows: Array<Array<string | number | null>>) {
+    const csv = [headers, ...rows]
+      .map((row) =>
+        row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(",")
+      )
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportTreasurerReport(kind: string) {
+    if (kind === "dues") {
+      downloadCsv(
+        "dues-outstanding.csv",
+        ["Name", "Email", "Amount", "Status", "Period start", "Period end"],
+        duesRecords
+          .filter((d) => d.status === "outstanding")
+          .map((d) => [d.member_name, d.member_email, d.amount, d.status, d.period_start, d.period_end])
+      );
+    }
+    if (kind === "payments") {
+      downloadCsv(
+        "payments-received.csv",
+        ["Date", "Name", "Email", "Amount", "Status", "Stripe intent"],
+        succeeded.map((p) => [
+          p.created_at,
+          p.user_name,
+          p.user_email,
+          p.total_amount,
+          p.status,
+          p.stripe_payment_intent_id,
+        ])
+      );
+    }
+    if (kind === "dining") {
+      downloadCsv(
+        "dining-income.csv",
+        ["Date", "Name", "Email", "Dining amount", "Status", "Stripe intent"],
+        payments
+          .filter((p) => p.dining_amount > 0)
+          .map((p) => [
+            p.created_at,
+            p.user_name,
+            p.user_email,
+            p.dining_amount,
+            p.status,
+            p.stripe_payment_intent_id,
+          ])
+      );
+    }
+    if (kind === "charity") {
+      downloadCsv(
+        "charity-totals.csv",
+        ["Date", "Name", "Email", "Amount", "Source", "Gift Aid", "Status"],
+        donations.map((d) => [
+          d.created_at,
+          d.donor_name,
+          d.donor_email,
+          d.amount,
+          d.source,
+          d.gift_aid_declared ? "yes" : "no",
+          d.status,
+        ])
+      );
+    }
+    if (kind === "refunds") {
+      downloadCsv(
+        "refunds.csv",
+        ["Date", "Name", "Email", "Refund amount", "Status", "Stripe intent"],
+        payments
+          .filter((p) => p.refund_amount > 0 || p.status === "refunded")
+          .map((p) => [
+            p.created_at,
+            p.user_name,
+            p.user_email,
+            p.refund_amount,
+            p.status,
+            p.stripe_payment_intent_id,
+          ])
+      );
+    }
+    if (kind === "gift-aid") {
+      downloadCsv(
+        "gift-aid-export.csv",
+        ["Donor", "Email", "Address", "Declaration date", "Donations", "Reclaimable", "Status"],
+        giftAidDeclarations.map((g) => [
+          g.donor_name,
+          g.donor_email,
+          g.donor_address ?? "",
+          g.declaration_date ?? "",
+          g.total_donations ?? 0,
+          g.reclaimable_amount ?? 0,
+          g.status,
+        ])
+      );
+    }
+    if (kind === "stripe") {
+      downloadCsv(
+        "stripe-reconciliation.csv",
+        ["Date", "Name", "Email", "Gross", "Dining", "Charity", "Raffle", "Refund", "Status", "Stripe intent"],
+        payments.map((p) => [
+          p.created_at,
+          p.user_name,
+          p.user_email,
+          p.total_amount,
+          p.dining_amount,
+          p.charity_amount,
+          p.raffle_amount,
+          p.refund_amount,
+          p.status,
+          p.stripe_payment_intent_id,
+        ])
+      );
+    }
+  }
+
   return (
     <div className="space-y-8">
       <div className="admin-page-head">
@@ -264,6 +408,42 @@ export function AdminPaymentsClient({
           );
         })}
       </div>
+
+      <Card variant="panel" className="p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-dash-text">Treasurer Exports</h2>
+            <p className="mt-1 text-sm text-dash-muted">
+              Export dues, payments, dining, charity, refunds, Gift Aid, and Stripe reconciliation.
+            </p>
+            <p className="mt-2 text-xs text-dash-faint">
+              Outstanding dues £{duesOutstanding.toFixed(2)} · Dining £{diningIncome.toFixed(2)} · Charity £{charityIncome.toFixed(2)}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {[
+              ["dues", "Dues Outstanding"],
+              ["payments", "Payments Received"],
+              ["dining", "Dining Income"],
+              ["charity", "Charity Totals"],
+              ["refunds", "Refunds"],
+              ["gift-aid", "Gift Aid"],
+              ["stripe", "Stripe Reconciliation"],
+            ].map(([kind, label]) => (
+              <Button
+                key={kind}
+                type="button"
+                variant="dashboard"
+                size="sm"
+                onClick={() => exportTreasurerReport(kind)}
+              >
+                <Download className="mr-1.5 h-4 w-4" />
+                {label}
+              </Button>
+            ))}
+          </div>
+        </div>
+      </Card>
 
       <div className="dash-filter-bar flex flex-wrap items-center gap-2 py-3">
         <span className="text-xs font-semibold uppercase tracking-[0.14em] text-dash-muted">
@@ -363,7 +543,7 @@ export function AdminPaymentsClient({
                         {formatDate(p.created_at)}
                       </TableCell>
                       <TableCell className={cn(DASH_TABLE.cell, "font-medium")}>
-                        {p.user_name ?? "—"}
+                        {p.user_name ?? "Not recorded"}
                       </TableCell>
                       <TableCell className={DASH_TABLE.cellMuted}>{p.user_email}</TableCell>
                       <TableCell className={cn(DASH_TABLE.cell, "text-right font-medium tabular-nums")}>
@@ -409,6 +589,14 @@ export function AdminPaymentsClient({
                                 Stripe ID: {p.stripe_payment_intent_id}
                               </p>
                             )}
+                            <div className="mt-3">
+                              <Link
+                                href={`/admin/payments/${p.id}`}
+                                className="text-xs font-medium text-dash-ring hover:underline"
+                              >
+                                Open full payment record →
+                              </Link>
+                            </div>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -477,7 +665,7 @@ export function AdminPaymentsClient({
                         {g.donor_address}
                       </TableCell>
                       <TableCell className={DASH_TABLE.cellMuted}>
-                        {g.declaration_date ? formatDate(g.declaration_date) : "—"}
+                        {g.declaration_date ? formatDate(g.declaration_date) : "Not recorded"}
                       </TableCell>
                       <TableCell className={cn(DASH_TABLE.cell, "text-right tabular-nums")}>
                         £{(g.total_donations ?? 0).toFixed(2)}
@@ -501,7 +689,7 @@ export function AdminPaymentsClient({
             <div>
               <h2 className="dash-panel-header-title">Donations snapshot</h2>
               <p className="dash-panel-header-description">
-                Latest rows — open the full page for filters and export.
+                Latest rows. Open the full page for filters and export.
               </p>
             </div>
             <Button variant="dashboard" size="sm" asChild className="shrink-0">

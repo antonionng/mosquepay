@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
+import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { requireAdminApiAuth } from "@/lib/auth/api";
 
 export async function GET(request: NextRequest) {
+  const _rejectMock = rejectIfMockDisabled();
+  if (_rejectMock) return _rejectMock;
+
   const lodgeSlug = getLodgeSlugFromRequest(request);
 
   if (isSupabaseConfigured()) {
@@ -12,16 +17,24 @@ export async function GET(request: NextRequest) {
     if (!lodgeId) {
       return NextResponse.json([]);
     }
-    const posts = await db.getBlogPosts(lodgeId);
+    const posts = await db.getBlogPosts(lodgeId, { published: true });
     return NextResponse.json(posts);
   }
 
-  const posts = mockDb.getBlogPosts({ lodge_slug: lodgeSlug });
+  const posts = mockDb
+    .getBlogPosts({ lodge_slug: lodgeSlug })
+    .filter((post) => post.published);
   return NextResponse.json(posts);
 }
 
 export async function POST(request: NextRequest) {
+  const _rejectMock = rejectIfMockDisabled();
+  if (_rejectMock) return _rejectMock;
+
   try {
+    const unauthorized = await requireAdminApiAuth();
+    if (unauthorized) return unauthorized;
+
     const lodgeSlug = getLodgeSlugFromRequest(request);
     const body = await request.json();
     const title = body.title?.trim();

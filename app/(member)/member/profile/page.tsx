@@ -288,13 +288,13 @@ export default function MemberProfilePage() {
               <div>
                 <p className="text-sm text-slate-500">Lodge</p>
                 <p className="text-base font-medium text-slate-900 mt-0.5">
-                  {profile?.lodge_name ?? "—"}
+                  {profile?.lodge_name ?? "Not recorded"}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-slate-500">Lodge Number</p>
                 <p className="text-base font-medium text-slate-900 mt-0.5">
-                  No. {profile?.lodge_number ?? "—"}
+                  No. {profile?.lodge_number ?? "Not recorded"}
                 </p>
               </div>
               {profile?.member_since && (

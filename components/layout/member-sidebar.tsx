@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   X,
+  IdCard,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -23,6 +24,7 @@ const nav = [
   { href: "/member/payments", label: "Payments", icon: CreditCard },
   { href: "/member/dues", label: "Dues", icon: Wallet },
   { href: "/member/donations", label: "Donations", icon: Heart },
+  { href: "/member/card", label: "My card", icon: IdCard },
   { href: "/member/profile", label: "Profile", icon: User },
 ];
 

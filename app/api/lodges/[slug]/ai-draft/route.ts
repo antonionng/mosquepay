@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
+import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { resolveLodgeSlug } from "@/lib/tenant";
 import type { LodgeSiteSectionStyle } from "@/lib/db/types";
 import { sanitizeSectionStyle } from "@/lib/site-section-style";
+import { requireAdminApiAuth } from "@/lib/auth/api";
 
 type SectionType =
   | "hero"
@@ -398,7 +400,13 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
+  const _rejectMock = rejectIfMockDisabled();
+  if (_rejectMock) return _rejectMock;
+
   try {
+    const unauthorized = await requireAdminApiAuth();
+    if (unauthorized) return unauthorized;
+
     const { slug } = await params;
     const lodgeSlug = resolveLodgeSlug(slug);
     const lodge = isSupabaseConfigured()

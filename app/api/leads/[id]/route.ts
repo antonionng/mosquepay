@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
+import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { requireAdminApiAuth } from "@/lib/auth/api";
+import { writeAuditLog } from "@/lib/audit";
 
 /** Stages accepted from admin CRM (list, detail, kanban) and public enquiry flow. */
 const VALID_STAGES = [
@@ -23,17 +26,60 @@ const VALID_STAGES = [
   "initiation",
 ];
 
+const ALLOWED_FIELDS = new Set([
+  "stage",
+  "assigned_to",
+  "first_name",
+  "last_name",
+  "phone",
+  "location",
+  "proposer_member_id",
+  "proposer_name",
+  "seconder_member_id",
+  "seconder_name",
+  "next_step",
+  "next_step_due_date",
+  "proposal_date",
+  "ballot_date",
+  "interview_completed_at",
+  "consent_given_at",
+  "notes",
+]);
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const _rejectMock = rejectIfMockDisabled();
+  if (_rejectMock) return _rejectMock;
+
   const { id } = await params;
   try {
+    const unauthorized = await requireAdminApiAuth();
+    if (unauthorized) return unauthorized;
+
     const lodgeSlug = getLodgeSlugFromRequest(request);
     const body = await request.json();
-    const stage = body.stage;
+    const updates: Record<string, unknown> = {};
 
-    if (!stage || !VALID_STAGES.includes(stage)) {
+    for (const [key, value] of Object.entries(body)) {
+      if (ALLOWED_FIELDS.has(key)) {
+        updates[key] = value === "" ? null : value;
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json(
+        { error: "No valid fields to update." },
+        { status: 400 }
+      );
+    }
+
+    if (
+      updates.stage !== undefined &&
+      typeof updates.stage === "string" &&
+      !VALID_STAGES.includes(updates.stage)
+    ) {
       return NextResponse.json(
         { error: "Valid stage is required." },
         { status: 400 }
@@ -45,19 +91,28 @@ export async function PATCH(
       if (!lodgeId) {
         return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
       }
-      const updated = await db.updateLead(id, lodgeId, { stage });
+      const updated = await db.updateLead(id, lodgeId, updates);
       if (!updated) {
         return NextResponse.json({ error: "Lead not found." }, { status: 404 });
       }
-      return NextResponse.json({ success: true });
+      if (updates.stage) {
+        await writeAuditLog({
+          lodgeId,
+          action: "stage_changed",
+          entityType: "lead",
+          entityId: updated.id,
+          summary: `Lead ${updated.first_name} ${updated.last_name} moved to ${updated.stage}`,
+        });
+      }
+      return NextResponse.json({ success: true, lead: updated });
     }
 
-    const updated = mockDb.updateLead(id, { stage }, { lodge_slug: lodgeSlug });
+    const updated = mockDb.updateLead(id, updates, { lodge_slug: lodgeSlug });
     if (!updated) {
       return NextResponse.json({ error: "Lead not found." }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, lead: updated });
   } catch (e) {
     console.error("Leads PATCH API error:", e);
     return NextResponse.json(

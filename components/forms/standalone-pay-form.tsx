@@ -171,7 +171,7 @@ export function StandalonePayForm({
             />
             <Label htmlFor="include_dining">
               Dining (£{diningPrice})
-              {diningDescription ? ` — ${diningDescription}` : ""}
+              {diningDescription ? `: ${diningDescription}` : ""}
             </Label>
           </div>
         )}

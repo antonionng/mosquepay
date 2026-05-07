@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 
 interface DuesInfo {
   annualAmount: number;
@@ -51,6 +52,8 @@ export default function MemberDuesPage() {
   const [dues, setDues] = useState<DuesInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
+  const [payMode, setPayMode] = useState<"payment" | "subscription" | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -91,6 +94,7 @@ export default function MemberDuesPage() {
   async function handlePay(mode: "payment" | "subscription") {
     if (!dues?.duesId || !dues?.memberEmail) return;
     setPaying(true);
+    setError(null);
     try {
       const res = await fetch("/api/dues/pay", {
         method: "POST",
@@ -102,17 +106,17 @@ export default function MemberDuesPage() {
           mode,
         }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.url) {
-          window.location.href = data.url;
-          return;
-        }
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+        return;
       }
-    } catch {
-      /* empty */
+      throw new Error(data.error ?? "Could not start payment.");
+    } catch (paymentError) {
+      setError(paymentError instanceof Error ? paymentError.message : "Could not start payment.");
     } finally {
       setPaying(false);
+      setPayMode(null);
     }
   }
 
@@ -137,6 +141,12 @@ export default function MemberDuesPage() {
         </div>
       ) : (
         <>
+          {error && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-800">
+              {error}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div
               className={`rounded-2xl border p-6 shadow-sm ${
@@ -245,7 +255,7 @@ export default function MemberDuesPage() {
                     variant="primary"
                     size="lg"
                     disabled={paying}
-                    onClick={() => handlePay("payment")}
+                    onClick={() => setPayMode("payment")}
                   >
                     <ExternalLink className="h-4 w-4 mr-2" />
                     {paying ? "Redirecting..." : `Pay £${outstanding.toFixed(2)} Now`}
@@ -273,7 +283,7 @@ export default function MemberDuesPage() {
                       variant="secondary"
                       size="lg"
                       disabled={paying}
-                      onClick={() => handlePay("subscription")}
+                      onClick={() => setPayMode("subscription")}
                     >
                       <Repeat className="h-4 w-4 mr-2" />
                       {paying ? "Redirecting..." : "Set Up Instalments"}
@@ -327,6 +337,23 @@ export default function MemberDuesPage() {
           </div>
         </>
       )}
+      <ConfirmActionDialog
+        open={Boolean(payMode)}
+        onOpenChange={(open) => {
+          if (!open) setPayMode(null);
+        }}
+        title={payMode === "subscription" ? "Set up instalments?" : "Pay dues in full?"}
+        description={
+          payMode === "subscription"
+            ? `You will be taken to Stripe to set up ${dues?.instalmentCount ?? 0} instalments.`
+            : `You will be taken to Stripe to pay £${outstanding.toFixed(2)} securely.`
+        }
+        confirmLabel={payMode === "subscription" ? "Continue to Stripe" : "Pay securely"}
+        loading={paying}
+        onConfirm={() => {
+          if (payMode) void handlePay(payMode);
+        }}
+      />
     </div>
   );
 }

@@ -2,18 +2,22 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Ban, Loader2, CheckCircle2 } from "lucide-react";
+import { Ban, CheckCircle2 } from "lucide-react";
 import type { Lodge } from "@/lib/db/types";
+import { Button } from "@/components/ui/button";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 
 export function LodgeDetailActions({ lodge }: { lodge: Lodge }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleToggle() {
     setLoading(true);
+    setError(null);
     try {
-      await fetch("/api/lodges", {
+      const res = await fetch("/api/lodges", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -22,54 +26,16 @@ export function LodgeDetailActions({ lodge }: { lodge: Lodge }) {
           is_active: !lodge.is_active,
         }),
       });
+      if (!res.ok) {
+        throw new Error("Could not update lodge status.");
+      }
       router.refresh();
-    } catch {
-      /* fail silently */
+      setConfirm(false);
+    } catch (toggleError) {
+      setError(toggleError instanceof Error ? toggleError.message : "Could not update lodge status.");
     } finally {
       setLoading(false);
-      setConfirm(false);
     }
-  }
-
-  if (confirm) {
-    return (
-      <div className="admin-surface p-6">
-        <h2 className="text-lg font-semibold text-white border-b border-white/10 pb-4">
-          {lodge.is_active ? "Deactivate" : "Activate"} Lodge
-        </h2>
-        <p className="mt-4 text-sm text-slate-300">
-          {lodge.is_active
-            ? "This will hide the lodge from public pages. You can reactivate it later."
-            : "This will make the lodge visible on public pages."}
-        </p>
-        <div className="mt-4 flex gap-2">
-          <button
-            onClick={handleToggle}
-            disabled={loading}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-white transition-colors ${
-              lodge.is_active
-                ? "bg-red-600 hover:bg-red-500"
-                : "bg-emerald-600 hover:bg-emerald-500"
-            } disabled:opacity-50`}
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : lodge.is_active ? (
-              <Ban className="h-4 w-4" />
-            ) : (
-              <CheckCircle2 className="h-4 w-4" />
-            )}
-            Confirm
-          </button>
-          <button
-            onClick={() => setConfirm(false)}
-            className="rounded-xl border border-white/10 px-4 py-2.5 text-sm text-slate-400 transition-colors hover:bg-white/5"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    );
   }
 
   return (
@@ -77,8 +43,15 @@ export function LodgeDetailActions({ lodge }: { lodge: Lodge }) {
       <h2 className="text-lg font-semibold text-white border-b border-white/10 pb-4">
         Actions
       </h2>
-      <div className="mt-4">
-        <button
+      {error && (
+        <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          {error}
+        </div>
+      )}
+      <div className="mt-4 space-y-3">
+        <Button
+          type="button"
+          variant="dashboard"
           onClick={() => setConfirm(true)}
           className={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
             lodge.is_active
@@ -95,8 +68,25 @@ export function LodgeDetailActions({ lodge }: { lodge: Lodge }) {
               <CheckCircle2 className="h-4 w-4" /> Activate Lodge
             </>
           )}
-        </button>
+        </Button>
+        <p className="text-xs leading-5 text-slate-400">
+          Status changes are recorded in the audit trail for operator review.
+        </p>
       </div>
+      <ConfirmActionDialog
+        open={confirm}
+        onOpenChange={setConfirm}
+        title={`${lodge.is_active ? "Deactivate" : "Activate"} lodge?`}
+        description={
+          lodge.is_active
+            ? "This will hide the lodge from public pages and tenant selectors. Existing admin records are preserved."
+            : "This will make the lodge visible again for public pages and tenant selectors."
+        }
+        confirmLabel={lodge.is_active ? "Deactivate lodge" : "Activate lodge"}
+        loading={loading}
+        tone={lodge.is_active ? "danger" : "success"}
+        onConfirm={handleToggle}
+      />
     </div>
   );
 }

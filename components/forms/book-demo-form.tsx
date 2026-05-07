@@ -59,7 +59,7 @@ export function BookDemoForm() {
         <CheckCircle className="mx-auto mb-3 h-10 w-10 text-green-600" />
         <p className="font-semibold text-slate-900">Demo request received</p>
         <p className="mt-2 text-sm text-slate-600">
-          Thanks. We will reach out shortly to schedule your LodgePay walkthrough.
+          Thanks. We will reach out shortly to schedule your LodgePay walkthrough, and a confirmation email is on its way.
         </p>
       </div>
     );

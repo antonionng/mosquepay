@@ -29,7 +29,10 @@ import {
   Mail,
   CheckCircle2,
   Inbox,
+  Flag,
+  UserCheck,
 } from "lucide-react";
+import { PROMPT_CLASSES } from "@/lib/leads/next-action";
 
 const STAGE_ACCENT: Record<string, string> = {
   expression_of_interest: "border-t-blue-500",
@@ -71,6 +74,10 @@ type Lead = {
   daysInStage: number;
   daysSinceActivity: number;
   lastActivityType: string | null;
+  converted_at: string | null;
+  promptLabel: string;
+  promptReason: string;
+  promptSeverity: "info" | "warn" | "urgent" | "ok";
 };
 
 export function LeadsKanban({
@@ -326,6 +333,21 @@ function KanbanCard({
             <span>Cooling</span>
           </div>
         )}
+      </div>
+
+      <div
+        className={cn(
+          "mt-2.5 flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-medium",
+          PROMPT_CLASSES[lead.promptSeverity]
+        )}
+        title={lead.promptReason}
+      >
+        {lead.converted_at ? (
+          <UserCheck className="h-3 w-3 shrink-0" />
+        ) : (
+          <Flag className="h-3 w-3 shrink-0" />
+        )}
+        <span className="truncate">{lead.promptLabel}</span>
       </div>
     </div>
   );

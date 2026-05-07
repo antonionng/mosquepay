@@ -12,14 +12,70 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
+  FileText,
+  User,
+  IdCard,
 } from "lucide-react";
+import { NextMeetingCard } from "@/components/member/next-meeting-card";
 
 interface DashboardData {
-  user: { full_name?: string; email?: string } | null;
+  user: {
+    full_name?: string;
+    email?: string;
+    phone?: string | null;
+    dietary_requirements?: string | null;
+    rank?: string | null;
+    membership_status?: string;
+  } | null;
+  nextEvent: {
+    id: string;
+    title: string;
+    slug: string;
+    event_date: string;
+    event_time: string | null;
+    location: string | null;
+    dress_code: string | null;
+    enable_rsvp: boolean;
+    enable_dining_rsvp: boolean;
+    dining_price: number | null;
+    current_rsvp: {
+      id: string;
+      status: string;
+      attending_ceremony: boolean;
+      attending_dining: boolean;
+    } | null;
+  } | null;
   upcomingEvents: number;
   outstandingDues: number;
   recentPaymentsTotal: number;
   donationTotal: number;
+  summonsLinks: {
+    id: string;
+    eventId: string;
+    title: string;
+    eventDate: string | null;
+    sentAt: string;
+    accessedAt: string | null;
+    accessCount: number;
+  }[];
+  rsvps: {
+    id: string;
+    eventId: string;
+    eventTitle: string;
+    eventDate: string | null;
+    status: string;
+    attendingDining: boolean;
+    guests: number;
+    dietary: string | null;
+    paymentRequired: boolean;
+    paymentCompleted: boolean;
+  }[];
+  notices: {
+    id: string;
+    title: string;
+    date: string;
+    text: string;
+  }[];
   recentActivity: {
     id: string;
     type: "payment" | "event" | "donation" | "dues";
@@ -98,20 +154,28 @@ export default function MemberDashboardPage() {
         } else {
           setData({
             user: null,
+            nextEvent: null,
             upcomingEvents: 0,
             outstandingDues: 0,
             recentPaymentsTotal: 0,
             donationTotal: 0,
+            summonsLinks: [],
+            rsvps: [],
+            notices: [],
             recentActivity: [],
           });
         }
       } catch {
         setData({
           user: null,
+          nextEvent: null,
           upcomingEvents: 0,
           outstandingDues: 0,
           recentPaymentsTotal: 0,
           donationTotal: 0,
+          summonsLinks: [],
+          rsvps: [],
+          notices: [],
           recentActivity: [],
         });
       } finally {
@@ -180,7 +244,9 @@ export default function MemberDashboardPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {!loading && <NextMeetingCard nextEvent={data?.nextEvent ?? null} />}
+
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <Link
           href="/member/events"
           className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-blue-200 hover:shadow-md transition-all"
@@ -222,7 +288,136 @@ export default function MemberDashboardPage() {
           </div>
           <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-pink-500 transition-colors" />
         </Link>
+
+        <Link
+          href="/member/card"
+          className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-emerald-200 hover:shadow-md transition-all"
+        >
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 group-hover:bg-emerald-100 transition-colors">
+            <IdCard className="h-6 w-6 text-emerald-600" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-slate-900">My Card</p>
+            <p className="text-xs text-slate-500">QR + calendar feed</p>
+          </div>
+          <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-emerald-500 transition-colors" />
+        </Link>
       </div>
+
+      {!loading && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <h2 className="text-base font-semibold text-slate-900">Summons</h2>
+              <FileText className="h-4 w-4 text-slate-400" />
+            </div>
+            <div className="divide-y divide-slate-100">
+              {data?.summonsLinks.length ? (
+                data.summonsLinks.map((summons) => (
+                  <Link
+                    key={summons.id}
+                    href={`/member/events/${summons.eventId}/summons`}
+                    className="block px-6 py-4 transition-colors hover:bg-slate-50"
+                  >
+                    <p className="text-sm font-medium text-slate-900">{summons.title}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {summons.eventDate
+                        ? new Date(summons.eventDate).toLocaleDateString("en-GB")
+                        : "Date to be confirmed"}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Viewed {summons.accessCount} time{summons.accessCount === 1 ? "" : "s"}
+                    </p>
+                  </Link>
+                ))
+              ) : (
+                <div className="px-6 py-8 text-sm text-slate-500">
+                  Summons sent by email will appear here after you sign up.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <h2 className="text-base font-semibold text-slate-900">RSVP History</h2>
+              <Calendar className="h-4 w-4 text-slate-400" />
+            </div>
+            <div className="divide-y divide-slate-100">
+              {data?.rsvps.length ? (
+                data.rsvps.slice(0, 5).map((rsvp) => (
+                  <div key={rsvp.id} className="px-6 py-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">{rsvp.eventTitle}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {rsvp.status} · {rsvp.attendingDining ? "Dining" : "No dining"}
+                          {rsvp.guests > 0 ? ` · ${rsvp.guests} guest${rsvp.guests === 1 ? "" : "s"}` : ""}
+                        </p>
+                      </div>
+                      {rsvp.paymentRequired && (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                          {rsvp.paymentCompleted ? "Paid" : "Unpaid"}
+                        </span>
+                      )}
+                    </div>
+                    {rsvp.dietary && (
+                      <p className="mt-2 text-xs text-slate-400">Dietary: {rsvp.dietary}</p>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="px-6 py-8 text-sm text-slate-500">
+                  Your RSVP history will appear here.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <h2 className="text-base font-semibold text-slate-900">Profile Snapshot</h2>
+              <User className="h-4 w-4 text-slate-400" />
+            </div>
+            <div className="space-y-4 px-6 py-5 text-sm">
+              <div>
+                <p className="text-xs text-slate-400">Email</p>
+                <p className="font-medium text-slate-900">{data?.user?.email ?? "Not recorded"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">Phone</p>
+                <p className="font-medium text-slate-900">{data?.user?.phone ?? "Not recorded"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">Dietary preferences</p>
+                <p className="font-medium text-slate-900">
+                  {data?.user?.dietary_requirements ?? "Not recorded"}
+                </p>
+              </div>
+              <Link href="/member/profile" className="inline-flex text-sm font-medium text-blue-600">
+                Update profile
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!loading && data?.notices.length ? (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 px-6 py-5">
+          <h2 className="text-base font-semibold text-blue-950">Lodge Notices</h2>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            {data.notices.map((notice) => (
+              <div key={notice.id} className="rounded-xl bg-white/80 p-4">
+                <p className="text-sm font-medium text-blue-950">{notice.title}</p>
+                <p className="mt-1 text-xs text-blue-700">
+                  {new Date(notice.date).toLocaleDateString("en-GB")}
+                </p>
+                <p className="mt-2 line-clamp-2 text-sm text-blue-900">{notice.text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">

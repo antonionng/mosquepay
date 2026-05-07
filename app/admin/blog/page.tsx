@@ -176,7 +176,7 @@ export default async function AdminBlogPage() {
                     )}
                   </TableCell>
                   <TableCell className={DASH_TABLE.cellMuted}>
-                    {p.published_at ? formatDate(p.published_at) : "—"}
+                    {p.published_at ? formatDate(p.published_at) : "Not recorded"}
                   </TableCell>
                   <TableCell className={DASH_TABLE.cell}>
                     <Button asChild variant="ghost" size="sm" className="text-dash-ring hover:text-dash-text">

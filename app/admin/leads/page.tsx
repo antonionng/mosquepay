@@ -11,8 +11,10 @@ import {
   Sparkles,
   Target,
   LayoutGrid,
+  Plus,
 } from "lucide-react";
 import { LeadsListClient } from "@/components/crm/leads-list-client";
+import { getLeadPrompt } from "@/lib/leads/next-action";
 
 const PIPELINE_STAGES = [
   "expression_of_interest",
@@ -75,6 +77,16 @@ export default async function AdminLeadsPage() {
           (NOW_TS - new Date(l.created_at).getTime()) / 86400000
         );
 
+    const prompt = getLeadPrompt({
+      stage: l.stage,
+      daysSinceActivity,
+      daysInStage,
+      hasActivity: Boolean(lastActivity),
+      next_step: l.next_step ?? null,
+      next_step_due_date: l.next_step_due_date ?? null,
+      converted_at: l.converted_at ?? null,
+    });
+
     return {
       id: l.id,
       first_name: l.first_name,
@@ -86,11 +98,15 @@ export default async function AdminLeadsPage() {
       created_at: l.created_at,
       updated_at: l.updated_at,
       stage_changed_at: l.stage_changed_at,
+      converted_at: l.converted_at ?? null,
       daysInStage,
       daysSinceActivity,
       lastActivityType: lastActivity?.activity_type ?? null,
       lastActivityTitle: lastActivity?.title ?? null,
       lastActivityDate: lastActivity?.created_at ?? null,
+      promptLabel: prompt.label,
+      promptReason: prompt.reason,
+      promptSeverity: prompt.severity,
     };
   }));
 
@@ -153,11 +169,17 @@ export default async function AdminLeadsPage() {
             Track recruitment from first enquiry to initiation.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button asChild variant="secondary" size="sm">
+        <div className="admin-action-row">
+          <Button asChild variant="outline" size="sm">
             <Link href="/admin/leads/kanban" className="flex items-center gap-2">
               <LayoutGrid className="h-4 w-4" />
               Kanban Board
+            </Link>
+          </Button>
+          <Button asChild variant="dashboard" size="sm">
+            <Link href="/admin/leads/new" className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              New lead
             </Link>
           </Button>
         </div>

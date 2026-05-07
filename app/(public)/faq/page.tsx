@@ -36,7 +36,7 @@ const faqs = [
   },
   {
     q: "Where do you meet?",
-    a: "We meet at Mark Masons' Hall, 86 St James's Street, Mayfair, London—a Grade II listed building and one of London's most prestigious Masonic venues.",
+    a: "We meet at Mark Masons' Hall, 86 St James's Street, Mayfair, London. It is a Grade II listed building and one of London's most prestigious Masonic venues.",
   },
   {
     q: "How long does the process take?",

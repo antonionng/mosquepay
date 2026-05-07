@@ -72,6 +72,17 @@ function sectionsToPuckData(sections: SiteSection[], primaryColor?: string): Dat
           body: section.body ?? "",
           ctaLabel: section.cta_label ?? "",
           ctaHref: section.cta_href ?? "",
+          imageUrl: section.style?.image_url ?? "",
+          imageAlt: section.style?.image_alt ?? "",
+          imagePosition: section.style?.image_position ?? "right",
+          imageShape: section.style?.image_shape ?? "rounded",
+          backgroundImageUrl: section.style?.background_image_url ?? "",
+          overlayOpacity:
+            typeof section.style?.overlay_opacity === "number"
+              ? section.style.overlay_opacity
+              : 0.35,
+          backgroundPosition: section.style?.background_position ?? "center",
+          formMode: section.style?.form_mode ?? "none",
         };
         if (section.type === "hero") {
           baseProps.primaryColor = mergeHeroPrimaryColor(section, primaryColor);
@@ -102,15 +113,18 @@ export function puckDataToSections(data: Data): SiteSection[] {
       visible: true,
       order: index + 1,
     };
-    if (type === "hero") {
-      const style = sanitizeSectionStyle({
-        primary_color: props.primaryColor,
-        background_image_url: props.backgroundImageUrl,
-        overlay_opacity: props.overlayOpacity,
-        background_position: props.backgroundPosition,
-      });
-      if (style) return { ...base, style };
-    }
+    const style = sanitizeSectionStyle({
+      primary_color: type === "hero" ? props.primaryColor : undefined,
+      background_image_url: props.backgroundImageUrl,
+      overlay_opacity: props.overlayOpacity,
+      background_position: props.backgroundPosition,
+      image_url: props.imageUrl,
+      image_alt: props.imageAlt,
+      image_position: props.imagePosition,
+      image_shape: props.imageShape,
+      form_mode: props.formMode,
+    });
+    if (style) return { ...base, style };
     return base;
   });
 }
@@ -325,7 +339,7 @@ export function PuckEditor({
           </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <Textarea
-              placeholder="Short lodge brief — describe your lodge…"
+              placeholder="Short lodge brief. Describe your lodge…"
               rows={3}
               value={aiBrief}
               onChange={(e) => setAiBrief(e.target.value)}

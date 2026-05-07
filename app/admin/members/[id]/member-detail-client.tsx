@@ -24,13 +24,27 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { cn } from "@/lib/utils";
 
 interface Member {
   id: string;
+  auth_user_id: string | null;
   full_name: string;
   email: string;
   phone: string | null;
+  address_line_1: string | null;
+  address_line_2: string | null;
+  city: string | null;
+  county: string | null;
+  postcode: string | null;
+  country: string | null;
+  country_list: boolean;
+  royal_arch: boolean;
+  honorary: boolean;
+  office_title: string | null;
+  officer_sort_order: number | null;
+  directory_sort_order: number | null;
   rank: string | null;
   dietary_requirements: string | null;
   date_of_initiation: string | null;
@@ -100,6 +114,51 @@ interface Props {
   duesRecords: DuesEntry[];
 }
 
+function buildEditForm(member: Member) {
+  return {
+    full_name: member.full_name,
+    phone: member.phone ?? "",
+    address_line_1: member.address_line_1 ?? "",
+    address_line_2: member.address_line_2 ?? "",
+    city: member.city ?? "",
+    county: member.county ?? "",
+    postcode: member.postcode ?? "",
+    country: member.country ?? "United Kingdom",
+    country_list: member.country_list,
+    royal_arch: member.royal_arch,
+    honorary: member.honorary,
+    office_title: member.office_title ?? "",
+    officer_sort_order: member.officer_sort_order?.toString() ?? "",
+    directory_sort_order: member.directory_sort_order?.toString() ?? "",
+    rank: member.rank ?? "",
+    dietary_requirements: member.dietary_requirements ?? "",
+    date_of_initiation: member.date_of_initiation ?? "",
+    membership_status: member.membership_status,
+  };
+}
+
+function emptyToNull(value: string) {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function numberOrNull(value: string) {
+  return value ? Number(value) : null;
+}
+
+function formatAddress(member: Member) {
+  return [
+    member.address_line_1,
+    member.address_line_2,
+    member.city,
+    member.county,
+    member.postcode,
+    member.country && member.country !== "United Kingdom" ? member.country : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
 export function MemberDetailClient({
   member: initialMember,
   dietaryHistory,
@@ -111,71 +170,172 @@ export function MemberDetailClient({
   const [duesRecords, setDuesRecords] = useState(initialDues);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [inviteSending, setInviteSending] = useState(false);
+  const [feedback, setFeedback] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+  const [pendingDuesAction, setPendingDuesAction] = useState<{
+    duesId: string;
+    action: "waive" | "mark_paid" | "mark_outstanding";
+  } | null>(null);
+  const [duesActionLoading, setDuesActionLoading] = useState(false);
 
-  const [editForm, setEditForm] = useState({
-    full_name: member.full_name,
-    phone: member.phone ?? "",
-    rank: member.rank ?? "",
-    dietary_requirements: member.dietary_requirements ?? "",
-    date_of_initiation: member.date_of_initiation ?? "",
-    membership_status: member.membership_status,
-  });
+  const [editForm, setEditForm] = useState(() => buildEditForm(member));
 
   async function handleSave() {
     setSaving(true);
+    setFeedback(null);
     try {
       const res = await fetch(`/api/members/${member.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           full_name: editForm.full_name,
-          phone: editForm.phone || null,
-          rank: editForm.rank || null,
-          dietary_requirements: editForm.dietary_requirements || null,
+          phone: emptyToNull(editForm.phone),
+          address_line_1: emptyToNull(editForm.address_line_1),
+          address_line_2: emptyToNull(editForm.address_line_2),
+          city: emptyToNull(editForm.city),
+          county: emptyToNull(editForm.county),
+          postcode: emptyToNull(editForm.postcode),
+          country: emptyToNull(editForm.country) ?? "United Kingdom",
+          country_list: editForm.country_list,
+          royal_arch: editForm.royal_arch,
+          honorary: editForm.honorary,
+          office_title: emptyToNull(editForm.office_title),
+          officer_sort_order: numberOrNull(editForm.officer_sort_order),
+          directory_sort_order: numberOrNull(editForm.directory_sort_order),
+          rank: emptyToNull(editForm.rank),
+          dietary_requirements: emptyToNull(editForm.dietary_requirements),
           date_of_initiation: editForm.date_of_initiation || null,
           membership_status: editForm.membership_status,
         }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        setMember(data.member);
-        setEditing(false);
-        router.refresh();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error ?? "Could not save member.");
       }
-    } catch {
-      /* empty */
+      setMember(data.member);
+      setEditForm(buildEditForm(data.member));
+      setEditing(false);
+      setFeedback({ type: "success", message: "Member profile saved." });
+      router.refresh();
+    } catch (saveError) {
+      setFeedback({
+        type: "error",
+        message: saveError instanceof Error ? saveError.message : "Could not save member.",
+      });
     } finally {
       setSaving(false);
     }
   }
 
   async function handleResendInitiation() {
+    setFeedback(null);
     try {
-      await fetch(`/api/members/${member.id}`, {
+      const res = await fetch(`/api/members/${member.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ initiation_email_sent: false }),
       });
+      if (!res.ok) {
+        throw new Error("Could not queue initiation email.");
+      }
+      setFeedback({ type: "success", message: "Initiation email queued for the next cron run." });
       router.refresh();
-    } catch {
-      /* empty */
+    } catch (emailError) {
+      setFeedback({
+        type: "error",
+        message: emailError instanceof Error ? emailError.message : "Could not queue initiation email.",
+      });
     }
   }
 
-  async function handleWaiveDues(duesId: string) {
+  async function handleSendPortalInvite() {
+    setInviteSending(true);
+    setFeedback(null);
     try {
-      await fetch("/api/dues", {
+      const res = await fetch(`/api/members/${member.id}/invite`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "waive", dues_id: duesId }),
       });
-      setDuesRecords((prev) =>
-        prev.map((d) => (d.id === duesId ? { ...d, status: "waived" } : d))
-      );
-    } catch {
-      /* empty */
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error ?? "Could not send portal invite.");
+      }
+      setFeedback({
+        type: "success",
+        message: `Member portal invite sent to ${member.email}.`,
+      });
+      router.refresh();
+    } catch (inviteError) {
+      setFeedback({
+        type: "error",
+        message:
+          inviteError instanceof Error
+            ? inviteError.message
+            : "Could not send portal invite.",
+      });
+    } finally {
+      setInviteSending(false);
     }
   }
+
+  async function handleDuesAction(
+    duesId: string,
+    action: "waive" | "mark_paid" | "mark_outstanding"
+  ) {
+    setDuesActionLoading(true);
+    setFeedback(null);
+    try {
+      const res = await fetch("/api/dues", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, dues_id: duesId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.dues) {
+        throw new Error(data.error ?? "Could not update dues.");
+      }
+      setDuesRecords((prev) =>
+        prev.map((d) => (d.id === duesId ? data.dues : d))
+      );
+      setFeedback({ type: "success", message: "Dues record updated." });
+      setPendingDuesAction(null);
+    } catch (duesError) {
+      setFeedback({
+        type: "error",
+        message: duesError instanceof Error ? duesError.message : "Could not update dues.",
+      });
+    } finally {
+      setDuesActionLoading(false);
+    }
+  }
+
+  const pendingDuesRecord = pendingDuesAction
+    ? duesRecords.find((dues) => dues.id === pendingDuesAction.duesId)
+    : null;
+  const duesActionCopy = pendingDuesAction
+    ? {
+        mark_paid: {
+          title: "Mark dues as paid?",
+          description: "This updates the member dues record and records the action in the audit trail.",
+          confirmLabel: "Mark paid",
+          tone: "success" as const,
+        },
+        waive: {
+          title: "Waive dues?",
+          description: "This marks the dues as waived. Use this only when the lodge has agreed the member does not need to pay this period.",
+          confirmLabel: "Waive dues",
+          tone: "danger" as const,
+        },
+        mark_outstanding: {
+          title: "Reopen dues?",
+          description: "This makes the dues outstanding again so the member can pay or be chased by the treasurer.",
+          confirmLabel: "Reopen dues",
+          tone: "default" as const,
+        },
+      }[pendingDuesAction.action]
+    : null;
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -187,6 +347,19 @@ export function MemberDetailClient({
           </Link>
         </Button>
       </div>
+
+      {feedback && (
+        <div
+          className={cn(
+            "rounded-xl border px-4 py-3 text-sm",
+            feedback.type === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : "border-red-200 bg-red-50 text-red-800"
+          )}
+        >
+          {feedback.message}
+        </div>
+      )}
 
       <div className="rounded-2xl border border-dash-border bg-dash-surface shadow-sm overflow-hidden">
         <div className="flex items-center justify-between border-b border-dash-border px-6 py-4 bg-dash-surface-subtle">
@@ -203,8 +376,30 @@ export function MemberDetailClient({
             >
               {STATUS_LABELS[member.membership_status] ?? member.membership_status}
             </span>
+            {!editing && (
+              <Button
+                variant="dashboard"
+                size="sm"
+                onClick={handleSendPortalInvite}
+                disabled={inviteSending}
+              >
+                <Send className="h-3.5 w-3.5 mr-1" />
+                {inviteSending
+                  ? "Sending..."
+                  : member.auth_user_id
+                    ? "Resend portal invite"
+                    : "Send portal invite"}
+              </Button>
+            )}
             {!editing ? (
-              <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEditForm(buildEditForm(member));
+                    setEditing(true);
+                  }}
+                >
                 <Pencil className="h-3.5 w-3.5 mr-1" />
                 Edit
               </Button>
@@ -214,7 +409,14 @@ export function MemberDetailClient({
                   <Save className="h-3.5 w-3.5 mr-1" />
                   {saving ? "Saving..." : "Save"}
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEditForm(buildEditForm(member));
+                    setEditing(false);
+                  }}
+                >
                   <X className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -243,6 +445,52 @@ export function MemberDetailClient({
                   onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                 />
               </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Address line 1</Label>
+                <Input
+                  value={editForm.address_line_1}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, address_line_1: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Address line 2</Label>
+                <Input
+                  value={editForm.address_line_2}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, address_line_2: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>City</Label>
+                <Input
+                  value={editForm.city}
+                  onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>County</Label>
+                <Input
+                  value={editForm.county}
+                  onChange={(e) => setEditForm({ ...editForm, county: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Postcode</Label>
+                <Input
+                  value={editForm.postcode}
+                  onChange={(e) => setEditForm({ ...editForm, postcode: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Country</Label>
+                <Input
+                  value={editForm.country}
+                  onChange={(e) => setEditForm({ ...editForm, country: e.target.value })}
+                />
+              </div>
               <div className="space-y-2">
                 <Label>Rank</Label>
                 <select
@@ -255,6 +503,74 @@ export function MemberDetailClient({
                   <option value="FC">Fellow Craft</option>
                   <option value="MM">Master Mason</option>
                 </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Office title</Label>
+                <Input
+                  placeholder="e.g. Worshipful Master"
+                  value={editForm.office_title}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, office_title: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Officer order</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={editForm.officer_sort_order}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, officer_sort_order: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Directory order</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={editForm.directory_sort_order}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, directory_sort_order: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-3 rounded-xl border border-dash-border bg-dash-surface-subtle p-4 sm:col-span-2">
+                <p className="text-sm font-medium text-dash-text">Summons directory flags</p>
+                <label className="flex items-center gap-2 text-sm text-dash-muted">
+                  <input
+                    type="checkbox"
+                    checked={editForm.royal_arch}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, royal_arch: e.target.checked })
+                    }
+                    className="h-4 w-4 rounded border-dash-border"
+                  />
+                  Royal Arch member
+                </label>
+                <label className="flex items-center gap-2 text-sm text-dash-muted">
+                  <input
+                    type="checkbox"
+                    checked={editForm.country_list}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, country_list: e.target.checked })
+                    }
+                    className="h-4 w-4 rounded border-dash-border"
+                  />
+                  Country List member
+                </label>
+                <label className="flex items-center gap-2 text-sm text-dash-muted">
+                  <input
+                    type="checkbox"
+                    checked={editForm.honorary}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, honorary: e.target.checked })
+                    }
+                    className="h-4 w-4 rounded border-dash-border"
+                  />
+                  Honorary member
+                </label>
               </div>
               <div className="space-y-2">
                 <Label>Dietary requirements</Label>
@@ -305,14 +621,51 @@ export function MemberDetailClient({
                 <Phone className="h-4 w-4 mt-0.5 text-dash-muted shrink-0" />
                 <div>
                   <p className="text-xs text-dash-muted">Phone</p>
-                  <p className="text-sm font-medium text-dash-text">{member.phone ?? "—"}</p>
+                  <p className="text-sm font-medium text-dash-text">
+                    {member.phone ?? "Not recorded"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 lg:col-span-2">
+                <Mail className="h-4 w-4 mt-0.5 text-dash-muted shrink-0" />
+                <div>
+                  <p className="text-xs text-dash-muted">Summons directory address</p>
+                  <p className="text-sm font-medium text-dash-text">
+                    {formatAddress(member) || "Not recorded"}
+                  </p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <Award className="h-4 w-4 mt-0.5 text-dash-muted shrink-0" />
                 <div>
                   <p className="text-xs text-dash-muted">Rank</p>
-                  <p className="text-sm font-medium text-dash-text">{member.rank ?? "—"}</p>
+                  <p className="text-sm font-medium text-dash-text">
+                    {member.rank ?? "Not recorded"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <Award className="h-4 w-4 mt-0.5 text-dash-muted shrink-0" />
+                <div>
+                  <p className="text-xs text-dash-muted">Office</p>
+                  <p className="text-sm font-medium text-dash-text">
+                    {member.office_title ?? "Not an officer"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <Award className="h-4 w-4 mt-0.5 text-dash-muted shrink-0" />
+                <div>
+                  <p className="text-xs text-dash-muted">Directory flags</p>
+                  <p className="text-sm font-medium text-dash-text">
+                    {[
+                      member.royal_arch ? "RA" : null,
+                      member.country_list ? "Country List" : null,
+                      member.honorary ? "Honorary" : null,
+                    ]
+                      .filter(Boolean)
+                      .join(", ") || "None"}
+                  </p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -450,12 +803,34 @@ export function MemberDetailClient({
                     >
                       {d.status.charAt(0).toUpperCase() + d.status.slice(1)}
                     </span>
+                    {d.status !== "paid" && (
+                      <button
+                        onClick={() =>
+                          setPendingDuesAction({ duesId: d.id, action: "mark_paid" })
+                        }
+                        className="text-xs text-dash-muted underline hover:text-dash-text"
+                      >
+                        Mark paid
+                      </button>
+                    )}
                     {d.status === "outstanding" && (
                       <button
-                        onClick={() => handleWaiveDues(d.id)}
-                        className="text-xs text-dash-muted hover:text-dash-text underline"
+                        onClick={() =>
+                          setPendingDuesAction({ duesId: d.id, action: "waive" })
+                        }
+                        className="text-xs text-dash-muted underline hover:text-dash-text"
                       >
                         Waive
+                      </button>
+                    )}
+                    {d.status !== "outstanding" && (
+                      <button
+                        onClick={() =>
+                          setPendingDuesAction({ duesId: d.id, action: "mark_outstanding" })
+                        }
+                        className="text-xs text-dash-muted underline hover:text-dash-text"
+                      >
+                        Reopen
                       </button>
                     )}
                   </div>
@@ -530,6 +905,23 @@ export function MemberDetailClient({
           )}
         </div>
       </div>
+
+      {pendingDuesAction && duesActionCopy && (
+        <ConfirmActionDialog
+          open={Boolean(pendingDuesAction)}
+          onOpenChange={(open) => {
+            if (!open) setPendingDuesAction(null);
+          }}
+          title={duesActionCopy.title}
+          description={`${duesActionCopy.description} Amount: £${(pendingDuesRecord?.amount ?? 0).toFixed(2)}.`}
+          confirmLabel={duesActionCopy.confirmLabel}
+          loading={duesActionLoading}
+          tone={duesActionCopy.tone}
+          onConfirm={() =>
+            handleDuesAction(pendingDuesAction.duesId, pendingDuesAction.action)
+          }
+        />
+      )}
     </div>
   );
 }

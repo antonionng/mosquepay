@@ -20,6 +20,7 @@ import {
   Shield,
 } from "lucide-react";
 import { heroBackgroundLayers } from "@/lib/site-section-style";
+import { ImageUploadField } from "./image-upload-field";
 
 type HeroProps = {
   heading: string;
@@ -37,6 +38,14 @@ type SectionProps = {
   body: string;
   ctaLabel: string;
   ctaHref: string;
+  imageUrl?: string;
+  imageAlt?: string;
+  imagePosition?: "left" | "right" | "top" | "bottom" | "full";
+  imageShape?: "rounded" | "square" | "circle" | "arch";
+  backgroundImageUrl?: string;
+  overlayOpacity?: number;
+  backgroundPosition?: string;
+  formMode?: "none" | "contact" | "lead";
 };
 
 type ComponentProps = {
@@ -49,6 +58,11 @@ type ComponentProps = {
   FAQ: SectionProps;
   JoinUs: SectionProps;
   Contact: SectionProps;
+};
+
+type CustomFieldRenderProps = {
+  value: unknown;
+  onChange: (value: string) => void;
 };
 
 function CTAButton({
@@ -112,11 +126,115 @@ function SectionBadge({
   );
 }
 
+function SectionImage({
+  imageUrl,
+  imageAlt,
+  imageShape,
+  className = "",
+}: {
+  imageUrl?: string;
+  imageAlt?: string;
+  imageShape?: string;
+  className?: string;
+}) {
+  if (!imageUrl) return null;
+  const shapeClass =
+    imageShape === "circle"
+      ? "rounded-full"
+      : imageShape === "arch"
+        ? "rounded-t-full rounded-b-[2rem]"
+        : imageShape === "square"
+          ? "rounded-none"
+          : "rounded-3xl";
+  return (
+    <div className={`mt-8 overflow-hidden border border-slate-200 bg-slate-100 shadow-lg ${shapeClass} ${className}`}>
+      <img
+        src={imageUrl}
+        alt={imageAlt || ""}
+        className="h-full min-h-56 w-full object-cover"
+      />
+    </div>
+  );
+}
+
 const sectionFields = {
   heading: { type: "text" as const },
   body: { type: "textarea" as const },
   ctaLabel: { type: "text" as const, label: "CTA Label" },
   ctaHref: { type: "text" as const, label: "CTA Link" },
+  imageUrl: {
+    type: "custom" as const,
+    label: "Section image",
+    render: ({ value, onChange }: CustomFieldRenderProps) => (
+      <ImageUploadField
+        label="Section image"
+        value={typeof value === "string" ? value : ""}
+        onChange={onChange}
+        compact
+      />
+    ),
+  },
+  imageAlt: { type: "text" as const, label: "Image alt text" },
+  imagePosition: {
+    type: "select" as const,
+    label: "Image position",
+    options: [
+      { label: "Top", value: "top" },
+      { label: "Right", value: "right" },
+      { label: "Left", value: "left" },
+      { label: "Bottom", value: "bottom" },
+      { label: "Full width", value: "full" },
+    ],
+  },
+  imageShape: {
+    type: "select" as const,
+    label: "Image shape",
+    options: [
+      { label: "Rounded", value: "rounded" },
+      { label: "Square", value: "square" },
+      { label: "Circle", value: "circle" },
+      { label: "Arch", value: "arch" },
+    ],
+  },
+  backgroundImageUrl: {
+    type: "custom" as const,
+    label: "Background image",
+    render: ({ value, onChange }: CustomFieldRenderProps) => (
+      <ImageUploadField
+        label="Background image"
+        value={typeof value === "string" ? value : ""}
+        onChange={onChange}
+        compact
+      />
+    ),
+  },
+  overlayOpacity: {
+    type: "number" as const,
+    label: "Background overlay (0-1)",
+    min: 0,
+    max: 1,
+    step: 0.05,
+  },
+  backgroundPosition: {
+    type: "select" as const,
+    label: "Background position",
+    options: [
+      { label: "Center", value: "center" },
+      { label: "Top", value: "top" },
+      { label: "Bottom", value: "bottom" },
+      { label: "Top left", value: "top left" },
+      { label: "Top right", value: "top right" },
+    ],
+  },
+  formMode: {
+    type: "select" as const,
+    label: "Embedded form",
+    options: [
+      { label: "No form", value: "none" },
+      { label: "Contact secretary", value: "contact" },
+      { label: "Lead intake", value: "lead" },
+    ],
+  },
 };
 
 export const puckConfig: Config<ComponentProps> = {
@@ -168,8 +286,16 @@ export const puckConfig: Config<ComponentProps> = {
           },
         },
         backgroundImageUrl: {
-          type: "text",
+          type: "custom",
           label: "Background image URL (https)",
+          render: ({ value, onChange }) => (
+            <ImageUploadField
+              label="Hero background"
+              value={typeof value === "string" ? value : ""}
+              onChange={onChange}
+              compact
+            />
+          ),
         },
         overlayOpacity: {
           type: "number",
@@ -264,7 +390,7 @@ export const puckConfig: Config<ComponentProps> = {
         ctaHref: "/about",
       },
       fields: sectionFields,
-      render: ({ heading, body, ctaLabel, ctaHref }) => (
+      render: ({ heading, body, ctaLabel, ctaHref, imageUrl, imageAlt, imageShape }) => (
         <SectionContainer className="bg-white">
           <div className="grid gap-10 md:grid-cols-[1fr_auto]">
             <div>
@@ -279,18 +405,27 @@ export const puckConfig: Config<ComponentProps> = {
               )}
               <CTAButton label={ctaLabel} href={ctaHref} />
             </div>
-            <div className="hidden md:flex flex-col justify-center gap-4">
-              {[
-                { icon: Shield, text: "Integrity" },
-                { icon: Heart, text: "Fellowship" },
-                { icon: Star, text: "Service" },
-              ].map((item) => (
-                <div key={item.text} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
-                  <item.icon className="h-5 w-5 text-blue-500" />
-                  <span className="text-sm font-medium text-slate-700">{item.text}</span>
-                </div>
-              ))}
-            </div>
+            {imageUrl ? (
+              <SectionImage
+                imageUrl={imageUrl}
+                imageAlt={imageAlt}
+                imageShape={imageShape}
+                className="mt-0 hidden w-72 md:block"
+              />
+            ) : (
+              <div className="hidden md:flex flex-col justify-center gap-4">
+                {[
+                  { icon: Shield, text: "Integrity" },
+                  { icon: Heart, text: "Fellowship" },
+                  { icon: Star, text: "Service" },
+                ].map((item) => (
+                  <div key={item.text} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                    <item.icon className="h-5 w-5 text-blue-500" />
+                    <span className="text-sm font-medium text-slate-700">{item.text}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </SectionContainer>
       ),
@@ -304,7 +439,7 @@ export const puckConfig: Config<ComponentProps> = {
         ctaHref: "/events",
       },
       fields: sectionFields,
-      render: ({ heading, body, ctaLabel, ctaHref }) => (
+      render: ({ heading, body, ctaLabel, ctaHref, imageUrl, imageAlt, imageShape }) => (
         <SectionContainer className="bg-slate-50">
           <SectionBadge icon={Calendar} label="Meetings" className="bg-indigo-50 text-indigo-700 border-indigo-200" />
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
@@ -315,6 +450,7 @@ export const puckConfig: Config<ComponentProps> = {
               {body}
             </p>
           )}
+          <SectionImage imageUrl={imageUrl} imageAlt={imageAlt} imageShape={imageShape} />
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
             {[
               { icon: Calendar, label: "Regular Meetings", detail: "Monthly gatherings" },
@@ -341,7 +477,7 @@ export const puckConfig: Config<ComponentProps> = {
         ctaHref: "/about",
       },
       fields: sectionFields,
-      render: ({ heading, body, ctaLabel, ctaHref }) => (
+      render: ({ heading, body, ctaLabel, ctaHref, imageUrl, imageAlt, imageShape }) => (
         <SectionContainer className="bg-white">
           <SectionBadge icon={Users} label="Officers" className="bg-emerald-50 text-emerald-700 border-emerald-200" />
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
@@ -352,6 +488,7 @@ export const puckConfig: Config<ComponentProps> = {
               {body}
             </p>
           )}
+          <SectionImage imageUrl={imageUrl} imageAlt={imageAlt} imageShape={imageShape} />
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
             {["Worshipful Master", "Senior Warden", "Junior Warden"].map((role) => (
               <div key={role} className="group rounded-xl border border-slate-100 bg-slate-50 p-5 text-center transition-all hover:border-emerald-200 hover:shadow-md">
@@ -376,7 +513,7 @@ export const puckConfig: Config<ComponentProps> = {
         ctaHref: "/charity",
       },
       fields: sectionFields,
-      render: ({ heading, body, ctaLabel, ctaHref }) => (
+      render: ({ heading, body, ctaLabel, ctaHref, imageUrl, imageAlt, imageShape }) => (
         <SectionContainer className="bg-rose-50/50">
           <SectionBadge icon={Heart} label="Charity" className="bg-rose-50 text-rose-700 border-rose-200" />
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
@@ -387,6 +524,7 @@ export const puckConfig: Config<ComponentProps> = {
               {body}
             </p>
           )}
+          <SectionImage imageUrl={imageUrl} imageAlt={imageAlt} imageShape={imageShape} />
           <div className="mt-8 flex flex-wrap gap-3">
             {["Local Community", "Youth Projects", "Medical Research", "Disaster Relief"].map((tag) => (
               <span key={tag} className="rounded-full border border-rose-200 bg-white px-4 py-2 text-sm font-medium text-rose-700 shadow-sm">
@@ -407,7 +545,7 @@ export const puckConfig: Config<ComponentProps> = {
         ctaHref: "/events",
       },
       fields: sectionFields,
-      render: ({ heading, body, ctaLabel, ctaHref }) => (
+      render: ({ heading, body, ctaLabel, ctaHref, imageUrl, imageAlt, imageShape }) => (
         <SectionContainer className="bg-white">
           <SectionBadge icon={CalendarDays} label="Events" className="bg-amber-50 text-amber-700 border-amber-200" />
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
@@ -418,6 +556,7 @@ export const puckConfig: Config<ComponentProps> = {
               {body}
             </p>
           )}
+          <SectionImage imageUrl={imageUrl} imageAlt={imageAlt} imageShape={imageShape} />
           <div className="mt-8 space-y-3">
             {[
               { month: "JAN", day: "15", title: "Regular Lodge Meeting", time: "6:30 PM" },
@@ -452,7 +591,7 @@ export const puckConfig: Config<ComponentProps> = {
         ctaHref: "/faq",
       },
       fields: sectionFields,
-      render: ({ heading, body, ctaLabel, ctaHref }) => (
+      render: ({ heading, body, ctaLabel, ctaHref, imageUrl, imageAlt, imageShape }) => (
         <SectionContainer className="bg-slate-50">
           <SectionBadge icon={HelpCircle} label="FAQ" className="bg-violet-50 text-violet-700 border-violet-200" />
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
@@ -463,6 +602,7 @@ export const puckConfig: Config<ComponentProps> = {
               {body}
             </p>
           )}
+          <SectionImage imageUrl={imageUrl} imageAlt={imageAlt} imageShape={imageShape} />
           <div className="mt-8 space-y-3">
             {[
               { q: "How do I become a member?", a: "Start by expressing your interest through our form. A member will reach out to guide you." },
@@ -493,7 +633,7 @@ export const puckConfig: Config<ComponentProps> = {
         ctaHref: "/join",
       },
       fields: sectionFields,
-      render: ({ heading, body, ctaLabel, ctaHref }) => (
+      render: ({ heading, body, ctaLabel, ctaHref, imageUrl, imageAlt, imageShape }) => (
         <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 px-6 py-20 text-center sm:px-8 sm:py-24">
           <div className="absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.04)_1px,transparent_1px)] bg-[size:32px_32px]" />
           <div className="relative z-10 mx-auto max-w-2xl">
@@ -506,6 +646,7 @@ export const puckConfig: Config<ComponentProps> = {
                 {body}
               </p>
             )}
+            <SectionImage imageUrl={imageUrl} imageAlt={imageAlt} imageShape={imageShape} />
             <CTAButton label={ctaLabel} href={ctaHref} color="#10b981" />
           </div>
         </section>
@@ -520,7 +661,7 @@ export const puckConfig: Config<ComponentProps> = {
         ctaHref: "/contact",
       },
       fields: sectionFields,
-      render: ({ heading, body, ctaLabel, ctaHref }) => (
+      render: ({ heading, body, ctaLabel, ctaHref, imageUrl, imageAlt, imageShape }) => (
         <SectionContainer className="bg-white">
           <SectionBadge icon={Mail} label="Contact" className="bg-sky-50 text-sky-700 border-sky-200" />
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
@@ -531,6 +672,7 @@ export const puckConfig: Config<ComponentProps> = {
               {body}
             </p>
           )}
+          <SectionImage imageUrl={imageUrl} imageAlt={imageAlt} imageShape={imageShape} />
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
             {[
               { icon: Mail, label: "Email", detail: "secretary@lodge.org" },

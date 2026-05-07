@@ -181,19 +181,19 @@ export default async function BillingPage() {
                     </Link>
                   </td>
                   <td className="text-slate-300 capitalize">
-                    {sub?.plan_code ?? "—"}
+                    {sub?.plan_code ?? "Not recorded"}
                   </td>
                   <td>{sub ? statusBadge(sub.status) : statusBadge("none")}</td>
                   <td className="hidden sm:table-cell text-slate-300">
-                    {sub ? `£${(sub.amount / 100).toFixed(2)}` : "—"}
+                    {sub ? `£${(sub.amount / 100).toFixed(2)}` : "Not recorded"}
                   </td>
                   <td className="hidden md:table-cell text-slate-400 capitalize">
-                    {sub?.billing_cycle ?? "—"}
+                    {sub?.billing_cycle ?? "Not recorded"}
                   </td>
                   <td className="hidden lg:table-cell text-slate-400">
                     {sub?.current_period_end
                       ? formatDate(sub.current_period_end)
-                      : "—"}
+                      : "Not recorded"}
                   </td>
                 </tr>
               ))}

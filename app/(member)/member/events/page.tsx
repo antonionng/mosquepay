@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  Calendar,
   MapPin,
   Clock,
   Tag,
@@ -43,6 +42,7 @@ function EventSkeleton() {
 export default function MemberEventsPage() {
   const [events, setEvents] = useState<LodgeEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -54,7 +54,7 @@ export default function MemberEventsPage() {
           setEvents(list);
         }
       } catch {
-        /* empty */
+        setError("Could not load events. Try refreshing the page.");
       } finally {
         setLoading(false);
       }
@@ -88,6 +88,11 @@ export default function MemberEventsPage() {
       </div>
 
       <div className="space-y-4">
+        {error && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-800">
+            {error}
+          </div>
+        )}
         {loading ? (
           <>
             <EventSkeleton />

@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 
 export async function GET(request: NextRequest) {
   try {
+    const unauthorized = await requireAdminApiAuth();
+    if (unauthorized) return unauthorized;
+
     const lodgeSlug = getLodgeSlugFromRequest(request);
 
     if (!isSupabaseConfigured()) {
@@ -26,6 +30,8 @@ export async function GET(request: NextRequest) {
     if (!lodgeId) {
       return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
     }
+    const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
+    if (forbidden) return forbidden;
 
     const dues = await db.getLodgeDues(lodgeId);
     if (dues.length === 0) {
@@ -41,6 +47,9 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const unauthorized = await requireAdminApiAuth();
+    if (unauthorized) return unauthorized;
+
     if (!isSupabaseConfigured()) {
       return NextResponse.json({ error: "Database not configured." }, { status: 503 });
     }
@@ -50,6 +59,8 @@ export async function PUT(request: NextRequest) {
     if (!lodgeId) {
       return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
     }
+    const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
+    if (forbidden) return forbidden;
 
     const body = await request.json();
     const {

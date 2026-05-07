@@ -58,7 +58,7 @@ export function ContactForm({ lodgeSlug }: { lodgeSlug?: string }) {
         <CheckCircle className="h-10 w-10 text-green-600 mx-auto mb-3" />
         <p className="font-semibold text-slate-900">Message sent</p>
         <p className="mt-2 text-sm text-slate-600">
-          Thank you. We&apos;ll get back to you as soon as we can.
+          Thank you. We&apos;ll get back to you as soon as we can, and a confirmation email is on its way.
         </p>
       </div>
     );

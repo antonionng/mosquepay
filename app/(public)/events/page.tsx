@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
-import { isSupabaseConfigured } from "@/lib/db/with-fallback";
+import { isSupabaseConfigured, shouldUseInMemoryMock } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { Calendar, MapPin, ArrowRight } from "lucide-react";
@@ -91,7 +91,7 @@ export default async function EventsPage({
       event_type: e.event_type,
       location: e.location ?? "",
     }));
-  } else {
+  } else if (shouldUseInMemoryMock()) {
     events = mockDb.getEvents({ published: true, upcoming: true, lodge_slug: lodgeSlug }).map((e) => ({
       id: e.id,
       title: e.title,
@@ -100,6 +100,8 @@ export default async function EventsPage({
       event_type: e.event_type,
       location: e.location ?? "",
     }));
+  } else {
+    events = [];
   }
 
   return (

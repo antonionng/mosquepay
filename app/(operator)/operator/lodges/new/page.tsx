@@ -296,7 +296,7 @@ export default function LodgeOnboardingWizard() {
                       onChange={(e) => update("logo_url", e.target.value)}
                     />
                     <p className="mt-1.5 text-xs text-slate-500">
-                      File upload coming soon — paste a URL for now
+                      File upload coming soon. Paste a URL for now
                     </p>
                   </div>
                   <div className="sm:col-span-2">
@@ -385,7 +385,7 @@ export default function LodgeOnboardingWizard() {
                   </div>
                   {!form.ai_brief.trim() && (
                     <p className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-300">
-                      You can skip the AI website step — the lodge will be
+                      You can skip the AI website step. The lodge will be
                       created without a site draft.
                     </p>
                   )}
@@ -401,10 +401,10 @@ export default function LodgeOnboardingWizard() {
                     {[
                       ["Name", form.name],
                       ["Slug", form.slug || "(auto)"],
-                      ["City", form.city || "—"],
-                      ["Country", form.country || "—"],
-                      ["Tagline", form.tagline || "—"],
-                      ["Support Email", form.support_email || "—"],
+                      ["City", form.city || "Not recorded"],
+                      ["Country", form.country || "Not recorded"],
+                      ["Tagline", form.tagline || "Not recorded"],
+                      ["Support Email", form.support_email || "Not recorded"],
                     ].map(([label, value]) => (
                       <div key={label}>
                         <p className="text-xs font-medium text-slate-500">

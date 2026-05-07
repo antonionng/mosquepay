@@ -13,7 +13,11 @@ import {
   ArrowRight,
 } from "lucide-react";
 import type { LodgeSiteSection } from "@/lib/db/types";
-import { heroBackgroundLayers, mergeHeroPrimaryColor } from "@/lib/site-section-style";
+import {
+  heroBackgroundLayers,
+  mergeHeroPrimaryColor,
+  sectionBackgroundLayers,
+} from "@/lib/site-section-style";
 
 type SiteSection = LodgeSiteSection;
 
@@ -142,10 +146,46 @@ function StandardPreview({
   const style = sectionStyles[section.type];
   const isDark = section.type === "join";
   const Icon = sectionIcons[section.type];
+  const background = sectionBackgroundLayers(section);
+  const imageShape =
+    section.style?.image_shape === "circle"
+      ? "rounded-full"
+      : section.style?.image_shape === "arch"
+        ? "rounded-t-full rounded-b-3xl"
+        : section.style?.image_shape === "square"
+          ? "rounded-none"
+          : "rounded-2xl";
 
   return (
-    <div className={`${style.bg} px-8 py-12`}>
-      <div className="mx-auto max-w-lg">
+    <div className={`relative overflow-hidden ${style.bg} px-8 py-12`}>
+      {background.imageUrl ? (
+        <>
+          <div
+            className="absolute inset-0 bg-cover bg-no-repeat"
+            style={{
+              backgroundImage: `url(${background.imageUrl})`,
+              backgroundPosition: background.backgroundPosition,
+            }}
+          />
+          <div
+            className="absolute inset-0 bg-white"
+            style={{ opacity: 1 - background.overlayOpacity }}
+            aria-hidden
+          />
+        </>
+      ) : null}
+      <div className="relative mx-auto max-w-lg">
+        {section.style?.image_url &&
+        (section.style.image_position === "top" ||
+          section.style.image_position === "full") ? (
+          <div className={`mb-6 overflow-hidden ${imageShape}`}>
+            <img
+              src={section.style.image_url}
+              alt={section.style.image_alt ?? ""}
+              className="h-48 w-full object-cover"
+            />
+          </div>
+        ) : null}
         <span
           className={`mb-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] ${style.badge}`}
         >
@@ -164,6 +204,17 @@ function StandardPreview({
             {section.body}
           </p>
         )}
+        {section.style?.image_url &&
+        section.style.image_position !== "top" &&
+        section.style.image_position !== "full" ? (
+          <div className={`mt-5 overflow-hidden ${imageShape}`}>
+            <img
+              src={section.style.image_url}
+              alt={section.style.image_alt ?? ""}
+              className="h-44 w-full object-cover"
+            />
+          </div>
+        ) : null}
         {section.cta_label && (
           <button
             className="mt-5 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white shadow-md"

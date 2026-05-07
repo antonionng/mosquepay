@@ -13,7 +13,7 @@ const faqs = [
   {
     question: "What is LodgePay and how does it differ from other lodge tools?",
     answer:
-      "LodgePay is an all-in-one SaaS platform purpose-built for lodge operations. Unlike generic website builders or payment tools, it combines a branded website builder, event management with RSVP, Stripe-powered payment processing with Gift Aid, and a full candidate CRM — all tenant-isolated so each lodge has its own space while provinces can oversee the whole portfolio.",
+      "LodgePay is an all-in-one SaaS platform purpose-built for lodge operations. Unlike generic website builders or payment tools, it combines a branded website builder, event management with RSVP, Stripe-powered payment processing with Gift Aid, and a full candidate CRM. Each lodge has its own tenant-isolated space while provinces can oversee the whole portfolio.",
   },
   {
     question: "How does the payment processing and Gift Aid capture work?",
@@ -28,7 +28,7 @@ const faqs = [
   {
     question: "Can we use LodgePay for multiple lodges in our province?",
     answer:
-      "Yes — multi-lodge support is a core feature. Each lodge gets its own branded website, member directory, and payment settings, while provincial administrators get a unified oversight panel with cross-lodge reporting, candidate pipeline visibility, and financial summaries.",
+      "Yes. Multi-lodge support is a core feature. Each lodge gets its own branded website, member directory, and payment settings, while provincial administrators get a unified oversight panel with cross-lodge reporting, candidate pipeline visibility, and financial summaries.",
   },
   {
     question: "How is pricing structured? Are there any hidden fees?",

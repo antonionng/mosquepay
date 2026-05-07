@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { isSupabaseConfigured } from "@/lib/db/with-fallback";
+import { isSupabaseConfigured, shouldUseInMemoryMock } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getDefaultLodgeSlug, resolveLodgeSlug } from "@/lib/tenant";
@@ -27,8 +27,10 @@ export default async function StandalonePayPage({
   if (useDb) {
     const lodgeId = await db.resolveLodgeId(lodgeSlug);
     event = lodgeId ? await db.getEventBySlug(slug, lodgeId) : null;
-  } else {
+  } else if (shouldUseInMemoryMock()) {
     event = mockDb.getEventBySlug(slug, { lodge_slug: lodgeSlug });
+  } else {
+    event = null;
   }
 
   if (!event || !event.enable_payments) notFound();

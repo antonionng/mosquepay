@@ -23,12 +23,18 @@ export default async function AdminPaymentsPage() {
     : lodgeId
       ? await db.getGiftAidDeclarations(lodgeId)
       : [];
+  const duesRecords = useMock
+    ? []
+    : lodgeId
+      ? await db.getMemberDues(lodgeId)
+      : [];
 
   return (
     <AdminPaymentsClient
       payments={JSON.parse(JSON.stringify(payments))}
       donations={JSON.parse(JSON.stringify(donations))}
       giftAidDeclarations={JSON.parse(JSON.stringify(giftAidDeclarations))}
+      duesRecords={JSON.parse(JSON.stringify(duesRecords))}
     />
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useRef, useState } from "react";
+import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   Users,
@@ -15,19 +15,35 @@ import {
   Shield,
   ChevronRight,
   UtensilsCrossed,
+  ArrowDownUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { parseMembersCsv, type ParsedMemberRow } from "@/lib/members/csv";
+import { MemberImportPreview } from "@/components/members/import-preview";
+import { MemberOrderPanel } from "@/components/members/officer-order";
 
 interface MemberRow {
   id: string;
   full_name: string;
   email: string;
   phone: string | null;
+  address_line_1: string | null;
+  address_line_2: string | null;
+  city: string | null;
+  county: string | null;
+  postcode: string | null;
+  country: string | null;
+  country_list: boolean;
+  royal_arch: boolean;
+  honorary: boolean;
+  office_title: string | null;
+  officer_sort_order: number | null;
+  directory_sort_order: number | null;
   rank: string | null;
   dietary_requirements: string | null;
   date_of_initiation: string | null;
@@ -51,15 +67,32 @@ const STATUS_VARIANTS: Record<string, string> = {
 
 export function AdminMembersClient({ members }: { members: MemberRow[] }) {
   const router = useRouter();
+  const importInputRef = useRef<HTMLInputElement | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [quickFilter, setQuickFilter] = useState<string>("all");
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [previewRows, setPreviewRows] = useState<ParsedMemberRow[] | null>(null);
+  const [showOrderPanel, setShowOrderPanel] = useState(false);
 
   const [formData, setFormData] = useState({
     full_name: "",
     email: "",
     phone: "",
+    address_line_1: "",
+    address_line_2: "",
+    city: "",
+    county: "",
+    postcode: "",
+    country: "United Kingdom",
+    country_list: false,
+    royal_arch: false,
+    honorary: false,
+    office_title: "",
+    officer_sort_order: "",
+    directory_sort_order: "",
     rank: "",
     dietary_requirements: "",
     date_of_initiation: "",
@@ -73,13 +106,100 @@ export function AdminMembersClient({ members }: { members: MemberRow[] }) {
       m.email.toLowerCase().includes(search.toLowerCase());
     const matchStatus =
       statusFilter === "all" || m.membership_status === statusFilter;
-    return matchSearch && matchStatus;
+    let matchQuick = true;
+    switch (quickFilter) {
+      case "officers":
+        matchQuick = Boolean(m.office_title && m.office_title.trim().length > 0);
+        break;
+      case "country_list":
+        matchQuick = m.country_list === true;
+        break;
+      case "honorary":
+        matchQuick = m.honorary === true;
+        break;
+      case "royal_arch":
+        matchQuick = m.royal_arch === true;
+        break;
+      case "missing_address":
+        matchQuick = !m.address_line_1 || m.address_line_1.trim().length === 0;
+        break;
+      case "missing_dietary":
+        matchQuick =
+          !m.dietary_requirements || m.dietary_requirements.trim().length === 0;
+        break;
+    }
+    return matchSearch && matchStatus && matchQuick;
   });
+
+  const quickFilterCounts = {
+    officers: members.filter((m) => m.office_title).length,
+    country_list: members.filter((m) => m.country_list).length,
+    honorary: members.filter((m) => m.honorary).length,
+    royal_arch: members.filter((m) => m.royal_arch).length,
+    missing_address: members.filter((m) => !m.address_line_1).length,
+    missing_dietary: members.filter((m) => !m.dietary_requirements).length,
+  };
 
   const activeCount = members.filter((m) => m.membership_status === "active").length;
   const totalCount = members.length;
 
-  async function handleSubmit(e: React.FormEvent) {
+  function exportMembers() {
+    const headers = [
+      "full_name",
+      "email",
+      "phone",
+      "rank",
+      "membership_status",
+      "address_line_1",
+      "address_line_2",
+      "city",
+      "county",
+      "postcode",
+      "country",
+      "office_title",
+      "officer_sort_order",
+      "directory_sort_order",
+      "royal_arch",
+      "country_list",
+      "honorary",
+    ];
+    const rows = members.map((member) =>
+      headers.map((header) => {
+        const value = member[header as keyof MemberRow];
+        return value == null ? "" : String(value);
+      })
+    );
+    const csv = [headers, ...rows]
+      .map((row) =>
+        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
+      )
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "lodge-members.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleImportFile(file: File | null) {
+    if (!file) return;
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const existingEmails = new Set(
+        members.map((m) => m.email.toLowerCase())
+      );
+      const { rows } = parseMembersCsv(text, existingEmails);
+      setPreviewRows(rows);
+    } finally {
+      setImporting(false);
+      if (importInputRef.current) importInputRef.current.value = "";
+    }
+  }
+
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
@@ -89,6 +209,19 @@ export function AdminMembersClient({ members }: { members: MemberRow[] }) {
         body: JSON.stringify({
           ...formData,
           phone: formData.phone || null,
+          address_line_1: formData.address_line_1 || null,
+          address_line_2: formData.address_line_2 || null,
+          city: formData.city || null,
+          county: formData.county || null,
+          postcode: formData.postcode || null,
+          country: formData.country || "United Kingdom",
+          office_title: formData.office_title || null,
+          officer_sort_order: formData.officer_sort_order
+            ? Number(formData.officer_sort_order)
+            : null,
+          directory_sort_order: formData.directory_sort_order
+            ? Number(formData.directory_sort_order)
+            : null,
           rank: formData.rank || null,
           dietary_requirements: formData.dietary_requirements || null,
           date_of_initiation: formData.date_of_initiation || null,
@@ -100,6 +233,18 @@ export function AdminMembersClient({ members }: { members: MemberRow[] }) {
           full_name: "",
           email: "",
           phone: "",
+          address_line_1: "",
+          address_line_2: "",
+          city: "",
+          county: "",
+          postcode: "",
+          country: "United Kingdom",
+          country_list: false,
+          royal_arch: false,
+          honorary: false,
+          office_title: "",
+          officer_sort_order: "",
+          directory_sort_order: "",
           rank: "",
           dietary_requirements: "",
           date_of_initiation: "",
@@ -123,10 +268,40 @@ export function AdminMembersClient({ members }: { members: MemberRow[] }) {
             Manage lodge membership, view history and dietary requirements.
           </p>
         </div>
-        <Button variant="primary" size="sm" onClick={() => setShowForm(true)}>
-          <Plus className="h-4 w-4 mr-1.5" />
-          Add Member
-        </Button>
+        <div className="admin-action-row">
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={(event) => handleImportFile(event.target.files?.[0] ?? null)}
+          />
+          <Button
+            type="button"
+            variant="dashboard"
+            size="sm"
+            onClick={() => importInputRef.current?.click()}
+            disabled={importing}
+          >
+            {importing ? "Reading..." : "Import CSV"}
+          </Button>
+          <Button type="button" variant="dashboard" size="sm" onClick={exportMembers}>
+            Export CSV
+          </Button>
+          <Button
+            type="button"
+            variant="dashboard"
+            size="sm"
+            onClick={() => setShowOrderPanel(true)}
+          >
+            <ArrowDownUp className="mr-1.5 h-4 w-4" />
+            Order
+          </Button>
+          <Button variant="primary" size="sm" onClick={() => setShowForm(true)}>
+            <Plus className="h-4 w-4 mr-1.5" />
+            Add Member
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -177,29 +352,68 @@ export function AdminMembersClient({ members }: { members: MemberRow[] }) {
         </Card>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative max-w-xs flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-dash-muted" />
-          <Input
-            placeholder="Search members..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative max-w-xs flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-dash-muted" />
+            <Input
+              placeholder="Search members..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <div className="flex gap-1.5">
+            {["all", "active", "suspended", "resigned", "excluded"].map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={cn(
+                  "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                  statusFilter === s
+                    ? "bg-dash-surface-subtle text-dash-text shadow-sm ring-1 ring-dash-border"
+                    : "text-dash-muted hover:bg-dash-surface-subtle hover:text-dash-text"
+                )}
+              >
+                {s === "all" ? "All" : STATUS_LABELS[s]}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex gap-1.5">
-          {["all", "active", "suspended", "resigned", "excluded"].map((s) => (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {(
+            [
+              { id: "all", label: "All members", count: members.length },
+              { id: "officers", label: "Officers", count: quickFilterCounts.officers },
+              { id: "country_list", label: "Country List", count: quickFilterCounts.country_list },
+              { id: "honorary", label: "Honorary", count: quickFilterCounts.honorary },
+              { id: "royal_arch", label: "Royal Arch", count: quickFilterCounts.royal_arch },
+              { id: "missing_address", label: "Missing address", count: quickFilterCounts.missing_address },
+              { id: "missing_dietary", label: "Missing dietary", count: quickFilterCounts.missing_dietary },
+            ] as const
+          ).map((f) => (
             <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
+              key={f.id}
+              onClick={() => setQuickFilter(f.id)}
               className={cn(
-                "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-                statusFilter === s
-                  ? "bg-dash-surface-subtle text-dash-text shadow-sm ring-1 ring-dash-border"
-                  : "text-dash-muted hover:bg-dash-surface-subtle hover:text-dash-text"
+                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                quickFilter === f.id
+                  ? "border-blue-500/40 bg-blue-50 text-blue-900"
+                  : "border-dash-border bg-dash-surface-subtle text-dash-muted hover:border-dash-border-strong hover:text-dash-text"
               )}
             >
-              {s === "all" ? "All" : STATUS_LABELS[s]}
+              {f.label}
+              <Badge
+                variant="outline"
+                className={cn(
+                  "h-4 min-w-4 justify-center border-transparent bg-white/60 px-1 text-[10px] tabular-nums",
+                  quickFilter === f.id
+                    ? "text-blue-900"
+                    : "text-dash-muted"
+                )}
+              >
+                {f.count}
+              </Badge>
             </button>
           ))}
         </div>
@@ -239,7 +453,7 @@ export function AdminMembersClient({ members }: { members: MemberRow[] }) {
                     </td>
                     <td className="px-4 py-3.5 text-dash-muted">{m.email}</td>
                     <td className="px-4 py-3.5 text-dash-muted hidden md:table-cell">
-                      {m.rank ?? "—"}
+                      {m.rank ?? "Not recorded"}
                     </td>
                     <td className="px-4 py-3.5 text-dash-muted hidden lg:table-cell">
                       {m.date_of_initiation
@@ -248,10 +462,10 @@ export function AdminMembersClient({ members }: { members: MemberRow[] }) {
                             month: "short",
                             year: "numeric",
                           })
-                        : "—"}
+                        : "Not recorded"}
                     </td>
                     <td className="px-4 py-3.5 text-dash-muted hidden lg:table-cell">
-                      {m.dietary_requirements ?? "—"}
+                      {m.dietary_requirements ?? "Not recorded"}
                     </td>
                     <td className="px-4 py-3.5">
                       <span
@@ -273,6 +487,30 @@ export function AdminMembersClient({ members }: { members: MemberRow[] }) {
           </table>
         </div>
       </Card>
+
+      {previewRows && (
+        <MemberImportPreview
+          rows={previewRows}
+          onClose={() => setPreviewRows(null)}
+          onComplete={() => {
+            setPreviewRows(null);
+            router.refresh();
+          }}
+        />
+      )}
+
+      {showOrderPanel && (
+        <MemberOrderPanel
+          members={members.map((m) => ({
+            id: m.id,
+            full_name: m.full_name,
+            office_title: m.office_title,
+            officer_sort_order: m.officer_sort_order,
+            directory_sort_order: m.directory_sort_order,
+          }))}
+          onClose={() => setShowOrderPanel(false)}
+        />
+      )}
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex justify-end">
@@ -330,6 +568,71 @@ export function AdminMembersClient({ members }: { members: MemberRow[] }) {
                   />
                 </div>
               </div>
+              <div className="space-y-3 rounded-xl border border-dash-border bg-dash-surface-subtle p-4">
+                <p className="text-sm font-semibold text-dash-text">
+                  Summons directory address
+                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="address_line_1">Address line 1</Label>
+                  <Input
+                    id="address_line_1"
+                    value={formData.address_line_1}
+                    onChange={(e) =>
+                      setFormData({ ...formData, address_line_1: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="address_line_2">Address line 2</Label>
+                  <Input
+                    id="address_line_2"
+                    value={formData.address_line_2}
+                    onChange={(e) =>
+                      setFormData({ ...formData, address_line_2: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="city">City</Label>
+                    <Input
+                      id="city"
+                      value={formData.city}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="county">County</Label>
+                    <Input
+                      id="county"
+                      value={formData.county}
+                      onChange={(e) => setFormData({ ...formData, county: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="postcode">Postcode</Label>
+                    <Input
+                      id="postcode"
+                      value={formData.postcode}
+                      onChange={(e) =>
+                        setFormData({ ...formData, postcode: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="country">Country</Label>
+                    <Input
+                      id="country"
+                      value={formData.country}
+                      onChange={(e) =>
+                        setFormData({ ...formData, country: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="rank">Rank</Label>
@@ -357,6 +660,81 @@ export function AdminMembersClient({ members }: { members: MemberRow[] }) {
                     <option value="suspended">Suspended</option>
                   </select>
                 </div>
+              </div>
+              <div className="space-y-3 rounded-xl border border-dash-border bg-dash-surface-subtle p-4">
+                <p className="text-sm font-semibold text-dash-text">
+                  Officer and directory settings
+                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="office_title">Office title</Label>
+                  <Input
+                    id="office_title"
+                    placeholder="e.g. Worshipful Master"
+                    value={formData.office_title}
+                    onChange={(e) =>
+                      setFormData({ ...formData, office_title: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="officer_sort_order">Officer order</Label>
+                    <Input
+                      id="officer_sort_order"
+                      type="number"
+                      min="0"
+                      value={formData.officer_sort_order}
+                      onChange={(e) =>
+                        setFormData({ ...formData, officer_sort_order: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="directory_sort_order">Directory order</Label>
+                    <Input
+                      id="directory_sort_order"
+                      type="number"
+                      min="0"
+                      value={formData.directory_sort_order}
+                      onChange={(e) =>
+                        setFormData({ ...formData, directory_sort_order: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 text-sm text-dash-muted">
+                  <input
+                    type="checkbox"
+                    checked={formData.royal_arch}
+                    onChange={(e) =>
+                      setFormData({ ...formData, royal_arch: e.target.checked })
+                    }
+                    className="h-4 w-4 rounded border-dash-border"
+                  />
+                  Royal Arch member
+                </label>
+                <label className="flex items-center gap-2 text-sm text-dash-muted">
+                  <input
+                    type="checkbox"
+                    checked={formData.country_list}
+                    onChange={(e) =>
+                      setFormData({ ...formData, country_list: e.target.checked })
+                    }
+                    className="h-4 w-4 rounded border-dash-border"
+                  />
+                  Country List member
+                </label>
+                <label className="flex items-center gap-2 text-sm text-dash-muted">
+                  <input
+                    type="checkbox"
+                    checked={formData.honorary}
+                    onChange={(e) =>
+                      setFormData({ ...formData, honorary: e.target.checked })
+                    }
+                    className="h-4 w-4 rounded border-dash-border"
+                  />
+                  Honorary member
+                </label>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="dietary">Dietary requirements</Label>

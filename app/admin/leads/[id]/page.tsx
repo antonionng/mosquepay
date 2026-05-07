@@ -10,6 +10,9 @@ import { getAdminReadContext } from "@/lib/admin/read-context";
 import { LeadActivityForm } from "@/components/forms/lead-activity-form";
 import { ActivityTimeline } from "@/components/timeline";
 import { LeadDetailActions } from "@/components/crm/lead-detail-actions";
+import { LeadNextActionPanel } from "@/components/crm/lead-next-action";
+import { LeadGovernancePanel } from "@/components/crm/lead-governance";
+import { getLeadPrompt, PROMPT_CLASSES } from "@/lib/leads/next-action";
 import {
   ArrowLeft,
   Mail,
@@ -20,6 +23,8 @@ import {
   AlertTriangle,
   Clock,
   CheckCircle2,
+  Flag,
+  UserCheck,
 } from "lucide-react";
 
 const PIPELINE_STAGES = [
@@ -88,6 +93,13 @@ export default async function LeadDetailPage({
         ? await db.getLeadActivities(id, lodgeId)
         : []
     : [];
+  const members = lead
+    ? useMock
+      ? mockDb.getMembers({ status: "active" })
+      : lodgeId
+        ? await db.getMembers(lodgeId, { status: "active" })
+        : []
+    : [];
 
   if (!lead) notFound();
 
@@ -104,6 +116,21 @@ export default async function LeadDetailPage({
   );
   const isStale = daysSinceActivity >= 14;
   const isWarning = daysSinceActivity >= 7 && !isStale;
+
+  const prompt = getLeadPrompt({
+    stage: lead.stage,
+    daysSinceActivity,
+    daysInStage,
+    hasActivity: Boolean(lastActivity),
+    next_step: lead.next_step ?? null,
+    next_step_due_date: lead.next_step_due_date ?? null,
+    converted_at: lead.converted_at ?? null,
+  });
+
+  const memberOptions = members.map((m) => ({
+    id: m.id,
+    name: `${m.full_name}${m.office_title ? ` (${m.office_title})` : ""}`,
+  }));
 
   const isTerminal = (TERMINAL_STAGES as readonly string[]).includes(lead.stage);
   const currentStageIndex = PIPELINE_STAGES.indexOf(
@@ -209,7 +236,7 @@ export default async function LeadDetailPage({
                 <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
                   <AlertTriangle className="h-3.5 w-3.5 text-red-600" />
                   <span className="font-medium text-red-800">
-                    Stale — {daysSinceActivity}d since activity
+                    Stale: {daysSinceActivity}d since activity
                   </span>
                 </div>
               )}
@@ -217,7 +244,7 @@ export default async function LeadDetailPage({
                 <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
                   <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
                   <span className="font-medium text-amber-900">
-                    Cooling — {daysSinceActivity}d since activity
+                    Cooling: {daysSinceActivity}d since activity
                   </span>
                 </div>
               )}
@@ -280,6 +307,20 @@ export default async function LeadDetailPage({
             </div>
           )}
 
+          <div
+            className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${PROMPT_CLASSES[prompt.severity]}`}
+          >
+            {lead.converted_at ? (
+              <UserCheck className="mt-0.5 h-4 w-4 shrink-0" />
+            ) : (
+              <Flag className="mt-0.5 h-4 w-4 shrink-0" />
+            )}
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">{prompt.label}</p>
+              <p className="text-xs opacity-90">{prompt.reason}</p>
+            </div>
+          </div>
+
           {lead.initial_message && (
             <div className="rounded-xl border border-dash-border bg-dash-surface-subtle p-4">
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-dash-muted">
@@ -296,6 +337,28 @@ export default async function LeadDetailPage({
 
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="space-y-8 lg:col-span-2">
+          <LeadNextActionPanel
+            leadId={lead.id}
+            initialNextStep={lead.next_step ?? null}
+            initialNextStepDueDate={lead.next_step_due_date ?? null}
+          />
+
+          <LeadGovernancePanel
+            leadId={lead.id}
+            members={memberOptions}
+            initial={{
+              proposer_member_id: lead.proposer_member_id ?? null,
+              proposer_name: lead.proposer_name ?? null,
+              seconder_member_id: lead.seconder_member_id ?? null,
+              seconder_name: lead.seconder_name ?? null,
+              proposal_date: lead.proposal_date ?? null,
+              ballot_date: lead.ballot_date ?? null,
+              interview_completed_at: lead.interview_completed_at ?? null,
+              consent_given_at: lead.consent_given_at ?? null,
+              notes: lead.notes ?? null,
+            }}
+          />
+
           <Card variant="panel" className="overflow-hidden p-0">
             <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
               <div>
@@ -340,6 +403,11 @@ export default async function LeadDetailPage({
               ...PIPELINE_STAGES,
               ...TERMINAL_STAGES,
             ]}
+            email={lead.email}
+            phone={lead.phone ?? null}
+            fullName={`${lead.first_name} ${lead.last_name}`}
+            alreadyConverted={Boolean(lead.converted_member_id)}
+            convertedMemberId={lead.converted_member_id ?? null}
           />
 
           <Card variant="panel" className="overflow-hidden p-0">

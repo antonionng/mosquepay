@@ -13,13 +13,15 @@ const buttonVariants = cva(
         default:
           "bg-slate-950 text-white shadow-soft hover:bg-slate-800 focus-visible:ring-blue-500 focus-visible:ring-offset-white",
         primary:
-          "bg-blue-600 text-white shadow-soft hover:bg-blue-500 focus-visible:ring-blue-500 focus-visible:ring-offset-white",
+          "bg-brand text-white shadow-sm hover:bg-brand-dark focus-visible:ring-brand focus-visible:ring-offset-white",
+        brand:
+          "bg-brand text-white shadow-sm hover:bg-brand-dark focus-visible:ring-brand focus-visible:ring-offset-white",
         secondary:
-          "border border-slate-200 bg-white text-slate-950 hover:border-slate-300 hover:bg-slate-50 focus-visible:ring-blue-500 focus-visible:ring-offset-white",
+          "border border-slate-400 bg-slate-50 text-slate-950 shadow-sm hover:border-slate-500 hover:bg-slate-100 focus-visible:ring-blue-500 focus-visible:ring-offset-white",
         ghost:
-          "text-slate-600 hover:bg-slate-100 hover:text-slate-950 focus-visible:ring-blue-500 focus-visible:ring-offset-white",
+          "border border-transparent text-slate-800 hover:border-slate-200 hover:bg-slate-100 hover:text-slate-950 focus-visible:ring-blue-500 focus-visible:ring-offset-white",
         outline:
-          "border border-slate-300 bg-transparent text-slate-950 hover:border-slate-400 hover:bg-slate-50 focus-visible:ring-blue-500 focus-visible:ring-offset-white",
+          "border border-slate-400 bg-slate-50 text-slate-950 shadow-sm hover:border-slate-500 hover:bg-slate-100 focus-visible:ring-blue-500 focus-visible:ring-offset-white",
         "outline-gold":
           "border border-blue-200 bg-blue-50/40 text-blue-700 hover:bg-blue-50 focus-visible:ring-blue-500 focus-visible:ring-offset-white",
         link:

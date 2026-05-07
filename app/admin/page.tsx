@@ -17,7 +17,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -30,14 +30,14 @@ import {
 
 const CLOSED_STAGES = new Set(["initiated", "declined"]);
 
-type KpiAccent = "blue" | "violet" | "emerald" | "amber";
+type KpiAccent = "brand" | "brandLight" | "emerald" | "amber";
 
 const kpiAccentIcon: Record<
   KpiAccent,
   { wrap: string; icon: string }
 > = {
-  blue: { wrap: "bg-blue-500/10", icon: "text-blue-600" },
-  violet: { wrap: "bg-violet-500/10", icon: "text-violet-600" },
+  brand: { wrap: "bg-[hsl(var(--dash-ring)/0.10)]", icon: "text-[hsl(var(--dash-ring))]" },
+  brandLight: { wrap: "bg-[hsl(var(--dash-ring-soft)/0.12)]", icon: "text-[hsl(var(--dash-ring-soft))]" },
   emerald: { wrap: "bg-emerald-500/10", icon: "text-emerald-600" },
   amber: { wrap: "bg-amber-500/10", icon: "text-amber-700" },
 };
@@ -175,7 +175,7 @@ export default async function AdminDashboardPage() {
       hint: `${newEnquiries} new / open enquiries`,
       href: "/admin/leads",
       icon: Users,
-      accent: "blue",
+      accent: "brand",
     },
     {
       label: "Assigned leads",
@@ -183,7 +183,7 @@ export default async function AdminDashboardPage() {
       hint: `${Math.max(0, leads.length - assignedLeads)} unassigned`,
       href: "/admin/leads",
       icon: UserCheck,
-      accent: "violet",
+      accent: "brandLight",
     },
     {
       label: "Closed outcomes",
@@ -209,7 +209,7 @@ export default async function AdminDashboardPage() {
         <div>
           <h1 className="admin-page-title">Dashboard</h1>
           <p className="admin-page-copy">
-            Lodge pipeline, events, and payments in one place — same data as your CRM and checkout.
+            Lodge pipeline, events, and payments in one place. Same data as your CRM and checkout.
           </p>
         </div>
       </div>
@@ -264,7 +264,7 @@ export default async function AdminDashboardPage() {
         })}
       </div>
 
-      {/* Activity strip — domain context */}
+      {/* Activity strip: domain context */}
       <div className="dash-filter-bar flex flex-wrap items-center gap-2 py-3">
         <span className="text-xs font-semibold uppercase tracking-[0.14em] text-dash-muted">Signals</span>
         <Badge variant="secondary">
@@ -330,7 +330,7 @@ export default async function AdminDashboardPage() {
           <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
             <div>
               <h2 className="dash-panel-header-title">Assignee leaderboard</h2>
-              <p className="dash-panel-header-description">Leads by owner — pipeline vs closed.</p>
+              <p className="dash-panel-header-description">Leads by owner. Pipeline vs closed.</p>
             </div>
             <Link
               href="/admin/leads"

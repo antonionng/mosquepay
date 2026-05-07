@@ -307,7 +307,7 @@ function DonatePageContent() {
                 {[
                   "Gift Aid lets charities reclaim 25p for every £1 you donate",
                   "You must be a UK taxpayer to qualify",
-                  "It costs you nothing extra — the charity claims it from HMRC",
+                  "It costs you nothing extra. The charity claims it from HMRC",
                 ].map((fact) => (
                   <div key={fact} className="flex items-start gap-3">
                     <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />

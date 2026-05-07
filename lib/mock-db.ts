@@ -4,7 +4,21 @@
  */
 
 import type { LodgeSiteSection } from "@/lib/db/types";
+import { shouldUseInMemoryMock } from "@/lib/db/with-fallback";
 import { DEFAULT_LODGE_SLUG } from "@/lib/tenant";
+
+/** True while module init seed runs (allows seed without Supabase). */
+let mockDbSeeding = false;
+
+function assertInMemoryMock(): void {
+  if (mockDbSeeding) return;
+  if (!shouldUseInMemoryMock()) {
+    throw new Error(
+      "In-memory mock DB is not in use. Set Supabase env vars for Postgres-backed data, " +
+        "or set ALLOW_IN_MEMORY_MOCK=true for offline demo mode."
+    );
+  }
+}
 
 function uuid() {
   return crypto.randomUUID();
@@ -31,7 +45,24 @@ export type MockLodge = {
   secondary_color: string | null;
   support_email: string | null;
   support_phone: string | null;
+  lodge_number: string | null;
+  consecrated_at: string | null;
+  governing_body: string | null;
+  meeting_schedule: string | null;
+  secretary_name: string | null;
+  secretary_address: string | null;
+  secretary_phone: string | null;
+  charity_donation_url: string | null;
+  relief_chest_name: string | null;
+  data_protection_notice: string | null;
+  visiting_notice: string | null;
+  loi_contact: string | null;
+  wifi_details: string | null;
   is_active: boolean;
+  province_id: string | null;
+  custom_domain: string | null;
+  custom_domain_verified_at: string | null;
+  custom_domain_verification_token: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -41,6 +72,7 @@ export type MockLodgeSite = LodgeScoped & {
   page_title: string;
   page_description: string | null;
   sections: LodgeSiteSection[];
+  published: boolean;
   updated_at: string;
 };
 
@@ -57,7 +89,27 @@ const lodges: MockLodge[] = [
     secondary_color: "#b45309",
     support_email: "secretary@covenantlodge4344.org",
     support_phone: null,
+    lodge_number: "4344",
+    consecrated_at: "1922-04-03",
+    governing_body: "Member of London Metropolitan Grand Lodge",
+    meeting_schedule:
+      "Regular meetings are held in January, March, June, and November.",
+    secretary_name: "Lodge Secretary",
+    secretary_address: "Mark Masons Hall, 86 St James's Street, London, SW1A 1PL",
+    secretary_phone: "01582 461961",
+    charity_donation_url: "https://gtap.uk/L4344",
+    relief_chest_name: "Covenant Relief Chest",
+    data_protection_notice:
+      "A member database is held by the Lodge Secretary for lodge business.",
+    visiting_notice:
+      "Brethren travelling abroad should confirm regularity before visiting lodges under other jurisdictions.",
+    loi_contact: "Contact the Secretary for Lodge of Instruction dates.",
+    wifi_details: "MMH Guest WiFi details available at the venue.",
     is_active: true,
+    province_id: null,
+    custom_domain: null,
+    custom_domain_verified_at: null,
+    custom_domain_verification_token: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   },
@@ -111,15 +163,18 @@ const lodgeSites: MockLodgeSite[] = [
         order: 4,
       },
     ],
+    published: true,
     updated_at: new Date().toISOString(),
   },
 ];
 
 export function listLodges(): MockLodge[] {
+  assertInMemoryMock();
   return [...lodges].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export function getLodgeBySlug(slug: string): MockLodge | null {
+  assertInMemoryMock();
   const safeSlug = withLodgeSlug(slug);
   return lodges.find((l) => l.slug === safeSlug && l.is_active) ?? null;
 }
@@ -127,6 +182,7 @@ export function getLodgeBySlug(slug: string): MockLodge | null {
 export function upsertLodge(
   input: Partial<Omit<MockLodge, "id" | "created_at" | "updated_at">> & Pick<MockLodge, "slug" | "name">
 ): MockLodge {
+  assertInMemoryMock();
   const safeSlug = withLodgeSlug(input.slug);
   const now = new Date().toISOString();
   const existing = lodges.find((l) => l.slug === safeSlug);
@@ -146,7 +202,24 @@ export function upsertLodge(
     secondary_color: input.secondary_color ?? null,
     support_email: input.support_email ?? null,
     support_phone: input.support_phone ?? null,
+    lodge_number: input.lodge_number ?? null,
+    consecrated_at: input.consecrated_at ?? null,
+    governing_body: input.governing_body ?? null,
+    meeting_schedule: input.meeting_schedule ?? null,
+    secretary_name: input.secretary_name ?? null,
+    secretary_address: input.secretary_address ?? null,
+    secretary_phone: input.secretary_phone ?? null,
+    charity_donation_url: input.charity_donation_url ?? null,
+    relief_chest_name: input.relief_chest_name ?? null,
+    data_protection_notice: input.data_protection_notice ?? null,
+    visiting_notice: input.visiting_notice ?? null,
+    loi_contact: input.loi_contact ?? null,
+    wifi_details: input.wifi_details ?? null,
     is_active: input.is_active ?? true,
+    province_id: input.province_id ?? null,
+    custom_domain: input.custom_domain ?? null,
+    custom_domain_verified_at: input.custom_domain_verified_at ?? null,
+    custom_domain_verification_token: input.custom_domain_verification_token ?? null,
     created_at: now,
     updated_at: now,
   };
@@ -155,6 +228,7 @@ export function upsertLodge(
 }
 
 export function getLodgeSite(lodgeSlug?: string): MockLodgeSite {
+  assertInMemoryMock();
   const safeSlug = withLodgeSlug(lodgeSlug);
   const existing = lodgeSites.find((s) => s.lodge_slug === safeSlug);
   if (existing) return existing;
@@ -164,6 +238,7 @@ export function getLodgeSite(lodgeSlug?: string): MockLodgeSite {
     page_title: "Lodge Homepage",
     page_description: null,
     sections: [],
+    published: true,
     updated_at: new Date().toISOString(),
   };
   lodgeSites.push(site);
@@ -172,8 +247,9 @@ export function getLodgeSite(lodgeSlug?: string): MockLodgeSite {
 
 export function updateLodgeSite(
   lodgeSlug: string,
-  updates: Partial<Pick<MockLodgeSite, "page_title" | "page_description" | "sections">>
+  updates: Partial<Pick<MockLodgeSite, "page_title" | "page_description" | "sections" | "published">>
 ): MockLodgeSite {
+  assertInMemoryMock();
   const site = getLodgeSite(lodgeSlug);
   Object.assign(site, updates, { updated_at: new Date().toISOString() });
   return site;
@@ -192,6 +268,19 @@ export type MockLead = LodgeScoped & {
   initial_message: string | null;
   stage: string;
   assigned_to: string | null;
+  proposer_member_id: string | null;
+  proposer_name: string | null;
+  seconder_member_id: string | null;
+  seconder_name: string | null;
+  next_step: string | null;
+  next_step_due_date: string | null;
+  proposal_date: string | null;
+  ballot_date: string | null;
+  interview_completed_at: string | null;
+  consent_given_at: string | null;
+  notes: string | null;
+  converted_member_id: string | null;
+  converted_at: string | null;
   created_at: string;
   updated_at: string;
   stage_changed_at: string;
@@ -200,6 +289,7 @@ export type MockLead = LodgeScoped & {
 const leads: MockLead[] = [];
 
 export function getLeads(opts?: { lodge_slug?: string }): MockLead[] {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   return [...leads]
     .filter((lead) => lead.lodge_slug === lodgeSlug)
@@ -207,17 +297,76 @@ export function getLeads(opts?: { lodge_slug?: string }): MockLead[] {
 }
 
 export function getLeadById(id: string, opts?: { lodge_slug?: string }): MockLead | null {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   return leads.find((l) => l.id === id && l.lodge_slug === lodgeSlug) ?? null;
 }
 
-export function addLead(
-  data: Omit<MockLead, "id" | "created_at" | "updated_at" | "stage_changed_at" | "lodge_slug"> & { lodge_slug?: string }
-): MockLead {
+type AddLeadInput = Omit<
+  MockLead,
+  | "id"
+  | "created_at"
+  | "updated_at"
+  | "stage_changed_at"
+  | "lodge_slug"
+  | "proposer_member_id"
+  | "proposer_name"
+  | "seconder_member_id"
+  | "seconder_name"
+  | "next_step"
+  | "next_step_due_date"
+  | "proposal_date"
+  | "ballot_date"
+  | "interview_completed_at"
+  | "consent_given_at"
+  | "notes"
+  | "converted_member_id"
+  | "converted_at"
+> & {
+  lodge_slug?: string;
+  proposer_member_id?: string | null;
+  proposer_name?: string | null;
+  seconder_member_id?: string | null;
+  seconder_name?: string | null;
+  next_step?: string | null;
+  next_step_due_date?: string | null;
+  proposal_date?: string | null;
+  ballot_date?: string | null;
+  interview_completed_at?: string | null;
+  consent_given_at?: string | null;
+  notes?: string | null;
+  converted_member_id?: string | null;
+  converted_at?: string | null;
+};
+
+export function addLead(data: AddLeadInput): MockLead {
+  assertInMemoryMock();
   const now = new Date().toISOString();
   const lead: MockLead = {
     id: uuid(),
-    ...data,
+    first_name: data.first_name,
+    last_name: data.last_name,
+    email: data.email,
+    phone: data.phone,
+    location: data.location,
+    source: data.source,
+    how_heard_about_us: data.how_heard_about_us,
+    initial_message: data.initial_message,
+    stage: data.stage,
+    assigned_to: data.assigned_to,
+    proposer_member_id: data.proposer_member_id ?? null,
+    proposer_name: data.proposer_name ?? null,
+    seconder_member_id: data.seconder_member_id ?? null,
+    seconder_name: data.seconder_name ?? null,
+    next_step: data.next_step ?? null,
+    next_step_due_date: data.next_step_due_date ?? null,
+    proposal_date: data.proposal_date ?? null,
+    ballot_date: data.ballot_date ?? null,
+    interview_completed_at: data.interview_completed_at ?? null,
+    consent_given_at: data.consent_given_at ?? null,
+    notes: data.notes ?? null,
+    converted_member_id: data.converted_member_id ?? null,
+    converted_at: data.converted_at ?? null,
     lodge_slug: withLodgeSlug(data.lodge_slug),
     created_at: now,
     updated_at: now,
@@ -229,9 +378,10 @@ export function addLead(
 
 export function updateLead(
   id: string,
-  updates: Partial<Pick<MockLead, "stage" | "assigned_to">>,
+  updates: Partial<Omit<MockLead, "id" | "created_at" | "lodge_slug">>,
   opts?: { lodge_slug?: string }
 ): MockLead | null {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   const i = leads.findIndex((l) => l.id === id && l.lodge_slug === lodgeSlug);
   if (i === -1) return null;
@@ -239,6 +389,37 @@ export function updateLead(
   if (updates.stage) leads[i].stage_changed_at = now;
   Object.assign(leads[i], updates, { updated_at: now });
   return leads[i];
+}
+
+export function updateLeadActivity(
+  id: string,
+  updates: Partial<Pick<MockLeadActivity, "title" | "description" | "meeting_date" | "attendees" | "due_date" | "completed">>,
+  opts?: { lodge_slug?: string }
+): MockLeadActivity | null {
+  assertInMemoryMock();
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  const i = leadActivities.findIndex(
+    (a) => a.id === id && a.lodge_slug === lodgeSlug
+  );
+  if (i === -1) return null;
+  Object.assign(leadActivities[i], updates);
+  return leadActivities[i];
+}
+
+export function getLatestLeadActivity(
+  leadId: string,
+  opts?: { lodge_slug?: string }
+): MockLeadActivity | null {
+  assertInMemoryMock();
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return (
+    leadActivities
+      .filter((a) => a.lead_id === leadId && a.lodge_slug === lodgeSlug)
+      .sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0] ?? null
+  );
 }
 
 // --- Lead activities ---
@@ -259,6 +440,7 @@ export type MockLeadActivity = LodgeScoped & {
 const leadActivities: MockLeadActivity[] = [];
 
 export function getLeadActivities(leadId: string, opts?: { lodge_slug?: string }): MockLeadActivity[] {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   return leadActivities
     .filter((a) => a.lead_id === leadId && a.lodge_slug === lodgeSlug)
@@ -268,6 +450,7 @@ export function getLeadActivities(leadId: string, opts?: { lodge_slug?: string }
 export function addLeadActivity(
   data: Omit<MockLeadActivity, "id" | "created_at" | "lodge_slug"> & { lodge_slug?: string }
 ): MockLeadActivity {
+  assertInMemoryMock();
   const activity: MockLeadActivity = {
     id: uuid(),
     ...data,
@@ -321,6 +504,7 @@ export type MockEvent = LodgeScoped & {
 const events: MockEvent[] = [];
 
 export function getEvents(opts?: { published?: boolean; upcoming?: boolean; lodge_slug?: string }): MockEvent[] {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   let list = [...events];
   list = list.filter((event) => event.lodge_slug === lodgeSlug);
@@ -330,11 +514,13 @@ export function getEvents(opts?: { published?: boolean; upcoming?: boolean; lodg
 }
 
 export function getEventById(id: string, opts?: { lodge_slug?: string }): MockEvent | null {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   return events.find((e) => e.id === id && e.lodge_slug === lodgeSlug) ?? null;
 }
 
 export function getEventBySlug(slug: string, opts?: { lodge_slug?: string }): MockEvent | null {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   return events.find((e) => e.slug === slug && e.published && e.lodge_slug === lodgeSlug) ?? null;
 }
@@ -342,6 +528,7 @@ export function getEventBySlug(slug: string, opts?: { lodge_slug?: string }): Mo
 export function addEvent(
   data: Omit<MockEvent, "id" | "created_at" | "updated_at" | "lodge_slug"> & { lodge_slug?: string }
 ): MockEvent {
+  assertInMemoryMock();
   const now = new Date().toISOString();
   const event: MockEvent = {
     id: uuid(),
@@ -355,6 +542,7 @@ export function addEvent(
 }
 
 export function updateEvent(id: string, updates: Partial<MockEvent>, opts?: { lodge_slug?: string }): MockEvent | null {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   const i = events.findIndex((e) => e.id === id && e.lodge_slug === lodgeSlug);
   if (i === -1) return null;
@@ -385,6 +573,7 @@ export type MockRsvp = LodgeScoped & {
 const rsvps: MockRsvp[] = [];
 
 export function getRsvpsByEventId(eventId: string, opts?: { lodge_slug?: string }): MockRsvp[] {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   return rsvps.filter((r) => r.event_id === eventId && r.lodge_slug === lodgeSlug);
 }
@@ -392,6 +581,7 @@ export function getRsvpsByEventId(eventId: string, opts?: { lodge_slug?: string 
 export function addRsvp(
   data: Omit<MockRsvp, "id" | "created_at" | "updated_at" | "lodge_slug"> & { lodge_slug?: string }
 ): MockRsvp {
+  assertInMemoryMock();
   const now = new Date().toISOString();
   const rsvp: MockRsvp = {
     id: uuid(),
@@ -409,6 +599,7 @@ export function updateRsvp(
   updates: Partial<Pick<MockRsvp, "payment_id" | "payment_completed" | "status">>,
   opts?: { lodge_slug?: string }
 ): MockRsvp | null {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   const i = rsvps.findIndex((r) => r.id === id && r.lodge_slug === lodgeSlug);
   if (i === -1) return null;
@@ -417,6 +608,7 @@ export function updateRsvp(
 }
 
 export function getRsvpById(id: string, opts?: { lodge_slug?: string }): MockRsvp | null {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   return rsvps.find((r) => r.id === id && r.lodge_slug === lodgeSlug) ?? null;
 }
@@ -447,6 +639,7 @@ export type MockPayment = LodgeScoped & {
 const payments: MockPayment[] = [];
 
 export function getPayments(opts?: { lodge_slug?: string }): MockPayment[] {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   return [...payments]
     .filter((payment) => payment.lodge_slug === lodgeSlug)
@@ -456,6 +649,7 @@ export function getPayments(opts?: { lodge_slug?: string }): MockPayment[] {
 export function addPayment(
   data: Omit<MockPayment, "id" | "created_at" | "updated_at" | "lodge_slug"> & { lodge_slug?: string }
 ): MockPayment {
+  assertInMemoryMock();
   const now = new Date().toISOString();
   const payment: MockPayment = {
     id: uuid(),
@@ -484,6 +678,7 @@ export function addEventGuests(
   guests: Omit<MockEventGuest, "id" | "created_at" | "lodge_slug">[] & { lodge_slug?: string }[],
   lodgeSlug?: string
 ): MockEventGuest[] {
+  assertInMemoryMock();
   const slug = withLodgeSlug(lodgeSlug);
   return guests.map((g) => {
     const guest: MockEventGuest = {
@@ -498,11 +693,13 @@ export function addEventGuests(
 }
 
 export function getGuestsByRsvp(rsvpId: string, opts?: { lodge_slug?: string }): MockEventGuest[] {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   return eventGuests.filter((g) => g.rsvp_id === rsvpId && g.lodge_slug === lodgeSlug);
 }
 
 export function getGuestsByEvent(eventId: string, opts?: { lodge_slug?: string }): MockEventGuest[] {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   return eventGuests.filter((g) => g.event_id === eventId && g.lodge_slug === lodgeSlug);
 }
@@ -514,6 +711,18 @@ export type MockMember = LodgeScoped & {
   email: string;
   full_name: string;
   phone: string | null;
+  address_line_1: string | null;
+  address_line_2: string | null;
+  city: string | null;
+  county: string | null;
+  postcode: string | null;
+  country: string | null;
+  country_list: boolean;
+  royal_arch: boolean;
+  honorary: boolean;
+  office_title: string | null;
+  officer_sort_order: number | null;
+  directory_sort_order: number | null;
   rank: string | null;
   dietary_requirements: string | null;
   date_of_initiation: string | null;
@@ -527,6 +736,7 @@ export type MockMember = LodgeScoped & {
 const members: MockMember[] = [];
 
 export function getMembers(opts?: { lodge_slug?: string; status?: string; search?: string }): MockMember[] {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   let list = members.filter((m) => m.lodge_slug === lodgeSlug);
   if (opts?.status) list = list.filter((m) => m.membership_status === opts.status);
@@ -538,11 +748,13 @@ export function getMembers(opts?: { lodge_slug?: string; status?: string; search
 }
 
 export function getMemberById(id: string, opts?: { lodge_slug?: string }): MockMember | null {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   return members.find((m) => m.id === id && m.lodge_slug === lodgeSlug) ?? null;
 }
 
 export function getMemberByEmail(email: string, opts?: { lodge_slug?: string }): MockMember | null {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   return members.find((m) => m.email.toLowerCase() === email.toLowerCase() && m.lodge_slug === lodgeSlug) ?? null;
 }
@@ -550,6 +762,7 @@ export function getMemberByEmail(email: string, opts?: { lodge_slug?: string }):
 export function createMember(
   data: Omit<MockMember, "id" | "created_at" | "updated_at" | "lodge_slug"> & { lodge_slug?: string }
 ): MockMember {
+  assertInMemoryMock();
   const now = new Date().toISOString();
   const member: MockMember = {
     id: uuid(),
@@ -567,6 +780,7 @@ export function updateMember(
   updates: Partial<Omit<MockMember, "id" | "lodge_slug" | "created_at">>,
   opts?: { lodge_slug?: string }
 ): MockMember | null {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   const i = members.findIndex((m) => m.id === id && m.lodge_slug === lodgeSlug);
   if (i === -1) return null;
@@ -575,6 +789,7 @@ export function updateMember(
 }
 
 export function getRsvpDietaryByEmail(email: string, opts?: { lodge_slug?: string }): Array<{ event_id: string; dietary_requirements: string | null; created_at: string }> {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   return rsvps
     .filter((r) => r.user_email.toLowerCase() === email.toLowerCase() && r.lodge_slug === lodgeSlug && r.dietary_requirements)
@@ -582,6 +797,7 @@ export function getRsvpDietaryByEmail(email: string, opts?: { lodge_slug?: strin
 }
 
 export function getPaymentsByEmail(email: string, opts?: { lodge_slug?: string }): MockPayment[] {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   return payments
     .filter((p) => p.user_email.toLowerCase() === email.toLowerCase() && p.lodge_slug === lodgeSlug)
@@ -607,6 +823,7 @@ export type MockBlogPost = LodgeScoped & {
 const blogPosts: MockBlogPost[] = [];
 
 export function getBlogPosts(opts?: { published?: boolean; lodge_slug?: string }): MockBlogPost[] {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   let list = [...blogPosts];
   list = list.filter((post) => post.lodge_slug === lodgeSlug);
@@ -617,11 +834,13 @@ export function getBlogPosts(opts?: { published?: boolean; lodge_slug?: string }
 }
 
 export function getBlogPostById(id: string, opts?: { lodge_slug?: string }): MockBlogPost | null {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   return blogPosts.find((p) => p.id === id && p.lodge_slug === lodgeSlug) ?? null;
 }
 
 export function getBlogPostBySlug(slug: string, opts?: { lodge_slug?: string }): MockBlogPost | null {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   return blogPosts.find((p) => p.slug === slug && p.published && p.lodge_slug === lodgeSlug) ?? null;
 }
@@ -629,6 +848,7 @@ export function getBlogPostBySlug(slug: string, opts?: { lodge_slug?: string }):
 export function addBlogPost(
   data: Omit<MockBlogPost, "id" | "created_at" | "updated_at" | "lodge_slug"> & { lodge_slug?: string }
 ): MockBlogPost {
+  assertInMemoryMock();
   const now = new Date().toISOString();
   const post: MockBlogPost = {
     id: uuid(),
@@ -642,6 +862,7 @@ export function addBlogPost(
 }
 
 export function updateBlogPost(id: string, updates: Partial<MockBlogPost>, opts?: { lodge_slug?: string }): MockBlogPost | null {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   const i = blogPosts.findIndex((p) => p.id === id && p.lodge_slug === lodgeSlug);
   if (i === -1) return null;
@@ -666,6 +887,7 @@ export type MockCharityCampaign = LodgeScoped & {
 const charityCampaigns: MockCharityCampaign[] = [];
 
 export function getCharityCampaigns(opts?: { lodge_slug?: string }): MockCharityCampaign[] {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   return [...charityCampaigns]
     .filter((c) => c.lodge_slug === lodgeSlug)
@@ -675,6 +897,7 @@ export function getCharityCampaigns(opts?: { lodge_slug?: string }): MockCharity
 export function addCharityCampaign(
   data: Omit<MockCharityCampaign, "id" | "created_at" | "updated_at" | "lodge_slug"> & { lodge_slug?: string }
 ): MockCharityCampaign {
+  assertInMemoryMock();
   const now = new Date().toISOString();
   const campaign: MockCharityCampaign = {
     id: uuid(),
@@ -707,6 +930,7 @@ export type MockDonation = LodgeScoped & {
 const donations: MockDonation[] = [];
 
 export function getDonations(opts?: { lodge_slug?: string }): MockDonation[] {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   return [...donations]
     .filter((d) => d.lodge_slug === lodgeSlug)
@@ -716,6 +940,7 @@ export function getDonations(opts?: { lodge_slug?: string }): MockDonation[] {
 export function addDonation(
   data: Omit<MockDonation, "id" | "created_at" | "lodge_slug"> & { lodge_slug?: string }
 ): MockDonation {
+  assertInMemoryMock();
   const donation: MockDonation = {
     id: uuid(),
     ...data,
@@ -742,6 +967,7 @@ export type MockGiftAidDeclaration = LodgeScoped & {
 const giftAidDeclarations: MockGiftAidDeclaration[] = [];
 
 export function getGiftAidDeclarations(opts?: { lodge_slug?: string }): MockGiftAidDeclaration[] {
+  assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   return [...giftAidDeclarations]
     .filter((g) => g.lodge_slug === lodgeSlug)
@@ -751,6 +977,7 @@ export function getGiftAidDeclarations(opts?: { lodge_slug?: string }): MockGift
 export function addGiftAidDeclaration(
   data: Omit<MockGiftAidDeclaration, "id" | "created_at" | "lodge_slug"> & { lodge_slug?: string }
 ): MockGiftAidDeclaration {
+  assertInMemoryMock();
   const declaration: MockGiftAidDeclaration = {
     id: uuid(),
     ...data,
@@ -763,6 +990,8 @@ export function addGiftAidDeclaration(
 
 // --- Seed data ---
 function seedData() {
+  mockDbSeeding = true;
+  try {
   const now = new Date();
   const daysAgo = (d: number) => new Date(now.getTime() - d * 86400000).toISOString();
   const daysFromNow = (d: number) => new Date(now.getTime() + d * 86400000).toISOString();
@@ -887,6 +1116,27 @@ function seedData() {
       email,
       full_name: `${first} ${last}`,
       phone: i % 2 === 0 ? `07700 20000${i}` : null,
+      address_line_1: `${10 + i} Example Road`,
+      address_line_2: null,
+      city: i % 2 === 0 ? "London" : "Essex",
+      county: i % 2 === 0 ? null : "Essex",
+      postcode: `SW1A ${i + 1}AA`,
+      country: "United Kingdom",
+      country_list: i % 5 === 0,
+      royal_arch: i % 3 === 0,
+      honorary: false,
+      office_title: [
+        "Worshipful Master",
+        "Senior Warden",
+        "Junior Warden",
+        "Secretary",
+        "Treasurer",
+        "Charity Steward",
+        "Almoner",
+        null,
+      ][i],
+      officer_sort_order: i < 7 ? i + 1 : null,
+      directory_sort_order: i + 1,
       rank: ["EA", "FC", "MM", "MM", "MM", "MM", "MM", "MM"][i],
       dietary_requirements: ["Vegetarian", null, "Gluten-free", null, null, "Vegan", null, "No nuts"][i],
       date_of_initiation: daysAgo(365 + i * 90),
@@ -901,7 +1151,7 @@ function seedData() {
     const dining = [45, 45, 65, 45, 45, 45, 65, 45][i];
     const charity = [10, 20, 25, 5, 15, 10, 50, 0][i];
     const raffle = [5, 10, 10, 5, 0, 5, 10, 5][i];
-    const p = addPayment({
+    addPayment({
       rsvp_id: null,
       event_id: events[i % events.length]?.id ?? null,
       user_email: email,
@@ -982,6 +1232,9 @@ function seedData() {
       });
     }
   });
+  } finally {
+    mockDbSeeding = false;
+  }
 }
 
 seedData();

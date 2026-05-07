@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   FileSpreadsheet,
   Download,
@@ -28,6 +30,7 @@ export function GiftAidClient({
 }: {
   declarations: Declaration[];
 }) {
+  const router = useRouter();
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "expired" | "revoked">("all");
   const [search, setSearch] = useState("");
 
@@ -219,8 +222,16 @@ export function GiftAidClient({
               </tr>
             ) : (
               filtered.map((d) => (
-                <tr key={d.id}>
-                  <td className="font-medium text-dash-text">{d.donor_name}</td>
+                <tr
+                  key={d.id}
+                  className="cursor-pointer transition-colors hover:bg-dash-surface-subtle"
+                  onClick={() => router.push(`/admin/gift-aid/${d.id}`)}
+                >
+                  <td className="font-medium text-dash-text">
+                    <Link href={`/admin/gift-aid/${d.id}`} className="hover:text-dash-ring">
+                      {d.donor_name}
+                    </Link>
+                  </td>
                   <td className="text-dash-muted">{d.donor_email}</td>
                   <td className="text-dash-text">{formatDate(d.declaration_date)}</td>
                   <td>{statusBadge(d.status)}</td>

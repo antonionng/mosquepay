@@ -1,12 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
+import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getDefaultLodgeSlug, getLodgeSlugFromRequest } from "@/lib/tenant";
 
 export async function POST(request: NextRequest) {
+  const _rejectMock = rejectIfMockDisabled();
+  if (_rejectMock) return _rejectMock;
+
+  const body = await request.json();
+  const {
+    event_id,
+    user_name,
+    user_email,
+    user_phone,
+    attending_ceremony,
+    attending_dining,
+    number_of_guests,
+    dietary_requirements,
+    special_requests,
+    dining_total,
+    meeting_fee,
+    guest_total,
+    guests,
+    charity_amount,
+    raffle_amount,
+    gift_aid,
+    gift_aid_address_line_1,
+    gift_aid_address_line_2,
+    gift_aid_city,
+    gift_aid_postcode,
+    standalone,
+    mock_payment,
+  } = body;
+
   const stripeSecret = process.env.STRIPE_SECRET_KEY;
-  if (!stripeSecret) {
+  const shouldMockPayment =
+    mock_payment === true || process.env.ALLOW_MOCK_PAYMENTS === "true";
+  if (!stripeSecret && !shouldMockPayment) {
     return NextResponse.json(
       { error: "Payments are not configured. Please complete RSVP without payment or contact the lodge." },
       { status: 503 }
@@ -17,30 +49,6 @@ export async function POST(request: NextRequest) {
     const lodgeSlug = getLodgeSlugFromRequest(request);
     const lodgeQuery =
       lodgeSlug === getDefaultLodgeSlug() ? "" : `?lodge=${encodeURIComponent(lodgeSlug)}`;
-    const body = await request.json();
-    const {
-      event_id,
-      user_name,
-      user_email,
-      user_phone,
-      attending_ceremony,
-      attending_dining,
-      number_of_guests,
-      dietary_requirements,
-      special_requests,
-      dining_total,
-      meeting_fee,
-      guest_total,
-      guests,
-      charity_amount,
-      raffle_amount,
-      gift_aid,
-      gift_aid_address_line_1,
-      gift_aid_address_line_2,
-      gift_aid_city,
-      gift_aid_postcode,
-      standalone,
-    } = body;
 
     const meetingFeeVal = meeting_fee ?? 0;
     const guestTotalVal = guest_total ?? 0;
@@ -106,6 +114,74 @@ export async function POST(request: NextRequest) {
           );
         }
       }
+    }
+
+    if (shouldMockPayment) {
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+      const paymentData = {
+        rsvp_id: rsvpId,
+        event_id,
+        user_email,
+        user_name: user_name ?? null,
+        stripe_payment_intent_id: `mock_pi_${Date.now()}`,
+        stripe_charge_id: null,
+        stripe_customer_id: null,
+        dining_amount: dining_total ?? 0,
+        charity_amount: charity_amount ?? 0,
+        raffle_amount: raffle_amount ?? 0,
+        meeting_fee_amount: meetingFeeVal,
+        guest_ticket_amount: guestTotalVal,
+        total_amount: total,
+        currency: "GBP",
+        charity_name: null,
+        status: "succeeded",
+        refund_amount: 0,
+        refund_reason: null,
+        completed_at: new Date().toISOString(),
+      };
+
+      if (isSupabaseConfigured()) {
+        const lodgeId = await db.resolveLodgeId(lodgeSlug);
+        if (!lodgeId) {
+          return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+        }
+        const payment = await db.addPayment(lodgeId, paymentData);
+        if (rsvpId) {
+          await db.updateRsvp(rsvpId, lodgeId, {
+            payment_id: payment.id,
+            payment_completed: true,
+            status: "confirmed",
+          });
+        }
+        return NextResponse.json({
+          url: `${siteUrl}/events/rsvp/success?mock=1${lodgeQuery ? `&lodge=${encodeURIComponent(lodgeSlug)}` : ""}`,
+          mock: true,
+          rsvp_id: rsvpId,
+          payment_id: payment.id,
+        });
+      }
+
+      const payment = mockDb.addPayment({ ...paymentData, lodge_slug: lodgeSlug });
+      if (rsvpId) {
+        mockDb.updateRsvp(
+          rsvpId,
+          { payment_id: payment.id, payment_completed: true, status: "confirmed" },
+          { lodge_slug: lodgeSlug }
+        );
+      }
+      return NextResponse.json({
+        url: `${siteUrl}/events/rsvp/success?mock=1${lodgeQuery ? `&lodge=${encodeURIComponent(lodgeSlug)}` : ""}`,
+        mock: true,
+        rsvp_id: rsvpId,
+        payment_id: payment.id,
+      });
+    }
+
+    if (!stripeSecret) {
+      return NextResponse.json(
+        { error: "Payments are not configured. Please complete RSVP without payment or contact the lodge." },
+        { status: 503 }
+      );
     }
 
     const Stripe = (await import("stripe")).default;

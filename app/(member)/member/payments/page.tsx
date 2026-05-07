@@ -8,7 +8,6 @@ import {
   Search,
   Receipt,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -168,9 +167,13 @@ export default function MemberPaymentsPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon-sm" title="Download receipt">
-                      <Download className="h-4 w-4 text-slate-400" />
-                    </Button>
+                    <a
+                      href={`/member/receipts/${payment.type}/${payment.id}`}
+                      title="View receipt"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+                    >
+                      <Download className="h-4 w-4" />
+                    </a>
                   </TableCell>
                 </TableRow>
               ))}

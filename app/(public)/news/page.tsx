@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
-import { isSupabaseConfigured } from "@/lib/db/with-fallback";
+import { isSupabaseConfigured, shouldUseInMemoryMock } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { Newspaper, ArrowRight } from "lucide-react";
@@ -80,13 +80,15 @@ export default async function NewsPage({
       excerpt: p.excerpt,
       published_at: p.published_at,
     }));
-  } else {
+  } else if (shouldUseInMemoryMock()) {
     posts = mockDb.getBlogPosts({ published: true, lodge_slug: lodgeSlug }).map((p) => ({
       slug: p.slug,
       title: p.title,
       excerpt: p.excerpt,
       published_at: p.published_at,
     }));
+  } else {
+    posts = [];
   }
 
   return (
