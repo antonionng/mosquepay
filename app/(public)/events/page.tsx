@@ -5,6 +5,20 @@ import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { Calendar, MapPin, ArrowRight } from "lucide-react";
 import { getDefaultLodgeSlug, resolveLodgeSlug } from "@/lib/tenant";
+import { marketingMetadata } from "@/lib/seo";
+
+export const metadata = marketingMetadata({
+  title: "Masonic Event RSVP and Payment Software | LodgePay Events",
+  description:
+    "Manage lodge meetings, festive boards, social events, dining choices, RSVPs, online event payments, summons links, attendee lists, and charitable donation add-ons with LodgePay.",
+  path: "/events",
+  keywords: [
+    "Masonic event software",
+    "lodge RSVP software",
+    "festive board payments",
+    "Masonic meeting management",
+  ],
+});
 
 export default async function EventsPage({
   searchParams,

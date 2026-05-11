@@ -1,0 +1,36 @@
+# LodgePay
+
+LodgePay is a web platform for Masonic lodges, Provinces, Districts, and hall groups.
+
+## What LodgePay Does
+
+LodgePay helps lodge teams manage:
+
+- Public lodge websites and custom pages
+- Member portals and digital member records
+- Lodge meetings, summons, RSVPs, dining choices, and events
+- Online dues, event payments, charity donations, and receipts
+- Gift Aid declarations and GASDS claim records
+- Candidate enquiries, lead pipelines, mentoring, and onboarding
+- Charity campaigns, welfare activity, Almoner notes, and reporting
+- Province, District, and multi-lodge administration
+- Staff roles, permissions, audit logs, and platform governance
+
+## Useful Pages
+
+- Overview: https://www.lodgepayments.co.uk/
+- Features: https://www.lodgepayments.co.uk/features
+- Pricing: https://www.lodgepayments.co.uk/pricing
+- Demo booking: https://www.lodgepayments.co.uk/book-demo
+- FAQ: https://www.lodgepayments.co.uk/faq
+- Contact: https://www.lodgepayments.co.uk/contact
+- Privacy: https://www.lodgepayments.co.uk/privacy
+- GDPR: https://www.lodgepayments.co.uk/gdpr
+
+## Search Context
+
+LodgePay is relevant to searches for Masonic lodge management software, lodge websites, Freemason website builders, online dues payments, event RSVP software, summons management, Gift Aid and GASDS tools, Masonic charity donations, member portals, candidate CRM, mentoring workflows, Almoner welfare records, Province administration, and multi-lodge reporting.
+
+## Contact
+
+For product questions, partnership enquiries, or a walkthrough, use https://www.lodgepayments.co.uk/book-demo or https://www.lodgepayments.co.uk/contact.

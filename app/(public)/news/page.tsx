@@ -5,6 +5,20 @@ import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { Newspaper, ArrowRight } from "lucide-react";
 import { getDefaultLodgeSlug, resolveLodgeSlug } from "@/lib/tenant";
+import { marketingMetadata } from "@/lib/seo";
+
+export const metadata = marketingMetadata({
+  title: "LodgePay News | Masonic Lodge Platform Updates",
+  description:
+    "Read LodgePay product updates and Masonic lodge platform news covering website tools, payments, event operations, member portals, candidate CRM, Gift Aid, reporting, and multi-lodge administration.",
+  path: "/news",
+  keywords: [
+    "LodgePay news",
+    "Masonic software updates",
+    "lodge platform updates",
+    "Masonic technology news",
+  ],
+});
 
 export default async function NewsPage({
   searchParams,

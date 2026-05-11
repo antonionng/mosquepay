@@ -2,6 +2,20 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Heart, HandHeart, TrendingUp, Gift, CheckCircle2 } from "lucide-react";
 import { getDefaultLodgeSlug, resolveLodgeSlug } from "@/lib/tenant";
+import { marketingMetadata } from "@/lib/seo";
+
+export const metadata = marketingMetadata({
+  title: "Masonic Charity, Donations, and Gift Aid | LodgePay",
+  description:
+    "See how LodgePay and lodge websites support Masonic charity work, online donations, Gift Aid declarations, GASDS records, fundraising campaigns, event donations, and transparent charitable reporting.",
+  path: "/charity",
+  keywords: [
+    "Masonic charity donations",
+    "Gift Aid for lodges",
+    "GASDS for lodges",
+    "lodge fundraising software",
+  ],
+});
 
 const causes = [
   {

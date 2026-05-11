@@ -2,6 +2,20 @@ import { ExpressionOfInterestForm } from "@/components/forms/expression-of-inter
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { resolveLodgeSlug } from "@/lib/tenant";
+import { marketingMetadata } from "@/lib/seo";
+
+export const metadata = marketingMetadata({
+  title: "Join a Lodge or Onboard Your Lodge | LodgePay",
+  description:
+    "Start a membership enquiry for a lodge site or bring your lodge onto LodgePay. LodgePay supports candidate enquiries, membership conversations, lodge onboarding, websites, payments, events, and member records.",
+  path: "/join",
+  keywords: [
+    "join a Masonic lodge",
+    "Masonic membership enquiry",
+    "lodge onboarding",
+    "candidate intake software",
+  ],
+});
 
 const benefits = [
   "Personal development and self-improvement",

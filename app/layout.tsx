@@ -3,6 +3,12 @@ import { Suspense } from "react";
 import { Inter, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { PageViewTracker } from "@/components/telemetry/page-view-tracker";
+import {
+  lodgePayStructuredData,
+  marketingMetadata,
+  SOCIAL_SHARE_IMAGE,
+  SITE_ORIGIN,
+} from "@/lib/seo";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -21,50 +27,41 @@ function siteUrl(): URL {
   const raw =
     process.env.NEXT_PUBLIC_SITE_URL ??
     process.env.VERCEL_PROJECT_PRODUCTION_URL ??
-    "https://lodgepayments.co.uk";
+    "https://www.lodgepayments.co.uk";
   const normalized = raw.startsWith("http") ? raw : `https://${raw}`;
   try {
     return new URL(normalized);
   } catch {
-    return new URL("https://lodgepayments.co.uk");
+    return new URL("https://www.lodgepayments.co.uk");
   }
 }
 
-const socialShareImage = {
-  url: "https://www.lodgepayments.co.uk/social-share.png",
-  width: 1024,
-  height: 537,
-  alt: "LodgePay platform preview",
-};
-
 export const metadata: Metadata = {
+  ...marketingMetadata({
+    title: "LodgePay | Masonic Lodge Websites, Payments, Events, and Member CRM",
+    description:
+      "LodgePay is an all-in-one platform for Masonic lodges, Provinces, and hall groups. Build lodge websites, collect dues and donations, manage events, send summons, claim Gift Aid, run member portals, and nurture candidates.",
+    path: "/",
+  }),
   metadataBase: siteUrl(),
-  title: {
-    default: "LodgePay | Websites, Payments, and Candidate CRM for Lodges",
-    template: "%s · LodgePay",
-  },
-  description:
-    "LodgePay helps lodges run websites, collect payments, manage events, and nurture candidates in one multi-tenant platform.",
+  applicationName: "LodgePay",
+  authors: [{ name: "LodgePay", url: SITE_ORIGIN }],
+  creator: "LodgePay",
+  publisher: "LodgePay",
+  category: "Masonic lodge management software",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "Lodge",
   },
-  openGraph: {
-    type: "website",
-    title: "LodgePay",
-    description:
-      "Lodge SaaS for websites, payments, event operations, and candidate nurturing.",
-    siteName: "LodgePay",
-    images: [socialShareImage],
+  icons: {
+    icon: "/icon.png",
+    apple: "/icon.png",
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "LodgePay",
-    description:
-      "Lodge SaaS for websites, payments, event operations, and candidate nurturing.",
-    images: [socialShareImage.url],
+  other: {
+    "og:image:secure_url": SOCIAL_SHARE_IMAGE.url,
+    "article:publisher": SITE_ORIGIN,
   },
 };
 
@@ -83,6 +80,11 @@ export default function RootLayout({
         <Suspense fallback={null}>
           <PageViewTracker />
         </Suspense>
+        <script
+          type="application/ld+json"
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(lodgePayStructuredData) }}
+        />
         {children}
       </body>
     </html>

@@ -8,12 +8,13 @@ import * as mockDb from "@/lib/mock-db";
 import { EventRsvpForm } from "@/components/forms/event-rsvp-form";
 import { ArrowLeft, Calendar, MapPin, Clock, Users } from "lucide-react";
 import { getDefaultLodgeSlug, resolveLodgeSlug } from "@/lib/tenant";
+import { SOCIAL_SHARE_IMAGE, SITE_ORIGIN } from "@/lib/seo";
 
 function siteUrl(): string {
   const url =
     process.env.NEXT_PUBLIC_SITE_URL ??
     process.env.VERCEL_PROJECT_PRODUCTION_URL ??
-    "https://lodgepayments.co.uk";
+    SITE_ORIGIN;
   return url.startsWith("http") ? url : `https://${url}`;
 }
 
@@ -45,6 +46,7 @@ export async function generateMetadata({
   const canonical = `${siteUrl()}/events/${slug}${
     lodgeSlug !== getDefaultLodgeSlug() ? `?lodge=${encodeURIComponent(lodgeSlug)}` : ""
   }`;
+  const imageUrl = event.featured_image_url || SOCIAL_SHARE_IMAGE.url;
   return {
     title: event.title,
     description,
@@ -54,12 +56,13 @@ export async function generateMetadata({
       title: event.title,
       description,
       url: canonical,
-      images: event.featured_image_url ? [event.featured_image_url] : undefined,
+      images: [imageUrl],
     },
     twitter: {
       card: "summary_large_image",
       title: event.title,
       description,
+      images: [imageUrl],
     },
   };
 }

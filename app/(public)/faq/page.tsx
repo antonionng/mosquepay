@@ -8,6 +8,20 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { getDefaultLodgeSlug, resolveLodgeSlug } from "@/lib/tenant";
+import { marketingMetadata } from "@/lib/seo";
+
+export const metadata = marketingMetadata({
+  title: "LodgePay FAQ | Masonic Lodge Software Questions",
+  description:
+    "Answers about LodgePay for Masonic lodges, including lodge websites, multi-lodge support, event and dues payments, Gift Aid, candidate CRM, member portals, website editing, and platform setup.",
+  path: "/faq",
+  keywords: [
+    "LodgePay FAQ",
+    "Masonic lodge software FAQ",
+    "lodge website questions",
+    "lodge payment questions",
+  ],
+});
 
 const faqs = [
   {

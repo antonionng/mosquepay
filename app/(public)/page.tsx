@@ -10,6 +10,7 @@ import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getLodgeSlugFromHost, resolveLodgeSlug } from "@/lib/tenant";
 import { sanitizeCustomPages, sanitizeSiteSections } from "@/lib/site-section-style";
+import { marketingMetadata, SOCIAL_SHARE_IMAGE } from "@/lib/seo";
 
 async function getPublicTenantSlug(querySlug?: string) {
   if (querySlug) return resolveLodgeSlug(querySlug);
@@ -53,7 +54,20 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { lodge } = await searchParams;
   const tenantSlug = await getPublicTenantSlug(lodge);
-  if (!tenantSlug) return {};
+  if (!tenantSlug) {
+    return marketingMetadata({
+      title: "LodgePay | Masonic Lodge Websites, Payments, Events, and Member CRM",
+      description:
+        "LodgePay helps Masonic lodges, Provinces, and hall groups run modern operations: lodge websites, online dues, event payments, charity donations, Gift Aid, summons, member portals, candidate CRM, welfare workflows, and reporting.",
+      path: "/",
+      keywords: [
+        "Masonic lodge software",
+        "Freemason lodge website platform",
+        "Masonic payments platform",
+        "lodge operations software",
+      ],
+    });
+  }
 
   const siteLodge = isSupabaseConfigured()
     ? await db.getLodgeBySlug(tenantSlug)
@@ -77,6 +91,13 @@ export async function generateMetadata({
     openGraph: {
       title,
       description,
+      images: [SOCIAL_SHARE_IMAGE],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [SOCIAL_SHARE_IMAGE.url],
     },
   };
 }

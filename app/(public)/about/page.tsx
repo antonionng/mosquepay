@@ -2,6 +2,20 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Timeline } from "@/components/timeline";
 import { getDefaultLodgeSlug, resolveLodgeSlug } from "@/lib/tenant";
+import { marketingMetadata } from "@/lib/seo";
+
+export const metadata = marketingMetadata({
+  title: "About Covenant Lodge | London Freemasonry in Mayfair",
+  description:
+    "Learn about Covenant Lodge No. 4344, a London Masonic lodge founded in 1922 and meeting at Mark Masons' Hall in Mayfair. Explore its history, values, venue, charitable work, and membership culture.",
+  path: "/about",
+  keywords: [
+    "Covenant Lodge 4344",
+    "London Freemasonry",
+    "Mayfair Masonic lodge",
+    "Mark Masons Hall lodge",
+  ],
+});
 
 const timelineItems = [
   {

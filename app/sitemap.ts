@@ -6,7 +6,7 @@ function siteUrl(): string {
   const url =
     process.env.NEXT_PUBLIC_SITE_URL ??
     process.env.VERCEL_PROJECT_PRODUCTION_URL ??
-    "https://lodgepayments.co.uk";
+    "https://www.lodgepayments.co.uk";
   return url.startsWith("http") ? url : `https://${url}`;
 }
 
@@ -14,7 +14,6 @@ const STATIC_PATHS = [
   "/",
   "/about",
   "/features",
-  "/product",
   "/pricing",
   "/contact",
   "/book-demo",

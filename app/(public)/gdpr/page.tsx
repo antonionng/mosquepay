@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { marketingMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "GDPR | LodgePay",
-  description: "GDPR information for LodgePay customers, lodges, members, candidates, donors, and platform users.",
-};
+export const metadata: Metadata = marketingMetadata({
+  title: "GDPR and Data Protection | LodgePay",
+  description:
+    "GDPR information for LodgePay customers, lodges, Provinces, members, candidates, donors, and platform users. Covers controller roles, processor duties, member records, candidate data, Gift Aid, payments, welfare notes, and security.",
+  path: "/gdpr",
+  keywords: ["LodgePay GDPR", "Masonic software GDPR", "lodge data protection"],
+});
 
 const sections = [
   {

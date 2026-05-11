@@ -2,6 +2,20 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { getDefaultLodgeSlug, resolveLodgeSlug } from "@/lib/tenant";
+import { marketingMetadata } from "@/lib/seo";
+
+export const metadata = marketingMetadata({
+  title: "Mark Masons' Hall Mayfair | London Masonic Venue",
+  description:
+    "Explore Mark Masons' Hall at 86 St James's Street, Mayfair, the London Masonic venue used by Covenant Lodge. Find venue details, history, transport notes, and lodge contact routes.",
+  path: "/venue",
+  keywords: [
+    "Mark Masons Hall",
+    "Masonic venue Mayfair",
+    "London Masonic hall",
+    "86 St James Street",
+  ],
+});
 
 const temples = [
   "Grand Temple",

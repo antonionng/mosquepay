@@ -4,6 +4,7 @@ import { PublicFooter } from "@/components/layout/public-footer";
 import { PublicHeader } from "@/components/layout/public-header";
 import { StaticMarketingSite } from "@/components/marketing/static-marketing-site";
 import { resolveLodgeSlug } from "@/lib/tenant";
+import { marketingMetadata } from "@/lib/seo";
 
 const contactInfo = [
   {
@@ -20,6 +21,34 @@ const contactInfo = [
     content: "We aim to respond within 48 hours",
   },
 ];
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ lodge?: string }>;
+}) {
+  const { lodge } = await searchParams;
+  if (lodge) {
+    return {
+      title: "Contact the Lodge",
+      description:
+        "Contact the lodge secretary about membership enquiries, visiting, events, meetings, charity, or general lodge information.",
+    };
+  }
+
+  return marketingMetadata({
+    title: "Contact LodgePay | Masonic Lodge Software Support and Sales",
+    description:
+      "Contact LodgePay to discuss Masonic lodge websites, payments, event RSVPs, dues, donations, Gift Aid, member portals, candidate CRM, Province administration, and lodge operations software.",
+    path: "/contact",
+    keywords: [
+      "contact LodgePay",
+      "Masonic software support",
+      "lodge software sales",
+      "lodge website enquiry",
+    ],
+  });
+}
 
 export default async function ContactPage({
   searchParams,

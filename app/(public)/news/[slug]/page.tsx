@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
@@ -6,6 +7,59 @@ import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { ArrowLeft, User, Calendar } from "lucide-react";
 import { getDefaultLodgeSlug, resolveLodgeSlug } from "@/lib/tenant";
+import { SOCIAL_SHARE_IMAGE, SITE_ORIGIN } from "@/lib/seo";
+
+async function loadPost(slug: string, lodgeSlug: string) {
+  if (isSupabaseConfigured()) {
+    const lodgeId = await db.resolveLodgeId(lodgeSlug);
+    return lodgeId ? await db.getBlogPostBySlug(slug, lodgeId) : null;
+  }
+  if (shouldUseInMemoryMock()) {
+    return mockDb.getBlogPostBySlug(slug, { lodge_slug: lodgeSlug });
+  }
+  return null;
+}
+
+export async function generateMetadata({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ lodge?: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const { lodge } = await searchParams;
+  const lodgeSlug = resolveLodgeSlug(lodge);
+  const post = await loadPost(slug, lodgeSlug);
+  if (!post) return { title: "News not found" };
+
+  const canonical = `${SITE_ORIGIN}/news/${slug}${
+    lodgeSlug !== getDefaultLodgeSlug() ? `?lodge=${encodeURIComponent(lodgeSlug)}` : ""
+  }`;
+  const description =
+    post.excerpt ||
+    `Read ${post.title} and other updates from LodgePay and lodge websites.`;
+  const imageUrl = post.featured_image_url || SOCIAL_SHARE_IMAGE.url;
+
+  return {
+    title: post.title,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      type: "article",
+      title: post.title,
+      description,
+      url: canonical,
+      images: [imageUrl],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: post.title,
+      description,
+      images: [imageUrl],
+    },
+  };
+}
 
 export default async function NewsPostPage({
   params,
@@ -21,16 +75,7 @@ export default async function NewsPostPage({
   const withLodgeQuery = (href: string) =>
     lodgeSlug === defaultSlug ? href : `${href}?lodge=${encodeURIComponent(lodgeSlug)}`;
 
-  const useDb = isSupabaseConfigured();
-  let post;
-  if (useDb) {
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    post = lodgeId ? await db.getBlogPostBySlug(slug, lodgeId) : null;
-  } else if (shouldUseInMemoryMock()) {
-    post = mockDb.getBlogPostBySlug(slug, { lodge_slug: lodgeSlug });
-  } else {
-    post = null;
-  }
+  const post = await loadPost(slug, lodgeSlug);
 
   if (!post) notFound();
 

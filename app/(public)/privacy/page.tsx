@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { marketingMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = marketingMetadata({
   title: "Privacy Policy | LodgePay",
-  description: "How LodgePay handles personal data across lodge websites, member portals, payments, communications, and administration tools.",
-};
+  description:
+    "How LodgePay handles personal data across lodge websites, member portals, payments, communications, candidate records, Gift Aid, welfare notes, reporting, and administration tools.",
+  path: "/privacy",
+  keywords: ["LodgePay privacy", "Masonic software privacy", "lodge member data"],
+});
 
 const sections = [
   {
