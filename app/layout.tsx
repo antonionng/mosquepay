@@ -30,6 +30,13 @@ function siteUrl(): URL {
   }
 }
 
+const socialShareImage = {
+  url: "https://www.lodgepayments.co.uk/social-share.png",
+  width: 1024,
+  height: 537,
+  alt: "LodgePay platform preview",
+};
+
 export const metadata: Metadata = {
   metadataBase: siteUrl(),
   title: {
@@ -50,12 +57,14 @@ export const metadata: Metadata = {
     description:
       "Lodge SaaS for websites, payments, event operations, and candidate nurturing.",
     siteName: "LodgePay",
+    images: [socialShareImage],
   },
   twitter: {
     card: "summary_large_image",
     title: "LodgePay",
     description:
       "Lodge SaaS for websites, payments, event operations, and candidate nurturing.",
+    images: [socialShareImage.url],
   },
 };
 
