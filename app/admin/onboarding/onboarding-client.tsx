@@ -871,6 +871,7 @@ const STAFF_ROLES = [
   { value: "almoner", label: "Almoner" },
   { value: "charity_steward", label: "Charity Steward" },
   { value: "membership_officer", label: "Membership Officer" },
+  { value: "master", label: "Master" },
 ] as const;
 
 function StaffStep({

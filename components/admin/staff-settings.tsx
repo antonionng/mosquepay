@@ -22,6 +22,8 @@ type StaffRole =
   | "treasurer"
   | "charity_steward"
   | "membership_officer"
+  | "almoner"
+  | "master"
   | "operator";
 
 type StaffUser = {
@@ -58,6 +60,16 @@ const ROLE_OPTIONS: Array<{
     value: "membership_officer",
     label: "Membership Officer",
     description: "Member records and membership workflow.",
+  },
+  {
+    value: "almoner",
+    label: "Almoner",
+    description: "Welfare cases, visits, alerts, and pastoral register.",
+  },
+  {
+    value: "master",
+    label: "Master",
+    description: "Meeting oversight, summons visibility, and audit trail.",
   },
   {
     value: "operator",

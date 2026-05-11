@@ -17,6 +17,7 @@ import {
   ArrowRight,
   Download,
   Users,
+  Coins,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +58,26 @@ type GiftAidDeclaration = {
   status: string;
 };
 
+type MeetingCollection = {
+  id: string;
+  title: string;
+  collection_date: string;
+  cash_amount: number;
+  card_amount: number;
+  anonymous_cash_amount: number;
+  gasds_eligible_amount: number;
+  gasds_tax_year: string | null;
+};
+
+type GasdsClaim = {
+  id: string;
+  tax_year: string;
+  eligible_cash_amount: number;
+  claimed_cash_amount: number;
+  reclaimable_amount: number;
+  status: "draft" | "exported" | "filed" | "paid";
+};
+
 type KpiAccent = "emerald" | "blue" | "violet" | "amber";
 
 const kpiAccentIcon: Record<KpiAccent, { wrap: string; icon: string }> = {
@@ -93,10 +114,14 @@ export function AdminCharityClient({
   campaigns,
   donations,
   giftAidDeclarations,
+  meetingCollections,
+  gasdsClaims,
 }: {
   campaigns: Campaign[];
   donations: Donation[];
   giftAidDeclarations: GiftAidDeclaration[];
+  meetingCollections: MeetingCollection[];
+  gasdsClaims: GasdsClaim[];
 }) {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
@@ -104,8 +129,14 @@ export function AdminCharityClient({
   const [targetAmount, setTargetAmount] = useState("");
   const [description, setDescription] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [collectionTitle, setCollectionTitle] = useState("Festive board collection");
+  const [collectionCash, setCollectionCash] = useState("");
+  const [collectionCard, setCollectionCard] = useState("");
   const [saving, setSaving] = useState(false);
+  const [savingCollection, setSavingCollection] = useState(false);
+  const [savingGasds, setSavingGasds] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [collectionError, setCollectionError] = useState<string | null>(null);
 
   const activeCampaigns = campaigns.filter((c) => c.status === "active");
   const totalRaised = campaigns.reduce((s, c) => s + c.raised_amount, 0);
@@ -115,6 +146,10 @@ export function AdminCharityClient({
     .filter((g) => g.status === "active")
     .reduce((s, g) => s + (g.reclaimable_amount ?? 0), 0);
   const meetingLinkedDonations = donations.filter((d) => Boolean(d.event_id));
+  const gasdsEligible = meetingCollections.reduce(
+    (sum, collection) => sum + collection.gasds_eligible_amount,
+    0
+  );
   const donorRows = [...donations.reduce((map, donation) => {
     const key = donation.donor_email.toLowerCase();
     const current = map.get(key) ?? {
@@ -203,6 +238,78 @@ export function AdminCharityClient({
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function recordMeetingCollection(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setCollectionError(null);
+    setSavingCollection(true);
+    try {
+      const res = await fetch("/api/meeting-collections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: collectionTitle,
+          cash_amount: Number(collectionCash || 0),
+          anonymous_cash_amount: Number(collectionCash || 0),
+          card_amount: Number(collectionCard || 0),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Could not record collection.");
+      setCollectionTitle("Festive board collection");
+      setCollectionCash("");
+      setCollectionCard("");
+      router.refresh();
+    } catch (error) {
+      setCollectionError(
+        error instanceof Error ? error.message : "Could not record collection."
+      );
+    } finally {
+      setSavingCollection(false);
+    }
+  }
+
+  async function createGasdsClaim() {
+    setSavingGasds("create");
+    setCollectionError(null);
+    try {
+      const res = await fetch("/api/gasds/claims", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Could not create GASDS claim.");
+      router.refresh();
+    } catch (error) {
+      setCollectionError(
+        error instanceof Error ? error.message : "Could not create GASDS claim."
+      );
+    } finally {
+      setSavingGasds(null);
+    }
+  }
+
+  async function updateGasdsClaimStatus(claimId: string, status: "exported" | "filed" | "paid") {
+    setSavingGasds(claimId);
+    setCollectionError(null);
+    try {
+      const res = await fetch(`/api/gasds/claims/${claimId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Could not update GASDS claim.");
+      router.refresh();
+    } catch (error) {
+      setCollectionError(
+        error instanceof Error ? error.message : "Could not update GASDS claim."
+      );
+    } finally {
+      setSavingGasds(null);
     }
   }
 
@@ -381,6 +488,161 @@ export function AdminCharityClient({
             ))}
           </div>
         )}
+      </Card>
+
+      <Card variant="panel" className="p-5">
+        <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+          <div>
+            <div className="flex items-center gap-2">
+              <Coins className="h-4 w-4 text-amber-700" />
+              <h2 className="text-base font-semibold text-dash-text">
+                Festive board and GASDS collections
+              </h2>
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-dash-muted">
+              Record small cash collections at the point they happen. LodgePay tracks the annual GASDS allowance separately from Gift Aid declarations.
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-dash-border bg-dash-surface-subtle p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-dash-muted">
+                  GASDS eligible
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-dash-text">
+                  £{gasdsEligible.toFixed(2)}
+                </p>
+                <p className="mt-1 text-xs text-dash-muted">£8,000 annual cap tracked in the API</p>
+              </div>
+              <div className="rounded-xl border border-dash-border bg-dash-surface-subtle p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-dash-muted">
+                  Reclaimable equivalent
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-emerald-700">
+                  £{(Math.min(gasdsEligible, 8000) * 0.25).toFixed(2)}
+                </p>
+                <p className="mt-1 text-xs text-dash-muted">Reported separately from donor Gift Aid</p>
+              </div>
+            </div>
+            <div className="mt-4 rounded-xl border border-dash-border bg-dash-surface-subtle p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-dash-text">GASDS claim workflow</p>
+                  <p className="mt-1 text-xs text-dash-muted">
+                    Create a draft claim from tracked small cash collections, then mark it exported, filed, and paid.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="dashboard"
+                  size="sm"
+                  onClick={createGasdsClaim}
+                  disabled={savingGasds === "create" || meetingCollections.length === 0}
+                >
+                  {savingGasds === "create" ? "Creating..." : "Create draft claim"}
+                </Button>
+              </div>
+              {gasdsClaims.length > 0 ? (
+                <ul className="mt-4 space-y-2">
+                  {gasdsClaims.slice(0, 3).map((claim) => (
+                    <li key={claim.id} className="rounded-lg border border-dash-border bg-dash-surface px-3 py-2 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-medium text-dash-text">
+                          {claim.tax_year}: £{claim.reclaimable_amount.toFixed(2)} reclaimable
+                        </span>
+                        <Badge variant={claim.status === "paid" ? "success" : "outline"}>
+                          {claim.status}
+                        </Badge>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {claim.status === "draft" ? (
+                          <Button
+                            type="button"
+                            variant="dashboard"
+                            size="sm"
+                            onClick={() => updateGasdsClaimStatus(claim.id, "exported")}
+                            disabled={savingGasds === claim.id}
+                          >
+                            Mark exported
+                          </Button>
+                        ) : null}
+                        {claim.status === "exported" ? (
+                          <Button
+                            type="button"
+                            variant="dashboard"
+                            size="sm"
+                            onClick={() => updateGasdsClaimStatus(claim.id, "filed")}
+                            disabled={savingGasds === claim.id}
+                          >
+                            Mark filed
+                          </Button>
+                        ) : null}
+                        {claim.status === "filed" ? (
+                          <Button
+                            type="button"
+                            variant="dashboard"
+                            size="sm"
+                            onClick={() => updateGasdsClaimStatus(claim.id, "paid")}
+                            disabled={savingGasds === claim.id}
+                          >
+                            Mark paid
+                          </Button>
+                        ) : null}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          </div>
+          <form onSubmit={recordMeetingCollection} className="space-y-3">
+            {collectionError ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                {collectionError}
+              </div>
+            ) : null}
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-dash-text-muted">
+                Collection title
+              </label>
+              <input
+                type="text"
+                value={collectionTitle}
+                onChange={(event) => setCollectionTitle(event.target.value)}
+                className="w-full rounded-xl border border-dash-border bg-dash-surface px-4 py-2.5 text-sm text-dash-text"
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-dash-text-muted">
+                  Anonymous cash (£)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={collectionCash}
+                  onChange={(event) => setCollectionCash(event.target.value)}
+                  className="w-full rounded-xl border border-dash-border bg-dash-surface px-4 py-2.5 text-sm text-dash-text"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-dash-text-muted">
+                  Card or linked donations (£)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={collectionCard}
+                  onChange={(event) => setCollectionCard(event.target.value)}
+                  className="w-full rounded-xl border border-dash-border bg-dash-surface px-4 py-2.5 text-sm text-dash-text"
+                />
+              </div>
+            </div>
+            <Button type="submit" variant="primary" disabled={savingCollection}>
+              {savingCollection ? "Recording..." : "Record collection"}
+            </Button>
+          </form>
+        </div>
       </Card>
 
       {showForm && (

@@ -5,6 +5,14 @@ import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getLodgeSlugFromRequest } from "@/lib/tenant";
 import { sendWebsiteNotification } from "@/lib/email/website-notifications";
+import { getLodgeAdminNotificationRecipients } from "@/lib/email/website-recipients";
+import { lodgePayFromEmail, renderSimpleMessageEmail } from "@/lib/email/templates";
+import type { LodgeSiteSectionStyle } from "@/lib/db/types";
+import {
+  parseRecipientList,
+  rejectHoneypot,
+  rejectRateLimited,
+} from "@/lib/api/form-protection";
 
 const leadSchema = {
   first_name: (v: unknown) => typeof v === "string" && v.trim().length > 0,
@@ -16,20 +24,96 @@ const leadSchema = {
   message: (v: unknown) => v == null || typeof v === "string",
 };
 
+function textValue(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function validateConfiguredLeadFields(
+  style: LodgeSiteSectionStyle | null,
+  values: {
+    phone: string | null;
+    location: string | null;
+    how_heard: string | null;
+    message: string | null;
+    consent: boolean;
+  }
+) {
+  const fields = style?.form_fields ?? null;
+  const visible = (field: string) =>
+    !fields || fields.length === 0 || fields.includes(field);
+  const required = (field: string) => Boolean(style?.form_required_fields?.includes(field));
+
+  if (
+    (required("phone") && !values.phone) ||
+    (required("location") && !values.location) ||
+    (required("how_heard") && !values.how_heard) ||
+    (required("message") && !values.message) ||
+    (visible("consent") && !values.consent)
+  ) {
+    return NextResponse.json(
+      { error: "Please complete the required form fields." },
+      { status: 400 }
+    );
+  }
+  return null;
+}
+
+async function sendLeadAutoReply({
+  to,
+  name,
+  lodgeName,
+  replyTo,
+  style,
+}: {
+  to: string;
+  name: string;
+  lodgeName: string;
+  replyTo?: string | null;
+  style: LodgeSiteSectionStyle | null;
+}) {
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey) return;
+  const { Resend } = await import("resend");
+  const resend = new Resend(resendKey);
+  const body =
+    style?.form_autoresponder_body ||
+    `Thank you for your enquiry. Your details have reached ${lodgeName} and the lodge will be in touch.`;
+
+  await resend.emails.send({
+    from: lodgePayFromEmail(process.env.EMAIL_FROM),
+    to,
+    replyTo: replyTo || undefined,
+    subject: style?.form_autoresponder_subject || `We received your enquiry for ${lodgeName}`,
+    html: renderSimpleMessageEmail({
+      eyebrow: "Enquiry received",
+      title: "Thanks for your interest",
+      preview: "Your membership enquiry has reached the lodge.",
+      greeting: `Hello ${name},`,
+      paragraphs: [body],
+    }),
+    text: `Hello ${name},\n\n${body}`,
+  });
+}
+
 export async function POST(request: NextRequest) {
   const _rejectMock = rejectIfMockDisabled();
   if (_rejectMock) return _rejectMock;
 
   try {
     const lodgeSlug = getLodgeSlugFromRequest(request);
-    const body = await request.json();
-    const first_name = body.first_name?.trim();
-    const last_name = body.last_name?.trim();
-    const email = body.email?.trim();
-    const phone = body.phone?.trim() ?? null;
-    const location = body.location?.trim() ?? null;
-    const how_heard = body.how_heard?.trim() ?? null;
-    const message = body.message?.trim() ?? null;
+    const body = (await request.json()) as Record<string, unknown>;
+    const honeypot = rejectHoneypot(body);
+    if (honeypot) return honeypot;
+    const first_name = textValue(body.first_name);
+    const last_name = textValue(body.last_name);
+    const email = textValue(body.email);
+    const phone = textValue(body.phone) || null;
+    const location = textValue(body.location) || null;
+    const how_heard = textValue(body.how_heard) || null;
+    const message = textValue(body.message) || null;
+    const sectionId = typeof body.section_id === "string" ? body.section_id : null;
+    const rateLimited = rejectRateLimited(request, "lead", email);
+    if (rateLimited) return rateLimited;
 
     if (
       !leadSchema.first_name(first_name) ||
@@ -47,6 +131,21 @@ export async function POST(request: NextRequest) {
       if (!lodge) {
         return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
       }
+      const site = sectionId ? await db.getLodgeSite(lodge.id) : null;
+      const formStyle =
+        site?.sections.find((section) => section.id === sectionId)?.style ??
+        site?.custom_pages
+          ?.flatMap((page) => page.sections)
+          .find((section) => section.id === sectionId)?.style ??
+        null;
+      const validation = validateConfiguredLeadFields(formStyle, {
+        phone,
+        location,
+        how_heard,
+        message,
+        consent: body.consent === true,
+      });
+      if (validation) return validation;
       const lead = await db.addLead(lodge.id, {
         first_name: first_name!,
         last_name: last_name!,
@@ -72,6 +171,10 @@ export async function POST(request: NextRequest) {
         converted_member_id: null,
         converted_at: null,
       });
+      const recipients = await getLodgeAdminNotificationRecipients(
+        lodge,
+        parseRecipientList(formStyle?.form_notification_recipients)
+      );
       await sendWebsiteNotification({
         lodge,
         replyTo: email,
@@ -89,11 +192,37 @@ export async function POST(request: NextRequest) {
           { label: "CRM lead ID", value: lead.id },
         ],
         message,
+        recipients,
+      });
+      await sendLeadAutoReply({
+        to: email!,
+        name: first_name!,
+        lodgeName: lodge.name,
+        replyTo: lodge.support_email,
+        style: formStyle,
       });
       return NextResponse.json({ id: lead.id, success: true });
     }
 
     const lodge = mockDb.getLodgeBySlug(lodgeSlug);
+    if (!lodge) {
+      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    }
+    const site = sectionId ? mockDb.getLodgeSite(lodgeSlug) : null;
+    const formStyle =
+      site?.sections.find((section) => section.id === sectionId)?.style ??
+      site?.custom_pages
+        ?.flatMap((page) => page.sections)
+        .find((section) => section.id === sectionId)?.style ??
+      null;
+    const validation = validateConfiguredLeadFields(formStyle, {
+      phone,
+      location,
+      how_heard,
+      message,
+      consent: body.consent === true,
+    });
+    if (validation) return validation;
     const lead = mockDb.addLead({
       lodge_slug: lodgeSlug,
       first_name: first_name!,
@@ -107,6 +236,10 @@ export async function POST(request: NextRequest) {
       stage: "expression_of_interest",
       assigned_to: null,
     });
+    const recipients = await getLodgeAdminNotificationRecipients(
+      lodge,
+      parseRecipientList(formStyle?.form_notification_recipients)
+    );
 
     await sendWebsiteNotification({
       lodge,
@@ -125,6 +258,15 @@ export async function POST(request: NextRequest) {
         { label: "CRM lead ID", value: lead.id },
       ],
       message,
+      recipients,
+    });
+
+    await sendLeadAutoReply({
+      to: email!,
+      name: first_name!,
+      lodgeName: lodge.name,
+      replyTo: lodge.support_email,
+      style: formStyle,
     });
 
     return NextResponse.json({ id: lead.id, success: true });

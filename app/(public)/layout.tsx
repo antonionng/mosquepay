@@ -11,9 +11,14 @@ export default function PublicLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const isHome = pathname === "/";
+  const isMarketingRoute =
+    pathname === "/" ||
+    pathname === "/features" ||
+    pathname === "/pricing" ||
+    pathname === "/contact" ||
+    pathname === "/book-demo";
 
-  if (isHome) {
+  if (isMarketingRoute) {
     return <>{children}</>;
   }
 

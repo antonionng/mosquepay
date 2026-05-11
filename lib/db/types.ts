@@ -43,6 +43,17 @@ export type LodgeSiteSectionStyle = {
   image_position?: "left" | "right" | "top" | "bottom" | "full" | null;
   image_shape?: "rounded" | "square" | "circle" | "arch" | null;
   form_mode?: "none" | "contact" | "lead" | null;
+  background_tone?: "default" | "soft" | "brand" | "dark" | null;
+  content_width?: "narrow" | "standard" | "wide" | "full" | null;
+  spacing?: "compact" | "normal" | "spacious" | null;
+  button_variant?: "solid" | "outline" | "ghost" | null;
+  form_fields?: string[] | null;
+  form_required_fields?: string[] | null;
+  form_consent_text?: string | null;
+  form_thank_you?: string | null;
+  form_notification_recipients?: string | null;
+  form_autoresponder_subject?: string | null;
+  form_autoresponder_body?: string | null;
 };
 
 export type LodgeSiteSection = {
@@ -73,8 +84,69 @@ export type LodgeSitePage = {
   page_title: string;
   page_description: string | null;
   sections: LodgeSiteSection[];
+  custom_pages?: LodgeSiteCustomPage[] | null;
+  header_settings?: LodgeSiteHeaderSettings | null;
+  footer_settings?: LodgeSiteFooterSettings | null;
   published: boolean;
   updated_at: string;
+};
+
+export type LodgeSiteHeaderNavItem = {
+  id: string;
+  label: string;
+  href: string;
+  visible: boolean;
+  order: number;
+};
+
+export type LodgeSiteHeaderSettings = {
+  show_logo: boolean;
+  show_lodge_name: boolean;
+  show_lodge_number: boolean;
+  nav_items: LodgeSiteHeaderNavItem[];
+  cta_label: string | null;
+  cta_href: string | null;
+};
+
+export type LodgeSiteFooterLink = {
+  id: string;
+  label: string;
+  href: string;
+  visible: boolean;
+  order: number;
+};
+
+export type LodgeSiteFooterLinkGroup = {
+  id: string;
+  title: string;
+  links: LodgeSiteFooterLink[];
+  order: number;
+};
+
+export type LodgeSiteFooterSettings = {
+  show_logo: boolean;
+  show_lodge_name: boolean;
+  show_lodge_number: boolean;
+  show_contact_details: boolean;
+  tagline: string | null;
+  badge_text: string | null;
+  powered_by_text: string | null;
+  link_groups: LodgeSiteFooterLinkGroup[];
+};
+
+export type LodgeSiteCustomPage = {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  seo_title?: string | null;
+  seo_description?: string | null;
+  social_image_url?: string | null;
+  sections: LodgeSiteSection[];
+  published: boolean;
+  show_in_nav: boolean;
+  nav_label: string | null;
+  order: number;
 };
 
 export type AdminUser = {
@@ -255,6 +327,12 @@ export type Donation = {
   status: string;
   gift_aid_declaration_id: string | null;
   gift_aid_status: "unknown" | "eligible" | "declared" | "declined";
+  gift_aid_eligible_amount: number | null;
+  gift_aid_claimed_at: string | null;
+  gift_aid_claim_batch_id: string | null;
+  gasds_eligible: boolean;
+  gasds_claimed_at: string | null;
+  tax_year: string | null;
   created_at: string;
 };
 
@@ -272,7 +350,10 @@ export type GiftAidDeclaration = {
   declaration_confirmed: boolean;
   confirmation_method: string;
   hmrc_eligible: boolean;
+  declaration_source: string;
+  retained_until: string | null;
   revoked_at: string | null;
+  revoked_reason: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -290,6 +371,9 @@ export type LodgeSubscription = {
   status: string;
   trial_ends_at: string | null;
   current_period_end: string | null;
+  requested_plan_code: string | null;
+  last_upgrade_requested_at: string | null;
+  lodge_limit: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -349,6 +433,9 @@ export type LodgeDues = {
   allow_instalments: boolean;
   instalment_count: number | null;
   instalment_frequency: string | null;
+  charitable_amount: number;
+  charitable_label: string;
+  gift_aid_enabled: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -368,6 +455,10 @@ export type MemberDues = {
   payment_id: string | null;
   stripe_payment_intent_id: string | null;
   stripe_subscription_id: string | null;
+  charitable_amount: number;
+  gift_aid_declaration_id: string | null;
+  gift_aid_status: "unknown" | "eligible" | "declared" | "declined";
+  gift_aid_eligible_amount: number;
   paid_at: string | null;
   reminder_sent_at: string | null;
   reminder_count: number;
@@ -389,6 +480,77 @@ export type MemberDuesInstalment = {
   payment_reference: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type MeetingCollection = {
+  id: string;
+  lodge_id: string;
+  event_id: string | null;
+  campaign_id: string | null;
+  collection_date: string;
+  collection_type: string;
+  title: string;
+  cash_amount: number;
+  card_amount: number;
+  donor_linked_amount: number;
+  anonymous_cash_amount: number;
+  gift_aid_reclaimable_amount: number;
+  gasds_eligible_amount: number;
+  gasds_tax_year: string | null;
+  notes: string | null;
+  recorded_by_email: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GasdsClaim = {
+  id: string;
+  lodge_id: string;
+  tax_year: string;
+  eligible_cash_amount: number;
+  claimed_cash_amount: number;
+  reclaimable_amount: number;
+  status: "draft" | "exported" | "filed" | "paid";
+  exported_at: string | null;
+  filed_at: string | null;
+  paid_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GiftAidClaimBatch = {
+  id: string;
+  lodge_id: string;
+  claim_reference: string | null;
+  period_start: string;
+  period_end: string;
+  status: "draft" | "exported" | "filed" | "paid";
+  donation_count: number;
+  eligible_amount: number;
+  reclaimable_amount: number;
+  exported_at: string | null;
+  filed_at: string | null;
+  paid_at: string | null;
+  notes: string | null;
+  created_by_email: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GiftAidClaimItem = {
+  id: string;
+  lodge_id: string;
+  claim_batch_id: string;
+  donation_id: string | null;
+  gift_aid_declaration_id: string | null;
+  donor_name: string | null;
+  donor_email: string | null;
+  donation_date: string;
+  source: string;
+  eligible_amount: number;
+  reclaimable_amount: number;
+  created_at: string;
 };
 
 export type BankStatementImport = {

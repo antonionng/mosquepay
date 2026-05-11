@@ -5,24 +5,11 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { resolveLodgeSlug } from "@/lib/tenant";
-
-const tenantLinks = {
-  main: [
-    { href: "/", label: "Home" },
-    { href: "/events", label: "Events" },
-    { href: "/charity", label: "Charity" },
-    { href: "/join", label: "Join Us" },
-  ],
-  secondary: [
-    { href: "/news", label: "News" },
-    { href: "/contact", label: "Contact" },
-    { href: "/faq", label: "FAQ" },
-  ],
-};
+import type { LodgeSiteFooterSettings } from "@/lib/db/types";
+import { defaultFooterSettings } from "@/lib/site-section-style";
 
 const marketingLinks = {
   main: [
-    { href: "/product", label: "Product" },
     { href: "/features", label: "Features" },
     { href: "/pricing", label: "Pricing" },
     { href: "/book-demo", label: "Book Demo" },
@@ -35,9 +22,14 @@ const marketingLinks = {
 };
 
 type LodgeBranding = {
+  slug: string;
   name: string;
   city: string | null;
   tagline: string | null;
+  logo_url: string | null;
+  lodge_number: string | null;
+  support_email: string | null;
+  support_phone: string | null;
 };
 
 function initialsFromName(name: string) {
@@ -50,41 +42,83 @@ function initialsFromName(name: string) {
     .toUpperCase();
 }
 
-export function PublicFooter() {
+export function PublicFooter({
+  initialBranding = null,
+  initialFooterSettings = null,
+  initialTenantSlug = null,
+}: {
+  initialBranding?: LodgeBranding | null;
+  initialFooterSettings?: LodgeSiteFooterSettings | null;
+  initialTenantSlug?: string | null;
+}) {
   const searchParams = useSearchParams();
-  const [branding, setBranding] = useState<LodgeBranding | null>(null);
-  const rawLodgeQuery = searchParams.get("lodge");
-  const isTenantMode = Boolean(rawLodgeQuery);
-  const lodgeSlug = useMemo(
-    () => resolveLodgeSlug(rawLodgeQuery),
-    [rawLodgeQuery]
+  const [branding, setBranding] = useState<LodgeBranding | null>(initialBranding);
+  const [hostTenantSlug, setHostTenantSlug] = useState<string | null>(initialTenantSlug);
+  const [footerSettings, setFooterSettings] = useState<LodgeSiteFooterSettings | null>(
+    initialFooterSettings
   );
-  const links = isTenantMode ? tenantLinks : marketingLinks;
+  const rawLodgeQuery = searchParams.get("lodge");
+  const queryTenantMode = Boolean(rawLodgeQuery);
+  const isTenantMode = queryTenantMode || Boolean(hostTenantSlug);
+  const lodgeSlug = useMemo(
+    () => hostTenantSlug ?? resolveLodgeSlug(rawLodgeQuery),
+    [hostTenantSlug, rawLodgeQuery]
+  );
+  const settings = footerSettings ?? defaultFooterSettings();
+  const tenantFooterGroups = settings.link_groups
+    .slice()
+    .sort((a, b) => a.order - b.order)
+    .map((group) => ({
+      ...group,
+      links: group.links
+        .filter((link) => link.visible)
+        .slice()
+        .sort((a, b) => a.order - b.order),
+    }))
+    .filter((group) => group.links.length > 0);
+  const marketingFooterGroups = [
+    { id: "main", title: "Explore", links: marketingLinks.main },
+    { id: "secondary", title: "More", links: marketingLinks.secondary },
+  ];
+  const footerGroups = isTenantMode ? tenantFooterGroups : marketingFooterGroups;
   const withTenantQuery = (href: string) =>
-    isTenantMode && href.startsWith("/")
+    queryTenantMode && href.startsWith("/")
       ? `${href}?lodge=${encodeURIComponent(lodgeSlug)}`
       : href;
 
   useEffect(() => {
+    if (initialBranding && initialTenantSlug === lodgeSlug) return;
+
     let active = true;
     async function loadBranding() {
       try {
-        const res = await fetch(`/api/lodges/${lodgeSlug}/site`);
+        const res = await fetch(
+          queryTenantMode
+            ? `/api/lodges/${lodgeSlug}/site`
+            : "/api/lodges/current/site"
+        );
         if (!res.ok) return;
         const data = await res.json();
         if (!active) return;
         const lodge = data.lodge as LodgeBranding | null;
-        if (lodge) setBranding(lodge);
+        const siteFooterSettings = data.site?.footer_settings as
+          | LodgeSiteFooterSettings
+          | null
+          | undefined;
+        if (lodge) {
+          setBranding(lodge);
+          if (!queryTenantMode) setHostTenantSlug(lodge.slug);
+        }
+        setFooterSettings(siteFooterSettings ?? null);
       } catch {
         // Keep static fallback branding.
       }
     }
-    if (!isTenantMode) return;
     loadBranding();
     return () => {
       active = false;
     };
-  }, [isTenantMode, lodgeSlug]);
+  }, [initialBranding, initialTenantSlug, lodgeSlug, queryTenantMode]);
 
   return (
     <footer
@@ -100,17 +134,40 @@ export function PublicFooter() {
             <div className="mb-5 flex items-center gap-3">
               {isTenantMode ? (
                 <>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-[11px] font-semibold tracking-[0.2em]">
-                    {initialsFromName(branding?.name ?? "Covenant Lodge")}
-                  </div>
-                  <div>
-                    <p className="text-base font-semibold tracking-tight">
-                      {branding?.name ?? "Covenant Lodge"}
-                    </p>
-                    <p className="text-sm text-slate-400">
-                      {`No. 4344 · ${branding?.city ?? "Mayfair, London"}`}
-                    </p>
-                  </div>
+                  {settings.show_logo && branding?.logo_url ? (
+                    <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white shadow-sm">
+                      <Image
+                        src={branding.logo_url}
+                        alt={`${branding.name} logo`}
+                        width={44}
+                        height={44}
+                        className="h-full w-full object-contain p-1"
+                      />
+                    </div>
+                  ) : settings.show_logo ? (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-[11px] font-semibold tracking-[0.2em]">
+                      {initialsFromName(branding?.name ?? "Covenant Lodge")}
+                    </div>
+                  ) : null}
+                  {(settings.show_lodge_name || settings.show_lodge_number) ? (
+                    <div>
+                      {settings.show_lodge_name ? (
+                        <p className="text-base font-semibold tracking-tight">
+                          {branding?.name ?? "Covenant Lodge"}
+                        </p>
+                      ) : null}
+                      <p className="text-sm text-slate-400">
+                        {[
+                          settings.show_lodge_number && branding?.lodge_number
+                            ? `No. ${branding.lodge_number}`
+                            : null,
+                          branding?.city ?? "Mayfair, London",
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    </div>
+                  ) : null}
                 </>
               ) : (
                 <Image
@@ -130,75 +187,66 @@ export function PublicFooter() {
               }
             >
               {isTenantMode
-                ? branding?.tagline ??
-                  "A lodge website powered by LodgePay, helping members and visitors navigate events and enquiries."
+                ? settings.tagline ??
+                  branding?.tagline ??
+                  "A complete lodge website with visitor information, meetings, charity, membership enquiries, and lodge contact details."
                 : "Websites, meetings, summons, dues, charity, Gift Aid, member portal, digital card, candidate CRM, mentoring, Almoner, communications, Treasurer reconciliation, and reporting for Masonic lodges."}
             </p>
-            {isTenantMode ? (
+            {isTenantMode && (settings.badge_text || settings.show_contact_details) ? (
               <div className="mt-6 flex flex-wrap gap-3 text-xs text-slate-400">
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                  Established 1922
-                </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                  Mark Masons&apos; Hall
-                </span>
+                {settings.badge_text ? (
+                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
+                    {settings.badge_text}
+                  </span>
+                ) : null}
+                {settings.show_contact_details && branding?.support_email ? (
+                  <Link
+                    href={`mailto:${branding.support_email}`}
+                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 transition-colors hover:text-white"
+                  >
+                    {branding.support_email}
+                  </Link>
+                ) : null}
+                {settings.show_contact_details && branding?.support_phone ? (
+                  <Link
+                    href={`tel:${branding.support_phone}`}
+                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 transition-colors hover:text-white"
+                  >
+                    {branding.support_phone}
+                  </Link>
+                ) : null}
               </div>
             ) : null}
           </div>
           
-          <div className="lg:col-span-3">
-            <p
-              className={
-                isTenantMode
-                  ? "mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
-                  : "mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-dash-faint"
-              }
-            >
-              Explore
-            </p>
-            <nav className="flex flex-col gap-3">
-              {links.main.map((link) => (
-                <Link
-                  key={link.href}
-                  href={withTenantQuery(link.href)}
-                  className={
-                    isTenantMode
-                      ? "text-sm text-slate-400 transition-colors hover:text-white"
-                      : "text-sm text-dash-muted transition-colors hover:text-dash-text"
-                  }
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </nav>
-          </div>
-          
-          <div className="lg:col-span-3">
-            <p
-              className={
-                isTenantMode
-                  ? "mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
-                  : "mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-dash-faint"
-              }
-            >
-              More
-            </p>
-            <nav className="flex flex-col gap-3">
-              {links.secondary.map((link) => (
-                <Link
-                  key={link.href}
-                  href={withTenantQuery(link.href)}
-                  className={
-                    isTenantMode
-                      ? "text-sm text-slate-400 transition-colors hover:text-white"
-                      : "text-sm text-dash-muted transition-colors hover:text-dash-text"
-                  }
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </nav>
-          </div>
+          {footerGroups.slice(0, 2).map((group) => (
+            <div key={group.id} className="lg:col-span-3">
+              <p
+                className={
+                  isTenantMode
+                    ? "mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+                    : "mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-dash-faint"
+                }
+              >
+                {group.title}
+              </p>
+              <nav className="flex flex-col gap-3">
+                {group.links.map((link) => (
+                  <Link
+                    key={`${group.id}-${link.href}`}
+                    href={withTenantQuery(link.href)}
+                    className={
+                      isTenantMode
+                        ? "text-sm text-slate-400 transition-colors hover:text-white"
+                        : "text-sm text-dash-muted transition-colors hover:text-dash-text"
+                    }
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </nav>
+            </div>
+          ))}
         </div>
         
         <div
@@ -215,12 +263,12 @@ export function PublicFooter() {
             </p>
             <div className={isTenantMode ? "flex flex-wrap gap-5 text-xs text-slate-500" : "flex flex-wrap gap-5 text-xs text-dash-faint"}>
               {isTenantMode ? (
-                <p>
-                  Powered by{" "}
-                  <Link href="/" className="font-medium text-slate-400 transition-colors hover:text-white">
-                    Covenant Platform
-                  </Link>
-                </p>
+                <Link
+                  href="https://lodgepayments.co.uk"
+                  className="transition-colors hover:text-slate-300"
+                >
+                  Powered by LodgePay
+                </Link>
               ) : (
                 <>
                   <Link href="/privacy" className="transition-colors hover:text-dash-muted">

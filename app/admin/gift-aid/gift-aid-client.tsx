@@ -10,6 +10,7 @@ import {
   XCircle,
   Clock,
   Search,
+  Send,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
@@ -25,14 +26,50 @@ type Declaration = {
   created_at: string;
 };
 
+type EligibleRow = {
+  id: string;
+  donor_name: string;
+  donor_email: string;
+  donor_address_line_1: string;
+  donor_postcode: string;
+  declaration_date: string;
+  donation_date: string;
+  source: string;
+  amount: number;
+  eligible_amount: number;
+  reclaimable_amount: number;
+};
+
+type ClaimBatch = {
+  id: string;
+  claim_reference: string | null;
+  period_start: string;
+  period_end: string;
+  status: "draft" | "exported" | "filed" | "paid";
+  donation_count: number;
+  eligible_amount: number;
+  reclaimable_amount: number;
+  exported_at: string | null;
+  filed_at: string | null;
+  paid_at: string | null;
+};
+
 export function GiftAidClient({
   declarations,
+  eligibleRows,
+  claims,
 }: {
   declarations: Declaration[];
+  eligibleRows: EligibleRow[];
+  claims: ClaimBatch[];
 }) {
   const router = useRouter();
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "expired" | "revoked">("all");
   const [search, setSearch] = useState("");
+  const [periodStart, setPeriodStart] = useState(() => `${new Date().getFullYear()}-01-01`);
+  const [periodEnd, setPeriodEnd] = useState(() => new Date().toISOString().slice(0, 10));
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     let list = declarations;
@@ -56,6 +93,8 @@ export function GiftAidClient({
   const totalReclaimable = declarations
     .filter((d) => d.status === "active")
     .reduce((s, d) => s + d.reclaimable_amount, 0);
+  const eligibleAmount = eligibleRows.reduce((sum, row) => sum + row.eligible_amount, 0);
+  const eligibleReclaimable = eligibleAmount * 0.25;
 
   function exportCSV() {
     const headers = [
@@ -84,6 +123,92 @@ export function GiftAidClient({
     a.download = `gift-aid-declarations-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function exportClaimPack() {
+    const headers = [
+      "Title",
+      "First name",
+      "Last name",
+      "House name or number",
+      "Postcode",
+      "Donation date",
+      "Source",
+      "Donation amount",
+      "Eligible amount",
+      "Reclaimable amount",
+      "Declaration date",
+      "Donor email",
+    ];
+    const rows = eligibleRows.map((row) => {
+      const parts = row.donor_name.trim().split(/\s+/);
+      const first = parts[0] ?? "";
+      const last = parts.slice(1).join(" ");
+      return [
+        "",
+        first,
+        last,
+        row.donor_address_line_1,
+        row.donor_postcode,
+        row.donation_date.slice(0, 10),
+        row.source,
+        row.amount.toFixed(2),
+        row.eligible_amount.toFixed(2),
+        row.reclaimable_amount.toFixed(2),
+        row.declaration_date.slice(0, 10),
+        row.donor_email,
+      ];
+    });
+    const csv = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `gift-aid-claim-pack-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function createClaimBatch() {
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const res = await fetch("/api/gift-aid/claims", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ period_start: periodStart, period_end: periodEnd }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? "Could not create claim batch.");
+      setFeedback("Claim batch created.");
+      router.refresh();
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : "Could not create claim batch.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function updateClaimStatus(claimId: string, status: "exported" | "filed" | "paid") {
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const res = await fetch(`/api/gift-aid/claims/${claimId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? "Could not update claim.");
+      setFeedback(`Claim marked ${status}.`);
+      router.refresh();
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : "Could not update claim.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   const statusIcon = (status: string) => {
@@ -131,6 +256,12 @@ export function GiftAidClient({
         </button>
       </div>
 
+      {feedback ? (
+        <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          {feedback}
+        </div>
+      ) : null}
+
       <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="dash-kpi-card p-6">
           <div className="flex items-center justify-between">
@@ -175,6 +306,124 @@ export function GiftAidClient({
           <p className="mt-4 text-3xl font-semibold tracking-tight text-purple-700">
             £{totalReclaimable.toFixed(2)}
           </p>
+        </div>
+      </div>
+
+      <div className="mt-8 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="rounded-[1.25rem] border border-dash-border bg-dash-surface p-6 shadow-sm">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-dash-muted">
+                HMRC claim pack
+              </p>
+              <h2 className="mt-2 text-xl font-semibold text-dash-text">
+                {eligibleRows.length} unclaimed eligible donations
+              </h2>
+              <p className="mt-2 text-sm text-dash-muted">
+                £{eligibleAmount.toFixed(2)} eligible, £{eligibleReclaimable.toFixed(2)} reclaimable.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={exportClaimPack}
+                disabled={eligibleRows.length === 0}
+                className="flex items-center gap-2 rounded-xl border border-dash-border bg-dash-surface px-4 py-2.5 text-sm font-medium text-dash-text disabled:opacity-50"
+              >
+                <Download className="h-4 w-4" />
+                Export claim pack
+              </button>
+            </div>
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+            <label className="block text-xs font-medium text-dash-text-muted">
+              Period start
+              <input
+                type="date"
+                value={periodStart}
+                onChange={(e) => setPeriodStart(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-dash-border bg-dash-surface px-3 py-2 text-sm text-dash-text"
+              />
+            </label>
+            <label className="block text-xs font-medium text-dash-text-muted">
+              Period end
+              <input
+                type="date"
+                value={periodEnd}
+                onChange={(e) => setPeriodEnd(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-dash-border bg-dash-surface px-3 py-2 text-sm text-dash-text"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={createClaimBatch}
+              disabled={busy || eligibleRows.length === 0}
+              className="self-end flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+            >
+              <Send className="h-4 w-4" />
+              {busy ? "Creating..." : "Create batch"}
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-[1.25rem] border border-dash-border bg-dash-surface p-6 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-dash-muted">
+            Claim history
+          </p>
+          {claims.length === 0 ? (
+            <p className="mt-4 text-sm text-dash-muted">No Gift Aid claim batches yet.</p>
+          ) : (
+            <ul className="mt-4 space-y-3">
+              {claims.slice(0, 5).map((claim) => (
+                <li key={claim.id} className="rounded-xl border border-dash-border bg-dash-surface-subtle p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-dash-text">
+                      {claim.claim_reference ?? "Gift Aid claim"}
+                    </p>
+                    {statusBadge(claim.status)}
+                  </div>
+                  <p className="mt-1 text-xs text-dash-muted">
+                    {formatDate(claim.period_start)} to {formatDate(claim.period_end)}
+                  </p>
+                  <p className="mt-2 text-sm text-dash-text">
+                    £{claim.reclaimable_amount.toFixed(2)} reclaimable from {claim.donation_count} donations
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {claim.status === "draft" ? (
+                      <button
+                        type="button"
+                        onClick={() => updateClaimStatus(claim.id, "exported")}
+                        disabled={busy}
+                        className="rounded-lg border border-dash-border px-2.5 py-1 text-xs font-medium text-dash-text disabled:opacity-50"
+                      >
+                        Mark exported
+                      </button>
+                    ) : null}
+                    {claim.status === "exported" ? (
+                      <button
+                        type="button"
+                        onClick={() => updateClaimStatus(claim.id, "filed")}
+                        disabled={busy}
+                        className="rounded-lg border border-dash-border px-2.5 py-1 text-xs font-medium text-dash-text disabled:opacity-50"
+                      >
+                        Mark filed
+                      </button>
+                    ) : null}
+                    {claim.status === "filed" ? (
+                      <button
+                        type="button"
+                        onClick={() => updateClaimStatus(claim.id, "paid")}
+                        disabled={busy}
+                        className="rounded-lg border border-dash-border px-2.5 py-1 text-xs font-medium text-dash-text disabled:opacity-50"
+                      >
+                        Mark paid
+                      </button>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
 

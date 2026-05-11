@@ -23,12 +23,20 @@ export default async function AdminCharityPage() {
     : lodgeId
       ? await db.getGiftAidDeclarations(lodgeId)
       : [];
+  const meetingCollections = useMock || !lodgeId
+    ? []
+    : await db.getMeetingCollections(lodgeId).catch(() => []);
+  const gasdsClaims = useMock || !lodgeId
+    ? []
+    : await db.getGasdsClaims(lodgeId).catch(() => []);
 
   return (
     <AdminCharityClient
       campaigns={JSON.parse(JSON.stringify(campaigns))}
       donations={JSON.parse(JSON.stringify(donations))}
       giftAidDeclarations={JSON.parse(JSON.stringify(giftAidDeclarations))}
+      meetingCollections={JSON.parse(JSON.stringify(meetingCollections))}
+      gasdsClaims={JSON.parse(JSON.stringify(gasdsClaims))}
     />
   );
 }

@@ -282,11 +282,70 @@ async function handleDuesCompleted(session: Stripe.Checkout.Session) {
     return;
   }
 
+  const duesRecord = (await db.getMemberDues(lodgeId)).find((dues) => dues.id === duesId);
+  if (!duesRecord) {
+    console.error("Webhook dues: dues record not found", duesId);
+    return;
+  }
+
+  const amount = Number(session.metadata?.amount ?? duesRecord.amount);
+  const payment = await db.addPayment(lodgeId, {
+    rsvp_id: null,
+    event_id: null,
+    user_email: duesRecord.member_email,
+    user_name: duesRecord.member_name,
+    stripe_payment_intent_id: paymentIntentId,
+    stripe_charge_id: null,
+    stripe_customer_id: null,
+    dining_amount: 0,
+    charity_amount: duesRecord.charitable_amount ?? 0,
+    raffle_amount: 0,
+    meeting_fee_amount: 0,
+    guest_ticket_amount: 0,
+    total_amount: amount,
+    currency: session.currency?.toUpperCase() ?? duesRecord.currency.toUpperCase(),
+    charity_name: duesRecord.charitable_amount > 0 ? "Dues charitable portion" : null,
+    status: "succeeded",
+    refund_amount: 0,
+    refund_reason: null,
+    completed_at: new Date().toISOString(),
+  });
+
+  const declaration =
+    duesRecord.charitable_amount > 0
+      ? await db.getActiveGiftAidDeclarationByEmail(lodgeId, duesRecord.member_email)
+      : null;
+  const giftAidStatus = declaration
+    ? "declared"
+    : duesRecord.charitable_amount > 0
+      ? "eligible"
+      : "unknown";
+
   await db.updateMemberDuesStatus(duesId, lodgeId, {
     status: "paid",
+    payment_id: payment.id,
     stripe_payment_intent_id: paymentIntentId,
+    gift_aid_declaration_id: declaration?.id ?? null,
+    gift_aid_status: giftAidStatus,
+    gift_aid_eligible_amount: duesRecord.charitable_amount ?? 0,
     paid_at: new Date().toISOString(),
   });
+
+  if (duesRecord.charitable_amount > 0) {
+    await db.addDonation(lodgeId, {
+      event_id: null,
+      payment_id: payment.id,
+      donor_name: duesRecord.member_name,
+      donor_email: duesRecord.member_email,
+      amount: duesRecord.charitable_amount,
+      currency: duesRecord.currency.toUpperCase(),
+      source: "dues_charitable_portion",
+      status: "completed",
+      gift_aid_declaration_id: declaration?.id ?? null,
+      gift_aid_status: giftAidStatus,
+      gift_aid_eligible_amount: declaration ? duesRecord.charitable_amount : 0,
+    });
+  }
 }
 
 async function handleDuesSubscriptionStarted(session: Stripe.Checkout.Session) {

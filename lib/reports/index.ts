@@ -10,6 +10,7 @@ import type {
   MemberDues,
   Lodge,
   EventSummonsSend,
+  MeetingCollection,
 } from "@/lib/db/types";
 
 export type SecretaryReport = {
@@ -45,6 +46,8 @@ export type TreasurerReport = {
   meetingFees: number;
   guestTickets: number;
   charityFromPayments: number;
+  duesGiftAidEligible: number;
+  duesGiftAidReclaimable: number;
   outstandingDues: Array<{
     member_email: string;
     member_name: string | null;
@@ -68,6 +71,8 @@ export type CharityReport = {
   campaignCount: number;
   donationCount: number;
   giftAidReclaimable: number;
+  gasdsEligible: number;
+  gasdsReclaimable: number;
   consentGap: number;
   campaignSummary: Array<{
     id: string;
@@ -212,6 +217,12 @@ export function buildTreasurerReport({
     meetingFees: completed.reduce((s, p) => s + p.meeting_fee_amount, 0),
     guestTickets: completed.reduce((s, p) => s + p.guest_ticket_amount, 0),
     charityFromPayments: completed.reduce((s, p) => s + p.charity_amount, 0),
+    duesGiftAidEligible: memberDues
+      .filter((d) => d.status === "paid" && d.gift_aid_status === "declared")
+      .reduce((s, d) => s + d.gift_aid_eligible_amount, 0),
+    duesGiftAidReclaimable: memberDues
+      .filter((d) => d.status === "paid" && d.gift_aid_status === "declared")
+      .reduce((s, d) => s + d.gift_aid_eligible_amount * 0.25, 0),
     outstandingDues: memberDues
       .filter((d) => d.status !== "paid" && d.status !== "waived")
       .slice(0, 50)
@@ -239,11 +250,13 @@ export function buildCharityReport({
   donations,
   giftAid,
   events,
+  meetingCollections = [],
 }: {
   campaigns: CharityCampaign[];
   donations: Donation[];
   giftAid: GiftAidDeclaration[];
   events: Event[];
+  meetingCollections?: MeetingCollection[];
 }): CharityReport {
   const eventTitleMap = new Map(events.map((e) => [e.id, e.title] as const));
   const giftAidEmails = new Set(
@@ -283,6 +296,10 @@ export function buildCharityReport({
     (a, b) => b.total - a.total
   );
   const consentGap = donorHistory.filter((d) => !d.giftAid).length;
+  const gasdsEligible = meetingCollections.reduce(
+    (sum, collection) => sum + collection.gasds_eligible_amount,
+    0
+  );
 
   const collectionsMap = new Map<
     string,
@@ -308,6 +325,8 @@ export function buildCharityReport({
     campaignCount: campaigns.length,
     donationCount: donations.length,
     giftAidReclaimable: eligible * 0.25,
+    gasdsEligible,
+    gasdsReclaimable: Math.min(gasdsEligible, 8000) * 0.25,
     consentGap,
     campaignSummary: campaigns.map((c) => {
       const ds = donations.filter((d) => d.campaign_id === c.id);

@@ -36,21 +36,21 @@ import { useEffect, useState } from "react";
 const nav = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/onboarding", label: "Get started", icon: Rocket, permission: "admin:all" },
-  { href: "/admin/leads", label: "Candidates", icon: Users, permission: "meetings:write" },
+  { href: "/admin/leads", label: "Candidates", icon: Users, permission: "meetings:write", flag: "candidate_crm" },
   { href: "/admin/members", label: "Members", icon: UserCheck, permission: "members:read" },
   { href: "/admin/meetings", label: "Meetings", icon: Clock, permission: "meetings:write" },
   { href: "/admin/communications", label: "Communications", icon: Megaphone, permission: "members:write" },
   { href: "/admin/website", label: "Website", icon: Globe, permission: "website:write" },
   { href: "/admin/payments", label: "Payments", icon: CreditCard, permission: "payments:write" },
   { href: "/admin/treasurer", label: "Treasurer", icon: Wallet, permission: "payments:write" },
-  { href: "/admin/charity", label: "Charity", icon: Heart, permission: "charity:write", flag: "charity" },
-  { href: "/admin/donations", label: "Donations", icon: Gift, permission: "charity:write", flag: "charity" },
-  { href: "/admin/gift-aid", label: "Gift Aid", icon: Shield, permission: "charity:write", flag: "charity" },
+  { href: "/admin/charity", label: "Charity", icon: Heart, permission: "charity:write", flag: "charity_campaigns" },
+  { href: "/admin/donations", label: "Donations", icon: Gift, permission: "charity:write", flag: "gift_aid" },
+  { href: "/admin/gift-aid", label: "Gift Aid", icon: Shield, permission: "charity:write", flag: "gift_aid" },
   { href: "/admin/almoner", label: "Almoner", icon: HeartHandshake, permission: "welfare:read", flag: "almoner" },
   { href: "/admin/mentoring", label: "Mentoring", icon: GraduationCap, permission: "members:write", flag: "mentor" },
   { href: "/admin/ai-assistant", label: "AI assistant", icon: Sparkles, permission: "members:write", flag: "ai" },
   { href: "/admin/reports", label: "Reports", icon: BarChart3, permission: "audit:read" },
-  { href: "/admin/audit-compliance", label: "Audit & Compliance", icon: ShieldCheck, permission: "audit:read" },
+  { href: "/admin/audit-compliance", label: "Audit & Compliance", icon: ShieldCheck, permission: "audit:read", flag: "audit" },
   { href: "/admin/platform", label: "Platform overview", icon: Building2, permission: "admin:all", platformOnly: true },
   { href: "/admin/provinces", label: "Provinces", icon: MapPin, permission: "admin:all", platformOnly: true },
   { href: "/admin/integrations", label: "Integrations", icon: Plug, permission: "admin:all", flag: "integrations", platformOnly: true },
@@ -73,6 +73,13 @@ const rolePermissions: Record<string, string[]> = {
   charity_steward: ["charity:write", "audit:read"],
   membership_officer: ["members:read", "members:write", "audit:read"],
   almoner: ["members:read", "welfare:read", "welfare:write", "audit:read"],
+  master: [
+    "members:read",
+    "meetings:write",
+    "summons:write",
+    "website:write",
+    "audit:read",
+  ],
 };
 
 function canSee(role: string, permission?: string) {
@@ -177,6 +184,7 @@ export function AdminSidebar() {
       <Link
         key={item.href + item.label}
         href={item.href}
+        prefetch={false}
         onClick={() => setMobileOpen(false)}
         aria-current={active ? "page" : undefined}
         className={cn(linkBase, active ? linkActive : linkIdle)}

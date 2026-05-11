@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useState } from "react";
 
 const nav = [
-  { href: "/product", label: "Product" },
   { href: "/features", label: "Features" },
   { href: "/pricing", label: "Pricing" },
   { href: "/contact", label: "Contact" },
@@ -46,9 +45,8 @@ const pillars = [
 
 const footerCols = [
   {
-    title: "Product",
+    title: "Explore",
     links: [
-      { href: "/product", label: "Overview" },
       { href: "/features", label: "Features" },
       { href: "/pricing", label: "Pricing" },
       { href: "/book-demo", label: "Book a demo" },

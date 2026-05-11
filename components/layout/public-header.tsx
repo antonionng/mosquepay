@@ -8,27 +8,75 @@ import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { resolveLodgeSlug } from "@/lib/tenant";
+import type { LodgeSiteHeaderSettings } from "@/lib/db/types";
+import { defaultHeaderSettings } from "@/lib/site-section-style";
 
-const tenantNavLinks = [
-  { href: "/", label: "Home" },
-  { href: "/events", label: "Events" },
-  { href: "/charity", label: "Charity" },
-  { href: "/news", label: "News" },
-  { href: "/contact", label: "Contact" },
-];
+type NavLink = {
+  href: string;
+  label: string;
+};
 
 const marketingNavLinks = [
-  { href: "/product", label: "Product" },
   { href: "/features", label: "Features" },
   { href: "/pricing", label: "Pricing" },
   { href: "/contact", label: "Contact" },
 ];
 
 type LodgeBranding = {
+  slug: string;
   name: string;
   city: string | null;
   tagline: string | null;
+  logo_url: string | null;
+  lodge_number: string | null;
 };
+
+type TenantNavPage = {
+  slug: string;
+  title: string;
+  nav_label: string | null;
+  published: boolean;
+  show_in_nav: boolean;
+  order: number;
+};
+
+function normalizeHref(href: string) {
+  const [path] = href.split("?");
+  const trimmed = path.trim();
+  if (!trimmed || trimmed === "/") return "/";
+  return trimmed.replace(/\/+$/, "");
+}
+
+function linkIntent(link: NavLink) {
+  const href = normalizeHref(link.href).toLowerCase();
+  const label = link.label.trim().toLowerCase();
+  if (href === "/" || label === "home") return "home";
+  if (href.includes("/events") || label.includes("event")) return "events";
+  if (href.includes("charity") || label.includes("charity")) return "charity";
+  if (href.includes("join") || href.includes("visit") || label.includes("join") || label.includes("visit")) {
+    return "join";
+  }
+  if (href.includes("contact") || label.includes("contact")) return "contact";
+  if (href.includes("about") || label.includes("about")) return "about";
+  return null;
+}
+
+function uniqueNavLinks(links: NavLink[]) {
+  const seen = new Set<string>();
+  return links.filter((link) => {
+    const hrefKey = `href:${normalizeHref(link.href).toLowerCase()}`;
+    const labelKey = `label:${link.label.trim().toLowerCase()}`;
+    const intent = linkIntent(link);
+    const intentKey = intent ? `intent:${intent}` : null;
+    if (seen.has(hrefKey) || seen.has(labelKey) || (intentKey && seen.has(intentKey))) {
+      return false;
+    }
+    seen.add(hrefKey);
+    seen.add(labelKey);
+    if (intentKey) seen.add(intentKey);
+    return true;
+  });
+}
 
 function initialsFromName(name: string) {
   const words = name.split(" ").filter(Boolean);
@@ -40,23 +88,55 @@ function initialsFromName(name: string) {
     .toUpperCase();
 }
 
-export function PublicHeader() {
+export function PublicHeader({
+  initialBranding = null,
+  initialHeaderSettings = null,
+  initialCustomPages = [],
+  initialTenantSlug = null,
+}: {
+  initialBranding?: LodgeBranding | null;
+  initialHeaderSettings?: LodgeSiteHeaderSettings | null;
+  initialCustomPages?: TenantNavPage[];
+  initialTenantSlug?: string | null;
+}) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [branding, setBranding] = useState<LodgeBranding | null>(null);
+  const [branding, setBranding] = useState<LodgeBranding | null>(initialBranding);
+  const [hostTenantSlug, setHostTenantSlug] = useState<string | null>(initialTenantSlug);
+  const [customNavLinks, setCustomNavLinks] = useState<NavLink[]>(
+    initialCustomPages
+      .filter((page) => page.published && page.show_in_nav)
+      .sort((a, b) => a.order - b.order)
+      .map((page) => ({
+        href: `/site/${page.slug}`,
+        label: page.nav_label || page.title,
+      }))
+  );
+  const [headerSettings, setHeaderSettings] = useState<LodgeSiteHeaderSettings>(
+    initialHeaderSettings ?? defaultHeaderSettings()
+  );
   const isHome = pathname === "/";
   const rawLodgeQuery = searchParams.get("lodge");
-  const isTenantMode = Boolean(rawLodgeQuery);
+  const queryTenantMode = Boolean(rawLodgeQuery);
+  const isTenantMode = queryTenantMode || Boolean(hostTenantSlug);
   const lodgeSlug = useMemo(
-    () => resolveLodgeSlug(rawLodgeQuery),
-    [rawLodgeQuery]
+    () => hostTenantSlug ?? resolveLodgeSlug(rawLodgeQuery),
+    [hostTenantSlug, rawLodgeQuery]
   );
-  const navLinks = isTenantMode ? tenantNavLinks : marketingNavLinks;
+  const navLinks = isTenantMode
+    ? uniqueNavLinks([
+        ...headerSettings.nav_items
+          .filter((item) => item.visible)
+          .sort((a, b) => a.order - b.order)
+          .map((item) => ({ href: item.href, label: item.label })),
+        ...customNavLinks,
+      ])
+    : marketingNavLinks;
 
   const withTenantQuery = (href: string) =>
-    isTenantMode ? `${href}?lodge=${encodeURIComponent(lodgeSlug)}` : href;
+    queryTenantMode ? `${href}?lodge=${encodeURIComponent(lodgeSlug)}` : href;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -67,25 +147,45 @@ export function PublicHeader() {
   }, []);
 
   useEffect(() => {
+    if (initialBranding && initialTenantSlug === lodgeSlug) return;
+
     let active = true;
     async function loadBranding() {
       try {
-        const res = await fetch(`/api/lodges/${lodgeSlug}/site`);
+        const res = await fetch(
+          queryTenantMode
+            ? `/api/lodges/${lodgeSlug}/site`
+            : "/api/lodges/current/site"
+        );
         if (!res.ok) return;
         const data = await res.json();
         if (!active) return;
         const lodge = data.lodge as LodgeBranding | null;
-        if (lodge) setBranding(lodge);
+        const pages = (data.site?.custom_pages ?? []) as TenantNavPage[];
+        const settings = (data.site?.header_settings ?? null) as LodgeSiteHeaderSettings | null;
+        if (lodge) {
+          setBranding(lodge);
+          if (!queryTenantMode) setHostTenantSlug(lodge.slug);
+        }
+        setHeaderSettings(settings ?? defaultHeaderSettings());
+        setCustomNavLinks(
+          pages
+            .filter((page) => page.published && page.show_in_nav)
+            .sort((a, b) => a.order - b.order)
+            .map((page) => ({
+              href: `/site/${page.slug}`,
+              label: page.nav_label || page.title,
+            }))
+        );
       } catch {
         // Keep static fallback branding.
       }
     }
-    if (!isTenantMode) return;
     loadBranding();
     return () => {
       active = false;
     };
-  }, [isTenantMode, lodgeSlug]);
+  }, [initialBranding, initialTenantSlug, lodgeSlug, queryTenantMode]);
 
   const solidHeader = scrolled || !isHome;
 
@@ -197,34 +297,62 @@ export function PublicHeader() {
         <Link href={withTenantQuery("/")} className="flex items-center gap-3">
           {isTenantMode ? (
             <>
-              <div
-                className={cn(
-                  "flex h-10 w-10 items-center justify-center rounded-xl border text-[11px] font-semibold tracking-[0.2em] transition-colors",
-                  isTenantMode && !solidHeader
-                    ? "border-white/20 bg-white/10 text-white"
-                    : "border-slate-200 bg-slate-950 text-white"
-                )}
-              >
-                {initialsFromName(branding?.name ?? "Covenant Lodge")}
-              </div>
-              <div className="min-w-0">
-                <p
+              {headerSettings.show_logo && branding?.logo_url ? (
+                <div
                   className={cn(
-                    "text-sm font-semibold tracking-tight transition-colors",
-                    isTenantMode && !solidHeader ? "text-white" : "text-slate-950"
+                    "flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl border bg-white shadow-sm transition-colors",
+                    isTenantMode && !solidHeader ? "border-white/30" : "border-slate-200"
                   )}
                 >
-                  {branding?.name ?? "Covenant Lodge"}
-                </p>
-                <p
+                  <Image
+                    src={branding.logo_url}
+                    alt={`${branding.name} logo`}
+                    width={44}
+                    height={44}
+                    className="h-full w-full object-contain p-1"
+                  />
+                </div>
+              ) : headerSettings.show_logo ? (
+                <div
                   className={cn(
-                    "text-xs transition-colors",
-                    isTenantMode && !solidHeader ? "text-slate-300" : "text-slate-500"
+                    "flex h-10 w-10 items-center justify-center rounded-xl border text-[11px] font-semibold tracking-[0.2em] transition-colors",
+                    isTenantMode && !solidHeader
+                      ? "border-white/20 bg-white/10 text-white"
+                      : "border-slate-200 bg-slate-950 text-white"
                   )}
                 >
-                  {`No. 4344 · ${branding?.city ?? "Mayfair, London"}`}
-                </p>
-              </div>
+                  {initialsFromName(branding?.name ?? "Covenant Lodge")}
+                </div>
+              ) : null}
+              {headerSettings.show_lodge_name || headerSettings.show_lodge_number ? (
+                <div className="min-w-0">
+                  {headerSettings.show_lodge_name ? (
+                    <p
+                      className={cn(
+                        "text-sm font-semibold tracking-tight transition-colors",
+                        isTenantMode && !solidHeader ? "text-white" : "text-slate-950"
+                      )}
+                    >
+                      {branding?.name ?? "Covenant Lodge"}
+                    </p>
+                  ) : null}
+                  {headerSettings.show_lodge_number ? (
+                    <p
+                      className={cn(
+                        "text-xs transition-colors",
+                        isTenantMode && !solidHeader ? "text-slate-300" : "text-slate-500"
+                      )}
+                    >
+                      {[
+                        branding?.lodge_number ? `No. ${branding.lodge_number}` : null,
+                        branding?.city ?? "Mayfair, London",
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
             </>
           ) : (
             <Image
@@ -254,20 +382,22 @@ export function PublicHeader() {
             </Link>
           ))}
           <div className="ml-4 flex items-center gap-3 border-l border-dash-border pl-4">
-            <Button
-              asChild
-              size="sm"
-              variant={solidHeader ? "primary" : "secondary"}
-              className={cn(
-                isTenantMode && !solidHeader
-                  ? "border-white/10 bg-white text-slate-950 hover:bg-slate-100"
-                  : "bg-dash-ring text-white hover:bg-dash-ring-dark"
-              )}
-            >
-              <Link href={withTenantQuery(isTenantMode ? "/join" : "/book-demo")}>
-                {isTenantMode ? "Join Us" : "Book a demo"}
-              </Link>
-            </Button>
+            {headerSettings.cta_label && headerSettings.cta_href ? (
+              <Button
+                asChild
+                size="sm"
+                variant={solidHeader ? "primary" : "secondary"}
+                className={cn(
+                  isTenantMode && !solidHeader
+                    ? "border-white/10 bg-white text-slate-950 hover:bg-slate-100"
+                    : "bg-dash-ring text-white hover:bg-dash-ring-dark"
+                )}
+              >
+                <Link href={withTenantQuery(headerSettings.cta_href)}>
+                  {headerSettings.cta_label}
+                </Link>
+              </Button>
+            ) : null}
             {!isTenantMode ? (
               <Button
                 asChild
@@ -327,15 +457,18 @@ export function PublicHeader() {
               {link.label}
             </Link>
           ))}
-          <div className="mt-3 border-t border-dash-border pt-4">
-            <Button asChild className="w-full" variant="primary">
-              <Link
-                href={withTenantQuery(isTenantMode ? "/join" : "/book-demo")}
-                onClick={() => setMobileOpen(false)}
-              >
-                {isTenantMode ? "Join Us" : "Book a demo"}
-              </Link>
-            </Button>
+          {headerSettings.cta_label && headerSettings.cta_href ? (
+            <div className="mt-3 border-t border-dash-border pt-4">
+              <Button asChild className="w-full" variant="primary">
+                <Link
+                  href={withTenantQuery(headerSettings.cta_href)}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  {headerSettings.cta_label}
+                </Link>
+              </Button>
+            </div>
+          ) : null}
             {!isTenantMode ? (
               <Button asChild className="mt-2 w-full bg-dash-ring text-white hover:bg-dash-ring-dark">
                 <Link href="/admin/login" onClick={() => setMobileOpen(false)}>
@@ -343,7 +476,6 @@ export function PublicHeader() {
                 </Link>
               </Button>
             ) : null}
-          </div>
         </nav>
       </div>
     </header>

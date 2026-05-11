@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import * as db from "@/lib/db";
 import { getCurrentAdminScope } from "@/lib/auth/permissions";
+import { isPlatformOwnerScope, isPlatformScope } from "@/lib/auth/platform";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +24,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { ProvisionLodgeClient } from "./provision-client";
 import { FeatureFlagsClient } from "./feature-flags-client";
+import { PlatformConsoleManager } from "@/components/admin/platform-console-manager";
 
 export const dynamic = "force-dynamic";
 
@@ -35,13 +37,16 @@ const GBP = new Intl.NumberFormat("en-GB", {
 export default async function PlatformOverviewPage() {
   if (!isSupabaseConfigured()) redirect("/admin");
   const scope = await getCurrentAdminScope();
-  if (scope.kind !== "platform" && scope.kind !== "dummy") {
+  if (!isPlatformScope(scope)) {
     redirect("/admin");
   }
 
-  const [stats, provinces] = await Promise.all([
+  const [stats, provinces, lodges, platformAdmins, tenantAdmins] = await Promise.all([
     db.getPlatformLodgeStats(),
     db.listProvinces(),
+    db.listLodges(),
+    db.listPlatformAdminUsers(),
+    db.listTenantAdminUsers(),
   ]);
 
   const provinceById = new Map(provinces.map((p) => [p.id, p]));
@@ -104,6 +109,23 @@ export default async function PlatformOverviewPage() {
         />
       </div>
 
+      <PlatformConsoleManager
+        lodges={lodges.map((lodge) => ({
+          id: lodge.id,
+          name: lodge.name,
+          slug: lodge.slug,
+          lodge_number: lodge.lodge_number,
+          province_id: lodge.province_id,
+        }))}
+        provinces={provinces.map((province) => ({
+          id: province.id,
+          name: province.name,
+        }))}
+        tenantAdmins={JSON.parse(JSON.stringify(tenantAdmins))}
+        platformAdmins={JSON.parse(JSON.stringify(platformAdmins))}
+        isOwner={isPlatformOwnerScope(scope)}
+      />
+
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat icon={Building2} label="Lodges" value={String(totals.lodges)} />
         <Stat
@@ -162,8 +184,8 @@ export default async function PlatformOverviewPage() {
                     </TableCell>
                     <TableCell className="text-sm text-slate-500">
                       {row.province_id
-                        ? provinceById.get(row.province_id)?.name ?? "—"
-                        : "—"}
+                        ? provinceById.get(row.province_id)?.name ?? "-"
+                        : "-"}
                     </TableCell>
                     <TableCell className="text-right text-sm">
                       {row.active_members}
@@ -183,7 +205,7 @@ export default async function PlatformOverviewPage() {
                     <TableCell className="text-sm text-slate-500">
                       {row.last_meeting_at
                         ? new Date(row.last_meeting_at).toLocaleDateString("en-GB")
-                        : "—"}
+                        : "-"}
                     </TableCell>
                     <TableCell>
                       <Link

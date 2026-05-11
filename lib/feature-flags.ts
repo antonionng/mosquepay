@@ -1,7 +1,20 @@
 import * as db from "@/lib/db";
+import {
+  ENTITLEMENT_KEYS,
+  entitlementsForPlan,
+  type EntitlementKey,
+} from "@/lib/billing/plans";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 
-export const FEATURE_FLAGS = {
+export const FEATURE_FLAGS: Record<
+  EntitlementKey,
+  {
+    key: EntitlementKey;
+    label: string;
+    description: string;
+    default: boolean;
+  }
+> = {
   ai: {
     key: "ai",
     label: "AI assistant",
@@ -17,7 +30,19 @@ export const FEATURE_FLAGS = {
   charity: {
     key: "charity",
     label: "Charity & Gift Aid",
-    description: "Charity campaigns, donations and Gift Aid declarations.",
+    description: "Legacy alias for charity campaigns, donations and Gift Aid.",
+    default: true,
+  },
+  charity_campaigns: {
+    key: "charity_campaigns",
+    label: "Charity campaigns",
+    description: "Campaigns, donor history and campaign reporting.",
+    default: true,
+  },
+  charity_reports: {
+    key: "charity_reports",
+    label: "Charity reports",
+    description: "Raised totals, consent gaps and Gift Aid reclaimable.",
     default: true,
   },
   almoner: {
@@ -38,7 +63,139 @@ export const FEATURE_FLAGS = {
     description: "Drag-and-drop public site builder for the lodge.",
     default: true,
   },
-} as const;
+  member_portal: {
+    key: "member_portal",
+    label: "Member portal",
+    description: "Member self-serve portal and installable app.",
+    default: true,
+  },
+  digital_lodge_card: {
+    key: "digital_lodge_card",
+    label: "Digital lodge card",
+    description: "Member lodge card always to hand.",
+    default: true,
+  },
+  payments: {
+    key: "payments",
+    label: "Payments",
+    description: "Stripe-backed checkout and reconciliation.",
+    default: true,
+  },
+  dues: {
+    key: "dues",
+    label: "Dues",
+    description: "Dues modelling, runs and reminders.",
+    default: true,
+  },
+  gift_aid: {
+    key: "gift_aid",
+    label: "Gift Aid",
+    description: "Declarations, eligibility tracking and HMRC-ready exports.",
+    default: true,
+  },
+  gasds: {
+    key: "gasds",
+    label: "GASDS",
+    description: "Small cash donation tracking and annual allowance reporting.",
+    default: true,
+  },
+  meetings: {
+    key: "meetings",
+    label: "Meetings",
+    description: "Meeting records and attendance.",
+    default: true,
+  },
+  summons: {
+    key: "summons",
+    label: "Summons",
+    description: "Summons workflow, links, print, send and history.",
+    default: true,
+  },
+  events: {
+    key: "events",
+    label: "Events",
+    description: "RSVPs, guests, dining and dietary tracking.",
+    default: true,
+  },
+  treasurer_reports: {
+    key: "treasurer_reports",
+    label: "Treasurer reports",
+    description: "Income breakdowns, dues posture and reclaimable Gift Aid.",
+    default: true,
+  },
+  secretary_reports: {
+    key: "secretary_reports",
+    label: "Secretary reports",
+    description: "Summons coverage, RSVP health and data gaps.",
+    default: true,
+  },
+  candidate_crm: {
+    key: "candidate_crm",
+    label: "Candidate CRM",
+    description: "Pipeline, proposer assignment, ballot and initiation stages.",
+    default: true,
+  },
+  recruitment_reports: {
+    key: "recruitment_reports",
+    label: "Recruitment reports",
+    description: "Funnel counts, source attribution and pipeline freshness.",
+    default: true,
+  },
+  audit: {
+    key: "audit",
+    label: "Audit trail",
+    description: "Accountability for sensitive actions.",
+    default: true,
+  },
+  bulk_import: {
+    key: "bulk_import",
+    label: "Bulk member import",
+    description: "Bulk member CSV import.",
+    default: true,
+  },
+  advanced_members: {
+    key: "advanced_members",
+    label: "Advanced member records",
+    description: "Advanced fields, ranks and lifecycle tracking.",
+    default: true,
+  },
+  multi_lodge: {
+    key: "multi_lodge",
+    label: "Multiple lodges",
+    description: "Separate records for connected lodges.",
+    default: true,
+  },
+  cross_lodge_reporting: {
+    key: "cross_lodge_reporting",
+    label: "Cross-lodge reporting",
+    description: "Roll-up reporting across lodges.",
+    default: true,
+  },
+  central_billing: {
+    key: "central_billing",
+    label: "Central billing",
+    description: "One invoice for connected lodges.",
+    default: true,
+  },
+  province_dashboards: {
+    key: "province_dashboards",
+    label: "Provincial dashboards",
+    description: "Province-wide rollout and portfolio dashboards.",
+    default: true,
+  },
+  migration_planning: {
+    key: "migration_planning",
+    label: "Migration planning",
+    description: "Migration support from legacy systems and spreadsheets.",
+    default: true,
+  },
+  named_support: {
+    key: "named_support",
+    label: "Named support",
+    description: "Provincial support desk and named contact.",
+    default: true,
+  },
+};
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
 
@@ -51,7 +208,12 @@ async function loadFlags(lodgeId: string): Promise<Record<string, boolean>> {
   const cached = cache.get(lodgeId);
   if (cached && now - cached.ts < TTL_MS) return cached.value;
   const rows = await db.listLodgeFeatureFlags(lodgeId);
-  const value: Record<string, boolean> = {};
+  const subscription = await db.getLodgeSubscription(lodgeId).catch(() => null);
+  const value: Record<string, boolean> = entitlementsForPlan(
+    subscription?.plan_code
+  );
+  value.charity =
+    value.charity_campaigns || value.gift_aid || value.gasds || false;
   for (const row of rows) value[row.flag_key] = row.enabled;
   cache.set(lodgeId, { ts: now, value });
   return value;
@@ -77,9 +239,12 @@ export async function getAllFlagsForLodge(
 ): Promise<Record<FeatureFlagKey, boolean>> {
   const flags = await loadFlags(lodgeId);
   const out = {} as Record<FeatureFlagKey, boolean>;
-  for (const key of Object.keys(FEATURE_FLAGS) as FeatureFlagKey[]) {
+  for (const key of ENTITLEMENT_KEYS) {
     out[key] = key in flags ? flags[key] : FEATURE_FLAGS[key].default;
   }
+  out.charity =
+    flags.charity ??
+    (out.charity_campaigns || out.gift_aid || out.gasds || false);
   return out;
 }
 

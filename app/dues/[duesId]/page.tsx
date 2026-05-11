@@ -48,6 +48,14 @@ export default async function PublicDuesPayPage({
               <dt className="text-slate-500">Amount</dt>
               <dd className="font-semibold text-slate-950">£{dues.amount.toFixed(2)}</dd>
             </div>
+            {dues.charitable_amount > 0 ? (
+              <div className="flex justify-between gap-4">
+                <dt className="text-slate-500">Gift Aid eligible portion</dt>
+                <dd className="font-semibold text-emerald-700">
+                  £{dues.charitable_amount.toFixed(2)}
+                </dd>
+              </div>
+            ) : null}
             <div className="flex justify-between gap-4">
               <dt className="text-slate-500">Period</dt>
               <dd className="text-right font-medium text-slate-950">

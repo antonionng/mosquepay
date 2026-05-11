@@ -275,7 +275,7 @@ function TreasurerView({ r }: { r: TreasurerReport }) {
         <Kpi label="Total paid" value={`£${r.totalPaid.toFixed(2)}`} hint={`£${r.totalRefunded.toFixed(2)} refunded`} />
         <Kpi label="Dues outstanding" value={`£${r.unpaidDuesTotal.toFixed(2)}`} hint={`${r.outstandingDues.length} members`} />
         <Kpi label="Dues paid" value={`£${r.paidDuesTotal.toFixed(2)}`} />
-        <Kpi label="Dining + meeting fees" value={`£${(r.diningIncome + r.meetingFees).toFixed(2)}`} hint={`Dining £${r.diningIncome.toFixed(2)} · Fees £${r.meetingFees.toFixed(2)}`} />
+        <Kpi label="Dues Gift Aid" value={`£${r.duesGiftAidReclaimable.toFixed(2)}`} hint={`£${r.duesGiftAidEligible.toFixed(2)} eligible`} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -405,7 +405,7 @@ function CharityView({ r }: { r: CharityReport }) {
         <Kpi label="Total raised" value={`£${r.totalRaised.toFixed(2)}`} hint={`${r.donationCount} donations`} />
         <Kpi label="Active campaigns" value={`${r.campaignCount}`} />
         <Kpi label="Gift Aid reclaimable" value={`£${r.giftAidReclaimable.toFixed(2)}`} />
-        <Kpi label="Consent gaps" value={`${r.consentGap}`} hint="Donors without Gift Aid" />
+        <Kpi label="GASDS reclaimable" value={`£${r.gasdsReclaimable.toFixed(2)}`} hint={`£${r.gasdsEligible.toFixed(2)} eligible cash`} />
       </div>
 
       <Card variant="panel" className="overflow-hidden p-0">

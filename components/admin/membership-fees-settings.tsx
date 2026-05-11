@@ -23,6 +23,9 @@ interface FeesData {
   allow_instalments: boolean;
   instalment_count: number;
   instalment_frequency: string;
+  charitable_amount: number;
+  charitable_label: string;
+  gift_aid_enabled: boolean;
 }
 
 export function MembershipFeesSettings() {
@@ -35,6 +38,9 @@ export function MembershipFeesSettings() {
     allow_instalments: false,
     instalment_count: 12,
     instalment_frequency: "monthly",
+    charitable_amount: 0,
+    charitable_label: "Charitable portion",
+    gift_aid_enabled: false,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -56,6 +62,9 @@ export function MembershipFeesSettings() {
               allow_instalments: data.fees.allow_instalments ?? false,
               instalment_count: data.fees.instalment_count ?? 12,
               instalment_frequency: data.fees.instalment_frequency ?? "monthly",
+              charitable_amount: data.fees.charitable_amount ?? 0,
+              charitable_label: data.fees.charitable_label ?? "Charitable portion",
+              gift_aid_enabled: data.fees.gift_aid_enabled ?? false,
             });
           }
         }
@@ -162,6 +171,73 @@ export function MembershipFeesSettings() {
                 />
               </div>
             </div>
+          </div>
+
+          <div className="rounded-xl border border-dash-border p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-dash-surface-subtle">
+                  <PoundSterling className="h-4 w-4 text-dash-muted" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-dash-text">Gift Aid on dues</p>
+                  <p className="text-xs text-dash-muted">
+                    Itemise the charitable portion of annual dues so only the eligible part is reclaimed.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={fees.gift_aid_enabled}
+                onClick={() => setFees({ ...fees, gift_aid_enabled: !fees.gift_aid_enabled })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  fees.gift_aid_enabled ? "bg-emerald-500" : "bg-slate-200"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    fees.gift_aid_enabled ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {fees.gift_aid_enabled && (
+              <div className="grid grid-cols-1 gap-4 border-t border-dash-border pt-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="charitableLabel">Charitable portion label</Label>
+                  <Input
+                    id="charitableLabel"
+                    value={fees.charitable_label}
+                    onChange={(e) => setFees({ ...fees, charitable_label: e.target.value })}
+                    placeholder="e.g. Relief chest contribution"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="charitableAmount">Eligible amount (£)</Label>
+                  <div className="relative">
+                    <PoundSterling className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-dash-muted" />
+                    <Input
+                      id="charitableAmount"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max={fees.amount}
+                      className="pl-9"
+                      value={fees.charitable_amount}
+                      onChange={(e) =>
+                        setFees({ ...fees, charitable_amount: Number(e.target.value) })
+                      }
+                    />
+                  </div>
+                </div>
+                <p className="text-xs leading-relaxed text-dash-muted sm:col-span-2">
+                  Members still pay the full dues amount. LodgePay records only £
+                  {Number(fees.charitable_amount || 0).toFixed(2)} as Gift Aid eligible when a valid declaration is on file.
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between rounded-xl border border-dash-border p-4">

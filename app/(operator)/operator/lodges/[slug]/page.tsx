@@ -15,6 +15,7 @@ import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { formatDate } from "@/lib/utils";
 import type { Lodge, LodgeSubscription } from "@/lib/db/types";
+import { getPlanDefinition } from "@/lib/billing/plans";
 import { LodgeDetailActions } from "./actions";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -210,7 +211,7 @@ export default async function LodgeDetailPage({ params }: Props) {
                 <div>
                   <p className="text-xs font-medium text-slate-500">Plan</p>
                   <p className="mt-0.5 text-sm font-medium text-white capitalize">
-                    {subscription.plan_code}
+                    {getPlanDefinition(subscription.plan_code).name}
                   </p>
                 </div>
                 <div>

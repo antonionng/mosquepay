@@ -1,8 +1,7 @@
 "use client";
 
-import type React from "react";
 import { useState } from "react";
-import { Check, Loader2, Save } from "lucide-react";
+import { Check, Eye, Loader2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,7 +12,51 @@ import {
 } from "@/components/ui/tabs";
 import { CustomDomainCard } from "@/components/admin/custom-domain-card";
 import { SimpleSiteBuilder } from "@/components/site-builder/simple-site-builder";
+import { MediaLibrary } from "@/components/site-builder/media-library";
+import { SitePagesManager } from "@/components/site-builder/site-pages-manager";
+import { ImageUploadField } from "@/components/site-builder/image-upload-field";
+import { HeaderSettingsManager } from "@/components/site-builder/header-settings-manager";
+import { FooterSettingsManager } from "@/components/site-builder/footer-settings-manager";
+import { WebsiteReadinessPanel } from "@/components/site-builder/website-readiness-panel";
 import type { Lodge, LodgeSitePage } from "@/lib/db/types";
+
+const THEME_PRESETS = [
+  {
+    id: "classic-blue",
+    name: "Classic blue",
+    description: "Crisp, formal, and familiar for most lodge sites.",
+    primary: "#0b43b8",
+    secondary: "#082e7d",
+  },
+  {
+    id: "heritage-gold",
+    name: "Heritage gold",
+    description: "Warm heritage tone for history-led lodges.",
+    primary: "#92400e",
+    secondary: "#111827",
+  },
+  {
+    id: "modern-teal",
+    name: "Modern teal",
+    description: "Fresh and approachable for recruitment-led pages.",
+    primary: "#0f766e",
+    secondary: "#134e4a",
+  },
+  {
+    id: "charity-rose",
+    name: "Charity rose",
+    description: "High-energy palette for campaigns and giving.",
+    primary: "#be123c",
+    secondary: "#881337",
+  },
+  {
+    id: "premium-dark",
+    name: "Premium dark",
+    description: "Dark, polished style for premium public presence.",
+    primary: "#2563eb",
+    secondary: "#0f172a",
+  },
+];
 
 function ColorInput({
   value,
@@ -53,11 +96,9 @@ function ColorInput({
 export function AdminWebsiteManager({
   lodge,
   site,
-  blog,
 }: {
   lodge: Lodge;
   site: LodgeSitePage | null;
-  blog: React.ReactNode;
 }) {
   const [brand, setBrand] = useState({
     primary_color: lodge.primary_color ?? "",
@@ -116,18 +157,66 @@ export function AdminWebsiteManager({
     page_title: lodge.name,
     page_description: lodge.tagline,
     sections: [],
+    custom_pages: [],
+    header_settings: null,
+    footer_settings: null,
     published: false,
     updated_at: new Date().toISOString(),
   };
 
   return (
     <Tabs defaultValue="builder" className="space-y-6">
+      <div className="rounded-3xl border border-dash-border bg-dash-surface p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-dash-muted">
+              Start here
+            </p>
+            <h2 className="mt-1 text-xl font-semibold tracking-tight text-dash-text">
+              Launch a beautiful lodge site with the fewest possible decisions.
+            </h2>
+            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-dash-muted">
+              Choose a complete site pack in Builder, add logo and colours in Brand, then use Go live to publish and connect the domain.
+            </p>
+          </div>
+          <div className="grid gap-2 text-sm sm:grid-cols-3 lg:min-w-[30rem]">
+            {[
+              "Pick site pack",
+              "Personalise words and images",
+              "Publish and connect domain",
+            ].map((label, index) => (
+              <div
+                key={label}
+                className="rounded-2xl border border-dash-border bg-dash-surface-subtle p-3"
+              >
+                <span className="text-xs font-semibold text-dash-muted">Step {index + 1}</span>
+                <p className="mt-1 font-medium text-dash-text">{label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dash-border bg-dash-surface-subtle p-3">
+          <p className="text-sm text-dash-muted">
+            Not sure what changed? Open the site in a new tab before sharing it.
+          </p>
+          <Button asChild type="button" variant="primary" className="rounded-xl">
+            <a href={`/?lodge=${lodge.slug}`} target="_blank" rel="noreferrer">
+              <Eye className="mr-2 h-4 w-4" />
+              Preview website
+            </a>
+          </Button>
+        </div>
+      </div>
+
       <TabsList>
         <TabsTrigger value="builder">Builder</TabsTrigger>
+        <TabsTrigger value="header">Navigation</TabsTrigger>
+        <TabsTrigger value="footer">Footer</TabsTrigger>
+        <TabsTrigger value="pages">Pages</TabsTrigger>
+        <TabsTrigger value="media">Media</TabsTrigger>
         <TabsTrigger value="brand">Brand</TabsTrigger>
-        <TabsTrigger value="blog">Blog</TabsTrigger>
         <TabsTrigger value="domains">Domains</TabsTrigger>
-        <TabsTrigger value="launch">Launch checklist</TabsTrigger>
+        <TabsTrigger value="launch">Go live</TabsTrigger>
       </TabsList>
 
       <TabsContent value="builder">
@@ -144,6 +233,43 @@ export function AdminWebsiteManager({
         </div>
       </TabsContent>
 
+      <TabsContent value="header">
+        <HeaderSettingsManager
+          lodgeSlug={lodge.slug}
+          initialSettings={siteDraft.header_settings}
+          lodgeName={lodge.name}
+          lodgeNumber={lodge.lodge_number}
+          logoUrl={brand.logo_url || lodge.logo_url}
+          primaryColor={brand.primary_color || "#3b82f6"}
+        />
+      </TabsContent>
+
+      <TabsContent value="footer">
+        <FooterSettingsManager
+          lodgeSlug={lodge.slug}
+          initialSettings={siteDraft.footer_settings}
+          lodgeName={lodge.name}
+          lodgeNumber={lodge.lodge_number}
+          city={lodge.city}
+          tagline={lodge.tagline}
+          supportEmail={lodge.support_email}
+          supportPhone={lodge.support_phone}
+          logoUrl={brand.logo_url || lodge.logo_url}
+        />
+      </TabsContent>
+
+      <TabsContent value="pages">
+        <SitePagesManager
+          lodgeSlug={lodge.slug}
+          site={siteDraft}
+          primaryColor={brand.primary_color || "#3b82f6"}
+        />
+      </TabsContent>
+
+      <TabsContent value="media">
+        <MediaLibrary />
+      </TabsContent>
+
       <TabsContent value="brand">
         <div className="admin-surface p-6">
           <h2 className="text-lg font-semibold text-dash-text">Website brand</h2>
@@ -151,6 +277,40 @@ export function AdminWebsiteManager({
             Set the colours and logo used by the public lodge website.
           </p>
           <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <p className="text-xs font-medium text-dash-muted">Theme presets</p>
+              <div className="mt-2 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                {THEME_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() =>
+                      setBrand((current) => ({
+                        ...current,
+                        primary_color: preset.primary,
+                        secondary_color: preset.secondary,
+                      }))
+                    }
+                    className="rounded-xl border border-dash-border bg-dash-surface-subtle p-3 text-left transition hover:border-dash-ring/50 hover:bg-dash-surface"
+                  >
+                    <div className="mb-2 flex gap-1">
+                      <span
+                        className="h-6 w-10 rounded-md border border-white shadow-sm"
+                        style={{ backgroundColor: preset.primary }}
+                      />
+                      <span
+                        className="h-6 w-10 rounded-md border border-white shadow-sm"
+                        style={{ backgroundColor: preset.secondary }}
+                      />
+                    </div>
+                    <p className="text-sm font-semibold text-dash-text">{preset.name}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-dash-muted">
+                      {preset.description}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
             <ColorInput
               label="Primary colour"
               value={brand.primary_color}
@@ -165,14 +325,17 @@ export function AdminWebsiteManager({
                 setBrand((current) => ({ ...current, secondary_color: value }))
               }
             />
-            <div className="space-y-1.5 md:col-span-2">
-              <label className="text-xs font-medium text-dash-muted">Logo URL</label>
-              <Input
+            <div className="md:col-span-2">
+              <ImageUploadField
+                label="Lodge logo"
                 value={brand.logo_url}
-                onChange={(event) =>
-                  setBrand((current) => ({ ...current, logo_url: event.target.value }))
+                onChange={(value) =>
+                  setBrand((current) => ({ ...current, logo_url: value }))
                 }
-                placeholder="https://..."
+                onClear={() =>
+                  setBrand((current) => ({ ...current, logo_url: "" }))
+                }
+                help="This logo is used on the public lodge website header, digital member card, and formal summons."
               />
             </div>
           </div>
@@ -192,14 +355,14 @@ export function AdminWebsiteManager({
         </div>
       </TabsContent>
 
-      <TabsContent value="blog">{blog}</TabsContent>
-
       <TabsContent value="domains">
         <CustomDomainCard />
       </TabsContent>
 
       <TabsContent value="launch">
-        <div className="admin-surface p-6">
+        <div className="space-y-6">
+          <WebsiteReadinessPanel />
+          <div className="admin-surface p-6">
           <h2 className="text-lg font-semibold text-dash-text">Website launch checklist</h2>
           <p className="mt-1 text-sm text-dash-muted">
             Complete these before publishing the public homepage.
@@ -221,6 +384,7 @@ export function AdminWebsiteManager({
                 <span>{item}</span>
               </div>
             ))}
+          </div>
           </div>
         </div>
       </TabsContent>

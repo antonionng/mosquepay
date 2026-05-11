@@ -3,7 +3,12 @@
  * Data resets on server restart. Replace with real DB when ready.
  */
 
-import type { LodgeSiteSection } from "@/lib/db/types";
+import type {
+  LodgeSiteCustomPage,
+  LodgeSiteFooterSettings,
+  LodgeSiteHeaderSettings,
+  LodgeSiteSection,
+} from "@/lib/db/types";
 import { shouldUseInMemoryMock } from "@/lib/db/with-fallback";
 import { DEFAULT_LODGE_SLUG } from "@/lib/tenant";
 
@@ -72,6 +77,9 @@ export type MockLodgeSite = LodgeScoped & {
   page_title: string;
   page_description: string | null;
   sections: LodgeSiteSection[];
+  custom_pages: LodgeSiteCustomPage[];
+  header_settings: LodgeSiteHeaderSettings | null;
+  footer_settings: LodgeSiteFooterSettings | null;
   published: boolean;
   updated_at: string;
 };
@@ -121,6 +129,9 @@ const lodgeSites: MockLodgeSite[] = [
     lodge_slug: DEFAULT_LODGE_SLUG,
     page_title: "Covenant Lodge No. 4344",
     page_description: "A London lodge rooted in fellowship, service, and meaningful ritual.",
+    custom_pages: [],
+    header_settings: null,
+    footer_settings: null,
     sections: [
       {
         id: uuid(),
@@ -238,6 +249,9 @@ export function getLodgeSite(lodgeSlug?: string): MockLodgeSite {
     page_title: "Lodge Homepage",
     page_description: null,
     sections: [],
+    custom_pages: [],
+    header_settings: null,
+    footer_settings: null,
     published: true,
     updated_at: new Date().toISOString(),
   };
@@ -247,7 +261,18 @@ export function getLodgeSite(lodgeSlug?: string): MockLodgeSite {
 
 export function updateLodgeSite(
   lodgeSlug: string,
-  updates: Partial<Pick<MockLodgeSite, "page_title" | "page_description" | "sections" | "published">>
+  updates: Partial<
+    Pick<
+      MockLodgeSite,
+      | "page_title"
+      | "page_description"
+      | "sections"
+      | "custom_pages"
+      | "header_settings"
+      | "footer_settings"
+      | "published"
+    >
+  >
 ): MockLodgeSite {
   assertInMemoryMock();
   const site = getLodgeSite(lodgeSlug);

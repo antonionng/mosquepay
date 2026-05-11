@@ -11,6 +11,7 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { listLodges, getLodgeSubscription } from "@/lib/db";
 import type { Lodge, LodgeSubscription } from "@/lib/db/types";
 import { formatDate } from "@/lib/utils";
+import { getPlanDefinition } from "@/lib/billing/plans";
 
 type LodgeWithSub = {
   lodge: Lodge;
@@ -181,7 +182,7 @@ export default async function BillingPage() {
                     </Link>
                   </td>
                   <td className="text-slate-300 capitalize">
-                    {sub?.plan_code ?? "Not recorded"}
+                    {sub ? getPlanDefinition(sub.plan_code).name : "Not recorded"}
                   </td>
                   <td>{sub ? statusBadge(sub.status) : statusBadge("none")}</td>
                   <td className="hidden sm:table-cell text-slate-300">

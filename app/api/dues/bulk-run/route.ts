@@ -97,6 +97,8 @@ export async function POST(request: NextRequest) {
 
     let amount: number | null = body.amount != null ? Number(body.amount) : null;
     let currency = body.currency ?? "gbp";
+    let charitableAmount = 0;
+    let giftAidEnabled = false;
 
     if (duesId) {
       const lodgeDuesList = await db.getLodgeDues(lodgeId);
@@ -109,6 +111,8 @@ export async function POST(request: NextRequest) {
       }
       amount = amount ?? template.amount;
       currency = template.currency;
+      charitableAmount = Math.min(template.charitable_amount ?? 0, amount ?? 0);
+      giftAidEnabled = template.gift_aid_enabled === true;
     }
 
     if (amount == null || Number.isNaN(amount) || amount <= 0) {
@@ -160,6 +164,10 @@ export async function POST(request: NextRequest) {
         payment_id: null,
         stripe_payment_intent_id: null,
         stripe_subscription_id: null,
+        charitable_amount: giftAidEnabled ? charitableAmount : 0,
+        gift_aid_declaration_id: null,
+        gift_aid_status: giftAidEnabled && charitableAmount > 0 ? "eligible" : "unknown",
+        gift_aid_eligible_amount: giftAidEnabled ? charitableAmount : 0,
         paid_at: null,
       });
 

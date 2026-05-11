@@ -3,6 +3,7 @@ import * as mockDb from "@/lib/mock-db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
 import { GiftAidClient } from "./gift-aid-client";
 import { isSuccessfulPaymentStatus } from "@/lib/reports";
+import type { GiftAidDeclaration } from "@/lib/db/types";
 
 export default async function GiftAidPage() {
   const ctx = await getAdminReadContext();
@@ -15,6 +16,14 @@ export default async function GiftAidPage() {
       ? await db.getGiftAidDeclarations(lodgeId)
       : [];
   const donations = useMock || !lodgeId ? [] : await db.getDonations(lodgeId);
+  const claims = useMock || !lodgeId
+    ? []
+    : await db.getGiftAidClaimBatches(lodgeId).catch(() => []);
+  const declarationsByEmail = new Map(
+    declarations
+      .filter((d) => !("donor_address" in d))
+      .map((d) => [d.donor_email.toLowerCase(), d as GiftAidDeclaration])
+  );
   const donationsByDeclaration = new Map<
     string,
     { total: number; reclaimable: number }
@@ -43,9 +52,9 @@ export default async function GiftAidPage() {
       donor_address: isMock
         ? (d as unknown as { donor_address: string }).donor_address
         : [
-            (d as db.GiftAidDeclaration).donor_address_line_1,
-            (d as db.GiftAidDeclaration).donor_city,
-            (d as db.GiftAidDeclaration).donor_postcode,
+            (d as GiftAidDeclaration).donor_address_line_1,
+            (d as GiftAidDeclaration).donor_city,
+            (d as GiftAidDeclaration).donor_postcode,
           ]
             .filter(Boolean)
             .join(", "),
@@ -54,7 +63,7 @@ export default async function GiftAidPage() {
         : d.created_at,
       status: (isMock
         ? (d as unknown as { status: string }).status
-        : (d as db.GiftAidDeclaration).revoked_at
+        : (d as GiftAidDeclaration).revoked_at
           ? "revoked"
           : "active") as "active" | "expired" | "revoked",
       total_donations: isMock
@@ -62,12 +71,50 @@ export default async function GiftAidPage() {
         : (donationsByDeclaration.get(d.id)?.total ?? 0),
       reclaimable_amount: isMock
         ? (d as unknown as { reclaimable_amount: number }).reclaimable_amount
-        : (d as db.GiftAidDeclaration).revoked_at
+        : (d as GiftAidDeclaration).revoked_at
           ? 0
           : (donationsByDeclaration.get(d.id)?.reclaimable ?? 0),
       created_at: d.created_at,
     };
   });
 
-  return <GiftAidClient declarations={JSON.parse(JSON.stringify(serialized))} />;
+  const eligibleRows = donations
+    .filter((donation) => isSuccessfulPaymentStatus(donation.status))
+    .filter((donation) => !donation.gift_aid_claim_batch_id)
+    .map((donation) => {
+      const declaration = donation.gift_aid_declaration_id
+        ? (declarations.find((item) => item.id === donation.gift_aid_declaration_id) as GiftAidDeclaration | undefined)
+        : declarationsByEmail.get(donation.donor_email.toLowerCase());
+      const declared =
+        donation.gift_aid_status === "declared" ||
+        Boolean(declaration && !declaration.revoked_at);
+      const eligibleAmount =
+        donation.gift_aid_eligible_amount && donation.gift_aid_eligible_amount > 0
+          ? donation.gift_aid_eligible_amount
+          : declared
+            ? donation.amount
+            : 0;
+      return {
+        id: donation.id,
+        donor_name: donation.donor_name ?? "Anonymous",
+        donor_email: donation.donor_email,
+        donor_address_line_1: declaration?.donor_address_line_1 ?? "",
+        donor_postcode: declaration?.donor_postcode ?? "",
+        declaration_date: declaration?.created_at ?? "",
+        donation_date: donation.created_at,
+        source: donation.source,
+        amount: donation.amount,
+        eligible_amount: eligibleAmount,
+        reclaimable_amount: eligibleAmount * 0.25,
+      };
+    })
+    .filter((row) => row.eligible_amount > 0);
+
+  return (
+    <GiftAidClient
+      declarations={JSON.parse(JSON.stringify(serialized))}
+      eligibleRows={JSON.parse(JSON.stringify(eligibleRows))}
+      claims={JSON.parse(JSON.stringify(claims))}
+    />
+  );
 }

@@ -117,7 +117,7 @@ export function HeroFigmaPanel() {
       </div>
 
       <Link
-        href="/product"
+        href="/features"
         className="absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-3 rounded-[48px] border-[12px] border-solid border-[rgba(195,209,255,0.35)] bg-white py-3 pl-3 pr-6 backdrop-blur-[6px] transition-opacity hover:opacity-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         data-name="Auto Layout Horizontal"
       >

@@ -35,6 +35,7 @@ export default async function ReportsPage() {
     donations,
     giftAid,
     campaigns,
+    meetingCollections,
   ] = await Promise.all([
     db.getMembers(lodgeId),
     db.getLeads(lodgeId),
@@ -44,6 +45,7 @@ export default async function ReportsPage() {
     db.getDonations(lodgeId),
     db.getGiftAidDeclarations(lodgeId),
     db.getCharityCampaigns(lodgeId),
+    db.getMeetingCollections(lodgeId).catch(() => []),
   ]);
 
   const rsvpsByEvent = new Map<string, Rsvp[]>();
@@ -70,7 +72,13 @@ export default async function ReportsPage() {
     hasSummonsByEvent,
   });
   const treasurer = buildTreasurerReport({ payments, memberDues });
-  const charity = buildCharityReport({ campaigns, donations, giftAid, events });
+  const charity = buildCharityReport({
+    campaigns,
+    donations,
+    giftAid,
+    events,
+    meetingCollections,
+  });
   const recruitment = buildRecruitmentReport({ leads });
 
   let operator: ReturnType<typeof buildOperatorReport> | null = null;

@@ -83,6 +83,17 @@ function sectionsToPuckData(sections: SiteSection[], primaryColor?: string): Dat
               : 0.35,
           backgroundPosition: section.style?.background_position ?? "center",
           formMode: section.style?.form_mode ?? "none",
+          backgroundTone: section.style?.background_tone ?? "default",
+          contentWidth: section.style?.content_width ?? "standard",
+          spacing: section.style?.spacing ?? "normal",
+          buttonVariant: section.style?.button_variant ?? "solid",
+          formFields: section.style?.form_fields?.join(",") ?? "",
+          formRequiredFields: section.style?.form_required_fields?.join(",") ?? "",
+          formConsentText: section.style?.form_consent_text ?? "",
+          formThankYou: section.style?.form_thank_you ?? "",
+          formNotificationRecipients: section.style?.form_notification_recipients ?? "",
+          formAutoresponderSubject: section.style?.form_autoresponder_subject ?? "",
+          formAutoresponderBody: section.style?.form_autoresponder_body ?? "",
         };
         if (section.type === "hero") {
           baseProps.primaryColor = mergeHeroPrimaryColor(section, primaryColor);
@@ -123,6 +134,17 @@ export function puckDataToSections(data: Data): SiteSection[] {
       image_position: props.imagePosition,
       image_shape: props.imageShape,
       form_mode: props.formMode,
+      background_tone: props.backgroundTone,
+      content_width: props.contentWidth,
+      spacing: props.spacing,
+      button_variant: props.buttonVariant,
+      form_fields: props.formFields,
+      form_required_fields: props.formRequiredFields,
+      form_consent_text: props.formConsentText,
+      form_thank_you: props.formThankYou,
+      form_notification_recipients: props.formNotificationRecipients,
+      form_autoresponder_subject: props.formAutoresponderSubject,
+      form_autoresponder_body: props.formAutoresponderBody,
     });
     if (style) return { ...base, style };
     return base;

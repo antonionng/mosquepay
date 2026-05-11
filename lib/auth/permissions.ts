@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDummySession } from "@/lib/auth/dummy";
+import { isPlatformOwnerEmail } from "@/lib/auth/platform-owner";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
@@ -24,7 +25,8 @@ export type AdminRole =
   | "treasurer"
   | "charity_steward"
   | "membership_officer"
-  | "almoner";
+  | "almoner"
+  | "master";
 
 const ROLE_PERMISSIONS: Record<AdminRole, AdminPermission[]> = {
   super_admin: ["admin:all"],
@@ -42,6 +44,13 @@ const ROLE_PERMISSIONS: Record<AdminRole, AdminPermission[]> = {
   charity_steward: ["charity:write", "audit:read"],
   membership_officer: ["members:read", "members:write", "audit:read"],
   almoner: ["members:read", "welfare:read", "welfare:write", "audit:read"],
+  master: [
+    "members:read",
+    "meetings:write",
+    "summons:write",
+    "website:write",
+    "audit:read",
+  ],
 };
 
 export function roleHasPermission(
@@ -83,6 +92,13 @@ export async function getCurrentStaffAdminContext(lodgeId?: string | null) {
     if (error || !user?.email) return null;
 
     const admin = await db.getAdminUserByEmail(user.email, lodgeId);
+    if (!admin && isPlatformOwnerEmail(user.email)) {
+      return {
+        email: user.email,
+        role: "super_admin",
+        permissions: [],
+      };
+    }
     if (!admin) return null;
 
     return {
@@ -156,6 +172,13 @@ export async function getCurrentAdminScope(): Promise<AdminScope> {
     if (error || !user?.email) return { kind: "none" };
 
     const memberships = await db.listAdminUsersByEmail(user.email);
+    if (memberships.length === 0 && isPlatformOwnerEmail(user.email)) {
+      return {
+        kind: "platform",
+        email: user.email,
+        role: "super_admin",
+      };
+    }
     if (memberships.length === 0) return { kind: "none" };
 
     const platformAdmin = memberships.find(

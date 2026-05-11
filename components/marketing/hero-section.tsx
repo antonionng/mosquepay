@@ -44,10 +44,10 @@ export function HeroSection() {
               Start Free Trial
             </Link>
             <Link
-              href="/product"
+              href="/features"
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-mkt-border bg-transparent px-7 py-3 font-heading text-base font-bold text-[#4b5162] transition-colors hover:border-mkt-text-secondary hover:text-white sm:w-auto"
             >
-              Explore Product
+              Explore Features
               <ArrowRight className="h-5 w-5" />
             </Link>
           </div>

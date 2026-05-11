@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   Sparkles,
   BookOpen,
@@ -17,7 +18,11 @@ import {
   heroBackgroundLayers,
   mergeHeroPrimaryColor,
   sectionBackgroundLayers,
+  sectionContentWidthStyle,
+  sectionDesignStyle,
+  sectionToneClass,
 } from "@/lib/site-section-style";
+import { cn } from "@/lib/utils";
 
 type SiteSection = LodgeSiteSection;
 
@@ -144,9 +149,15 @@ function StandardPreview({
   primaryColor: string;
 }) {
   const style = sectionStyles[section.type];
-  const isDark = section.type === "join";
+  const isDark = section.type === "join" || section.style?.background_tone === "dark";
   const Icon = sectionIcons[section.type];
   const background = sectionBackgroundLayers(section);
+  const designStyle = sectionDesignStyle(section);
+  const contentStyle = sectionContentWidthStyle(section);
+  const imagePosition = section.style?.image_position ?? "right";
+  const hasImage = Boolean(section.style?.image_url);
+  const imageFirst = imagePosition === "left" || imagePosition === "top";
+  const imageFull = imagePosition === "full";
   const imageShape =
     section.style?.image_shape === "circle"
       ? "rounded-full"
@@ -157,7 +168,10 @@ function StandardPreview({
           : "rounded-2xl";
 
   return (
-    <div className={`relative overflow-hidden ${style.bg} px-8 py-12`}>
+    <div
+      className={`relative overflow-hidden ${style.bg} px-8 py-14 ${sectionToneClass(section)}`}
+      style={designStyle}
+    >
       {background.imageUrl ? (
         <>
           <div
@@ -174,56 +188,94 @@ function StandardPreview({
           />
         </>
       ) : null}
-      <div className="relative mx-auto max-w-lg">
-        {section.style?.image_url &&
-        (section.style.image_position === "top" ||
-          section.style.image_position === "full") ? (
-          <div className={`mb-6 overflow-hidden ${imageShape}`}>
-            <img
-              src={section.style.image_url}
-              alt={section.style.image_alt ?? ""}
-              className="h-48 w-full object-cover"
-            />
-          </div>
-        ) : null}
-        <span
-          className={`mb-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] ${style.badge}`}
+      <div className="relative mx-auto max-w-5xl" style={contentStyle}>
+        <div
+          className={cn(
+            "grid gap-8",
+            hasImage && !imageFull ? "md:grid-cols-[minmax(0,1fr)_minmax(16rem,0.85fr)] md:items-center" : ""
+          )}
         >
-          <Icon className="h-3 w-3" />
-          {section.type.replace("_", " ")}
-        </span>
-        <h3
-          className={`text-xl font-semibold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}
-        >
-          {section.heading}
-        </h3>
-        {section.body && (
-          <p
-            className={`mt-2 text-sm leading-relaxed ${isDark ? "text-slate-300" : "text-slate-600"}`}
-          >
-            {section.body}
-          </p>
-        )}
-        {section.style?.image_url &&
-        section.style.image_position !== "top" &&
-        section.style.image_position !== "full" ? (
-          <div className={`mt-5 overflow-hidden ${imageShape}`}>
-            <img
-              src={section.style.image_url}
-              alt={section.style.image_alt ?? ""}
-              className="h-44 w-full object-cover"
-            />
+          {hasImage && imageFirst ? (
+            <div className={cn("overflow-hidden shadow-2xl ring-1 ring-black/5", imageShape)}>
+              <Image
+                src={section.style?.image_url ?? ""}
+                alt={section.style?.image_alt ?? ""}
+                width={900}
+                height={520}
+                unoptimized
+                className={cn("w-full object-cover", imageFull ? "h-64" : "h-60")}
+              />
+            </div>
+          ) : null}
+
+          <div className={cn(imageFirst && !imageFull ? "md:order-2" : "")}>
+            <span
+              className={`mb-4 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${style.badge}`}
+            >
+              <Icon className="h-3 w-3" />
+              {section.type.replace("_", " ")}
+            </span>
+            <h3
+              className={`text-2xl font-semibold tracking-tight sm:text-3xl ${isDark ? "text-white" : "text-slate-950"}`}
+            >
+              {section.heading}
+            </h3>
+            {section.body && (
+              <p
+                className={`mt-3 max-w-2xl text-sm leading-relaxed sm:text-base ${isDark ? "text-slate-300" : "text-slate-600"}`}
+              >
+                {section.body}
+              </p>
+            )}
+            {section.style?.form_mode && section.style.form_mode !== "none" ? (
+              <div className="mt-6 rounded-2xl border border-dash-border bg-white/90 p-4 shadow-lg">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Embedded form
+                </p>
+                <div className="mt-3 grid gap-2">
+                  <div className="h-9 rounded-lg bg-slate-100" />
+                  <div className="h-9 rounded-lg bg-slate-100" />
+                  <div className="h-16 rounded-lg bg-slate-100" />
+                </div>
+              </div>
+            ) : null}
+            {section.cta_label && (
+              <button
+                className={cn(
+                  "mt-6 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium shadow-md",
+                  section.style?.button_variant === "outline"
+                    ? "border bg-transparent"
+                    : section.style?.button_variant === "ghost"
+                      ? "bg-transparent shadow-none"
+                      : "text-white"
+                )}
+                style={
+                  section.style?.button_variant === "outline"
+                    ? { borderColor: primaryColor || "#3b82f6", color: primaryColor || "#3b82f6" }
+                    : section.style?.button_variant === "ghost"
+                      ? { color: primaryColor || "#3b82f6" }
+                      : { backgroundColor: primaryColor || "#3b82f6" }
+                }
+              >
+                {section.cta_label}
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
-        ) : null}
-        {section.cta_label && (
-          <button
-            className="mt-5 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white shadow-md"
-            style={{ backgroundColor: primaryColor || "#3b82f6" }}
-          >
-            {section.cta_label}
-            <ArrowRight className="h-3.5 w-3.5" />
-          </button>
-        )}
+
+          {hasImage && !imageFirst ? (
+            <div className={cn("overflow-hidden shadow-2xl ring-1 ring-black/5", imageShape)}>
+              <Image
+                src={section.style?.image_url ?? ""}
+                alt={section.style?.image_alt ?? ""}
+                width={900}
+                height={520}
+                unoptimized
+                className={cn("w-full object-cover", imageFull ? "h-64" : "h-60")}
+              />
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );

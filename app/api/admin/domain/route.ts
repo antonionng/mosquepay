@@ -10,17 +10,42 @@ import {
 import { writeAuditLog } from "@/lib/audit";
 
 const DOMAIN_PATTERN = /^(?!:\/\/)([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/;
+const PRODUCTION_PLATFORM_HOSTNAME = "lodgepayments.co.uk";
+
+function normalizeHostname(value?: string | null): string | null {
+  if (!value) return null;
+  try {
+    return new URL(value.startsWith("http") ? value : `https://${value}`).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function isLocalHostname(hostname: string | null) {
+  if (!hostname) return true;
+  return (
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    hostname === "127.0.0.1" ||
+    hostname === "0.0.0.0"
+  );
+}
 
 function platformHostname(): string {
-  const url =
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    process.env.VERCEL_PROJECT_PRODUCTION_URL ??
-    "lodgepayments.co.uk";
-  try {
-    return new URL(url.startsWith("http") ? url : `https://${url}`).hostname;
-  } catch {
-    return "lodgepayments.co.uk";
+  const candidates = [
+    process.env.CUSTOM_DOMAIN_CNAME_TARGET,
+    process.env.NEXT_PUBLIC_CUSTOM_DOMAIN_CNAME_TARGET,
+    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.VERCEL_PROJECT_PRODUCTION_URL,
+    PRODUCTION_PLATFORM_HOSTNAME,
+  ];
+  for (const candidate of candidates) {
+    const hostname = normalizeHostname(candidate);
+    if (hostname && !isLocalHostname(hostname)) {
+      return hostname;
+    }
   }
+  return PRODUCTION_PLATFORM_HOSTNAME;
 }
 
 function freshToken(): string {

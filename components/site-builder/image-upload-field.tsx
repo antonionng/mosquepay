@@ -1,10 +1,21 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ImagePlus, Loader2, Upload, X } from "lucide-react";
+import { Images, ImagePlus, Loader2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+
+type SiteAsset = {
+  id: string | null;
+  name: string;
+  path: string;
+  url: string;
+  size: number | null;
+  mimetype: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
 
 type ImageUploadFieldProps = {
   label: string;
@@ -25,7 +36,27 @@ export function ImageUploadField({
 }: ImageUploadFieldProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [loadingLibrary, setLoadingLibrary] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [assets, setAssets] = useState<SiteAsset[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  async function loadLibrary() {
+    setLibraryOpen((current) => !current);
+    if (libraryOpen || assets.length > 0) return;
+    setLoadingLibrary(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/site-assets");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Could not load media library.");
+      setAssets(Array.isArray(data.assets) ? data.assets : []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load media library.");
+    } finally {
+      setLoadingLibrary(false);
+    }
+  }
 
   async function upload(file: File) {
     setUploading(true);
@@ -40,6 +71,23 @@ export function ImageUploadField({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Upload failed.");
       onChange(data.url);
+      setAssets((current) =>
+        data.path
+          ? [
+              {
+                id: data.path,
+                name: data.path.split("/").pop() ?? "Uploaded image",
+                path: data.path,
+                url: data.url,
+                size: file.size,
+                mimetype: file.type,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              },
+              ...current,
+            ]
+          : current
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed.");
     } finally {
@@ -101,6 +149,21 @@ export function ImageUploadField({
           )}
           {value ? "Replace" : "Upload"}
         </Button>
+        <Button
+          type="button"
+          variant="dashboard"
+          size="sm"
+          onClick={() => void loadLibrary()}
+          disabled={loadingLibrary}
+          className="gap-2"
+        >
+          {loadingLibrary ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Images className="h-3.5 w-3.5" />
+          )}
+          Library
+        </Button>
         <Input
           value={value ?? ""}
           onChange={(event) => onChange(event.target.value)}
@@ -118,6 +181,38 @@ export function ImageUploadField({
           if (file) void upload(file);
         }}
       />
+      {libraryOpen && (
+        <div className="rounded-xl border border-dash-border bg-dash-surface-subtle p-3">
+          {assets.length === 0 ? (
+            <p className="py-4 text-center text-xs text-dash-muted">
+              No uploaded website images yet.
+            </p>
+          ) : (
+            <div className="grid max-h-72 gap-2 overflow-auto sm:grid-cols-2 lg:grid-cols-3">
+              {assets.map((asset) => (
+                <button
+                  key={asset.path}
+                  type="button"
+                  onClick={() => {
+                    onChange(asset.url);
+                    setLibraryOpen(false);
+                  }}
+                  className="group overflow-hidden rounded-lg border border-dash-border bg-white text-left transition hover:border-dash-ring/60"
+                >
+                  <img
+                    src={asset.url}
+                    alt=""
+                    className="h-20 w-full object-cover transition group-hover:scale-[1.02]"
+                  />
+                  <span className="block truncate px-2 py-1.5 text-[11px] text-dash-muted">
+                    {asset.name}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {help ? <p className="text-xs text-dash-muted">{help}</p> : null}
       {error ? <p className="text-xs font-medium text-red-600">{error}</p> : null}
     </div>

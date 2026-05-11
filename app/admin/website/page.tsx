@@ -4,7 +4,7 @@ import { getAdminReadContext } from "@/lib/admin/read-context";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Globe } from "lucide-react";
 import { AdminWebsiteManager } from "@/components/site-builder/admin-website-manager";
-import AdminBlogPage from "../blog/page";
+import { sanitizeCustomPages, sanitizeSiteSections } from "@/lib/site-section-style";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,7 @@ export default async function AdminWebsitePage() {
           <div>
             <h1 className="admin-page-title">Website</h1>
             <p className="admin-page-copy">
-              Build the lodge website, manage brand settings, and publish news.
+              Build the lodge website, manage brand settings, and connect domains.
             </p>
           </div>
         </div>
@@ -31,28 +31,33 @@ export default async function AdminWebsitePage() {
     );
   }
 
-  const [lodge, site] = await Promise.all([
+  const [lodge, rawSite] = await Promise.all([
     db.getLodgeById(ctx.lodgeId),
     db.getLodgeSite(ctx.lodgeId),
   ]);
+  const site = rawSite
+    ? {
+        ...rawSite,
+        sections: sanitizeSiteSections(rawSite.sections) ?? rawSite.sections,
+        custom_pages: sanitizeCustomPages(rawSite.custom_pages) ?? rawSite.custom_pages,
+      }
+    : rawSite;
 
   if (!lodge) {
     redirect("/admin");
   }
-  const blog = await AdminBlogPage();
-
   return (
     <div className="space-y-8">
       <div className="admin-page-head">
         <div>
           <h1 className="admin-page-title">Website</h1>
           <p className="admin-page-copy">
-            Build the public lodge site, manage brand settings, domains, and news.
+            Build the public lodge site, manage brand settings, and connect domains.
           </p>
         </div>
       </div>
 
-      <AdminWebsiteManager lodge={lodge} site={site} blog={blog} />
+      <AdminWebsiteManager lodge={lodge} site={site} />
     </div>
   );
 }

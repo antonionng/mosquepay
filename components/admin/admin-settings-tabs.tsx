@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/tabs";
 import { StaffSettings } from "@/components/admin/staff-settings";
 import { AdminProfileSettings } from "@/components/admin/admin-profile-settings";
+import { BillingSettings } from "@/components/admin/billing-settings";
 import { LodgeProfileSettings } from "@/components/forms/lodge-profile-settings";
 
 export function AdminSettingsTabs() {
@@ -15,12 +16,17 @@ export function AdminSettingsTabs() {
     <Tabs defaultValue="lodge" className="space-y-6">
       <TabsList>
         <TabsTrigger value="lodge">Lodge profile</TabsTrigger>
+        <TabsTrigger value="billing">Package</TabsTrigger>
         <TabsTrigger value="team">Lodge team</TabsTrigger>
         <TabsTrigger value="profile">My profile</TabsTrigger>
       </TabsList>
 
       <TabsContent value="lodge">
         <LodgeProfileSettings />
+      </TabsContent>
+
+      <TabsContent value="billing">
+        <BillingSettings />
       </TabsContent>
 
       <TabsContent value="team">

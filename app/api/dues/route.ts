@@ -105,6 +105,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    let charitableAmount = Number(body.charitable_amount ?? 0);
+    let giftAidEnabled = Boolean(body.gift_aid_enabled);
+    if (dues_id) {
+      const templates = await db.getLodgeDues(lodgeId);
+      const template = templates.find((item) => item.id === dues_id);
+      if (template) {
+        charitableAmount = Math.min(template.charitable_amount ?? 0, Number(amount));
+        giftAidEnabled = template.gift_aid_enabled === true;
+      }
+    }
+
     const record = await db.createMemberDues(lodgeId, {
       member_email,
       member_name: member_name ?? null,
@@ -118,6 +129,10 @@ export async function POST(request: NextRequest) {
       payment_id: null,
       stripe_payment_intent_id: null,
       stripe_subscription_id: null,
+      charitable_amount: giftAidEnabled ? charitableAmount : 0,
+      gift_aid_declaration_id: null,
+      gift_aid_status: giftAidEnabled && charitableAmount > 0 ? "eligible" : "unknown",
+      gift_aid_eligible_amount: giftAidEnabled ? charitableAmount : 0,
       paid_at: null,
     });
 

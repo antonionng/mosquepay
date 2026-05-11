@@ -1,4 +1,13 @@
-import type { LodgeSiteSection, LodgeSiteSectionStyle } from "@/lib/db/types";
+import type {
+  LodgeSiteCustomPage,
+  LodgeSiteFooterLink,
+  LodgeSiteFooterLinkGroup,
+  LodgeSiteFooterSettings,
+  LodgeSiteHeaderNavItem,
+  LodgeSiteHeaderSettings,
+  LodgeSiteSection,
+  LodgeSiteSectionStyle,
+} from "@/lib/db/types";
 
 const SECTION_TYPES: LodgeSiteSection["type"][] = [
   "hero",
@@ -17,6 +26,12 @@ export const DEFAULT_HERO_PRIMARY = "#3b82f6";
 const MAX_IMAGE_URL_LENGTH = 2048;
 const HEX_6 = /^#[0-9A-Fa-f]{6}$/;
 const HEX_3 = /^#[0-9A-Fa-f]{3}$/;
+const TEMPLATE_IMAGE_PREFIX = "/site-template-images/";
+const LEGACY_TEMPLATE_IMAGE_REPLACEMENTS: Record<string, string> = {
+  "/site-template-images/website-portal-feature.png": "/site-template-images/visitor-contact.png",
+  "/site-template-images/meetings-summons-feature.png": "/site-template-images/officers-formal.png",
+  "/site-template-images/gift-aid-giving.png": "/site-template-images/charity-welfare.png",
+};
 
 /** Allowed CSS background-position keywords (single or two-token subset). */
 const BG_POS = new Set([
@@ -38,6 +53,22 @@ const BG_POS = new Set([
 const IMAGE_POS = new Set(["left", "right", "top", "bottom", "full"]);
 const IMAGE_SHAPE = new Set(["rounded", "square", "circle", "arch"]);
 const FORM_MODES = new Set(["none", "contact", "lead"]);
+const BACKGROUND_TONES = new Set(["default", "soft", "brand", "dark"]);
+const CONTENT_WIDTHS = new Set(["narrow", "standard", "wide", "full"]);
+const SPACING_OPTIONS = new Set(["compact", "normal", "spacious"]);
+const BUTTON_VARIANTS = new Set(["solid", "outline", "ghost"]);
+const FORM_FIELDS = new Set([
+  "name",
+  "first_name",
+  "last_name",
+  "email",
+  "phone",
+  "subject",
+  "location",
+  "how_heard",
+  "message",
+  "consent",
+]);
 
 function normalizeHex(color: string | null | undefined): string | null {
   if (!color || typeof color !== "string") return null;
@@ -57,6 +88,9 @@ function sanitizeImageUrl(url: string | null | undefined): string | null {
   if (!url || typeof url !== "string") return null;
   const t = url.trim();
   if (!t || t.length > MAX_IMAGE_URL_LENGTH) return null;
+  if (t.startsWith(TEMPLATE_IMAGE_PREFIX)) {
+    return LEGACY_TEMPLATE_IMAGE_REPLACEMENTS[t] ?? t;
+  }
   if (t.startsWith("data:image/")) return t;
   try {
     const u = new URL(t);
@@ -87,6 +121,63 @@ function sanitizeShortText(value: string | null | undefined): string | null {
   return t.length > 0 ? t.slice(0, 160) : null;
 }
 
+function sanitizeSlug(value: string | null | undefined): string | null {
+  if (!value || typeof value !== "string") return null;
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+  if (!slug || ["admin", "api", "member", "operator"].includes(slug)) return null;
+  return slug;
+}
+
+function sanitizeHref(value: string | null | undefined): string | null {
+  if (!value || typeof value !== "string") return null;
+  const href = value.trim();
+  if (!href || href.length > 240) return null;
+  if (href.startsWith("/") || href.startsWith("#")) return href;
+  try {
+    const url = new URL(href);
+    return url.protocol === "https:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeLongText(value: string | null | undefined, max = 1200): string | null {
+  if (!value || typeof value !== "string") return null;
+  const t = value.trim().replace(/\s+/g, " ");
+  return t.length > 0 ? t.slice(0, max) : null;
+}
+
+function sanitizeEmailList(value: string | null | undefined): string | null {
+  if (!value || typeof value !== "string") return null;
+  const emails = value
+    .split(/[,\n;]/)
+    .map((item) => item.trim().toLowerCase())
+    .filter((item) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(item))
+    .slice(0, 5);
+  return emails.length > 0 ? emails.join(", ") : null;
+}
+
+function sanitizeFieldList(value: unknown): string[] | null {
+  const raw = Array.isArray(value)
+    ? value
+    : typeof value === "string"
+      ? value.split(",")
+      : [];
+  const fields = Array.from(
+    new Set(
+      raw
+        .map((item) => (typeof item === "string" ? item.trim().toLowerCase() : ""))
+        .filter((item) => FORM_FIELDS.has(item))
+    )
+  );
+  return fields.length > 0 ? fields : null;
+}
+
 function sanitizeImagePosition(value: string | null | undefined): LodgeSiteSectionStyle["image_position"] {
   if (!value || typeof value !== "string") return null;
   const t = value.trim().toLowerCase();
@@ -103,6 +194,15 @@ function sanitizeFormMode(value: string | null | undefined): LodgeSiteSectionSty
   if (!value || typeof value !== "string") return null;
   const t = value.trim().toLowerCase();
   return FORM_MODES.has(t) ? (t as NonNullable<LodgeSiteSectionStyle["form_mode"]>) : null;
+}
+
+function sanitizeToken<T extends string>(
+  value: string | null | undefined,
+  allowed: Set<string>
+): T | null {
+  if (!value || typeof value !== "string") return null;
+  const t = value.trim().toLowerCase();
+  return allowed.has(t) ? (t as T) : null;
 }
 
 /** Server-safe normalization for persisted section.style */
@@ -145,6 +245,69 @@ export function sanitizeSectionStyle(
 
   const formMode = sanitizeFormMode(typeof o.form_mode === "string" ? o.form_mode : null);
   if (formMode) out.form_mode = formMode;
+
+  const backgroundTone = sanitizeToken<NonNullable<LodgeSiteSectionStyle["background_tone"]>>(
+    typeof o.background_tone === "string" ? o.background_tone : null,
+    BACKGROUND_TONES
+  );
+  if (backgroundTone) out.background_tone = backgroundTone;
+
+  const contentWidth = sanitizeToken<NonNullable<LodgeSiteSectionStyle["content_width"]>>(
+    typeof o.content_width === "string" ? o.content_width : null,
+    CONTENT_WIDTHS
+  );
+  if (contentWidth) out.content_width = contentWidth;
+
+  const spacing = sanitizeToken<NonNullable<LodgeSiteSectionStyle["spacing"]>>(
+    typeof o.spacing === "string" ? o.spacing : null,
+    SPACING_OPTIONS
+  );
+  if (spacing) out.spacing = spacing;
+
+  const buttonVariant = sanitizeToken<NonNullable<LodgeSiteSectionStyle["button_variant"]>>(
+    typeof o.button_variant === "string" ? o.button_variant : null,
+    BUTTON_VARIANTS
+  );
+  if (buttonVariant) out.button_variant = buttonVariant;
+
+  const formFields = sanitizeFieldList(o.form_fields);
+  if (formFields) out.form_fields = formFields;
+
+  const requiredFields = sanitizeFieldList(o.form_required_fields);
+  if (requiredFields) out.form_required_fields = requiredFields;
+
+  const consentText = sanitizeLongText(
+    typeof o.form_consent_text === "string" ? o.form_consent_text : null,
+    360
+  );
+  if (consentText) out.form_consent_text = consentText;
+
+  const thankYou = sanitizeLongText(
+    typeof o.form_thank_you === "string" ? o.form_thank_you : null,
+    360
+  );
+  if (thankYou) out.form_thank_you = thankYou;
+
+  const recipients = sanitizeEmailList(
+    typeof o.form_notification_recipients === "string"
+      ? o.form_notification_recipients
+      : null
+  );
+  if (recipients) out.form_notification_recipients = recipients;
+
+  const responderSubject = sanitizeShortText(
+    typeof o.form_autoresponder_subject === "string"
+      ? o.form_autoresponder_subject
+      : null
+  );
+  if (responderSubject) out.form_autoresponder_subject = responderSubject;
+
+  const responderBody = sanitizeLongText(
+    typeof o.form_autoresponder_body === "string"
+      ? o.form_autoresponder_body
+      : null
+  );
+  if (responderBody) out.form_autoresponder_body = responderBody;
 
   return Object.keys(out).length > 0 ? out : undefined;
 }
@@ -196,6 +359,54 @@ export function sectionBackgroundLayers(section: SiteSectionLike | null | undefi
   return heroBackgroundLayers(section);
 }
 
+export function sectionDesignStyle(section: SiteSectionLike | null | undefined): {
+  backgroundColor?: string;
+  color?: string;
+  paddingTop?: string;
+  paddingBottom?: string;
+} {
+  const tone = section?.style?.background_tone;
+  const spacing = section?.style?.spacing;
+  const design: {
+    backgroundColor?: string;
+    color?: string;
+    paddingTop?: string;
+    paddingBottom?: string;
+  } = {};
+
+  if (tone === "soft") design.backgroundColor = "#f8fafc";
+  if (tone === "brand") design.backgroundColor = "#eff6ff";
+  if (tone === "dark") {
+    design.backgroundColor = "#0f172a";
+    design.color = "#ffffff";
+  }
+
+  if (spacing === "compact") {
+    design.paddingTop = "3rem";
+    design.paddingBottom = "3rem";
+  }
+  if (spacing === "spacious") {
+    design.paddingTop = "7rem";
+    design.paddingBottom = "7rem";
+  }
+
+  return design;
+}
+
+export function sectionToneClass(section: SiteSectionLike | null | undefined): string {
+  return section?.style?.background_tone === "dark" ? "site-section-tone-dark" : "";
+}
+
+export function sectionContentWidthStyle(section: SiteSectionLike | null | undefined): {
+  maxWidth?: string;
+} {
+  const width = section?.style?.content_width;
+  if (width === "narrow") return { maxWidth: "52rem" };
+  if (width === "wide") return { maxWidth: "88rem" };
+  if (width === "full") return { maxWidth: "none" };
+  return {};
+}
+
 function parseSectionType(v: unknown): LodgeSiteSection["type"] {
   if (typeof v !== "string") return "about";
   return SECTION_TYPES.includes(v as LodgeSiteSection["type"])
@@ -239,4 +450,221 @@ export function mergeSectionStylesPreserve(
     }
     return s;
   });
+}
+
+export function sanitizeCustomPages(input: unknown): LodgeSiteCustomPage[] | undefined {
+  if (!Array.isArray(input)) return undefined;
+  const seen = new Set<string>();
+  const pages: LodgeSiteCustomPage[] = [];
+
+  input.slice(0, 24).forEach((item, idx) => {
+    const o =
+      item && typeof item === "object" && !Array.isArray(item)
+        ? (item as Record<string, unknown>)
+        : {};
+    const slug = sanitizeSlug(typeof o.slug === "string" ? o.slug : null);
+    if (!slug || slug === "home" || seen.has(slug)) return;
+    seen.add(slug);
+    const title = sanitizeShortText(typeof o.title === "string" ? o.title : null);
+    const sections = sanitizeSiteSections(o.sections) ?? [];
+
+    pages.push({
+      id: typeof o.id === "string" && o.id.length > 0 ? o.id.slice(0, 120) : `page-${idx}`,
+      slug,
+      title: title ?? "Untitled page",
+      description:
+        sanitizeLongText(typeof o.description === "string" ? o.description : null, 360) ??
+        null,
+      seo_title:
+        sanitizeShortText(typeof o.seo_title === "string" ? o.seo_title : null) ?? null,
+      seo_description:
+        sanitizeLongText(typeof o.seo_description === "string" ? o.seo_description : null, 360) ??
+        null,
+      social_image_url:
+        sanitizeImageUrl(typeof o.social_image_url === "string" ? o.social_image_url : null) ??
+        null,
+      sections,
+      published: o.published === true,
+      show_in_nav: o.show_in_nav !== false,
+      nav_label:
+        sanitizeShortText(typeof o.nav_label === "string" ? o.nav_label : null) ?? null,
+      order: typeof o.order === "number" && o.order >= 0 ? o.order : idx + 1,
+    });
+  });
+
+  return pages
+    .sort((a, b) => a.order - b.order)
+    .map((page, idx) => ({ ...page, order: idx + 1 }));
+}
+
+export function defaultHeaderNavItems(): LodgeSiteHeaderNavItem[] {
+  return [
+    { id: "home", label: "Home", href: "/", visible: true, order: 1 },
+    { id: "events", label: "Events", href: "/events", visible: true, order: 2 },
+    { id: "charity", label: "Charity", href: "/charity", visible: true, order: 3 },
+    { id: "news", label: "News", href: "/news", visible: true, order: 4 },
+    { id: "contact", label: "Contact", href: "/contact", visible: true, order: 5 },
+  ];
+}
+
+export function defaultHeaderSettings(): LodgeSiteHeaderSettings {
+  return {
+    show_logo: true,
+    show_lodge_name: true,
+    show_lodge_number: true,
+    nav_items: defaultHeaderNavItems(),
+    cta_label: "Join Us",
+    cta_href: "/join",
+  };
+}
+
+export function sanitizeHeaderSettings(input: unknown): LodgeSiteHeaderSettings | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
+  const o = input as Record<string, unknown>;
+  const defaults = defaultHeaderSettings();
+  const rawItems = Array.isArray(o.nav_items) ? o.nav_items : defaults.nav_items;
+  const navItems = rawItems
+    .slice(0, 12)
+    .map((item, idx): LodgeSiteHeaderNavItem | null => {
+      const row =
+        item && typeof item === "object" && !Array.isArray(item)
+          ? (item as Record<string, unknown>)
+          : {};
+      const label = sanitizeShortText(typeof row.label === "string" ? row.label : null);
+      const href = sanitizeHref(typeof row.href === "string" ? row.href : null);
+      if (!label || !href) return null;
+      return {
+        id:
+          typeof row.id === "string" && row.id.trim()
+            ? row.id.trim().slice(0, 80)
+            : `nav-${idx + 1}`,
+        label,
+        href,
+        visible: row.visible !== false,
+        order: typeof row.order === "number" && row.order >= 0 ? row.order : idx + 1,
+      };
+    })
+    .filter((item): item is LodgeSiteHeaderNavItem => Boolean(item))
+    .sort((a, b) => a.order - b.order)
+    .map((item, idx) => ({ ...item, order: idx + 1 }));
+
+  return {
+    show_logo: o.show_logo !== false,
+    show_lodge_name: o.show_lodge_name !== false,
+    show_lodge_number: o.show_lodge_number !== false,
+    nav_items: navItems.length ? navItems : defaults.nav_items,
+    cta_label:
+      sanitizeShortText(typeof o.cta_label === "string" ? o.cta_label : null) ??
+      null,
+    cta_href: sanitizeHref(typeof o.cta_href === "string" ? o.cta_href : null),
+  };
+}
+
+function sanitizeFooterLinks(input: unknown): LodgeSiteFooterLink[] {
+  const rawLinks = Array.isArray(input) ? input : [];
+  return rawLinks
+    .slice(0, 12)
+    .map((item, idx): LodgeSiteFooterLink | null => {
+      const row =
+        item && typeof item === "object" && !Array.isArray(item)
+          ? (item as Record<string, unknown>)
+          : {};
+      const label = sanitizeShortText(typeof row.label === "string" ? row.label : null);
+      const href = sanitizeHref(typeof row.href === "string" ? row.href : null);
+      if (!label || !href) return null;
+      return {
+        id:
+          typeof row.id === "string" && row.id.trim()
+            ? row.id.trim().slice(0, 80)
+            : `footer-link-${idx + 1}`,
+        label,
+        href,
+        visible: row.visible !== false,
+        order: typeof row.order === "number" && row.order >= 0 ? row.order : idx + 1,
+      };
+    })
+    .filter((item): item is LodgeSiteFooterLink => Boolean(item))
+    .sort((a, b) => a.order - b.order)
+    .map((item, idx) => ({ ...item, order: idx + 1 }));
+}
+
+export function defaultFooterSettings(): LodgeSiteFooterSettings {
+  return {
+    show_logo: true,
+    show_lodge_name: true,
+    show_lodge_number: true,
+    show_contact_details: true,
+    tagline: null,
+    badge_text: "Member website",
+    powered_by_text: null,
+    link_groups: [
+      {
+        id: "explore",
+        title: "Explore",
+        order: 1,
+        links: [
+          { id: "home", label: "Home", href: "/", visible: true, order: 1 },
+          { id: "events", label: "Events", href: "/events", visible: true, order: 2 },
+          { id: "charity", label: "Charity", href: "/charity", visible: true, order: 3 },
+          { id: "join", label: "Join Us", href: "/join", visible: true, order: 4 },
+        ],
+      },
+      {
+        id: "more",
+        title: "More",
+        order: 2,
+        links: [
+          { id: "news", label: "News", href: "/news", visible: true, order: 1 },
+          { id: "contact", label: "Contact", href: "/contact", visible: true, order: 2 },
+          { id: "faq", label: "FAQ", href: "/faq", visible: true, order: 3 },
+        ],
+      },
+    ],
+  };
+}
+
+export function sanitizeFooterSettings(input: unknown): LodgeSiteFooterSettings | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
+  const o = input as Record<string, unknown>;
+  const defaults = defaultFooterSettings();
+  const rawGroups = Array.isArray(o.link_groups) ? o.link_groups : defaults.link_groups;
+  const linkGroups = rawGroups
+    .slice(0, 4)
+    .map((item, idx): LodgeSiteFooterLinkGroup | null => {
+      const row =
+        item && typeof item === "object" && !Array.isArray(item)
+          ? (item as Record<string, unknown>)
+          : {};
+      const title = sanitizeShortText(typeof row.title === "string" ? row.title : null);
+      const links = sanitizeFooterLinks(row.links);
+      if (!title || links.length === 0) return null;
+      return {
+        id:
+          typeof row.id === "string" && row.id.trim()
+            ? row.id.trim().slice(0, 80)
+            : `footer-group-${idx + 1}`,
+        title,
+        links,
+        order: typeof row.order === "number" && row.order >= 0 ? row.order : idx + 1,
+      };
+    })
+    .filter((item): item is LodgeSiteFooterLinkGroup => Boolean(item))
+    .sort((a, b) => a.order - b.order)
+    .map((item, idx) => ({ ...item, order: idx + 1 }));
+
+  return {
+    show_logo: o.show_logo !== false,
+    show_lodge_name: o.show_lodge_name !== false,
+    show_lodge_number: o.show_lodge_number !== false,
+    show_contact_details: o.show_contact_details !== false,
+    tagline:
+      sanitizeLongText(typeof o.tagline === "string" ? o.tagline : null, 360) ?? null,
+    badge_text:
+      sanitizeShortText(typeof o.badge_text === "string" ? o.badge_text : null) ?? null,
+    powered_by_text:
+      sanitizeShortText(
+        typeof o.powered_by_text === "string" ? o.powered_by_text : null
+      ) ?? null,
+    link_groups: linkGroups.length ? linkGroups : defaults.link_groups,
+  };
 }

@@ -11,7 +11,8 @@ const ROLES = new Set([
   "treasurer",
   "charity_steward",
   "membership_officer",
-  "operator",
+  "almoner",
+  "master",
 ]);
 
 function cleanEmail(value: unknown) {
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
   }
 
   const staff = await db.createAdminUser({
-    lodge_id: role === "operator" ? null : lodgeId,
+    lodge_id: lodgeId,
     email,
     full_name: fullName,
     role,
@@ -170,7 +171,7 @@ export async function PATCH(request: NextRequest) {
     full_name: fullName,
     role,
     active: body.active !== false,
-    lodge_id: role === "operator" ? null : lodgeId,
+    lodge_id: lodgeId,
     permissions: Array.isArray(body.permissions) ? body.permissions : [],
   };
 

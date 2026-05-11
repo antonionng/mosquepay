@@ -22,6 +22,9 @@ export async function GET(request: NextRequest) {
           allow_instalments: false,
           instalment_count: 12,
           instalment_frequency: "monthly",
+          charitable_amount: 0,
+          charitable_label: "Charitable portion",
+          gift_aid_enabled: false,
         },
       });
     }
@@ -72,6 +75,9 @@ export async function PUT(request: NextRequest) {
       allow_instalments,
       instalment_count,
       instalment_frequency,
+      charitable_amount,
+      charitable_label,
+      gift_aid_enabled,
     } = body;
 
     if (!name || amount === undefined) {
@@ -90,6 +96,9 @@ export async function PUT(request: NextRequest) {
       allow_instalments: allow_instalments ?? false,
       instalment_count: instalment_count ?? 12,
       instalment_frequency: instalment_frequency ?? "monthly",
+      charitable_amount: Number(charitable_amount ?? 0),
+      charitable_label: charitable_label ?? "Charitable portion",
+      gift_aid_enabled: gift_aid_enabled ?? false,
     });
 
     return NextResponse.json({ fees });

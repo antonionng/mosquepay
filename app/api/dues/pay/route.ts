@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
             member_email,
             member_name: member_name ?? "",
             total_amount: String(duesRecord.amount),
+            charitable_amount: String(duesRecord.charitable_amount ?? 0),
             instalment_count: String(instalmentCount),
           },
         },
@@ -104,6 +105,7 @@ export async function POST(request: NextRequest) {
           type: "dues_subscription",
           dues_id: duesRecord.id,
           member_email,
+          charitable_amount: String(duesRecord.charitable_amount ?? 0),
         },
       });
 
@@ -133,6 +135,7 @@ export async function POST(request: NextRequest) {
         member_email,
         member_name: member_name ?? "",
         amount: String(duesRecord.amount),
+        charitable_amount: String(duesRecord.charitable_amount ?? 0),
       },
     });
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getCurrentAdminScope } from "@/lib/auth/permissions";
+import { requirePlatformScope } from "@/lib/auth/platform";
 import { writeAuditLog } from "@/lib/audit";
 import { sendStaffInvite } from "@/lib/auth/invites";
 
@@ -21,10 +21,8 @@ export async function POST(request: NextRequest) {
       { status: 503 }
     );
   }
-  const scope = await getCurrentAdminScope();
-  if (scope.kind !== "platform" && scope.kind !== "dummy") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const { scope, response } = await requirePlatformScope();
+  if (response) return response;
 
   const body = await request.json().catch(() => ({}));
   const name = typeof body.name === "string" ? body.name.trim() : "";
@@ -75,7 +73,7 @@ export async function POST(request: NextRequest) {
 
   if (secretaryEmail) {
     try {
-      const existingAdmin = await db.getAdminUserByEmail(secretaryEmail);
+      const existingAdmin = await db.getAdminUserForScope(secretaryEmail, lodge.id);
       const staff =
         existingAdmin ??
         (await db.createAdminUser({

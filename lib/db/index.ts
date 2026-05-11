@@ -17,6 +17,10 @@ import type {
   LodgeDues,
   MemberDues,
   MemberDuesInstalment,
+  MeetingCollection,
+  GasdsClaim,
+  GiftAidClaimBatch,
+  GiftAidClaimItem,
   LedgerEntry,
   BankStatementImport,
   BankTransaction,
@@ -172,6 +176,46 @@ export async function listAdminUsersByEmail(email: string): Promise<AdminUser[]>
   return data as AdminUser[];
 }
 
+export async function getAdminUserForScope(
+  email: string,
+  lodgeId: string | null
+): Promise<AdminUser | null> {
+  let query = db()
+    .from("admin_users")
+    .select("*")
+    .eq("email", email.trim().toLowerCase());
+  query =
+    lodgeId === null
+      ? query.is("lodge_id", null)
+      : query.eq("lodge_id", lodgeId);
+  const { data, error } = await query.maybeSingle();
+  if (error) throw error;
+  return data as AdminUser | null;
+}
+
+export async function listPlatformAdminUsers(): Promise<AdminUser[]> {
+  const { data, error } = await db()
+    .from("admin_users")
+    .select("*")
+    .is("lodge_id", null)
+    .order("role")
+    .order("full_name");
+  if (error) throw error;
+  return data as AdminUser[];
+}
+
+export async function listTenantAdminUsers(): Promise<AdminUser[]> {
+  const { data, error } = await db()
+    .from("admin_users")
+    .select("*")
+    .not("lodge_id", "is", null)
+    .order("lodge_id")
+    .order("role")
+    .order("full_name");
+  if (error) throw error;
+  return data as AdminUser[];
+}
+
 export async function listAdminUsersForLodge(
   lodgeId: string
 ): Promise<AdminUser[]> {
@@ -284,7 +328,16 @@ export async function getLodgeSite(
 export async function updateLodgeSite(
   lodgeId: string,
   updates: Partial<
-    Pick<LodgeSitePage, "page_title" | "page_description" | "sections" | "published">
+    Pick<
+      LodgeSitePage,
+      | "page_title"
+      | "page_description"
+      | "sections"
+      | "custom_pages"
+      | "header_settings"
+      | "footer_settings"
+      | "published"
+    >
   >
 ): Promise<LodgeSitePage> {
   const { data, error } = await db()
@@ -742,8 +795,33 @@ export async function getDonations(lodgeId: string): Promise<Donation[]> {
 
 export async function addDonation(
   lodgeId: string,
-  data: Omit<Donation, "id" | "lodge_id" | "created_at" | "campaign_id" | "gift_aid_status"> &
-    Partial<Pick<Donation, "campaign_id" | "gift_aid_status">>
+  data: Omit<
+    Donation,
+    | "id"
+    | "lodge_id"
+    | "created_at"
+    | "campaign_id"
+    | "gift_aid_status"
+    | "gift_aid_eligible_amount"
+    | "gift_aid_claimed_at"
+      | "gift_aid_claim_batch_id"
+    | "gasds_eligible"
+    | "gasds_claimed_at"
+    | "tax_year"
+  > &
+    Partial<
+      Pick<
+        Donation,
+        | "campaign_id"
+        | "gift_aid_status"
+        | "gift_aid_eligible_amount"
+        | "gift_aid_claimed_at"
+        | "gift_aid_claim_batch_id"
+        | "gasds_eligible"
+        | "gasds_claimed_at"
+        | "tax_year"
+      >
+    >
 ): Promise<Donation> {
   const { data: row, error } = await db()
     .from("donations")
@@ -768,6 +846,9 @@ export async function updateDonation(
       | "campaign_id"
       | "gift_aid_declaration_id"
       | "gift_aid_status"
+      | "gift_aid_eligible_amount"
+      | "gift_aid_claimed_at"
+      | "gift_aid_claim_batch_id"
       | "event_id"
     >
   >
@@ -781,6 +862,84 @@ export async function updateDonation(
     .maybeSingle();
   if (error) throw error;
   return data as Donation | null;
+}
+
+export async function getGiftAidClaimBatches(
+  lodgeId: string
+): Promise<GiftAidClaimBatch[]> {
+  const { data, error } = await db()
+    .from("gift_aid_claim_batches")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data as GiftAidClaimBatch[];
+}
+
+export async function createGiftAidClaimBatch(
+  lodgeId: string,
+  data: Omit<
+    GiftAidClaimBatch,
+    "id" | "lodge_id" | "created_at" | "updated_at"
+  >
+): Promise<GiftAidClaimBatch> {
+  const { data: row, error } = await db()
+    .from("gift_aid_claim_batches")
+    .insert({ ...data, lodge_id: lodgeId })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return row as GiftAidClaimBatch;
+}
+
+export async function updateGiftAidClaimBatch(
+  id: string,
+  lodgeId: string,
+  updates: Partial<
+    Pick<
+      GiftAidClaimBatch,
+      "status" | "exported_at" | "filed_at" | "paid_at" | "notes" | "claim_reference"
+    >
+  >
+): Promise<GiftAidClaimBatch | null> {
+  const { data, error } = await db()
+    .from("gift_aid_claim_batches")
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("lodge_id", lodgeId)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  return data as GiftAidClaimBatch | null;
+}
+
+export async function getGiftAidClaimItems(
+  lodgeId: string,
+  claimBatchId: string
+): Promise<GiftAidClaimItem[]> {
+  const { data, error } = await db()
+    .from("gift_aid_claim_items")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .eq("claim_batch_id", claimBatchId)
+    .order("donation_date", { ascending: true });
+  if (error) throw error;
+  return data as GiftAidClaimItem[];
+}
+
+export async function createGiftAidClaimItems(
+  lodgeId: string,
+  rows: Array<
+    Omit<GiftAidClaimItem, "id" | "lodge_id" | "created_at">
+  >
+): Promise<GiftAidClaimItem[]> {
+  if (rows.length === 0) return [];
+  const { data, error } = await db()
+    .from("gift_aid_claim_items")
+    .insert(rows.map((row) => ({ ...row, lodge_id: lodgeId })))
+    .select("*");
+  if (error) throw error;
+  return data as GiftAidClaimItem[];
 }
 
 // ---------------------------------------------------------------------------
@@ -808,6 +967,25 @@ export async function getGiftAidDeclarationById(
     .select("*")
     .eq("id", id)
     .eq("lodge_id", lodgeId)
+    .maybeSingle();
+  if (error) throw error;
+  return data as GiftAidDeclaration | null;
+}
+
+export async function getActiveGiftAidDeclarationByEmail(
+  lodgeId: string,
+  email: string
+): Promise<GiftAidDeclaration | null> {
+  const { data, error } = await db()
+    .from("gift_aid_declarations")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .ilike("donor_email", email)
+    .is("revoked_at", null)
+    .eq("declaration_confirmed", true)
+    .eq("hmrc_eligible", true)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
   if (error) throw error;
   return data as GiftAidDeclaration | null;
@@ -864,7 +1042,20 @@ export async function listAuditLogsByEntity(
 
 export async function addGiftAidDeclaration(
   lodgeId: string,
-  data: Omit<GiftAidDeclaration, "id" | "lodge_id" | "created_at" | "updated_at" | "revoked_at">
+  data: Omit<
+    GiftAidDeclaration,
+    | "id"
+    | "lodge_id"
+    | "created_at"
+    | "updated_at"
+    | "revoked_at"
+    | "declaration_source"
+    | "retained_until"
+    | "revoked_reason"
+  > &
+    Partial<
+      Pick<GiftAidDeclaration, "declaration_source" | "retained_until" | "revoked_reason">
+    >
 ): Promise<GiftAidDeclaration> {
   const { data: row, error } = await db()
     .from("gift_aid_declarations")
@@ -908,7 +1099,22 @@ export async function getLodgeSubscription(
 
 export async function upsertLodgeSubscription(
   lodgeId: string,
-  data: Omit<LodgeSubscription, "id" | "lodge_id" | "created_at" | "updated_at">
+  data: Omit<
+    LodgeSubscription,
+    | "id"
+    | "lodge_id"
+    | "created_at"
+    | "updated_at"
+    | "requested_plan_code"
+    | "last_upgrade_requested_at"
+    | "lodge_limit"
+  > &
+    Partial<
+      Pick<
+        LodgeSubscription,
+        "requested_plan_code" | "last_upgrade_requested_at" | "lodge_limit"
+      >
+    >
 ): Promise<LodgeSubscription> {
   const { data: row, error } = await db()
     .from("lodge_subscriptions")
@@ -1137,8 +1343,30 @@ export async function getMemberDues(
 
 export async function createMemberDues(
   lodgeId: string,
-  data: Omit<MemberDues, "id" | "lodge_id" | "created_at" | "updated_at" | "reminder_sent_at" | "reminder_count"> &
-    Partial<Pick<MemberDues, "reminder_sent_at" | "reminder_count">>
+  data: Omit<
+    MemberDues,
+    | "id"
+    | "lodge_id"
+    | "created_at"
+    | "updated_at"
+    | "reminder_sent_at"
+    | "reminder_count"
+    | "charitable_amount"
+    | "gift_aid_declaration_id"
+    | "gift_aid_status"
+    | "gift_aid_eligible_amount"
+  > &
+    Partial<
+      Pick<
+        MemberDues,
+        | "reminder_sent_at"
+        | "reminder_count"
+        | "charitable_amount"
+        | "gift_aid_declaration_id"
+        | "gift_aid_status"
+        | "gift_aid_eligible_amount"
+      >
+    >
 ): Promise<MemberDues> {
   const { data: row, error } = await db()
     .from("member_dues")
@@ -1161,6 +1389,9 @@ export async function updateMemberDuesStatus(
       | "paid_at"
       | "reminder_sent_at"
       | "reminder_count"
+      | "gift_aid_declaration_id"
+      | "gift_aid_status"
+      | "gift_aid_eligible_amount"
     >
   >
 ): Promise<MemberDues | null> {
@@ -1249,6 +1480,67 @@ export async function updateInstalment(
     .maybeSingle();
   if (error) throw error;
   return data as MemberDuesInstalment | null;
+}
+
+// ---------------------------------------------------------------------------
+// Meeting collections and GASDS
+// ---------------------------------------------------------------------------
+
+export async function getMeetingCollections(
+  lodgeId: string,
+  opts?: { eventId?: string; taxYear?: string }
+): Promise<MeetingCollection[]> {
+  let query = db()
+    .from("meeting_collections")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .order("collection_date", { ascending: false });
+
+  if (opts?.eventId) query = query.eq("event_id", opts.eventId);
+  if (opts?.taxYear) query = query.eq("gasds_tax_year", opts.taxYear);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data as MeetingCollection[];
+}
+
+export async function createMeetingCollection(
+  lodgeId: string,
+  data: Omit<
+    MeetingCollection,
+    "id" | "lodge_id" | "created_at" | "updated_at"
+  >
+): Promise<MeetingCollection> {
+  const { data: row, error } = await db()
+    .from("meeting_collections")
+    .insert({ ...data, lodge_id: lodgeId })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return row as MeetingCollection;
+}
+
+export async function getGasdsClaims(lodgeId: string): Promise<GasdsClaim[]> {
+  const { data, error } = await db()
+    .from("gasds_claims")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .order("tax_year", { ascending: false });
+  if (error) throw error;
+  return data as GasdsClaim[];
+}
+
+export async function upsertGasdsClaim(
+  lodgeId: string,
+  data: Omit<GasdsClaim, "id" | "lodge_id" | "created_at" | "updated_at">
+): Promise<GasdsClaim> {
+  const { data: row, error } = await db()
+    .from("gasds_claims")
+    .upsert({ ...data, lodge_id: lodgeId }, { onConflict: "lodge_id,tax_year" })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return row as GasdsClaim;
 }
 
 // ---------------------------------------------------------------------------

@@ -28,10 +28,14 @@ import {
 } from "@/components/ui/accordion";
 import { FadeIn, StaggerChildren, StaggerItem } from "@/components/motion";
 import type { LodgeSiteSection } from "@/lib/db/types";
+import type { LodgeSiteFooterSettings, LodgeSiteHeaderSettings } from "@/lib/db/types";
 import {
   heroBackgroundLayers,
   mergeHeroPrimaryColor,
+  sectionContentWidthStyle,
   sectionBackgroundLayers,
+  sectionDesignStyle,
+  sectionToneClass,
 } from "@/lib/site-section-style";
 import { resolveLodgeSlug } from "@/lib/tenant";
 
@@ -53,6 +57,19 @@ type SitePayload = {
     page_title: string;
     page_description: string | null;
     sections: SiteSection[];
+    header_settings?: LodgeSiteHeaderSettings | null;
+    footer_settings?: LodgeSiteFooterSettings | null;
+    custom_pages?: Array<{
+      id: string;
+      slug: string;
+      title: string;
+      description: string | null;
+      sections: SiteSection[];
+      published: boolean;
+      show_in_nav: boolean;
+      nav_label: string | null;
+      order: number;
+    }>;
   };
 };
 
@@ -66,6 +83,22 @@ function formModeFor(section: SiteSection): NonNullable<NonNullable<SiteSection[
   if (section.type === "contact") return "contact";
   if (section.type === "join") return "lead";
   return "none";
+}
+
+function formFieldVisible(section: SiteSection, field: string) {
+  const configured = section.style?.form_fields;
+  if (!configured || configured.length === 0) {
+    return ["phone", "subject", "location", "how_heard", "message"].includes(field);
+  }
+  return configured.includes(field);
+}
+
+function formFieldRequired(section: SiteSection, field: string, core = false) {
+  return core || Boolean(section.style?.form_required_fields?.includes(field));
+}
+
+function formThankYou(section: SiteSection, fallback: string) {
+  return section.style?.form_thank_you?.trim() || fallback;
 }
 
 function imageShapeClass(shape: NonNullable<SiteSection["style"]>["image_shape"]) {
@@ -119,13 +152,53 @@ function sectionContentClass(section: SiteSection) {
   return section.style?.background_image_url ? "relative z-10" : "";
 }
 
+function sectionShellClass(section: SiteSection, className: string) {
+  return `${className} ${sectionToneClass(section)}`;
+}
+
+function sectionShellStyle(section: SiteSection) {
+  return sectionDesignStyle(section);
+}
+
+function sectionContainerStyle(section: SiteSection) {
+  return sectionContentWidthStyle(section);
+}
+
+function ctaButtonProps(
+  section: SiteSection,
+  opts: { className?: string; dark?: boolean } = {}
+) {
+  const variant = section.style?.button_variant ?? "solid";
+  if (variant === "outline") {
+    return {
+      variant: "outline" as const,
+      className: opts.className,
+    };
+  }
+  if (variant === "ghost") {
+    return {
+      variant: "ghost" as const,
+      className: opts.className,
+    };
+  }
+  return {
+    className:
+      opts.className ??
+      (opts.dark
+        ? "rounded-xl bg-white text-slate-950 hover:bg-white/90"
+        : "bg-slate-950 text-white hover:bg-slate-800"),
+  };
+}
+
 function ContactEnquiryForm({
   lodgeSlug,
   lodge,
+  section,
   dark = false,
 }: {
   lodgeSlug: string;
   lodge: LodgeData | null;
+  section: SiteSection;
   dark?: boolean;
 }) {
   const [submitting, setSubmitting] = useState(false);
@@ -141,17 +214,20 @@ function ContactEnquiryForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          section_id: section.id,
+          website: form.get("website"),
           name: form.get("name"),
           email: form.get("email"),
           phone: form.get("phone"),
           subject: form.get("subject") || `Website enquiry for ${lodge?.name ?? "the lodge"}`,
           message: form.get("message"),
+          consent: form.get("consent") === "on",
         }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Could not send enquiry.");
       event.currentTarget.reset();
-      setStatus("Thanks. Your message has been sent to the lodge secretary.");
+      setStatus(formThankYou(section, "Thanks. Your message has been sent to the lodge secretary."));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not send enquiry.");
     } finally {
@@ -161,6 +237,7 @@ function ContactEnquiryForm({
 
   return (
     <form id="contact-form" className="space-y-5" onSubmit={submit}>
+      <input type="text" name="website" tabIndex={-1} autoComplete="off" className="hidden" />
       <div className="grid gap-5 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="contact-name">Full name</Label>
@@ -171,26 +248,50 @@ function ContactEnquiryForm({
           <Input id="contact-email" name="email" required type="email" placeholder="john@example.com" />
         </div>
       </div>
-      <div className="grid gap-5 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="contact-phone">Phone</Label>
-          <Input id="contact-phone" name="phone" placeholder="Optional" />
+      {formFieldVisible(section, "phone") || formFieldVisible(section, "subject") ? (
+        <div className="grid gap-5 sm:grid-cols-2">
+          {formFieldVisible(section, "phone") ? (
+            <div className="space-y-2">
+              <Label htmlFor="contact-phone">Phone</Label>
+              <Input
+                id="contact-phone"
+                name="phone"
+                required={formFieldRequired(section, "phone")}
+                placeholder="Optional"
+              />
+            </div>
+          ) : null}
+          {formFieldVisible(section, "subject") ? (
+            <div className="space-y-2">
+              <Label htmlFor="contact-subject">Subject</Label>
+              <Input
+                id="contact-subject"
+                name="subject"
+                required={formFieldRequired(section, "subject")}
+                placeholder="Visiting, membership, or general enquiry"
+              />
+            </div>
+          ) : null}
         </div>
+      ) : null}
+      {formFieldVisible(section, "message") ? (
         <div className="space-y-2">
-          <Label htmlFor="contact-subject">Subject</Label>
-          <Input id="contact-subject" name="subject" placeholder="Visiting, membership, or general enquiry" />
+          <Label htmlFor="contact-message">Message</Label>
+          <Textarea
+            id="contact-message"
+            name="message"
+            required={formFieldRequired(section, "message", true)}
+            placeholder="Tell us how the lodge can help..."
+            rows={5}
+          />
         </div>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="contact-message">Message</Label>
-        <Textarea
-          id="contact-message"
-          name="message"
-          required
-          placeholder="Tell us how the lodge can help..."
-          rows={5}
-        />
-      </div>
+      ) : null}
+      {formFieldVisible(section, "consent") ? (
+        <label className={dark ? "flex gap-2 text-sm text-slate-300" : "flex gap-2 text-sm text-slate-600"}>
+          <input name="consent" type="checkbox" required className="mt-1" />
+          {section.style?.form_consent_text ?? "I agree to be contacted about my enquiry."}
+        </label>
+      ) : null}
       <Button
         type="submit"
         disabled={submitting}
@@ -214,9 +315,11 @@ function ContactEnquiryForm({
 
 function LeadIntakeForm({
   lodgeSlug,
+  section,
   dark = false,
 }: {
   lodgeSlug: string;
+  section: SiteSection;
   dark?: boolean;
 }) {
   const [submitting, setSubmitting] = useState(false);
@@ -232,6 +335,8 @@ function LeadIntakeForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          section_id: section.id,
+          website: form.get("website"),
           first_name: form.get("first_name"),
           last_name: form.get("last_name"),
           email: form.get("email"),
@@ -239,12 +344,13 @@ function LeadIntakeForm({
           location: form.get("location"),
           how_heard: form.get("how_heard"),
           message: form.get("message"),
+          consent: form.get("consent") === "on",
         }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Could not send lead intake.");
       event.currentTarget.reset();
-      setStatus("Thanks. Your enquiry has been added and sent to the lodge secretary.");
+      setStatus(formThankYou(section, "Thanks. Your enquiry has been added and sent to the lodge secretary."));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not send lead intake.");
     } finally {
@@ -254,6 +360,7 @@ function LeadIntakeForm({
 
   return (
     <form id="lead-intake" className="space-y-5" onSubmit={submit}>
+      <input type="text" name="website" tabIndex={-1} autoComplete="off" className="hidden" />
       <div className="grid gap-5 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="lead-first-name">First name</Label>
@@ -269,30 +376,62 @@ function LeadIntakeForm({
           <Label htmlFor="lead-email">Email</Label>
           <Input id="lead-email" name="email" required type="email" placeholder="john@example.com" />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="lead-phone">Phone</Label>
-          <Input id="lead-phone" name="phone" placeholder="Optional" />
-        </div>
+        {formFieldVisible(section, "phone") ? (
+          <div className="space-y-2">
+            <Label htmlFor="lead-phone">Phone</Label>
+            <Input
+              id="lead-phone"
+              name="phone"
+              required={formFieldRequired(section, "phone")}
+              placeholder="Optional"
+            />
+          </div>
+        ) : null}
       </div>
-      <div className="grid gap-5 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="lead-location">Location</Label>
-          <Input id="lead-location" name="location" placeholder="Town or city" />
+      {formFieldVisible(section, "location") || formFieldVisible(section, "how_heard") ? (
+        <div className="grid gap-5 sm:grid-cols-2">
+          {formFieldVisible(section, "location") ? (
+            <div className="space-y-2">
+              <Label htmlFor="lead-location">Location</Label>
+              <Input
+                id="lead-location"
+                name="location"
+                required={formFieldRequired(section, "location")}
+                placeholder="Town or city"
+              />
+            </div>
+          ) : null}
+          {formFieldVisible(section, "how_heard") ? (
+            <div className="space-y-2">
+              <Label htmlFor="lead-how-heard">How did you hear about us?</Label>
+              <Input
+                id="lead-how-heard"
+                name="how_heard"
+                required={formFieldRequired(section, "how_heard")}
+                placeholder="Friend, search, event..."
+              />
+            </div>
+          ) : null}
         </div>
+      ) : null}
+      {formFieldVisible(section, "message") ? (
         <div className="space-y-2">
-          <Label htmlFor="lead-how-heard">How did you hear about us?</Label>
-          <Input id="lead-how-heard" name="how_heard" placeholder="Friend, search, event..." />
+          <Label htmlFor="lead-message">Message</Label>
+          <Textarea
+            id="lead-message"
+            name="message"
+            required={formFieldRequired(section, "message")}
+            placeholder="Tell us a little about your interest in visiting or joining..."
+            rows={5}
+          />
         </div>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="lead-message">Message</Label>
-        <Textarea
-          id="lead-message"
-          name="message"
-          placeholder="Tell us a little about your interest in visiting or joining..."
-          rows={5}
-        />
-      </div>
+      ) : null}
+      {formFieldVisible(section, "consent") ? (
+        <label className={dark ? "flex gap-2 text-sm text-slate-300" : "flex gap-2 text-sm text-slate-600"}>
+          <input name="consent" type="checkbox" required className="mt-1" />
+          {section.style?.form_consent_text ?? "I agree to be contacted about my membership enquiry."}
+        </label>
+      ) : null}
       <Button
         type="submit"
         disabled={submitting}
@@ -318,11 +457,13 @@ function SectionFormCard({
   mode,
   lodgeSlug,
   lodge,
+  section,
   dark = false,
 }: {
   mode: "contact" | "lead";
   lodgeSlug: string;
   lodge: LodgeData | null;
+  section: SiteSection;
   dark?: boolean;
 }) {
   return (
@@ -347,9 +488,9 @@ function SectionFormCard({
         </p>
       </div>
       {mode === "lead" ? (
-        <LeadIntakeForm lodgeSlug={lodgeSlug} dark={dark} />
+        <LeadIntakeForm lodgeSlug={lodgeSlug} section={section} dark={dark} />
       ) : (
-        <ContactEnquiryForm lodgeSlug={lodgeSlug} lodge={lodge} dark={dark} />
+        <ContactEnquiryForm lodgeSlug={lodgeSlug} lodge={lodge} section={section} dark={dark} />
       )}
     </div>
   );
@@ -371,7 +512,7 @@ function StandaloneSectionForm({
   return (
     <section className="border-y border-slate-200 bg-slate-50 py-16">
       <div className="container-full">
-        <SectionFormCard mode={mode} lodgeSlug={lodgeSlug} lodge={lodge} />
+        <SectionFormCard mode={mode} lodgeSlug={lodgeSlug} lodge={lodge} section={section} />
       </div>
     </section>
   );
@@ -395,7 +536,8 @@ function HeroSection({
 
   return (
     <section
-      className="public-hero"
+      className={sectionShellClass(section, "public-hero")}
+      style={sectionShellStyle(section)}
       aria-label="Hero"
       data-has-custom-bg={hasCustomBg ? "true" : undefined}
     >
@@ -415,7 +557,10 @@ function HeroSection({
           />
         </>
       ) : null}
-      <div className="public-hero-shell !lg:grid-cols-1 !lg:items-center">
+      <div
+        className="public-hero-shell lg:!grid-cols-1 lg:!items-center"
+        style={sectionContainerStyle(section)}
+      >
         <div className="public-hero-copy mx-auto text-center lg:text-center">
           <FadeIn delay={0.1}>
             <p className="public-kicker mx-auto inline-flex">{lodge?.name ?? "Welcome"}</p>
@@ -443,8 +588,16 @@ function HeroSection({
                 <Button
                   asChild
                   size="lg"
-                  className="rounded-xl text-white shadow-lg transition hover:opacity-95"
-                  style={{ backgroundColor: primaryHex }}
+                  {...ctaButtonProps(section, {
+                    className: "rounded-xl text-white shadow-lg transition hover:opacity-95",
+                    dark: true,
+                  })}
+                  style={
+                    section.style?.button_variant === "solid" ||
+                    !section.style?.button_variant
+                      ? { backgroundColor: primaryHex }
+                      : undefined
+                  }
                 >
                   <Link href={withQuery(section.cta_href, lodgeSlug)}>
                     {section.cta_label}
@@ -466,7 +619,14 @@ function HeroSection({
             <div className="public-hero-meta mt-12 justify-center">
               {lodge?.city && <span className="public-hero-meta-chip">{lodge.city}</span>}
               <span className="public-hero-meta-chip">Established Tradition</span>
-              <span className="public-hero-meta-chip">Powered by Covenant</span>
+              <Link
+                href="https://lodgepayments.co.uk"
+                target="_blank"
+                rel="noreferrer"
+                className="public-hero-meta-chip"
+              >
+                Powered by LodgePay
+              </Link>
             </div>
           </FadeIn>
         </div>
@@ -480,9 +640,13 @@ function HeroSection({
  * ──────────────────────────────────────────────────────────── */
 function AboutSection({ section }: { section: SiteSection }) {
   return (
-    <section className="relative overflow-hidden bg-white py-20 lg:py-28" aria-label="About">
+    <section
+      className={sectionShellClass(section, "relative overflow-hidden bg-white py-20 lg:py-28")}
+      style={sectionShellStyle(section)}
+      aria-label="About"
+    >
       <SectionBackground section={section} />
-      <div className={`container-full ${sectionContentClass(section)}`}>
+      <div className={`container-full ${sectionContentClass(section)}`} style={sectionContainerStyle(section)}>
         <div className="grid gap-12 lg:grid-cols-[1fr_0.6fr] lg:items-center">
           <FadeIn>
             <div>
@@ -496,7 +660,7 @@ function AboutSection({ section }: { section: SiteSection }) {
                 </p>
               )}
               {section.cta_href && section.cta_label && (
-                <Button asChild className="mt-8" variant="outline">
+                <Button asChild {...ctaButtonProps(section, { className: "mt-8" })}>
                   <Link href={section.cta_href}>
                     {section.cta_label}
                     <ArrowRight className="ml-2 h-4 w-4" />
@@ -543,9 +707,13 @@ function MeetingDetailsSection({
   lodgeSlug: string;
 }) {
   return (
-    <section className="relative overflow-hidden border-y border-slate-200 bg-slate-50 py-20 lg:py-28" aria-label="Meeting details">
+    <section
+      className={sectionShellClass(section, "relative overflow-hidden border-y border-slate-200 bg-slate-50 py-20 lg:py-28")}
+      style={sectionShellStyle(section)}
+      aria-label="Meeting details"
+    >
       <SectionBackground section={section} />
-      <div className={`container-full ${sectionContentClass(section)}`}>
+      <div className={`container-full ${sectionContentClass(section)}`} style={sectionContainerStyle(section)}>
         <FadeIn>
           <div className="mb-14 max-w-2xl">
             <p className="section-label">Meetings</p>
@@ -595,7 +763,7 @@ function MeetingDetailsSection({
         {section.cta_href && section.cta_label && (
           <FadeIn delay={0.3}>
             <div className="mt-10 text-center">
-              <Button asChild variant="outline">
+              <Button asChild {...ctaButtonProps(section)}>
                 <Link href={withQuery(section.cta_href, lodgeSlug)}>
                   {section.cta_label}
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -614,9 +782,13 @@ function MeetingDetailsSection({
  * ──────────────────────────────────────────────────────────── */
 function OfficersSection({ section }: { section: SiteSection }) {
   return (
-    <section className="relative overflow-hidden bg-white py-20 lg:py-28" aria-label="Officers">
+    <section
+      className={sectionShellClass(section, "relative overflow-hidden bg-white py-20 lg:py-28")}
+      style={sectionShellStyle(section)}
+      aria-label="Officers"
+    >
       <SectionBackground section={section} />
-      <div className={`container-full ${sectionContentClass(section)}`}>
+      <div className={`container-full ${sectionContentClass(section)}`} style={sectionContainerStyle(section)}>
         <FadeIn>
           <div className="mb-14 max-w-2xl">
             <p className="section-label">Leadership</p>
@@ -662,9 +834,13 @@ function CharitySection({
   lodgeSlug: string;
 }) {
   return (
-    <section className="relative overflow-hidden border-y border-slate-200 bg-slate-50 py-20 lg:py-28" aria-label="Charity">
+    <section
+      className={sectionShellClass(section, "relative overflow-hidden border-y border-slate-200 bg-slate-50 py-20 lg:py-28")}
+      style={sectionShellStyle(section)}
+      aria-label="Charity"
+    >
       <SectionBackground section={section} />
-      <div className={`container-full ${sectionContentClass(section)}`}>
+      <div className={`container-full ${sectionContentClass(section)}`} style={sectionContainerStyle(section)}>
         <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
           <FadeIn>
             <div>
@@ -678,10 +854,7 @@ function CharitySection({
                 </p>
               )}
               {section.cta_href && section.cta_label && (
-                <Button
-                  asChild
-                  className="mt-8 bg-slate-950 text-white hover:bg-slate-800"
-                >
+                <Button asChild {...ctaButtonProps(section, { className: "mt-8" })}>
                   <Link href={withQuery(section.cta_href, lodgeSlug)}>
                     {section.cta_label}
                     <ArrowRight className="ml-2 h-4 w-4" />
@@ -736,9 +909,13 @@ function EventsSection({
   lodgeSlug: string;
 }) {
   return (
-    <section className="relative overflow-hidden bg-white py-20 lg:py-28" aria-label="Events">
+    <section
+      className={sectionShellClass(section, "relative overflow-hidden bg-white py-20 lg:py-28")}
+      style={sectionShellStyle(section)}
+      aria-label="Events"
+    >
       <SectionBackground section={section} />
-      <div className={`container-full ${sectionContentClass(section)}`}>
+      <div className={`container-full ${sectionContentClass(section)}`} style={sectionContainerStyle(section)}>
         <FadeIn>
           <div className="mb-14 max-w-2xl">
             <p className="section-label">Events</p>
@@ -781,7 +958,7 @@ function EventsSection({
         {section.cta_href && section.cta_label && (
           <FadeIn delay={0.3}>
             <div className="mt-10 text-center">
-              <Button asChild variant="outline">
+              <Button asChild {...ctaButtonProps(section)}>
                 <Link href={withQuery(section.cta_href, lodgeSlug)}>
                   {section.cta_label}
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -823,9 +1000,13 @@ function FaqSection({ section }: { section: SiteSection }) {
   ];
 
   return (
-    <section className="relative overflow-hidden bg-white py-20 lg:py-28" aria-label="Frequently asked questions">
+    <section
+      className={sectionShellClass(section, "relative overflow-hidden bg-white py-20 lg:py-28")}
+      style={sectionShellStyle(section)}
+      aria-label="Frequently asked questions"
+    >
       <SectionBackground section={section} />
-      <div className={`container-full ${sectionContentClass(section)}`}>
+      <div className={`container-full ${sectionContentClass(section)}`} style={sectionContainerStyle(section)}>
         <div className="grid gap-12 lg:grid-cols-[0.4fr_1fr]">
           <FadeIn>
             <div>
@@ -870,7 +1051,11 @@ function JoinSection({
 }) {
   const mode = formModeFor(section);
   return (
-    <section className="relative overflow-hidden bg-slate-950 py-24 lg:py-32" aria-label="Join us">
+    <section
+      className={sectionShellClass(section, "relative overflow-hidden bg-slate-950 py-24 lg:py-32")}
+      style={sectionShellStyle(section)}
+      aria-label="Join us"
+    >
       <SectionBackground section={section} />
       <div className="absolute inset-0 bg-grid-overlay bg-[size:28px_28px] opacity-40" />
       <div className="absolute inset-0 bg-gradient-to-b from-slate-950/60 via-slate-950/90 to-slate-950" />
@@ -889,15 +1074,11 @@ function JoinSection({
           )}
           <InlineSectionImage section={section} className="mx-auto mt-10 max-w-3xl" />
           {mode !== "none" ? (
-            <SectionFormCard mode={mode} lodgeSlug={lodgeSlug} lodge={lodge} dark />
+            <SectionFormCard mode={mode} lodgeSlug={lodgeSlug} lodge={lodge} section={section} dark />
           ) : null}
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             {section.cta_href && section.cta_label && (
-              <Button
-                asChild
-                size="lg"
-                className="rounded-xl bg-white text-slate-950 hover:bg-white/90"
-              >
+              <Button asChild size="lg" {...ctaButtonProps(section, { dark: true })}>
                 <Link href={withQuery(section.cta_href, lodgeSlug)}>
                   {section.cta_label}
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -933,9 +1114,13 @@ function ContactSection({
 }) {
   const mode = formModeFor(section);
   return (
-    <section className="relative overflow-hidden border-t border-slate-200 bg-white py-20 lg:py-28" aria-label="Contact">
+    <section
+      className={sectionShellClass(section, "relative overflow-hidden border-t border-slate-200 bg-white py-20 lg:py-28")}
+      style={sectionShellStyle(section)}
+      aria-label="Contact"
+    >
       <SectionBackground section={section} />
-      <div className={`container-full ${sectionContentClass(section)}`}>
+      <div className={`container-full ${sectionContentClass(section)}`} style={sectionContainerStyle(section)}>
         <div className="grid gap-14 lg:grid-cols-[1fr_0.8fr]">
           <FadeIn>
             <div>
@@ -947,9 +1132,9 @@ function ContactSection({
               {mode !== "none" ? (
                 <div className="mt-10">
                   {mode === "lead" ? (
-                    <LeadIntakeForm lodgeSlug={lodgeSlug} />
+                    <LeadIntakeForm lodgeSlug={lodgeSlug} section={section} />
                   ) : (
-                    <ContactEnquiryForm lodgeSlug={lodgeSlug} lodge={lodge} />
+                    <ContactEnquiryForm lodgeSlug={lodgeSlug} lodge={lodge} section={section} />
                   )}
                 </div>
               ) : null}
@@ -1011,9 +1196,13 @@ function ContactSection({
  * ──────────────────────────────────────────────────────────── */
 function GenericSection({ section }: { section: SiteSection }) {
   return (
-    <section className="relative overflow-hidden bg-white py-20 lg:py-28" aria-label={section.heading}>
+    <section
+      className={sectionShellClass(section, "relative overflow-hidden bg-white py-20 lg:py-28")}
+      style={sectionShellStyle(section)}
+      aria-label={section.heading}
+    >
       <SectionBackground section={section} />
-      <div className={`container-full ${sectionContentClass(section)}`}>
+      <div className={`container-full ${sectionContentClass(section)}`} style={sectionContainerStyle(section)}>
         <FadeIn>
           <div className="public-grid-card max-w-3xl">
             <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
@@ -1087,18 +1276,35 @@ function SectionRenderer({
 /* ────────────────────────────────────────────────────────────
  *  MAIN COMPONENT: LodgeHomepage
  * ──────────────────────────────────────────────────────────── */
-export function LodgeHomepage() {
+export function LodgeHomepage({
+  pageSlug = "home",
+  initialLodgeSlug,
+  initialPayload = null,
+}: {
+  pageSlug?: string;
+  initialLodgeSlug?: string | null;
+  initialPayload?: SitePayload | null;
+}) {
   const searchParams = useSearchParams();
   const rawLodgeQuery = searchParams.get("lodge");
-  const lodgeSlug = useMemo(() => resolveLodgeSlug(rawLodgeQuery), [rawLodgeQuery]);
-  const [payload, setPayload] = useState<SitePayload | null>(null);
-  const [loading, setLoading] = useState(true);
+  const lodgeSlug = useMemo(
+    () => initialLodgeSlug ?? resolveLodgeSlug(rawLodgeQuery),
+    [initialLodgeSlug, rawLodgeQuery]
+  );
+  const [payload, setPayload] = useState<SitePayload | null>(initialPayload);
+  const [loading, setLoading] = useState(!initialPayload);
 
   useEffect(() => {
+    if (initialPayload && initialLodgeSlug === lodgeSlug) return;
+
     let active = true;
     async function load() {
       try {
-        const res = await fetch(`/api/lodges/${lodgeSlug}/site`);
+        const res = await fetch(
+          initialLodgeSlug && !rawLodgeQuery
+            ? "/api/lodges/current/site"
+            : `/api/lodges/${lodgeSlug}/site`
+        );
         if (!res.ok) return;
         const data = (await res.json()) as SitePayload;
         if (active) setPayload(data);
@@ -1112,7 +1318,7 @@ export function LodgeHomepage() {
     return () => {
       active = false;
     };
-  }, [lodgeSlug]);
+  }, [initialPayload, initialLodgeSlug, lodgeSlug, rawLodgeQuery]);
 
   if (loading) {
     return (
@@ -1139,7 +1345,27 @@ export function LodgeHomepage() {
     );
   }
 
-  const sections = [...payload.site.sections]
+  const customPage =
+    pageSlug === "home"
+      ? null
+      : payload.site.custom_pages?.find((page) => page.slug === pageSlug) ?? null;
+
+  if (pageSlug !== "home" && (!customPage || !customPage.published)) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center bg-white">
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold text-slate-950">Page not found</h2>
+          <p className="mt-2 text-slate-600">This lodge page is not published.</p>
+          <Button asChild className="mt-6" variant="outline">
+            <Link href={`/?lodge=${encodeURIComponent(lodgeSlug)}`}>Return to lodge home</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const activeSections = customPage?.sections ?? payload.site.sections;
+  const sections = [...activeSections]
     .filter((s) => s.visible)
     .sort((a, b) => a.order - b.order);
 

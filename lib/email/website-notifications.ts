@@ -13,10 +13,15 @@ type WebsiteNotificationInput = {
   intro: string;
   rows: Array<{ label: string; value: string | null | undefined }>;
   message?: string | null;
+  recipients?: string[] | null;
 };
 
-function notificationRecipient() {
-  return CONTACT_NOTIFICATION_EMAIL;
+function notificationRecipients(
+  lodge: WebsiteNotificationInput["lodge"],
+  recipients?: string[] | null
+) {
+  if (recipients?.length) return recipients;
+  return lodge?.support_email ? [lodge.support_email] : [CONTACT_NOTIFICATION_EMAIL];
 }
 
 function plainRows(rows: WebsiteNotificationInput["rows"]) {
@@ -36,15 +41,16 @@ export async function sendWebsiteNotification({
   intro,
   rows,
   message,
+  recipients,
 }: WebsiteNotificationInput) {
   const resendKey = process.env.RESEND_API_KEY;
+  const to = notificationRecipients(lodge, recipients);
   if (!resendKey) {
-    return { sent: false, to: notificationRecipient(), reason: "Resend not configured." };
+    return { sent: false, to, reason: "Resend not configured." };
   }
 
   const { Resend } = await import("resend");
   const resend = new Resend(resendKey);
-  const to = notificationRecipient();
   const safeRows = rows
     .filter((row) => row.value)
     .map((row) => ({ label: row.label, value: String(row.value) }));

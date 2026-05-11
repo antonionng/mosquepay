@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
@@ -103,6 +104,17 @@ export default async function MemberMeetingSummonsPage({
     <div className="mx-auto max-w-5xl space-y-6">
       <article className="rounded-2xl border border-slate-200 bg-white p-8 text-slate-950 shadow-sm">
         <header className="border-b border-slate-300 pb-6 text-center">
+          {lodge?.logo_url ? (
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <Image
+                src={lodge.logo_url}
+                alt={`${lodge.name} logo`}
+                width={96}
+                height={96}
+                className="h-full w-full object-contain p-2"
+              />
+            </div>
+          ) : null}
           <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">
             Summons
           </p>

@@ -20,6 +20,14 @@ type DomainState = {
   cname_target: string;
 };
 
+function recordName(domain: string) {
+  return domain.startsWith("www.") ? "www" : domain;
+}
+
+function isLikelySubdomain(domain: string) {
+  return domain.split(".").length > 2;
+}
+
 export function CustomDomainCard() {
   const router = useRouter();
   const [state, setState] = useState<DomainState | null>(null);
@@ -81,6 +89,8 @@ export function CustomDomainCard() {
   if (!state) return null;
 
   const verified = Boolean(state.custom_domain_verified_at);
+  const savedDomain = state.custom_domain;
+  const isSubdomain = savedDomain ? isLikelySubdomain(savedDomain) : true;
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -94,8 +104,8 @@ export function CustomDomainCard() {
         )}
       </div>
       <p className="mt-1 text-sm text-slate-500">
-        Point a subdomain like <code>lodge.your-domain.org</code> at LodgePay
-        and we will serve your public site from it.
+        Point a lodge-owned domain at LodgePay and we will serve this lodge&apos;s
+        public site from it. The platform app stays on <code>lodgepayments.co.uk</code>.
       </p>
 
       <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
@@ -154,14 +164,14 @@ export function CustomDomainCard() {
         </div>
       )}
 
-      {state.custom_domain && (
+      {savedDomain && (
         <div className="mt-4 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
           <p className="font-semibold text-slate-900">DNS instructions</p>
           <ol className="list-decimal space-y-2 pl-5 text-slate-700">
             <li>
               In your DNS provider, add a <strong>CNAME</strong> record for{" "}
               <code className="rounded bg-white px-1 py-0.5">
-                {state.custom_domain}
+                {recordName(savedDomain)}
               </code>{" "}
               pointing to{" "}
               <code className="rounded bg-white px-1 py-0.5">
@@ -169,16 +179,29 @@ export function CustomDomainCard() {
               </code>
               .
             </li>
+            {!isSubdomain ? (
+              <li>
+                This looks like an apex/root domain. If your DNS provider does not
+                allow CNAME records at the root, use <strong>ALIAS</strong>,
+                <strong> ANAME</strong>, or CNAME flattening to point it at{" "}
+                <code className="rounded bg-white px-1 py-0.5">
+                  {state.cname_target}
+                </code>
+                . Otherwise use a subdomain such as{" "}
+                <code className="rounded bg-white px-1 py-0.5">www.{savedDomain}</code>.
+              </li>
+            ) : null}
             <li>
               Add the verification record (TXT) below if your DNS provider
               requires it. Some providers can verify the CNAME alone.
               <pre className="mt-1 overflow-auto rounded bg-white p-2 text-xs text-slate-600">
-                TXT _lodgepay-verify.{state.custom_domain} = {state.custom_domain_verification_token ?? "(generated on save)"}
+                TXT _lodgepay-verify.{savedDomain} = {state.custom_domain_verification_token ?? "(generated on save)"}
               </pre>
             </li>
             <li>
               Wait 5-10 minutes for DNS to propagate, then click <em>Verify</em>.
-              Once verified your visitors can use the new domain.
+              Once verified and added to the live hosting project, visitors can use
+              the new domain.
             </li>
           </ol>
         </div>

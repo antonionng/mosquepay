@@ -9,9 +9,13 @@ import {
   Eye,
   EyeOff,
   GripVertical,
+  ImageIcon,
+  LayoutTemplate,
   Loader2,
+  MousePointerClick,
   Pencil,
   Plus,
+  Rocket,
   Save,
   Sparkles,
   Trash2,
@@ -29,7 +33,16 @@ import type { LodgeSiteSection } from "@/lib/db/types";
 import { SitePreview } from "./site-preview";
 import { PuckEditor } from "./puck-editor";
 import { ImageUploadField } from "./image-upload-field";
-import { TEMPLATES, SECTION_PRESETS } from "@/lib/site-builder/templates";
+import {
+  buildTemplateSitePack,
+  SECTION_VARIANTS,
+  TEMPLATES,
+} from "@/lib/site-builder/templates";
+import type {
+  LodgeSiteCustomPage,
+  LodgeSiteFooterSettings,
+  LodgeSiteHeaderSettings,
+} from "@/lib/db/types";
 
 type Step = "template" | "edit" | "preview" | "publish";
 
@@ -46,11 +59,47 @@ const SECTION_LABELS: Record<LodgeSiteSection["type"], string> = {
 };
 
 const STEPS: { id: Step; label: string }[] = [
-  { id: "template", label: "Choose template" },
-  { id: "edit", label: "Edit sections" },
+  { id: "template", label: "Choose site" },
+  { id: "edit", label: "Personalise" },
   { id: "preview", label: "Preview" },
   { id: "publish", label: "Publish" },
 ];
+
+const LAUNCH_GUIDE = [
+  {
+    id: "template" as const,
+    icon: LayoutTemplate,
+    title: "Pick a complete site",
+    body: "Start from a polished lodge website with pages, header, footer, images, and forms already wired.",
+  },
+  {
+    id: "edit" as const,
+    icon: MousePointerClick,
+    title: "Change words and images",
+    body: "Edit headings, text, calls to action, and photos without touching layout code.",
+  },
+  {
+    id: "preview" as const,
+    icon: ImageIcon,
+    title: "Check the live look",
+    body: "Preview desktop, tablet, and phone before anything goes public.",
+  },
+  {
+    id: "publish" as const,
+    icon: Rocket,
+    title: "Go live",
+    body: "Save, publish, and then connect the lodge domain from the launch checklist.",
+  },
+];
+
+const FORM_FIELD_OPTIONS = [
+  { id: "phone", label: "Phone" },
+  { id: "subject", label: "Subject" },
+  { id: "location", label: "Location" },
+  { id: "how_heard", label: "How heard" },
+  { id: "message", label: "Message" },
+  { id: "consent", label: "Consent checkbox" },
+] as const;
 
 export function SimpleSiteBuilder({
   lodgeSlug,
@@ -60,6 +109,9 @@ export function SimpleSiteBuilder({
   primaryColor = "#3b82f6",
   initiallyPublished,
   publicHref,
+  title = "Lodge website builder",
+  description = "Pick a template, edit sections in friendly forms, preview, and publish when ready.",
+  onPersist,
 }: {
   lodgeSlug: string;
   initialSections: LodgeSiteSection[];
@@ -68,7 +120,19 @@ export function SimpleSiteBuilder({
   primaryColor?: string;
   initiallyPublished: boolean;
   publicHref: string;
+  title?: string;
+  description?: string;
+  onPersist?: (payload: {
+    page_title: string;
+    page_description: string | null;
+    sections: LodgeSiteSection[];
+    custom_pages?: LodgeSiteCustomPage[];
+    header_settings?: LodgeSiteHeaderSettings;
+    footer_settings?: LodgeSiteFooterSettings;
+    published?: boolean;
+  }) => Promise<void>;
 }) {
+  const isFullSiteBuilder = !onPersist;
   const [step, setStep] = useState<Step>(
     initialSections.length === 0 ? "template" : "edit"
   );
@@ -100,11 +164,62 @@ export function SimpleSiteBuilder({
     [sections]
   );
 
-  function applyTemplate(templateId: string) {
+  async function savePayload(
+    payload: {
+      page_title: string;
+      page_description: string | null;
+      sections: LodgeSiteSection[];
+      custom_pages?: LodgeSiteCustomPage[];
+      header_settings?: LodgeSiteHeaderSettings;
+      footer_settings?: LodgeSiteFooterSettings;
+      published?: boolean;
+    },
+    message = "Saved."
+  ) {
+    setSaving(true);
+    try {
+      if (onPersist) {
+        await onPersist(payload);
+      } else {
+        const res = await fetch(`/api/lodges/${lodgeSlug}/site`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error("save failed");
+      }
+      flash(message, "success");
+      if (payload.published !== undefined) setPublished(payload.published);
+      return true;
+    } catch {
+      flash("Could not save changes.", "error");
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function applyTemplate(templateId: string) {
     const tpl = TEMPLATES.find((t) => t.id === templateId);
     if (!tpl) return;
-    setSections(tpl.buildSections());
-    setStep("edit");
+    const nextSections = tpl
+      .buildSections()
+      .sort((a, b) => a.order - b.order)
+      .map((section, index) => ({ ...section, order: index + 1 }));
+    const sitePack = onPersist ? null : buildTemplateSitePack(tpl);
+    setSections(nextSections);
+    setStep("preview");
+    await savePayload(
+      {
+        page_title: pageTitle,
+        page_description: pageDescription || null,
+        sections: nextSections,
+        ...(sitePack ?? {}),
+      },
+      sitePack
+        ? `${tpl.name} site pack applied: homepage, pages, header, footer, and draft saved.`
+        : `${tpl.name} template applied and saved as a draft.`
+    );
   }
 
   function updateSection(id: string, patch: Partial<LodgeSiteSection>) {
@@ -135,6 +250,22 @@ export function SimpleSiteBuilder({
     );
   }
 
+  function toggleStyleArrayValue(
+    id: string,
+    key: "form_fields" | "form_required_fields",
+    value: string,
+    checked: boolean
+  ) {
+    const section = sections.find((s) => s.id === id);
+    const current = Array.isArray(section?.style?.[key])
+      ? section?.style?.[key] ?? []
+      : [];
+    const next = checked
+      ? Array.from(new Set([...current, value]))
+      : current.filter((item) => item !== value);
+    updateSectionStyle(id, { [key]: next.length > 0 ? next : null });
+  }
+
   function moveSection(id: string, direction: -1 | 1) {
     setSections((prev) => {
       const sorted = prev.slice().sort((a, b) => a.order - b.order);
@@ -151,8 +282,8 @@ export function SimpleSiteBuilder({
     setSections((prev) => prev.filter((s) => s.id !== id));
   }
 
-  function addSection(type: LodgeSiteSection["type"]) {
-    const preset = SECTION_PRESETS.find((p) => p.type === type);
+  function addSectionVariant(variantId: string) {
+    const preset = SECTION_VARIANTS.find((p) => p.id === variantId);
     if (!preset) return;
     const next = preset.example();
     setSections((prev) => [...prev, { ...next, order: prev.length + 1 }]);
@@ -161,28 +292,14 @@ export function SimpleSiteBuilder({
   }
 
   async function persist(opts: { nextPublished?: boolean } = {}) {
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/lodges/${lodgeSlug}/site`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          page_title: pageTitle,
-          page_description: pageDescription || null,
-          sections: orderedSections,
-          ...(opts.nextPublished !== undefined
-            ? { published: opts.nextPublished }
-            : {}),
-        }),
-      });
-      if (!res.ok) throw new Error("save failed");
-      flash("Saved.", "success");
-      if (opts.nextPublished !== undefined) setPublished(opts.nextPublished);
-    } catch {
-      flash("Could not save changes.", "error");
-    } finally {
-      setSaving(false);
-    }
+    await savePayload({
+      page_title: pageTitle,
+      page_description: pageDescription || null,
+      sections: orderedSections,
+      ...(opts.nextPublished !== undefined
+        ? { published: opts.nextPublished }
+        : {}),
+    });
   }
 
   async function togglePublish(nextPublished: boolean) {
@@ -197,10 +314,10 @@ export function SimpleSiteBuilder({
         <div>
           <h2 className="flex items-center gap-2 text-lg font-semibold text-dash-text">
             <Sparkles className="h-5 w-5 text-amber-600" />
-            Lodge website builder
+            {title}
           </h2>
           <p className="mt-1 text-sm text-dash-muted">
-            Pick a template, edit sections in friendly forms, preview, and publish when ready.
+            {description}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -217,11 +334,78 @@ export function SimpleSiteBuilder({
           </span>
           <Button asChild variant="dashboard" size="sm">
             <a href={publicHref} target="_blank" rel="noreferrer" className="gap-2">
-              View site <ExternalLink className="h-3.5 w-3.5" />
+              View published site <ExternalLink className="h-3.5 w-3.5" />
             </a>
           </Button>
         </div>
       </div>
+
+      {isFullSiteBuilder ? (
+        <div className="overflow-hidden rounded-3xl border border-dash-border bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 text-white shadow-dash">
+          <div className="grid gap-6 p-6 lg:grid-cols-[1.15fr_1fr] lg:p-8">
+            <div>
+              <span className="inline-flex rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
+                Website launch assistant
+              </span>
+              <h3 className="mt-4 max-w-2xl text-2xl font-semibold tracking-tight md:text-3xl">
+                Build a lodge website in minutes, then only tweak what matters.
+              </h3>
+              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-300">
+                The builder now starts from complete site packs. Non-technical admins can choose a design, replace a few words and images, preview it, and publish with confidence.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setStep("template")}
+                  className="rounded-xl bg-white text-slate-950 hover:bg-slate-100"
+                >
+                  Choose a site pack
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setStep(orderedSections.length ? "preview" : "template")}
+                  className="rounded-xl border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+                >
+                  Preview current draft
+                </Button>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {LAUNCH_GUIDE.map((item, index) => {
+                const Icon = item.icon;
+                const active = item.id === step;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setStep(item.id)}
+                    className={cn(
+                      "rounded-2xl border p-4 text-left transition",
+                      active
+                        ? "border-white/30 bg-white/15"
+                        : "border-white/10 bg-white/[0.06] hover:bg-white/10"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-slate-950">
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        Step {index + 1}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-sm font-semibold">{item.title}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-400">{item.body}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="dash-filter-bar flex flex-wrap items-center gap-2 py-3">
         {STEPS.map((s, i) => {
@@ -256,7 +440,7 @@ export function SimpleSiteBuilder({
             className="gap-2"
           >
             <Wand2 className="h-3.5 w-3.5" />
-            {advanced ? "Hide advanced editor" : "Advanced editor"}
+            {advanced ? "Simple editor" : "Advanced controls"}
           </Button>
           <Button
             variant="primary"
@@ -277,37 +461,134 @@ export function SimpleSiteBuilder({
             <div>
               <h3 className="dash-panel-header-title">Choose a starting template</h3>
               <p className="dash-panel-header-description">
-                Pick the layout closest to your lodge. You can rearrange and edit anything afterwards.
+                {isFullSiteBuilder
+                  ? "Pick one complete site. The homepage, extra pages, header, footer, images, and forms are set up for you."
+                  : "Pick the layout closest to this page. You can rearrange and edit anything afterwards."}
               </p>
             </div>
           </div>
-          <CardContent className="grid gap-4 border-t border-dash-border bg-dash-surface p-5 md:grid-cols-2">
-            {TEMPLATES.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => applyTemplate(t.id)}
-                className="group flex flex-col gap-3 rounded-xl border border-dash-border bg-dash-surface-subtle/40 p-5 text-left transition-colors hover:border-dash-ring/50 hover:bg-dash-surface"
-              >
-                <p className="text-sm font-semibold text-dash-text group-hover:text-dash-ring">
-                  {t.name}
-                </p>
-                <p className="text-sm text-dash-muted">{t.description}</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {t.buildSections().map((s) => (
-                    <span
-                      key={s.id}
-                      className="rounded-full border border-dash-border bg-white px-2 py-0.5 text-[11px] text-dash-muted"
-                    >
-                      {SECTION_LABELS[s.type]}
-                    </span>
-                  ))}
-                </div>
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-dash-ring">
-                  Use this template <ArrowRight className="h-3.5 w-3.5" />
-                </span>
-              </button>
-            ))}
+          <CardContent className="grid gap-5 border-t border-dash-border bg-dash-surface p-5 xl:grid-cols-2">
+            {TEMPLATES.map((t) => {
+              const previewSections = t.buildSections();
+              const accent = t.accent ?? primaryColor;
+              const heroImage = previewSections[0]?.style?.background_image_url;
+              const heroPosition =
+                previewSections[0]?.style?.background_position ?? "center";
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => applyTemplate(t.id)}
+                  disabled={saving}
+                  className="group overflow-hidden rounded-3xl border border-dash-border bg-dash-surface-subtle/40 text-left shadow-sm transition-all hover:-translate-y-1 hover:border-dash-ring/60 hover:bg-dash-surface hover:shadow-dash"
+                >
+                  <div
+                    className="h-2"
+                    style={{ background: `linear-gradient(90deg, ${accent}, ${accent}55)` }}
+                  />
+                  <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_15rem]">
+                    <div className="flex min-w-0 flex-col gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full border border-dash-border bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-dash-muted">
+                          {t.category ?? "Template"}
+                        </span>
+                        {(t.tags ?? []).slice(0, 2).map((tag) => (
+                          <span
+                            key={tag}
+                            className="rounded-full bg-dash-ring/10 px-2.5 py-1 text-[11px] font-medium text-dash-ring"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                      <div>
+                        <p className="text-base font-semibold text-dash-text group-hover:text-dash-ring">
+                          {t.name}
+                        </p>
+                        <p className="mt-1 text-sm leading-relaxed text-dash-muted">
+                          {t.description}
+                        </p>
+                      </div>
+                      {t.bestFor ? (
+                        <p className="rounded-xl border border-dash-border bg-white/70 px-3 py-2 text-xs text-dash-muted">
+                          Best for: {t.bestFor}
+                        </p>
+                      ) : null}
+                      {isFullSiteBuilder ? (
+                        <div className="grid gap-2 rounded-xl border border-dash-border bg-white/80 p-3 text-xs text-dash-muted sm:grid-cols-2">
+                          <span>Includes homepage and 4 pages</span>
+                          <span>Pre-built header and footer</span>
+                          <span>Contact form to lodge admins</span>
+                          <span>Join form to lead pipeline</span>
+                        </div>
+                      ) : null}
+                      <div className="flex flex-wrap gap-1.5">
+                        {previewSections.slice(0, 6).map((s, index) => (
+                          <span
+                            key={`${t.id}-${s.type}-${index}`}
+                            className="rounded-full border border-dash-border bg-white px-2 py-0.5 text-[11px] text-dash-muted"
+                          >
+                            {SECTION_LABELS[s.type]}
+                          </span>
+                        ))}
+                      </div>
+                      <span className="inline-flex items-center gap-1 text-sm font-semibold text-dash-ring">
+                        {saving
+                          ? "Applying template..."
+                          : isFullSiteBuilder
+                            ? "Apply site pack, save draft, and preview"
+                            : "Apply, save draft, and preview"}{" "}
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </span>
+                    </div>
+                    <div className="rounded-3xl border border-dash-border bg-white p-2 shadow-inner">
+                      <div
+                        className="relative overflow-hidden rounded-2xl px-4 py-8 text-center text-white"
+                        style={{
+                          background: `linear-gradient(135deg, ${accent}, #0f172a)`,
+                        }}
+                      >
+                        {heroImage ? (
+                          <>
+                            <div
+                              className="absolute inset-0 bg-cover bg-center"
+                              style={{
+                                backgroundImage: `url("${heroImage}")`,
+                                backgroundPosition: heroPosition,
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-slate-950/55" />
+                          </>
+                        ) : null}
+                        <p className="relative text-[10px] font-bold uppercase tracking-[0.2em] opacity-80">
+                          Hero
+                        </p>
+                        <p className="relative mt-2 line-clamp-2 text-sm font-semibold">
+                          {previewSections[0]?.heading ?? t.name}
+                        </p>
+                        <div className="relative mx-auto mt-4 h-1.5 w-20 rounded-full bg-white/40" />
+                      </div>
+                      <div className="mt-2 space-y-1.5">
+                        {previewSections.slice(1, 5).map((s, index) => (
+                          <div
+                            key={`${t.id}-preview-${s.type}-${index}`}
+                            className="flex items-center gap-2 rounded-xl bg-slate-50 px-2 py-2"
+                          >
+                            <span
+                              className="h-2 w-2 rounded-full"
+                              style={{ backgroundColor: accent }}
+                            />
+                            <span className="truncate text-[11px] text-slate-600">
+                              {SECTION_LABELS[s.type]}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </CardContent>
           <div className="flex justify-between border-t border-dash-border bg-dash-surface-subtle p-4">
             <span className="text-xs text-dash-muted">
@@ -369,9 +650,9 @@ export function SimpleSiteBuilder({
             <Card variant="panel" className="overflow-hidden p-0">
               <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
                 <div>
-                  <h3 className="dash-panel-header-title">Sections</h3>
+                  <h3 className="dash-panel-header-title">Personalise your site</h3>
                   <p className="dash-panel-header-description">
-                    Reorder, hide, or edit individual sections.
+                    Replace the words and images. The layout is already handled by the selected site pack.
                   </p>
                 </div>
                 <Button
@@ -385,20 +666,82 @@ export function SimpleSiteBuilder({
               </div>
 
               {showAddPanel && (
-                <div className="grid gap-2 border-t border-dash-border bg-dash-surface-subtle p-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {SECTION_PRESETS.map((p) => (
+                <div className="border-t border-dash-border bg-dash-surface-subtle p-4">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-dash-text">
+                        Section variant library
+                      </p>
+                      <p className="text-xs text-dash-muted">
+                        Add polished blocks with sensible layout, CTA, image, and form defaults.
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-dash-border bg-white px-2.5 py-1 text-xs text-dash-muted">
+                      {SECTION_VARIANTS.length} variants
+                    </span>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  {SECTION_VARIANTS.map((p) => (
                     <button
-                      key={p.type}
+                      key={p.id}
                       type="button"
-                      onClick={() => addSection(p.type)}
-                      className="flex flex-col items-start gap-1 rounded-lg border border-dash-border bg-white p-3 text-left text-sm hover:border-dash-ring/50 hover:bg-dash-surface"
+                      onClick={() => addSectionVariant(p.id)}
+                      className="flex min-h-32 flex-col items-start gap-2 rounded-xl border border-dash-border bg-white p-3 text-left text-sm transition hover:border-dash-ring/50 hover:bg-dash-surface hover:shadow-sm"
                     >
+                      <div className="flex w-full flex-wrap items-center gap-1.5">
+                        <span className="rounded-full border border-dash-border bg-dash-surface-subtle px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-dash-muted">
+                          {SECTION_LABELS[p.type]}
+                        </span>
+                        <span className="rounded-full bg-dash-ring/10 px-2 py-0.5 text-[10px] font-medium capitalize text-dash-ring">
+                          {p.tone}
+                        </span>
+                      </div>
                       <span className="font-medium text-dash-text">{p.label}</span>
-                      <span className="text-xs text-dash-muted">{p.description}</span>
+                      <span className="line-clamp-2 text-xs text-dash-muted">
+                        {p.description}
+                      </span>
+                      <div className="mt-auto flex flex-wrap gap-1">
+                        {p.tags.slice(0, 2).map((tag) => (
+                          <span
+                            key={tag}
+                            className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
                     </button>
                   ))}
+                  </div>
                 </div>
               )}
+
+              {orderedSections.length > 0 ? (
+                <div className="border-t border-dash-border bg-slate-950 p-4">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-white">Draft preview while editing</p>
+                      <p className="text-xs text-slate-400">
+                        Keep this open while changing sections below.
+                      </p>
+                    </div>
+                    <Button asChild type="button" variant="secondary" size="sm" className="rounded-xl">
+                      <a href={publicHref} target="_blank" rel="noreferrer">
+                        Preview in new tab
+                        <ExternalLink className="ml-2 h-3.5 w-3.5" />
+                      </a>
+                    </Button>
+                  </div>
+                  <div className="h-[520px] overflow-hidden rounded-2xl border border-white/10">
+                    <SitePreview
+                      sections={orderedSections}
+                      pageTitle={pageTitle}
+                      pageDescription={pageDescription || null}
+                      primaryColor={primaryColor}
+                    />
+                  </div>
+                </div>
+              ) : null}
 
               <CardContent className="border-t border-dash-border bg-dash-surface p-0">
                 {orderedSections.length === 0 ? (
@@ -564,6 +907,90 @@ export function SimpleSiteBuilder({
                                     </select>
                                   </div>
                                 </div>
+                                <div className="grid gap-3 sm:grid-cols-4">
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-medium text-dash-muted">
+                                      Background tone
+                                    </label>
+                                    <select
+                                      value={s.style?.background_tone ?? "default"}
+                                      onChange={(e) =>
+                                        updateSectionStyle(s.id, {
+                                          background_tone: e.target.value as NonNullable<
+                                            LodgeSiteSection["style"]
+                                          >["background_tone"],
+                                        })
+                                      }
+                                      className="h-10 w-full rounded-lg border border-dash-border bg-dash-surface px-3 text-sm text-dash-text"
+                                    >
+                                      <option value="default">Default</option>
+                                      <option value="soft">Soft</option>
+                                      <option value="brand">Brand tint</option>
+                                      <option value="dark">Dark</option>
+                                    </select>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-medium text-dash-muted">
+                                      Content width
+                                    </label>
+                                    <select
+                                      value={s.style?.content_width ?? "standard"}
+                                      onChange={(e) =>
+                                        updateSectionStyle(s.id, {
+                                          content_width: e.target.value as NonNullable<
+                                            LodgeSiteSection["style"]
+                                          >["content_width"],
+                                        })
+                                      }
+                                      className="h-10 w-full rounded-lg border border-dash-border bg-dash-surface px-3 text-sm text-dash-text"
+                                    >
+                                      <option value="narrow">Narrow</option>
+                                      <option value="standard">Standard</option>
+                                      <option value="wide">Wide</option>
+                                      <option value="full">Full width</option>
+                                    </select>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-medium text-dash-muted">
+                                      Spacing
+                                    </label>
+                                    <select
+                                      value={s.style?.spacing ?? "normal"}
+                                      onChange={(e) =>
+                                        updateSectionStyle(s.id, {
+                                          spacing: e.target.value as NonNullable<
+                                            LodgeSiteSection["style"]
+                                          >["spacing"],
+                                        })
+                                      }
+                                      className="h-10 w-full rounded-lg border border-dash-border bg-dash-surface px-3 text-sm text-dash-text"
+                                    >
+                                      <option value="compact">Compact</option>
+                                      <option value="normal">Normal</option>
+                                      <option value="spacious">Spacious</option>
+                                    </select>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-medium text-dash-muted">
+                                      Button style
+                                    </label>
+                                    <select
+                                      value={s.style?.button_variant ?? "solid"}
+                                      onChange={(e) =>
+                                        updateSectionStyle(s.id, {
+                                          button_variant: e.target.value as NonNullable<
+                                            LodgeSiteSection["style"]
+                                          >["button_variant"],
+                                        })
+                                      }
+                                      className="h-10 w-full rounded-lg border border-dash-border bg-dash-surface px-3 text-sm text-dash-text"
+                                    >
+                                      <option value="solid">Solid</option>
+                                      <option value="outline">Outline</option>
+                                      <option value="ghost">Ghost</option>
+                                    </select>
+                                  </div>
+                                </div>
                                 {s.style?.background_image_url && (
                                   <div className="grid gap-3 sm:grid-cols-2">
                                     <div className="space-y-1.5">
@@ -686,6 +1113,160 @@ export function SimpleSiteBuilder({
                                     Contact submissions email the lodge secretary. Lead intake also creates a CRM lead.
                                   </p>
                                 </div>
+                                {s.style?.form_mode && s.style.form_mode !== "none" ? (
+                                  <div className="rounded-2xl border border-dash-border bg-dash-surface/60 p-4">
+                                    <div className="grid gap-4 lg:grid-cols-2">
+                                      <div>
+                                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-dash-muted">
+                                          Visible fields
+                                        </p>
+                                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                          {FORM_FIELD_OPTIONS.filter((field) =>
+                                            s.style?.form_mode === "contact"
+                                              ? !["location", "how_heard"].includes(field.id)
+                                              : field.id !== "subject"
+                                          ).map((field) => {
+                                            const selected =
+                                              s.style?.form_fields?.includes(field.id) ??
+                                              ["phone", "subject", "location", "how_heard", "message"].includes(field.id);
+                                            return (
+                                              <label
+                                                key={field.id}
+                                                className="flex items-center gap-2 text-sm text-dash-text"
+                                              >
+                                                <input
+                                                  type="checkbox"
+                                                  checked={selected}
+                                                  onChange={(e) =>
+                                                    toggleStyleArrayValue(
+                                                      s.id,
+                                                      "form_fields",
+                                                      field.id,
+                                                      e.target.checked
+                                                    )
+                                                  }
+                                                />
+                                                {field.label}
+                                              </label>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-dash-muted">
+                                          Required fields
+                                        </p>
+                                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                          {FORM_FIELD_OPTIONS.filter((field) =>
+                                            (s.style?.form_fields ?? [
+                                              "phone",
+                                              "subject",
+                                              "location",
+                                              "how_heard",
+                                              "message",
+                                            ]).includes(field.id)
+                                          ).map((field) => (
+                                            <label
+                                              key={field.id}
+                                              className="flex items-center gap-2 text-sm text-dash-text"
+                                            >
+                                              <input
+                                                type="checkbox"
+                                                checked={
+                                                  s.style?.form_required_fields?.includes(field.id) ??
+                                                  false
+                                                }
+                                                onChange={(e) =>
+                                                  toggleStyleArrayValue(
+                                                    s.id,
+                                                    "form_required_fields",
+                                                    field.id,
+                                                    e.target.checked
+                                                  )
+                                                }
+                                              />
+                                              {field.label}
+                                            </label>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                                      <div className="space-y-1.5">
+                                        <label className="text-xs font-medium text-dash-muted">
+                                          Consent text
+                                        </label>
+                                        <Input
+                                          value={s.style?.form_consent_text ?? ""}
+                                          onChange={(e) =>
+                                            updateSectionStyle(s.id, {
+                                              form_consent_text: e.target.value || null,
+                                            })
+                                          }
+                                          placeholder="I agree to be contacted about my enquiry."
+                                        />
+                                      </div>
+                                      <div className="space-y-1.5">
+                                        <label className="text-xs font-medium text-dash-muted">
+                                          Thank-you message
+                                        </label>
+                                        <Input
+                                          value={s.style?.form_thank_you ?? ""}
+                                          onChange={(e) =>
+                                            updateSectionStyle(s.id, {
+                                              form_thank_you: e.target.value || null,
+                                            })
+                                          }
+                                          placeholder="Thanks. The lodge secretary will be in touch."
+                                        />
+                                      </div>
+                                    </div>
+                                    <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                                      <div className="space-y-1.5">
+                                        <label className="text-xs font-medium text-dash-muted">
+                                          Notification recipients
+                                        </label>
+                                        <Input
+                                          value={s.style?.form_notification_recipients ?? ""}
+                                          onChange={(e) =>
+                                            updateSectionStyle(s.id, {
+                                              form_notification_recipients: e.target.value || null,
+                                            })
+                                          }
+                                          placeholder="secretary@example.com, assistant@example.com"
+                                        />
+                                      </div>
+                                      <div className="space-y-1.5">
+                                        <label className="text-xs font-medium text-dash-muted">
+                                          Auto-reply subject
+                                        </label>
+                                        <Input
+                                          value={s.style?.form_autoresponder_subject ?? ""}
+                                          onChange={(e) =>
+                                            updateSectionStyle(s.id, {
+                                              form_autoresponder_subject: e.target.value || null,
+                                            })
+                                          }
+                                          placeholder="We received your enquiry"
+                                        />
+                                      </div>
+                                      <div className="space-y-1.5">
+                                        <label className="text-xs font-medium text-dash-muted">
+                                          Auto-reply body
+                                        </label>
+                                        <Input
+                                          value={s.style?.form_autoresponder_body ?? ""}
+                                          onChange={(e) =>
+                                            updateSectionStyle(s.id, {
+                                              form_autoresponder_body: e.target.value || null,
+                                            })
+                                          }
+                                          placeholder="Thanks for getting in touch."
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : null}
                               </div>
                             )}
                           </div>
@@ -760,7 +1341,7 @@ export function SimpleSiteBuilder({
             <div>
               <h3 className="dash-panel-header-title">Live preview</h3>
               <p className="dash-panel-header-description">
-                Showing only visible sections, in order.
+                Draft preview with site header, footer, images, and visible sections in order.
               </p>
             </div>
           </div>
@@ -768,6 +1349,7 @@ export function SimpleSiteBuilder({
             <SitePreview
               sections={orderedSections}
               pageTitle={pageTitle}
+              pageDescription={pageDescription || null}
               primaryColor={primaryColor}
             />
           </div>
@@ -775,9 +1357,17 @@ export function SimpleSiteBuilder({
             <Button variant="dashboard" size="sm" onClick={() => setStep("edit")}>
               <ChevronLeft className="mr-1 h-3.5 w-3.5" /> Back to edit
             </Button>
-            <Button variant="primary" size="sm" onClick={() => setStep("publish")}>
+            <div className="flex gap-2">
+              <Button asChild variant="dashboard" size="sm">
+                <a href={publicHref} target="_blank" rel="noreferrer">
+                  Preview in new tab
+                  <ExternalLink className="ml-2 h-3.5 w-3.5" />
+                </a>
+              </Button>
+              <Button variant="primary" size="sm" onClick={() => setStep("publish")}>
               Continue to publish <ChevronRight className="ml-1 h-3.5 w-3.5" />
-            </Button>
+              </Button>
+            </div>
           </div>
         </Card>
       )}

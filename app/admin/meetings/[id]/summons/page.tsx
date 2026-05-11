@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -140,6 +141,17 @@ export default async function MeetingSummonsPage({
 
       <article className="rounded-2xl border border-dash-border bg-white p-8 text-slate-950 shadow-sm print:border-0 print:p-0 print:shadow-none">
         <header className="border-b border-slate-300 pb-6 text-center">
+          {lodge?.logo_url ? (
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm print:h-16 print:w-16">
+              <Image
+                src={lodge.logo_url}
+                alt={`${lodge.name} logo`}
+                width={96}
+                height={96}
+                className="h-full w-full object-contain p-2"
+              />
+            </div>
+          ) : null}
           <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">
             Summons
           </p>

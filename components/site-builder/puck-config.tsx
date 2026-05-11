@@ -46,6 +46,17 @@ type SectionProps = {
   overlayOpacity?: number;
   backgroundPosition?: string;
   formMode?: "none" | "contact" | "lead";
+  backgroundTone?: "default" | "soft" | "brand" | "dark";
+  contentWidth?: "narrow" | "standard" | "wide" | "full";
+  spacing?: "compact" | "normal" | "spacious";
+  buttonVariant?: "solid" | "outline" | "ghost";
+  formFields?: string;
+  formRequiredFields?: string;
+  formConsentText?: string;
+  formThankYou?: string;
+  formNotificationRecipients?: string;
+  formAutoresponderSubject?: string;
+  formAutoresponderBody?: string;
 };
 
 type ComponentProps = {
@@ -74,7 +85,7 @@ function CTAButton({
   label: string;
   href: string;
   color?: string;
-  variant?: "solid" | "outline";
+  variant?: "solid" | "outline" | "ghost";
 }) {
   if (!label) return null;
   return (
@@ -82,9 +93,11 @@ function CTAButton({
       href={href || "#"}
       className="mt-6 inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold shadow-lg transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5"
       style={
-        variant === "solid"
-          ? { backgroundColor: color, color: "#fff" }
-          : { border: `2px solid ${color}`, color }
+        variant === "outline"
+          ? { border: `2px solid ${color}`, color }
+          : variant === "ghost"
+            ? { color }
+            : { backgroundColor: color, color: "#fff" }
       }
     >
       {label}
@@ -234,6 +247,72 @@ const sectionFields = {
       { label: "Contact secretary", value: "contact" },
       { label: "Lead intake", value: "lead" },
     ],
+  },
+  backgroundTone: {
+    type: "select" as const,
+    label: "Background tone",
+    options: [
+      { label: "Default", value: "default" },
+      { label: "Soft", value: "soft" },
+      { label: "Brand tint", value: "brand" },
+      { label: "Dark", value: "dark" },
+    ],
+  },
+  contentWidth: {
+    type: "select" as const,
+    label: "Content width",
+    options: [
+      { label: "Narrow", value: "narrow" },
+      { label: "Standard", value: "standard" },
+      { label: "Wide", value: "wide" },
+      { label: "Full", value: "full" },
+    ],
+  },
+  spacing: {
+    type: "select" as const,
+    label: "Spacing",
+    options: [
+      { label: "Compact", value: "compact" },
+      { label: "Normal", value: "normal" },
+      { label: "Spacious", value: "spacious" },
+    ],
+  },
+  buttonVariant: {
+    type: "select" as const,
+    label: "Button style",
+    options: [
+      { label: "Solid", value: "solid" },
+      { label: "Outline", value: "outline" },
+      { label: "Ghost", value: "ghost" },
+    ],
+  },
+  formFields: {
+    type: "text" as const,
+    label: "Visible optional form fields",
+  },
+  formRequiredFields: {
+    type: "text" as const,
+    label: "Required optional form fields",
+  },
+  formConsentText: {
+    type: "textarea" as const,
+    label: "Consent text",
+  },
+  formThankYou: {
+    type: "textarea" as const,
+    label: "Thank-you message",
+  },
+  formNotificationRecipients: {
+    type: "text" as const,
+    label: "Notification recipients",
+  },
+  formAutoresponderSubject: {
+    type: "text" as const,
+    label: "Auto-reply subject",
+  },
+  formAutoresponderBody: {
+    type: "textarea" as const,
+    label: "Auto-reply body",
   },
 };
 

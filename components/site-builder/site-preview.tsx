@@ -19,10 +19,12 @@ const viewportConfig: Record<Viewport, { width: string; icon: React.ComponentTyp
 export function SitePreview({
   sections,
   pageTitle,
+  pageDescription,
   primaryColor = "#3b82f6",
 }: {
   sections: SiteSection[];
   pageTitle: string;
+  pageDescription?: string | null;
   primaryColor?: string;
 }) {
   const [viewport, setViewport] = useState<Viewport>("desktop");
@@ -59,9 +61,9 @@ export function SitePreview({
       </div>
 
       {/* Preview frame */}
-      <div className="flex-1 overflow-auto bg-slate-900/50 p-4">
+      <div className="flex-1 overflow-auto bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.18),transparent_32%),#020617] p-4">
         <div
-          className="mx-auto overflow-hidden rounded-xl border border-white/10 bg-white shadow-2xl transition-all duration-500"
+          className="mx-auto overflow-hidden rounded-2xl border border-white/10 bg-white shadow-2xl shadow-black/40 transition-all duration-500"
           style={{
             maxWidth: viewportConfig[viewport].width,
             minHeight: "400px",
@@ -72,13 +74,74 @@ export function SitePreview({
               No visible sections to preview
             </div>
           ) : (
-            visibleSections.map((section) => (
-              <SectionPreview
-                key={section.id}
-                section={section}
-                primaryColor={primaryColor}
-              />
-            ))
+            <>
+              <div className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white/90 px-6 py-4 shadow-sm backdrop-blur">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-xs font-bold tracking-[0.18em] text-white shadow-lg"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    LG
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-950">
+                      {pageTitle || "Lodge website"}
+                    </p>
+                    <p className="truncate text-xs text-slate-500">
+                      Draft site preview
+                    </p>
+                  </div>
+                </div>
+                <div className="hidden items-center gap-5 text-xs font-medium text-slate-600 sm:flex">
+                  <span>Home</span>
+                  <span>About</span>
+                  <span>Events</span>
+                  <span>Charity</span>
+                  <span className="rounded-full px-3 py-1 text-white" style={{ backgroundColor: primaryColor }}>
+                    Contact
+                  </span>
+                </div>
+              </div>
+              {visibleSections.map((section) => (
+                <SectionPreview
+                  key={section.id}
+                  section={section}
+                  primaryColor={primaryColor}
+                />
+              ))}
+              <footer className="border-t border-slate-800 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 px-6 py-10 text-white">
+                <div className="grid gap-8 md:grid-cols-[1.4fr_1fr_1fr]">
+                  <div>
+                    <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-2xl text-xs font-bold tracking-[0.18em] text-white" style={{ backgroundColor: primaryColor }}>
+                      LG
+                    </div>
+                    <p className="text-base font-semibold">{pageTitle || "Lodge website"}</p>
+                    <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-400">
+                      {pageDescription ||
+                        "A public lodge website with meetings, charity, candidate enquiries, and contact details."}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Explore
+                    </p>
+                    <div className="mt-3 grid gap-2 text-sm text-slate-400">
+                      <span>Meetings</span>
+                      <span>Charity</span>
+                      <span>Join</span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Contact
+                    </p>
+                    <p className="mt-3 text-sm text-slate-400">
+                      Footer details pull from lodge settings on the published site.
+                    </p>
+                  </div>
+                </div>
+              </footer>
+            </>
           )}
         </div>
       </div>
