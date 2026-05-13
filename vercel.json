@@ -4,6 +4,10 @@
     {
       "path": "/api/jobs/process?max=25",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/post-event-emails",
+      "schedule": "0 9 * * *"
     }
   ]
 }

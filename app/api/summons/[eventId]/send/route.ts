@@ -62,6 +62,21 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Meeting not found." }, { status: 404 });
     }
 
+    // Hard guard: a summons must have been explicitly approved by an admin
+    // before it can be sent to the membership. Test sends bypass this so an
+    // admin can still email themselves a preview.
+    const status = event.summons_status ?? "none";
+    if (!testRecipientEmail && status !== "approved" && status !== "sent") {
+      return NextResponse.json(
+        {
+          error:
+            "Summons has not been approved for sending. Open the summons editor and approve it first.",
+          summons_status: status,
+        },
+        { status: 409 }
+      );
+    }
+
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? request.nextUrl.origin;
     const recipients: SummonsRecipient[] = testRecipientEmail
       ? [
@@ -156,6 +171,12 @@ export async function POST(request: NextRequest, { params }: Params) {
       failed_count: failures.length,
       failures,
     });
+
+    if (!testRecipientEmail && sentCount > 0) {
+      await db.setEventSummonsStatus(event.id, lodgeId, "sent", {
+        summons_last_sent_at: new Date().toISOString(),
+      });
+    }
 
     await writeAuditLog({
       lodgeId,

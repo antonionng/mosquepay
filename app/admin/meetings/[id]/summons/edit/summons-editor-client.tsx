@@ -4,7 +4,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { ArrowLeft, Eye, Plus, Save, Send, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Eye,
+  Plus,
+  Save,
+  Send,
+  ShieldCheck,
+  ShieldOff,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,6 +36,8 @@ type SummonsSend = {
   failed_count: number;
   created_at: string;
 };
+
+type SummonsStatus = "none" | "draft" | "approved" | "sent";
 
 function normaliseItems(items: string[]) {
   return items.length > 0 ? items : [""];
@@ -97,19 +108,30 @@ export function SummonsEditorClient({
   eventTitle,
   sendHistory,
   initial,
+  summonsStatus: initialStatus,
+  approvedAt: initialApprovedAt,
+  approvedByEmail: initialApprovedBy,
 }: {
   eventId: string;
   eventTitle: string;
   sendHistory: SummonsSend[];
   initial: SummonsForm;
+  summonsStatus: SummonsStatus;
+  approvedAt: string | null;
+  approvedByEmail: string | null;
 }) {
   const router = useRouter();
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [status, setStatus] = useState<SummonsStatus>(initialStatus);
+  const [approvedAt, setApprovedAt] = useState<string | null>(initialApprovedAt);
+  const [approvedBy, setApprovedBy] = useState<string | null>(initialApprovedBy);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [sendConfirmOpen, setSendConfirmOpen] = useState(false);
+  const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
   const [latestSend, setLatestSend] = useState<SummonsSend | null>(
     sendHistory[0] ?? null
   );
@@ -134,6 +156,11 @@ export function SummonsEditorClient({
     setSaved(false);
     try {
       await saveSummons();
+      if (status !== "sent") {
+        setStatus("draft");
+        setApprovedAt(null);
+        setApprovedBy(null);
+      }
       setSaved(true);
       router.refresh();
     } catch (saveError) {
@@ -143,12 +170,67 @@ export function SummonsEditorClient({
     }
   }
 
+  async function handleApprove() {
+    setApproving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      await saveSummons();
+      const res = await fetch(`/api/summons/${eventId}/approve`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error ?? "Failed to approve summons");
+      }
+      setStatus(data.event?.summons_status ?? "approved");
+      setApprovedAt(data.event?.summons_approved_at ?? new Date().toISOString());
+      setApprovedBy(data.event?.summons_approved_by_email ?? null);
+      router.refresh();
+      return true;
+    } catch (approveError) {
+      setError(
+        approveError instanceof Error
+          ? approveError.message
+          : "Could not approve summons."
+      );
+      return false;
+    } finally {
+      setApproving(false);
+    }
+  }
+
+  async function handleUnapprove() {
+    setApproving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/summons/${eventId}/approve`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error ?? "Failed to revert approval.");
+      }
+      setStatus(data.event?.summons_status ?? "draft");
+      setApprovedAt(null);
+      setApprovedBy(null);
+      router.refresh();
+    } catch (revertError) {
+      setError(
+        revertError instanceof Error
+          ? revertError.message
+          : "Could not revert approval."
+      );
+    } finally {
+      setApproving(false);
+    }
+  }
+
   async function handleSend() {
     setSending(true);
     setError(null);
     setSaved(false);
     try {
-      await saveSummons();
       const res = await fetch(`/api/summons/${eventId}/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -158,6 +240,7 @@ export function SummonsEditorClient({
         throw new Error(data.error ?? "Failed to send summons");
       }
       setLatestSend(data.send);
+      setStatus("sent");
       router.refresh();
       return true;
     } catch (sendError) {
@@ -167,6 +250,9 @@ export function SummonsEditorClient({
       setSending(false);
     }
   }
+
+  const sendDisabled =
+    saving || sending || approving || (status !== "approved" && status !== "sent");
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
@@ -188,16 +274,71 @@ export function SummonsEditorClient({
             <Save className="mr-2 h-4 w-4" />
             {saving ? "Saving..." : "Save summons"}
           </Button>
+          {status === "approved" || status === "sent" ? (
+            <Button
+              type="button"
+              variant="dashboard"
+              disabled={approving || sending}
+              onClick={handleUnapprove}
+            >
+              <ShieldOff className="mr-2 h-4 w-4" />
+              {approving ? "Reverting..." : "Revert approval"}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="dashboard"
+              disabled={approving || sending}
+              onClick={() => setApproveConfirmOpen(true)}
+            >
+              <ShieldCheck className="mr-2 h-4 w-4" />
+              {approving ? "Approving..." : "Approve for sending"}
+            </Button>
+          )}
           <Button
             type="button"
             variant="default"
-            disabled={saving || sending}
+            disabled={sendDisabled}
             onClick={() => setSendConfirmOpen(true)}
+            title={
+              sendDisabled && status !== "sent"
+                ? "Approve the summons first to enable sending."
+                : undefined
+            }
           >
             <Send className="mr-2 h-4 w-4" />
             {sending ? "Sending..." : "Send summons"}
           </Button>
         </div>
+      </div>
+
+      <div
+        className={`rounded-xl border px-4 py-3 text-sm ${
+          status === "sent"
+            ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+            : status === "approved"
+              ? "border-blue-200 bg-blue-50 text-blue-900"
+              : status === "draft"
+                ? "border-amber-200 bg-amber-50 text-amber-900"
+                : "border-slate-200 bg-slate-50 text-slate-800"
+        }`}
+      >
+        <p className="flex items-center gap-2 font-medium">
+          <ShieldCheck className="h-4 w-4" />
+          {status === "sent"
+            ? "Sent. The summons has been emailed to active members."
+            : status === "approved"
+              ? "Approved and ready to send. Edits will revert this back to draft."
+              : status === "draft"
+                ? "Draft. Approve before the Send button will work."
+                : "Not drafted yet. Save the form first to create a draft."}
+        </p>
+        {status === "approved" && approvedAt && (
+          <p className="mt-1 text-xs">
+            Approved {new Date(approvedAt).toLocaleString("en-GB")}
+            {approvedBy ? ` by ${approvedBy}` : ""}.
+          </p>
+        )}
       </div>
 
       <div className="admin-page-head">
@@ -231,12 +372,25 @@ export function SummonsEditorClient({
       )}
 
       <ConfirmActionDialog
+        open={approveConfirmOpen}
+        onOpenChange={setApproveConfirmOpen}
+        title="Approve summons for sending?"
+        description="This saves the current draft and marks it as approved. Sending is still a separate, deliberate step. Any further edits will revert the approval."
+        confirmLabel="Approve"
+        loading={approving}
+        onConfirm={async () => {
+          const ok = await handleApprove();
+          if (ok) setApproveConfirmOpen(false);
+        }}
+      />
+
+      <ConfirmActionDialog
         open={sendConfirmOpen}
         onOpenChange={setSendConfirmOpen}
         title="Send summons to active members?"
-        description="This saves the current summons, creates secure access links, and emails every active member for this lodge. The send is recorded in the audit trail."
+        description="Creates secure access links and emails every active member for this lodge. The send is recorded in the audit trail. Drafts cannot be sent until they have been approved."
         confirmLabel="Send summons"
-        loading={sending || saving}
+        loading={sending}
         onConfirm={async () => {
           const sent = await handleSend();
           if (sent) setSendConfirmOpen(false);

@@ -99,6 +99,15 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       include_member_directory: body.include_member_directory !== false,
     });
 
+    // Editing a summons reverts it back to draft so an approval is required
+    // again before sending. This keeps the human gate honest after any edit.
+    if (event.summons_status !== "sent") {
+      await db.setEventSummonsStatus(event.id, lodgeId, "draft", {
+        summons_approved_at: null,
+        summons_approved_by_email: null,
+      });
+    }
+
     await writeAuditLog({
       lodgeId,
       action: "updated",

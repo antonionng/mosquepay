@@ -41,6 +41,8 @@ import type {
   EventSummons,
   EventSummonsSend,
   EventSummonsAccessLink,
+  MeetingSequence,
+  SummonsStatus,
   Province,
   MemberRank,
   LodgeVisit,
@@ -576,9 +578,19 @@ export async function getEventBySlug(
   return data as Event | null;
 }
 
+type AddEventOptional =
+  | "sequence_id"
+  | "sequence_position"
+  | "summons_status"
+  | "summons_auto_drafted_at"
+  | "summons_approved_at"
+  | "summons_approved_by_email"
+  | "summons_last_sent_at";
+
 export async function addEvent(
   lodgeId: string,
-  data: Omit<Event, "id" | "lodge_id" | "created_at" | "updated_at">
+  data: Omit<Event, "id" | "lodge_id" | "created_at" | "updated_at" | AddEventOptional> &
+    Partial<Pick<Event, AddEventOptional>>
 ): Promise<Event> {
   const { data: row, error } = await db()
     .from("events")
@@ -1868,6 +1880,148 @@ export async function getEventSummonsAccessLinkByTokenHash(
     .maybeSingle();
   if (error) throw error;
   return data as EventSummonsAccessLink | null;
+}
+
+// ---------------------------------------------------------------------------
+// Meeting sequences (recurring schedule recipes)
+// ---------------------------------------------------------------------------
+
+export async function listMeetingSequences(
+  lodgeId: string
+): Promise<MeetingSequence[]> {
+  const { data, error } = await db()
+    .from("meeting_sequences")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as MeetingSequence[];
+}
+
+export async function getMeetingSequenceById(
+  id: string,
+  lodgeId: string
+): Promise<MeetingSequence | null> {
+  const { data, error } = await db()
+    .from("meeting_sequences")
+    .select("*")
+    .eq("id", id)
+    .eq("lodge_id", lodgeId)
+    .maybeSingle();
+  if (error) throw error;
+  return data as MeetingSequence | null;
+}
+
+export async function listActiveMeetingSequencesForAllLodges(): Promise<
+  MeetingSequence[]
+> {
+  const { data, error } = await db()
+    .from("meeting_sequences")
+    .select("*")
+    .eq("active", true)
+    .eq("auto_draft_summons", true);
+  if (error) throw error;
+  return (data ?? []) as MeetingSequence[];
+}
+
+export async function createMeetingSequence(
+  lodgeId: string,
+  data: Omit<MeetingSequence, "id" | "lodge_id" | "created_at" | "updated_at">
+): Promise<MeetingSequence> {
+  const { data: row, error } = await db()
+    .from("meeting_sequences")
+    .insert({ ...data, lodge_id: lodgeId })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return row as MeetingSequence;
+}
+
+export async function updateMeetingSequence(
+  id: string,
+  lodgeId: string,
+  updates: Partial<
+    Omit<MeetingSequence, "id" | "lodge_id" | "created_at" | "updated_at">
+  >
+): Promise<MeetingSequence | null> {
+  const { data, error } = await db()
+    .from("meeting_sequences")
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("lodge_id", lodgeId)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  return data as MeetingSequence | null;
+}
+
+export async function deleteMeetingSequence(
+  id: string,
+  lodgeId: string
+): Promise<boolean> {
+  const { error } = await db()
+    .from("meeting_sequences")
+    .delete()
+    .eq("id", id)
+    .eq("lodge_id", lodgeId);
+  if (error) throw error;
+  return true;
+}
+
+export async function getEventsBySequenceId(
+  sequenceId: string,
+  lodgeId: string
+): Promise<Event[]> {
+  const { data, error } = await db()
+    .from("events")
+    .select("*")
+    .eq("sequence_id", sequenceId)
+    .eq("lodge_id", lodgeId)
+    .order("event_date", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as Event[];
+}
+
+export async function getEventsAwaitingSummonsDraft(
+  lodgeId: string,
+  windowEndIso: string
+): Promise<Event[]> {
+  const nowIso = new Date().toISOString();
+  const { data, error } = await db()
+    .from("events")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .eq("summons_status", "none")
+    .gte("event_date", nowIso)
+    .lte("event_date", windowEndIso)
+    .order("event_date", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as Event[];
+}
+
+export async function setEventSummonsStatus(
+  eventId: string,
+  lodgeId: string,
+  status: SummonsStatus,
+  extra?: Partial<
+    Pick<
+      Event,
+      | "summons_auto_drafted_at"
+      | "summons_approved_at"
+      | "summons_approved_by_email"
+      | "summons_last_sent_at"
+    >
+  >
+): Promise<Event | null> {
+  const { data, error } = await db()
+    .from("events")
+    .update({ summons_status: status, ...(extra ?? {}) })
+    .eq("id", eventId)
+    .eq("lodge_id", lodgeId)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  return data as Event | null;
 }
 
 export async function recordEventSummonsAccess(

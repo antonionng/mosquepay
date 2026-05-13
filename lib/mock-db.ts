@@ -522,6 +522,13 @@ export type MockEvent = LodgeScoped & {
   guest_ticket_description: string | null;
   featured_image_url: string | null;
   published: boolean;
+  sequence_id: string | null;
+  sequence_position: number | null;
+  summons_status: "none" | "draft" | "approved" | "sent";
+  summons_auto_drafted_at: string | null;
+  summons_approved_at: string | null;
+  summons_approved_by_email: string | null;
+  summons_last_sent_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -550,13 +557,42 @@ export function getEventBySlug(slug: string, opts?: { lodge_slug?: string }): Mo
   return events.find((e) => e.slug === slug && e.published && e.lodge_slug === lodgeSlug) ?? null;
 }
 
-export function addEvent(
-  data: Omit<MockEvent, "id" | "created_at" | "updated_at" | "lodge_slug"> & { lodge_slug?: string }
-): MockEvent {
+type AddEventInput = Omit<
+  MockEvent,
+  | "id"
+  | "created_at"
+  | "updated_at"
+  | "lodge_slug"
+  | "sequence_id"
+  | "sequence_position"
+  | "summons_status"
+  | "summons_auto_drafted_at"
+  | "summons_approved_at"
+  | "summons_approved_by_email"
+  | "summons_last_sent_at"
+> & {
+  lodge_slug?: string;
+  sequence_id?: string | null;
+  sequence_position?: number | null;
+  summons_status?: MockEvent["summons_status"];
+  summons_auto_drafted_at?: string | null;
+  summons_approved_at?: string | null;
+  summons_approved_by_email?: string | null;
+  summons_last_sent_at?: string | null;
+};
+
+export function addEvent(data: AddEventInput): MockEvent {
   assertInMemoryMock();
   const now = new Date().toISOString();
   const event: MockEvent = {
     id: uuid(),
+    sequence_id: null,
+    sequence_position: null,
+    summons_status: "none",
+    summons_auto_drafted_at: null,
+    summons_approved_at: null,
+    summons_approved_by_email: null,
+    summons_last_sent_at: null,
     ...data,
     lodge_slug: withLodgeSlug(data.lodge_slug),
     created_at: now,
@@ -1114,7 +1150,7 @@ function seedData() {
   });
 
   const guestMeetingDefaults = { enable_meeting_fee: false, meeting_fee_amount: null, meeting_fee_description: null, enable_guest_tickets: false, guest_ticket_price: null, guest_ticket_description: null };
-  const seedEvents: Array<Omit<MockEvent, "id" | "created_at" | "updated_at" | "lodge_slug">> = [
+  const seedEvents: Array<AddEventInput> = [
     { title: "Regular Meeting – April", slug: "regular-meeting-april", description: "Monthly regular meeting with ceremony.", event_type: "regular_meeting", event_date: daysFromNow(5), event_time: "18:30", location: "Mark Masons' Hall", temple_room: "Temple 1", dress_code: "Dark lounge suit", enable_rsvp: true, rsvp_deadline: daysFromNow(3), max_attendees: 60, enable_payments: true, enable_dining_rsvp: true, dining_price: 45, dining_description: "Three course festive board", enable_charity_donation: true, charity_name: "Masonic Charitable Foundation", charity_description: "Support MCF", charity_suggested_amounts: [5, 10, 20], charity_allow_custom: true, enable_raffle_donation: true, raffle_description: "Charity raffle", raffle_suggested_amounts: [2, 5, 10], raffle_allow_custom: true, ...guestMeetingDefaults, enable_guest_tickets: true, guest_ticket_price: 45, guest_ticket_description: "Guest dining ticket", featured_image_url: null, published: true },
     { title: "Installation Meeting", slug: "installation-meeting", description: "Annual installation of the new Worshipful Master.", event_type: "installation", event_date: daysFromNow(30), event_time: "16:00", location: "Mark Masons' Hall", temple_room: "Grand Temple", dress_code: "Morning dress", enable_rsvp: true, rsvp_deadline: daysFromNow(25), max_attendees: 120, enable_payments: true, enable_dining_rsvp: true, dining_price: 65, dining_description: "Four course installation banquet", enable_charity_donation: true, charity_name: "London Grand Rank Benevolent Fund", charity_description: null, charity_suggested_amounts: [10, 25, 50], charity_allow_custom: true, enable_raffle_donation: true, raffle_description: "Grand raffle", raffle_suggested_amounts: [5, 10], raffle_allow_custom: false, ...guestMeetingDefaults, enable_guest_tickets: true, guest_ticket_price: 65, guest_ticket_description: "Guest banquet ticket", featured_image_url: null, published: true },
     { title: "Summer Social Evening", slug: "summer-social", description: "Annual summer social for brethren and guests.", event_type: "social", event_date: daysFromNow(60), event_time: "19:00", location: "The Ivy, London", temple_room: null, dress_code: "Smart casual", enable_rsvp: true, rsvp_deadline: daysFromNow(55), max_attendees: 40, enable_payments: true, enable_dining_rsvp: false, dining_price: null, dining_description: null, enable_charity_donation: false, charity_name: null, charity_description: null, charity_suggested_amounts: null, charity_allow_custom: false, enable_raffle_donation: false, raffle_description: null, raffle_suggested_amounts: null, raffle_allow_custom: false, ...guestMeetingDefaults, featured_image_url: null, published: true },

@@ -82,6 +82,12 @@ export default async function AdminMeetingsPage() {
       published: m.published,
       hasSummons,
       summonsSentCount,
+      summonsStatus: m.summons_status as
+        | "none"
+        | "draft"
+        | "approved"
+        | "sent"
+        | undefined,
     });
   }
 

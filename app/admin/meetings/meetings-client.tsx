@@ -576,10 +576,15 @@ export function AdminMeetingsClient({
             Calendar, lodge meetings, summons, and attendance in one place.
           </p>
         </div>
-        <Button variant="primary" size="sm" onClick={openNewMeetingForm}>
-          <Plus className="mr-1.5 h-4 w-4" />
-          New Meeting
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant="dashboard" size="sm">
+            <Link href="/admin/sequences">Sequences</Link>
+          </Button>
+          <Button variant="primary" size="sm" onClick={openNewMeetingForm}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            New Meeting
+          </Button>
+        </div>
       </div>
 
       <Tabs value={workflowTab} onValueChange={(value) => selectWorkflowTab(value as WorkflowTab)}>

@@ -18,6 +18,7 @@ export type MeetingReadinessInput = {
   published: boolean;
   hasSummons: boolean;
   summonsSentCount: number;
+  summonsStatus?: "none" | "draft" | "approved" | "sent";
 };
 
 export type ReadinessIssue = {
@@ -53,16 +54,28 @@ export function getMeetingReadiness(
     });
   }
 
-  if (isFuture && !input.hasSummons) {
+  const summonsStatus =
+    input.summonsStatus ?? (input.hasSummons ? "draft" : "none");
+  if (isFuture && summonsStatus === "none") {
     issues.push({
       key: "no_summons",
       message: "Summons not drafted",
       severity: daysUntil <= 14 ? "urgent" : "warn",
     });
-  } else if (isFuture && input.hasSummons && input.summonsSentCount === 0) {
+  } else if (isFuture && summonsStatus === "draft") {
+    issues.push({
+      key: "summons_unapproved",
+      message: "Summons drafted but not yet approved",
+      severity: daysUntil <= 14 ? "urgent" : "warn",
+    });
+  } else if (
+    isFuture &&
+    summonsStatus === "approved" &&
+    input.summonsSentCount === 0
+  ) {
     issues.push({
       key: "summons_unsent",
-      message: "Summons drafted but never sent",
+      message: "Summons approved but not yet sent",
       severity: daysUntil <= 7 ? "urgent" : "warn",
     });
   }

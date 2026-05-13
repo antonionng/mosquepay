@@ -32,11 +32,20 @@ export default async function EditMeetingSummonsPage({
       : [null, [], useMock ? mockDb.listLodges()[0] ?? null : null];
   const defaultOpeningText = renderDefaultSummonsOpening(event, lodge);
 
+  const summonsStatus = (event.summons_status ?? "none") as
+    | "none"
+    | "draft"
+    | "approved"
+    | "sent";
+
   return (
     <SummonsEditorClient
       eventId={id}
       eventTitle={event.title}
       sendHistory={JSON.parse(JSON.stringify(sends))}
+      summonsStatus={summonsStatus}
+      approvedAt={event.summons_approved_at ?? null}
+      approvedByEmail={event.summons_approved_by_email ?? null}
       initial={{
         issue_date:
           summons?.issue_date ??

@@ -263,6 +263,58 @@ export type Event = {
   featured_image_url: string | null;
   created_by: string | null;
   published: boolean;
+  sequence_id: string | null;
+  sequence_position: number | null;
+  summons_status: SummonsStatus;
+  summons_auto_drafted_at: string | null;
+  summons_approved_at: string | null;
+  summons_approved_by_email: string | null;
+  summons_last_sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SummonsStatus = "none" | "draft" | "approved" | "sent";
+
+/**
+ * A recurring meeting recipe for a lodge. The sequence captures the
+ * standard "third Saturday in Jan/Mar/Jun/Sep/Nov" rhythm so the
+ * secretary can generate a year of regular meetings in one go and have
+ * draft summons auto-created within the configured lead window.
+ *
+ * Sends are NEVER automatic. The send route checks summons_status on
+ * the event and refuses to dispatch unless an admin has explicitly
+ * approved the draft.
+ */
+export type MeetingSequence = {
+  id: string;
+  lodge_id: string;
+  name: string;
+  description: string | null;
+  event_type: string;
+  /** ISO weekday: 1 = Monday, 7 = Sunday. */
+  day_of_week: number;
+  /** 1..5 for nth occurrence of the weekday in the month, -1 for last. */
+  week_of_month: number;
+  /** Calendar months 1..12 the sequence runs in. */
+  months: number[];
+  default_event_time: string | null;
+  default_location: string | null;
+  default_temple_room: string | null;
+  default_dress_code: string | null;
+  default_dining_price: number | null;
+  default_meeting_fee_amount: number | null;
+  default_enable_dining_rsvp: boolean;
+  default_enable_meeting_fee: boolean;
+  default_enable_charity_donation: boolean;
+  default_charity_name: string | null;
+  /** Max lead time in weeks for auto-creating a draft summons. */
+  summons_lead_weeks: number;
+  /** UI warning threshold: anything inside this is overdue. */
+  summons_min_lead_weeks: number;
+  auto_draft_summons: boolean;
+  active: boolean;
+  created_by_email: string | null;
   created_at: string;
   updated_at: string;
 };
