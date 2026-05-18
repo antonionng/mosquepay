@@ -91,3 +91,57 @@ export async function PATCH(
     );
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const _rejectMock = rejectIfMockDisabled();
+  if (_rejectMock) return _rejectMock;
+
+  const { id } = await params;
+  try {
+    const unauthorized = await requireAdminApiAuth();
+    if (unauthorized) return unauthorized;
+
+    const lodgeSlug = getLodgeSlugFromRequest(request);
+    const updates = {
+      published: false,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (isSupabaseConfigured()) {
+      const lodgeId = await db.resolveLodgeId(lodgeSlug);
+      if (!lodgeId) {
+        return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+      }
+      const forbidden = await requireAdminApiPermission("meetings:write", lodgeId);
+      if (forbidden) return forbidden;
+
+      const updated = await db.updateEvent(id, lodgeId, updates);
+      if (!updated) {
+        return NextResponse.json({ error: "Event not found." }, { status: 404 });
+      }
+      await writeAuditLog({
+        lodgeId,
+        action: "unpublished",
+        entityType: "meeting",
+        entityId: updated.id,
+        summary: `Unpublished meeting ${updated.title}`,
+      });
+      return NextResponse.json({ success: true, event: updated });
+    }
+
+    const updated = mockDb.updateEvent(id, updates, { lodge_slug: lodgeSlug });
+    if (!updated) {
+      return NextResponse.json({ error: "Event not found." }, { status: 404 });
+    }
+    return NextResponse.json({ success: true, event: updated });
+  } catch (e) {
+    console.error("Events DELETE API error:", e);
+    return NextResponse.json(
+      { error: "Something went wrong." },
+      { status: 500 }
+    );
+  }
+}

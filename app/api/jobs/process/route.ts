@@ -13,6 +13,14 @@ export async function POST(request: NextRequest) {
   const auth = request.headers.get("authorization");
   const token = auth?.replace(/^Bearer\s+/i, "");
   const expected = process.env.CRON_SECRET;
+
+  if (!expected && !cronHeader) {
+    return NextResponse.json(
+      { error: "Queue processing is not configured." },
+      { status: 503 }
+    );
+  }
+
   if (!cronHeader && expected && token !== expected) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

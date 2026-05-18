@@ -110,9 +110,23 @@ export default function MemberProfilePage() {
       });
 
       if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          setProfile({
+            full_name: data.user.full_name ?? fullName,
+            email: data.user.email ?? email,
+            phone: data.user.phone ?? "",
+            dietary_requirements: data.user.dietary_requirements ?? "",
+            lodge_name: profile?.lodge_name,
+            lodge_number: profile?.lodge_number,
+            member_since: profile?.member_since,
+            gift_aid_declared: profile?.gift_aid_declared ?? false,
+          });
+        }
         setMessage({ type: "success", text: "Profile updated successfully" });
       } else {
-        setMessage({ type: "error", text: "Failed to update profile" });
+        const data = await res.json().catch(() => ({}));
+        setMessage({ type: "error", text: data.error ?? "Failed to update profile" });
       }
     } catch {
       setMessage({ type: "error", text: "Something went wrong" });
@@ -141,6 +155,25 @@ export default function MemberProfilePage() {
     setChangingPassword(true);
 
     try {
+      const res = await fetch("/api/auth/member/session", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "change_password",
+          current_password: currentPassword,
+          new_password: newPassword,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setPasswordMessage({
+          type: "error",
+          text: data.error ?? "Failed to change password",
+        });
+        return;
+      }
+
       setPasswordMessage({
         type: "success",
         text: "Password updated successfully",
