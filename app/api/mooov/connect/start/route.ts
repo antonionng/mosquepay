@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminReadContext } from "@/lib/admin/read-context";
 import { getMooovConnectConfig } from "@/lib/mooov";
+import { createServiceClient } from "@/lib/supabase/server";
 import {
   createMooovConnectState,
   MOOOV_CONNECT_STATE_COOKIE,
@@ -8,6 +9,21 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+async function loadExistingMerchantHint(lodgeId: string): Promise<string | null> {
+  try {
+    const { data, error } = await createServiceClient()
+      .schema("mooov")
+      .from("lodges")
+      .select("merchant_id,status")
+      .eq("id", lodgeId)
+      .maybeSingle<{ merchant_id: string; status: string }>();
+    if (error || data?.status !== "active") return null;
+    return data.merchant_id;
+  } catch {
+    return null;
+  }
+}
 
 export async function GET(request: NextRequest) {
   const ctx = await getAdminReadContext();
@@ -39,6 +55,10 @@ export async function GET(request: NextRequest) {
     "payments:write payments:read refunds:write customers:read customers:write webhooks:read"
   );
   url.searchParams.set("mode", process.env.MOOOV_CONNECT_MODE ?? "test");
+  const merchantHint = await loadExistingMerchantHint(ctx.lodgeId);
+  if (merchantHint) {
+    url.searchParams.set("platform_tenant_id_hint", merchantHint);
+  }
 
   const response = NextResponse.redirect(url);
   response.cookies.set(MOOOV_CONNECT_STATE_COOKIE, state, {
