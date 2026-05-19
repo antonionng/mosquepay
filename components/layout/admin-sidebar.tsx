@@ -53,7 +53,7 @@ const nav = [
   { href: "/admin/audit-compliance", label: "Audit & Compliance", icon: ShieldCheck, permission: "audit:read", flag: "audit" },
   { href: "/admin/platform", label: "Platform overview", icon: Building2, permission: "admin:all", platformOnly: true },
   { href: "/admin/provinces", label: "Provinces", icon: MapPin, permission: "admin:all", platformOnly: true },
-  { href: "/admin/integrations", label: "Integrations", icon: Plug, permission: "admin:all", flag: "integrations", platformOnly: true },
+  { href: "/admin/integrations", label: "Integrations", icon: Plug, permission: "admin:all", flag: "integrations" },
   { href: "/admin/settings", label: "Settings", icon: Settings, permission: "admin:all" },
 ];
 
@@ -151,6 +151,7 @@ export function AdminSidebar() {
       "/admin/ai-assistant",
       "/admin/reports",
       "/admin/audit-compliance",
+      "/admin/integrations",
       "/admin/settings",
     ].includes(item.href)
   );
@@ -158,7 +159,6 @@ export function AdminSidebar() {
     [
       "/admin/platform",
       "/admin/provinces",
-      "/admin/integrations",
     ].includes(item.href)
   );
 
