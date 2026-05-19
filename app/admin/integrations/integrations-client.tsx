@@ -3,18 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Calendar,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
   Copy,
   Download,
   Loader2,
-  Mail,
   Plug,
   RefreshCw,
   Trash2,
-  Wallet,
   XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -79,7 +76,7 @@ type FieldDef = {
 type ProviderMeta = {
   label: string;
   group: "Calendar" | "Email" | "Accounting";
-  icon: typeof Plug;
+  logo: string;
   blurb: string;
   fields: FieldDef[];
 };
@@ -88,7 +85,7 @@ const PROVIDER_META: Record<Provider, ProviderMeta> = {
   google_calendar: {
     label: "Google Calendar",
     group: "Calendar",
-    icon: Calendar,
+    logo: "/brand/integrations/google-calendar.svg",
     blurb:
       "Push lodge meetings to a shared Google Calendar. Paste an OAuth refresh token plus the target calendar ID.",
     fields: [
@@ -111,7 +108,7 @@ const PROVIDER_META: Record<Provider, ProviderMeta> = {
   outlook: {
     label: "Microsoft Outlook",
     group: "Calendar",
-    icon: Calendar,
+    logo: "/brand/integrations/outlook.svg",
     blurb:
       "Sync meetings into a shared Outlook / Microsoft 365 calendar. Provide an app refresh token and target calendar.",
     fields: [
@@ -133,7 +130,7 @@ const PROVIDER_META: Record<Provider, ProviderMeta> = {
   mailchimp: {
     label: "Mailchimp",
     group: "Email",
-    icon: Mail,
+    logo: "/brand/integrations/mailchimp.svg",
     blurb:
       "Mirror your members and leads into a Mailchimp audience for newsletters.",
     fields: [
@@ -162,7 +159,7 @@ const PROVIDER_META: Record<Provider, ProviderMeta> = {
   brevo: {
     label: "Brevo (Sendinblue)",
     group: "Email",
-    icon: Mail,
+    logo: "/brand/integrations/brevo.png",
     blurb:
       "Send transactional and bulk emails through Brevo and sync contact lists.",
     fields: [
@@ -189,7 +186,7 @@ const PROVIDER_META: Record<Provider, ProviderMeta> = {
   xero: {
     label: "Xero",
     group: "Accounting",
-    icon: Wallet,
+    logo: "/brand/integrations/xero.svg",
     blurb:
       "Push the treasurer ledger into Xero. Use a long-lived OAuth refresh token from your Xero app.",
     fields: [
@@ -217,7 +214,7 @@ const PROVIDER_META: Record<Provider, ProviderMeta> = {
   quickbooks: {
     label: "QuickBooks",
     group: "Accounting",
-    icon: Wallet,
+    logo: "/brand/integrations/quickbooks.svg",
     blurb:
       "Push payments, dues and donations into QuickBooks Online. Provide an OAuth refresh token and realm ID.",
     fields: [
@@ -430,7 +427,12 @@ export function IntegrationsClient({
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="flex flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between">
               <div className="flex items-start gap-3">
-                <Wallet className="mt-0.5 h-5 w-5 text-slate-400" />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/brand/mooov-logo.png"
+                  alt="Mooov"
+                  className="mt-0.5 h-6 w-auto"
+                />
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="text-base font-semibold text-slate-900">
@@ -489,13 +491,19 @@ export function IntegrationsClient({
                 {providers.map((provider) => {
                   const meta = PROVIDER_META[provider];
                   const cred = credByProvider.get(provider);
-                  const Icon = meta.icon;
                   const isOpen = open === provider;
                   return (
                     <div key={provider} className="px-5 py-3">
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
-                          <Icon className="h-5 w-5 text-slate-400" />
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white ring-1 ring-slate-200">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={meta.logo}
+                              alt={`${meta.label} logo`}
+                              className="h-5 w-5 object-contain"
+                            />
+                          </div>
                           <div>
                             <p className="text-sm font-medium text-slate-900">
                               {meta.label}
