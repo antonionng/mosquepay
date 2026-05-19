@@ -18,7 +18,12 @@
 //   d. PATH is the bare URL path; do NOT append the query string when
 //      computing the canonical request.
 
-import { createHash, createHmac, randomUUID } from "node:crypto";
+import {
+  createHash,
+  createHmac,
+  randomUUID,
+  timingSafeEqual,
+} from "node:crypto";
 
 export interface MooovKey {
   keyId: string;
@@ -28,6 +33,8 @@ export interface MooovKey {
 
 export type MooovErrorCategory =
   | "auth"
+  | "grant_required"
+  | "scope_denied"
   | "idempotency_conflict"
   | "invalid_request"
   | "unprocessable"
@@ -46,6 +53,49 @@ export class MooovApiError extends Error {
     super(`mooov ${method} ${path} -> ${status} ${category}`);
     this.name = "MooovApiError";
   }
+}
+
+export type MooovMethod = "GET" | "POST" | "PUT" | "DELETE";
+
+export interface MooovConnectConfig {
+  platformSlug: string;
+  platformId: string;
+  connectBaseUrl: string;
+  apiBaseUrl: string;
+  redirectUri?: string;
+  key: MooovKey;
+  webhookSecret: string;
+}
+
+export function getMooovConnectConfig(): MooovConnectConfig {
+  const apiBaseUrl =
+    process.env.MOOOV_GATEWAY_BASE_URL ??
+    process.env.MOOOV_API_BASE ??
+    process.env.MOOOV_BASE_URL;
+  const keyId = process.env.MOOOV_KEY_ID ?? process.env.MOOOV_PLATFORM_KEY_ID;
+  const keySecret =
+    process.env.MOOOV_KEY_SECRET ?? process.env.MOOOV_PLATFORM_KEY_SECRET;
+  const webhookSecret =
+    process.env.MOOOV_WEBHOOK_SIGNING_SECRET ??
+    process.env.MOOOV_WEBHOOK_SECRET ??
+    process.env.MOOOV_PLATFORM_WEBHOOK_SECRET;
+
+  if (!apiBaseUrl || !keyId || !keySecret || !webhookSecret) {
+    throw new Error(
+      "Missing Mooov Connect env: MOOOV_GATEWAY_BASE_URL, MOOOV_PLATFORM_KEY_ID, MOOOV_PLATFORM_KEY_SECRET, MOOOV_WEBHOOK_SIGNING_SECRET"
+    );
+  }
+
+  return {
+    platformSlug: process.env.MOOOV_PLATFORM_SLUG ?? "lodgepay",
+    platformId: process.env.MOOOV_PLATFORM_ID ?? "plat_lodgepay",
+    connectBaseUrl:
+      process.env.MOOOV_CONNECT_BASE ?? "https://staging.connect.mooov.money",
+    apiBaseUrl,
+    redirectUri: process.env.MOOOV_REDIRECT_URI,
+    key: { keyId, secret: keySecret },
+    webhookSecret,
+  };
 }
 
 export function canonicalRequest(
@@ -69,6 +119,7 @@ export function authHeaders(
   path: string,
   body: string,
   idempotencyKey: string,
+  merchant?: string,
 ): Record<string, string> {
   const timestamp = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
   const headers: Record<string, string> = {
@@ -83,11 +134,15 @@ export function authHeaders(
   if (method.toUpperCase() !== "GET") {
     headers["Idempotency-Key"] = idempotencyKey;
   }
+  if (merchant) {
+    headers["Mooov-Merchant"] = merchant;
+  }
   return headers;
 }
 
 function categorise(status: number): MooovErrorCategory {
   if (status === 401) return "auth";
+  if (status === 403) return "grant_required";
   if (status === 409) return "idempotency_conflict";
   if (status === 422) return "unprocessable";
   if (status === 429) return "rate_limited";
@@ -98,14 +153,15 @@ function categorise(status: number): MooovErrorCategory {
 export async function callMooov<T>(
   baseUrl: string,
   key: MooovKey,
-  method: "GET" | "POST",
+  method: MooovMethod,
   path: string,
   body?: unknown,
   idempotencyKey?: string,
+  merchant?: string,
 ): Promise<T> {
   const raw = body === undefined ? "" : JSON.stringify(body);
   const idem = idempotencyKey ?? `idem_${randomUUID()}`;
-  const headers = authHeaders(key, method, path, raw, idem);
+  const headers = authHeaders(key, method, path, raw, idem, merchant);
   let res: Response;
   try {
     res = await fetch(baseUrl + path, {
@@ -124,7 +180,66 @@ export async function callMooov<T>(
   }
   const text = await res.text();
   if (!res.ok) {
-    throw new MooovApiError(res.status, categorise(res.status), text, method, path);
+    const category =
+      res.status === 403 && text.includes("SCOPE_DENIED")
+        ? "scope_denied"
+        : categorise(res.status);
+    throw new MooovApiError(res.status, category, text, method, path);
   }
   return text.length === 0 ? (undefined as T) : (JSON.parse(text) as T);
+}
+
+export async function callMooovConnect<T>(
+  method: MooovMethod,
+  path: string,
+  opts: {
+    body?: unknown;
+    merchant?: string;
+    idempotencyKey?: string;
+  } = {}
+): Promise<T> {
+  const config = getMooovConnectConfig();
+  return callMooov<T>(
+    config.apiBaseUrl,
+    config.key,
+    method,
+    path,
+    opts.body,
+    opts.idempotencyKey,
+    opts.merchant
+  );
+}
+
+export function verifyMooovWebhook(
+  rawBody: string | Uint8Array,
+  sigHeader: string,
+  secret: string,
+  toleranceSec = 300
+): boolean {
+  const parts = Object.fromEntries(
+    sigHeader.split(",").map((part) => part.split("=") as [string, string])
+  );
+  const timestamp = Number(parts.t);
+  if (
+    !Number.isFinite(timestamp) ||
+    Math.abs(Date.now() / 1000 - timestamp) > toleranceSec ||
+    !parts.v1
+  ) {
+    return false;
+  }
+
+  const bodyBytes =
+    typeof rawBody === "string" ? Buffer.from(rawBody, "utf8") : rawBody;
+  const expected = createHmac("sha256", secret)
+    .update(`${parts.t}.`)
+    .update(bodyBytes)
+    .digest("hex");
+  const got = parts.v1;
+  const expectedBuffer = Buffer.from(expected, "hex");
+  const gotBuffer = Buffer.from(got, "hex");
+
+  return (
+    expectedBuffer.length === gotBuffer.length &&
+    timingSafeEqual(expectedBuffer, gotBuffer)
+  );
 }

@@ -12,6 +12,7 @@ import {
   Loader2,
   Mail,
   Plug,
+  RefreshCw,
   Trash2,
   Wallet,
   XCircle,
@@ -60,6 +61,12 @@ type Job = {
   attempts: number;
   last_error: string | null;
 };
+
+type MooovConnection = {
+  merchantId: string;
+  status: string;
+  metadata: Record<string, unknown>;
+} | null;
 
 type FieldDef = {
   key: string;
@@ -255,11 +262,13 @@ export function IntegrationsClient({
   lodgeName,
   credentials,
   jobs,
+  mooovConnection,
 }: {
   lodgeSlug: string;
   lodgeName: string;
   credentials: Credential[];
   jobs: Job[];
+  mooovConnection: MooovConnection;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -418,6 +427,54 @@ export function IntegrationsClient({
         </TabsList>
 
         <TabsContent value="providers" className="space-y-4">
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-start gap-3">
+                <Wallet className="mt-0.5 h-5 w-5 text-slate-400" />
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-base font-semibold text-slate-900">
+                      Mooov Connect
+                    </h2>
+                    {mooovConnection?.status === "active" ? (
+                      <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">
+                        <CheckCircle2 className="mr-1 h-3 w-3" /> Connected
+                      </Badge>
+                    ) : mooovConnection ? (
+                      <Badge variant="outline">
+                        <XCircle className="mr-1 h-3 w-3" /> {mooovConnection.status}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline">
+                        <XCircle className="mr-1 h-3 w-3" /> Not connected
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Connect this lodge to Mooov for dues and payment processing.
+                    LodgePay uses the platform credential, while each lodge grants
+                    its own merchant access.
+                  </p>
+                  {mooovConnection?.merchantId ? (
+                    <p className="mt-2 font-mono text-[11px] text-slate-500">
+                      Merchant: {mooovConnection.merchantId}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+              <a href="/api/mooov/connect/start">
+                <Button size="sm" variant={mooovConnection ? "outline" : "primary"}>
+                  {mooovConnection ? (
+                    <RefreshCw className="mr-1 h-3 w-3" />
+                  ) : (
+                    <Plug className="mr-1 h-3 w-3" />
+                  )}
+                  {mooovConnection ? "Reconnect Mooov" : "Connect Mooov"}
+                </Button>
+              </a>
+            </div>
+          </div>
+
           {Object.entries(grouped).map(([groupName, providers]) => (
             <div
               key={groupName}

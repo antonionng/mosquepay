@@ -1,15 +1,12 @@
 // POST /api/dues/start
 //
-// Starts a Mooov payment_intent for a single member due. Implements
-// Section 6 of mooov3:docs/integrations/lodgepay-mooov-dev-quickstart.md.
-//
-// Pre-conditions: the lodge_id passed in must already exist in
-// mooov.lodges and have a credentials row in mooov.mooov_credentials with
-// the API key + secret encrypted under the Vault master key.
+// Starts a Mooov payment_intent for a single member due using Mooov Connect.
+// LodgePay signs with its platform key and acts on behalf of the lodge merchant
+// via the Mooov-Merchant header.
 
 import { type NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { callMooov, MooovApiError, type MooovKey } from "@/lib/mooov";
+import { callMooovConnect, MooovApiError } from "@/lib/mooov";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,29 +31,46 @@ interface PaymentIntentResponse {
   };
 }
 
-interface MooovKeyRow {
-  api_key_id: string;
-  api_key_secret: string;
-  base_url: string;
-  merchant_id: string;
-}
-
-async function loadKey(
+async function loadMerchant(
   supa: ReturnType<typeof createServiceClient>,
   lodgeId: string,
-): Promise<{ key: MooovKey; baseUrl: string; merchantId: string }> {
+): Promise<string | null> {
   const { data, error } = await supa
     .schema("mooov")
-    .rpc("get_lodge_mooov_key", { p_lodge_id: lodgeId })
-    .single<MooovKeyRow>();
-  if (error || !data) {
-    throw new Error(`unknown lodge ${lodgeId}: ${error?.message ?? "no row"}`);
+    .from("lodges")
+    .select("merchant_id")
+    .eq("id", lodgeId)
+    .maybeSingle<{ merchant_id: string }>();
+  if (error) {
+    throw new Error(`unknown lodge ${lodgeId}: ${error.message}`);
   }
-  return {
-    key: { keyId: data.api_key_id, secret: data.api_key_secret },
-    baseUrl: data.base_url,
-    merchantId: data.merchant_id,
-  };
+  return data?.merchant_id ?? null;
+}
+
+async function ensureDemoLodge(
+  supa: ReturnType<typeof createServiceClient>,
+  lodgeId: string,
+): Promise<string | null> {
+  const demoMerchant =
+    process.env.MOOOV_DEMO_MERCHANT_ID ??
+    process.env.MOOOV_DEMO_LODGE_ID ??
+    process.env.MOOOV_LODGE_PILOT_MERCHANT_ID;
+  const demoLodgeId = process.env.MOOOV_DEMO_LODGE_ID ?? "merch_lodgepay_demo";
+  if (!demoMerchant || lodgeId !== demoLodgeId) return null;
+
+  const { error } = await supa.schema("mooov").from("lodges").upsert(
+    {
+      id: demoLodgeId,
+      merchant_id: demoMerchant,
+      display_name: "LodgePay demo merchant",
+      currency: "GBP",
+      status: "active",
+      metadata: { source: "mooov_connect_staging" },
+    },
+    { onConflict: "id" }
+  );
+  if (error) throw error;
+  return demoMerchant;
 }
 
 function userStatusFor(category: MooovApiError["category"]): number {
@@ -100,11 +114,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "supabase not configured" }, { status: 500 });
   }
 
-  let key: MooovKey;
-  let baseUrl: string;
   let merchantId: string;
   try {
-    ({ key, baseUrl, merchantId } = await loadKey(supa, input.lodge_id));
+    merchantId =
+      (await loadMerchant(supa, input.lodge_id)) ??
+      (await ensureDemoLodge(supa, input.lodge_id)) ??
+      "";
   } catch (err) {
     console.error("mooov credentials lookup failed", {
       lodge_id: input.lodge_id,
@@ -113,6 +128,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: "lodge credentials not found" },
       { status: 404 },
+    );
+  }
+  if (!merchantId) {
+    return NextResponse.json(
+      { error: "lodge has not connected Mooov" },
+      { status: 409 },
     );
   }
 
@@ -132,23 +153,23 @@ export async function POST(req: NextRequest) {
   });
 
   try {
-    const result = await callMooov<PaymentIntentResponse>(
-      baseUrl,
-      key,
+    const result = await callMooovConnect<PaymentIntentResponse>(
       "POST",
       "/v1/payment_intents",
       {
-        payment_id: paymentId,
-        merchant_id: merchantId,
-        amount: input.amount,
-        currency: input.currency,
-        payment_method: input.payment_method,
-        metadata: {
-          lodgepay_member_id: input.member_id,
-          lodge_id: input.lodge_id,
+        merchant: merchantId,
+        idempotencyKey,
+        body: {
+          payment_id: paymentId,
+          amount: input.amount,
+          currency: input.currency,
+          payment_method: input.payment_method,
+          metadata: {
+            lodgepay_member_id: input.member_id,
+            lodge_id: input.lodge_id,
+          },
         },
-      },
-      idempotencyKey,
+      }
     );
 
     await supa
