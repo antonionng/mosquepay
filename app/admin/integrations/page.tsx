@@ -6,7 +6,25 @@ import { createServiceClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-export default async function IntegrationsPage() {
+function feedbackForMooovStatus(status: string | undefined) {
+  switch (status) {
+    case "connected":
+      return "Mooov connected.";
+    case "invalid_state":
+      return "Mooov did not connect because the session expired or the browser state did not match. Please try Connect Mooov again in the same browser tab.";
+    case "error":
+      return "Mooov did not connect because the token exchange failed. Please retry, and contact support if it happens again.";
+    default:
+      return null;
+  }
+}
+
+export default async function IntegrationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mooov?: string }>;
+}) {
+  const { mooov } = await searchParams;
   const ctx = await getAdminReadContext();
   if (ctx.mode !== "database" || !ctx.lodgeId) {
     redirect("/admin");
@@ -24,6 +42,7 @@ export default async function IntegrationsPage() {
       credentials={JSON.parse(JSON.stringify(credentials))}
       jobs={JSON.parse(JSON.stringify(jobs))}
       mooovConnection={mooovConnection}
+      initialFeedback={feedbackForMooovStatus(mooov)}
     />
   );
 }

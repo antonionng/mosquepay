@@ -5,6 +5,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import {
   createMooovConnectState,
   MOOOV_CONNECT_STATE_COOKIE,
+  MOOOV_CONNECT_STATE_TTL_SECONDS,
 } from "@/lib/mooov-connect-state";
 
 export const runtime = "nodejs";
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest) {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: 10 * 60,
+    maxAge: MOOOV_CONNECT_STATE_TTL_SECONDS,
     path: "/",
   });
   return response;

@@ -29,6 +29,11 @@ export async function GET(request: NextRequest) {
     : null;
 
   if (!code || !state || !verifiedState) {
+    console.warn("Mooov callback rejected before token exchange", {
+      has_code: Boolean(code),
+      has_state: Boolean(state),
+      has_expected_state_cookie: Boolean(expectedState),
+    });
     return NextResponse.redirect(
       new URL("/admin/integrations?mooov=invalid_state", request.url)
     );

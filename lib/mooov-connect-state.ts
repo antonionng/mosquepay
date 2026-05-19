@@ -1,6 +1,9 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 
-const STATE_TTL_MS = 10 * 60 * 1000;
+// First-time Mooov merchant signup can take longer than a quick OAuth consent.
+// Keep this comfortably above the manual bridge flow while still bounded.
+export const MOOOV_CONNECT_STATE_TTL_SECONDS = 30 * 60;
+const STATE_TTL_MS = MOOOV_CONNECT_STATE_TTL_SECONDS * 1000;
 
 export const MOOOV_CONNECT_STATE_COOKIE = "mooov_connect_state";
 

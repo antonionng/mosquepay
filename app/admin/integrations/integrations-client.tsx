@@ -260,16 +260,18 @@ export function IntegrationsClient({
   credentials,
   jobs,
   mooovConnection,
+  initialFeedback,
 }: {
   lodgeSlug: string;
   lodgeName: string;
   credentials: Credential[];
   jobs: Job[];
   mooovConnection: MooovConnection;
+  initialFeedback?: string | null;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(initialFeedback ?? null);
   const [open, setOpen] = useState<Provider | null>(null);
   const [disconnectingProvider, setDisconnectingProvider] = useState<Provider | null>(null);
   const [drafts, setDrafts] = useState<Record<Provider, Record<string, string>>>(
