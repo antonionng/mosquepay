@@ -140,17 +140,45 @@ export async function POST(req: NextRequest) {
   const paymentId = `pay_${input.lodge_id}_${input.member_id}_${Date.now()}`;
   const idempotencyKey = `dues_${input.member_id}_${paymentId}`;
 
-  await supa.schema("mooov").from("payment_attempts").insert({
-    payment_id: paymentId,
-    lodge_id: input.lodge_id,
-    member_id: input.member_id,
-    amount: input.amount,
-    currency: input.currency,
-    intent: "dues",
-    status: "pending",
-    idempotency_key: idempotencyKey,
-    metadata: { source: "lodgepay_dev_quickstart" },
-  });
+  // Pre-flight: persist the attempt BEFORE talking to Mooov. If this
+  // fails (RLS, FK miss on members, network), we must not call Mooov --
+  // an authorize without a local row leaves a Mooov payment we can't
+  // reconcile and the eventual payment.succeeded webhook will only land
+  // in mooov_webhook_events with no payment_attempts row to project to.
+  const { error: insertError } = await supa
+    .schema("mooov")
+    .from("payment_attempts")
+    .insert({
+      payment_id: paymentId,
+      lodge_id: input.lodge_id,
+      member_id: input.member_id,
+      amount: input.amount,
+      currency: input.currency,
+      intent: "dues",
+      status: "pending",
+      idempotency_key: idempotencyKey,
+      metadata: { source: "lodgepay_dev_quickstart" },
+    });
+  if (insertError) {
+    console.error("dues_start preflight insert failed", {
+      lodge_id: input.lodge_id,
+      member_id: input.member_id,
+      payment_id: paymentId,
+      code: insertError.code,
+      message: insertError.message,
+      details: insertError.details,
+      hint: insertError.hint,
+    });
+    return NextResponse.json(
+      {
+        error: "preflight_persist_failed",
+        payment_id: paymentId,
+        db_code: insertError.code ?? null,
+        db_hint: insertError.hint ?? null,
+      },
+      { status: 500 },
+    );
+  }
 
   try {
     const result = await callMooovConnect<PaymentIntentResponse>(
@@ -172,31 +200,52 @@ export async function POST(req: NextRequest) {
       }
     );
 
-    await supa
+    // Mooov authorized; persist the new state. If THIS update fails we
+    // can't undo the Mooov authorize, so log loudly and still return
+    // 200 to the caller (with persisted: false). The eventual
+    // payment.succeeded webhook gives us a second chance to reconcile.
+    const { error: updateError, count: updateCount } = await supa
       .schema("mooov")
       .from("payment_attempts")
-      .update({
-        status: result.state,
-        provider_ref: result.provider?.provider_ref ?? null,
-        authorized_at: result.state === "authorized" ? new Date().toISOString() : null,
-      })
+      .update(
+        {
+          status: result.state,
+          provider_ref: result.provider?.provider_ref ?? null,
+          authorized_at:
+            result.state === "authorized" ? new Date().toISOString() : null,
+          captured_at:
+            result.state === "captured" ? new Date().toISOString() : null,
+        },
+        { count: "exact" },
+      )
       .eq("payment_id", paymentId);
+    if (updateError || (updateCount ?? 0) === 0) {
+      console.error("dues_start post-authorize update failed", {
+        lodge_id: input.lodge_id,
+        payment_id: paymentId,
+        mooov_state: result.state,
+        provider_ref: result.provider?.provider_ref ?? null,
+        update_count: updateCount ?? null,
+        code: updateError?.code ?? null,
+        message: updateError?.message ?? null,
+      });
+    }
 
     return NextResponse.json({
       payment_id: paymentId,
       state: result.state,
       hosted_url: result.provider?.hosted_url ?? null,
+      persisted: !updateError && (updateCount ?? 0) > 0,
     });
   } catch (err) {
     if (err instanceof MooovApiError) {
-      // Log only the safe-to-log fields; never the body or headers.
       console.error("mooov call failed", {
         category: err.category,
         status: err.status,
         method: "POST",
         path: "/v1/payment_intents",
       });
-      await supa
+      const { error: failUpdateError } = await supa
         .schema("mooov")
         .from("payment_attempts")
         .update({
@@ -204,11 +253,27 @@ export async function POST(req: NextRequest) {
           failure_reason: `${err.category}:${err.status}`,
         })
         .eq("payment_id", paymentId);
+      if (failUpdateError) {
+        console.error("dues_start failure-status update failed", {
+          payment_id: paymentId,
+          code: failUpdateError.code,
+          message: failUpdateError.message,
+        });
+      }
       return NextResponse.json(
-        { error: err.category, status: err.status },
+        { error: err.category, status: err.status, payment_id: paymentId },
         { status: userStatusFor(err.category) },
       );
     }
-    throw err;
+    console.error("dues_start unhandled error", {
+      lodge_id: input.lodge_id,
+      payment_id: paymentId,
+      err_name: err instanceof Error ? err.name : typeof err,
+      err_message: err instanceof Error ? err.message : String(err),
+    });
+    return NextResponse.json(
+      { error: "internal_error", payment_id: paymentId },
+      { status: 500 },
+    );
   }
 }
