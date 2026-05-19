@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { callMooovConnect, getMooovConnectConfig } from "@/lib/mooov";
+import {
+  callMooovConnect,
+  getMooovConnectConfig,
+  MooovApiError,
+} from "@/lib/mooov";
 import {
   MOOOV_CONNECT_STATE_COOKIE,
   verifyMooovConnectState,
@@ -88,9 +92,18 @@ export async function GET(request: NextRequest) {
     response.cookies.delete(MOOOV_CONNECT_STATE_COOKIE);
     return response;
   } catch (error) {
-    console.error("Mooov callback failed", {
-      message: error instanceof Error ? error.message : String(error),
-    });
+    if (error instanceof MooovApiError) {
+      console.error("Mooov callback failed", {
+        message: error.message,
+        category: error.category,
+        status: error.status,
+        body: error.body,
+      });
+    } else {
+      console.error("Mooov callback failed", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
     return NextResponse.redirect(
       new URL("/admin/integrations?mooov=error", request.url)
     );
