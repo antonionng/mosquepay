@@ -104,43 +104,88 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const supa = createServiceClient();
-  const lodgeId = await findLodgeIdForMerchant(supa, event.merchant.id);
-  if (!lodgeId) {
-    console.warn("Mooov webhook for unknown merchant", {
+  // Single guard around every server-side step so any uncaught throw
+  // (Supabase client init, PostgREST 4xx that supabase-js converts to
+  // a rejection, network blip during the projection update, etc.)
+  // surfaces as a JSON 500 with the event id to correlate, instead of
+  // a body-less Vercel 500. Mooov's outbox can safely retry on 500.
+  try {
+    const supa = createServiceClient();
+    const lodgeId = await findLodgeIdForMerchant(supa, event.merchant.id);
+    if (!lodgeId) {
+      console.warn("Mooov webhook for unknown merchant", {
+        event_id: event.id,
+        event_type: event.type,
+        merchant_id: event.merchant.id,
+      });
+      return NextResponse.json({ ok: true, ignored: true });
+    }
+
+    const paymentId = event.data?.payment_id ?? null;
+    const { error: insertError } = await supa
+      .schema("mooov")
+      .from("mooov_webhook_events")
+      .insert({
+        lodge_id: lodgeId,
+        event_id: event.id,
+        event_type: event.type,
+        payment_id: paymentId,
+        raw_body: raw,
+        delivery_id: deliveryId,
+      });
+
+    if (insertError) {
+      if (insertError.code === "23505") {
+        return NextResponse.json({ ok: true, replay: true });
+      }
+      console.error("Mooov Connect webhook persist failed", {
+        code: insertError.code,
+        message: insertError.message,
+        details: insertError.details,
+        hint: insertError.hint,
+        event_id: event.id,
+        event_type: event.type,
+      });
+      return NextResponse.json(
+        {
+          error: "Persist failed.",
+          ref: event.id,
+          db_code: insertError.code ?? null,
+        },
+        { status: 500 }
+      );
+    }
+
+    await projectConnectEvent(supa, lodgeId, event);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const code =
+      err && typeof err === "object" && "code" in err
+        ? (err as { code?: string }).code
+        : undefined;
+    const status =
+      err && typeof err === "object" && "status" in err
+        ? (err as { status?: number }).status
+        : undefined;
+    console.error("Mooov Connect webhook unhandled error", {
       event_id: event.id,
       event_type: event.type,
       merchant_id: event.merchant.id,
+      err_name: err instanceof Error ? err.name : typeof err,
+      err_message: message,
+      err_code: code ?? null,
+      err_status: status ?? null,
     });
-    return NextResponse.json({ ok: true, ignored: true });
+    return NextResponse.json(
+      {
+        error: "Internal error processing webhook.",
+        ref: event.id,
+        err_code: code ?? null,
+      },
+      { status: 500 }
+    );
   }
-
-  const paymentId = event.data?.payment_id ?? null;
-  const { error: insertError } = await supa
-    .schema("mooov")
-    .from("mooov_webhook_events")
-    .insert({
-      lodge_id: lodgeId,
-      event_id: event.id,
-      event_type: event.type,
-      payment_id: paymentId,
-      raw_body: raw,
-      delivery_id: deliveryId,
-    });
-
-  if (insertError) {
-    if (insertError.code === "23505") {
-      return NextResponse.json({ ok: true, replay: true });
-    }
-    console.error("Mooov Connect webhook persist failed", {
-      code: insertError.code,
-      event_id: event.id,
-    });
-    return NextResponse.json({ error: "Persist failed." }, { status: 500 });
-  }
-
-  await projectConnectEvent(supa, lodgeId, event);
-  return NextResponse.json({ ok: true });
 }
 
 async function projectConnectEvent(
