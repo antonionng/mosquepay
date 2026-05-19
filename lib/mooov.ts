@@ -1,22 +1,10 @@
-// LodgePay HMAC helper for signing Mooov gateway requests. Mirrors the
-// canonical signing scheme spec'd in
-// mooov3:docs/integrations/lodgepay-mooov-dev-quickstart.md (Section 5)
-// and the canonical reference (Section 4 of the integration doc).
+// LodgePay helper for Mooov Connect.
 //
-// Outbound (LodgePay -> Mooov) signature: HMAC-SHA256 over
-//   `${METHOD}\n${PATH}\n${TIMESTAMP}\n${SHA256_HEX(body)}`
-// Header: X-Mooov-Signature: <hex>; X-Mooov-Key-Id, X-Mooov-Timestamp,
-// Idempotency-Key sit alongside it.
+// Outbound API calls use the single platform credential, plus Mooov-Merchant
+// for per-lodge on-behalf-of routing. Lodge admins never see per-lodge API keys.
 //
-// IMPORTANT INVARIANTS (the four likeliest 401 causes if violated):
-//   a. Sign the exact bytes you are about to send. Do not re-stringify
-//      the body between sign() and fetch(). callMooov() handles this.
-//   b. The timestamp is RFC3339 UTC without milliseconds. The .replace()
-//      below strips the .000Z suffix produced by Date#toISOString().
-//   c. The 48-char hex secret is fed into HMAC AS A UTF-8 STRING. Do not
-//      hex-decode it first. createHmac("sha256", secret) is correct.
-//   d. PATH is the bare URL path; do NOT append the query string when
-//      computing the canonical request.
+// Inbound webhooks are still HMAC verified with the platform webhook signing
+// secret using Mooov-Signature: t=<unix>,v1=<hex>.
 
 import {
   createHash,
@@ -67,22 +55,38 @@ export interface MooovConnectConfig {
   webhookSecret: string;
 }
 
+function firstNonEmptyEnv(...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = process.env[key]?.trim();
+    if (value) return value;
+  }
+  return undefined;
+}
+
 export function getMooovConnectConfig(): MooovConnectConfig {
   const apiBaseUrl =
-    process.env.MOOOV_GATEWAY_BASE_URL ??
-    process.env.MOOOV_API_BASE ??
-    process.env.MOOOV_BASE_URL;
-  const keyId = process.env.MOOOV_KEY_ID ?? process.env.MOOOV_PLATFORM_KEY_ID;
-  const keySecret =
-    process.env.MOOOV_KEY_SECRET ?? process.env.MOOOV_PLATFORM_KEY_SECRET;
-  const webhookSecret =
-    process.env.MOOOV_WEBHOOK_SIGNING_SECRET ??
-    process.env.MOOOV_WEBHOOK_SECRET ??
-    process.env.MOOOV_PLATFORM_WEBHOOK_SECRET;
+    firstNonEmptyEnv("MOOOV_API_BASE", "MOOOV_BASE_URL") ??
+    "https://staging.api.mooov.money";
+  const keyId = firstNonEmptyEnv(
+    "MOOOV_PLATFORM_API_KEY_ID",
+    "MOOOV_KEY_ID",
+    "MOOOV_PLATFORM_KEY_ID"
+  );
+  const keySecret = firstNonEmptyEnv(
+    "MOOOV_PLATFORM_API_KEY_SECRET",
+    "MOOOV_KEY_SECRET",
+    "MOOOV_PLATFORM_KEY_SECRET"
+  );
+  const webhookSecret = firstNonEmptyEnv(
+    "MOOOV_PLATFORM_WEBHOOK_SIGNING_SECRET",
+    "MOOOV_WEBHOOK_SIGNING_SECRET",
+    "MOOOV_WEBHOOK_SECRET",
+    "MOOOV_PLATFORM_WEBHOOK_SECRET"
+  );
 
   if (!apiBaseUrl || !keyId || !keySecret || !webhookSecret) {
     throw new Error(
-      "Missing Mooov Connect env: MOOOV_GATEWAY_BASE_URL, MOOOV_PLATFORM_KEY_ID, MOOOV_PLATFORM_KEY_SECRET, MOOOV_WEBHOOK_SIGNING_SECRET"
+      "Missing Mooov Connect env: MOOOV_PLATFORM_API_KEY_ID, MOOOV_PLATFORM_API_KEY_SECRET, MOOOV_PLATFORM_WEBHOOK_SIGNING_SECRET"
     );
   }
 
@@ -115,25 +119,18 @@ export function sign(secret: string, canonical: string): string {
 
 export function authHeaders(
   key: MooovKey,
-  method: string,
-  path: string,
-  body: string,
+  _method: string,
+  _path: string,
+  _body: string,
   idempotencyKey: string,
   merchant?: string,
 ): Record<string, string> {
-  const timestamp = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
   const headers: Record<string, string> = {
-    "X-Mooov-Key-Id": key.keyId,
-    "X-Mooov-Timestamp": timestamp,
-    "X-Mooov-Signature": sign(
-      key.secret,
-      canonicalRequest(method, path, timestamp, body),
-    ),
+    Authorization: `Bearer ${key.secret}`,
+    "Mooov-Key-Id": key.keyId,
     "Content-Type": "application/json",
   };
-  if (method.toUpperCase() !== "GET") {
-    headers["Idempotency-Key"] = idempotencyKey;
-  }
+  headers["Idempotency-Key"] = idempotencyKey;
   if (merchant) {
     headers["Mooov-Merchant"] = merchant;
   }
@@ -181,7 +178,9 @@ export async function callMooov<T>(
   const text = await res.text();
   if (!res.ok) {
     const category =
-      res.status === 403 && text.includes("SCOPE_DENIED")
+      res.status === 403 && text.includes("MERCHANT_GRANT_REVOKED")
+        ? "grant_required"
+        : res.status === 403 && text.includes("SCOPE_DENIED")
         ? "scope_denied"
         : categorise(res.status);
     throw new MooovApiError(res.status, category, text, method, path);

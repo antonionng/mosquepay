@@ -34,14 +34,9 @@ export async function GET(request: NextRequest) {
   url.searchParams.set("client_id", config.platformSlug);
   url.searchParams.set("redirect_uri", redirectUri);
   url.searchParams.set("state", state);
-  // Scopes requested intentionally do NOT include customers:write.
-  // No live code path calls Mooov's customer-management endpoints
-  // today, and asking for a scope we don't use bloats the consent
-  // screen the lodge admin sees. Re-add if/when LodgePay starts
-  // creating Mooov customer records (e.g. on first member payment).
   url.searchParams.set(
     "scope",
-    "payments:write payments:read refunds:write"
+    "payments:write payments:read refunds:write customers:read customers:write webhooks:read"
   );
   url.searchParams.set("mode", process.env.MOOOV_CONNECT_MODE ?? "test");
 

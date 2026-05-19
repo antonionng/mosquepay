@@ -374,6 +374,34 @@ export async function POST(req: NextRequest) {
           message: failUpdateError.message,
         });
       }
+      if (err.status === 403 && err.body.includes("MERCHANT_GRANT_REVOKED")) {
+        const { data: lodgeConnection } = await supa
+          .schema("mooov")
+          .from("lodges")
+          .select("metadata")
+          .eq("id", input.lodge_id)
+          .maybeSingle<{ metadata: Record<string, unknown> | null }>();
+        const { error: revokeUpdateError } = await supa
+          .schema("mooov")
+          .from("lodges")
+          .update({
+            status: "revoked",
+            metadata: {
+              ...(lodgeConnection?.metadata ?? {}),
+              revoked_at: new Date().toISOString(),
+              revoked_source: "dues_start",
+              revoked_error: "MERCHANT_GRANT_REVOKED",
+            },
+          })
+          .eq("id", input.lodge_id);
+        if (revokeUpdateError) {
+          console.error("dues_start revoke-status update failed", {
+            lodge_id: input.lodge_id,
+            code: revokeUpdateError.code,
+            message: revokeUpdateError.message,
+          });
+        }
+      }
       return NextResponse.json(
         { error: err.category, status: err.status, payment_id: paymentId },
         { status: userStatusFor(err.category) },

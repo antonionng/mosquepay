@@ -22,6 +22,14 @@ type MooovConnectEvent = {
   };
 };
 
+function firstNonEmptyEnv(...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = process.env[key]?.trim();
+    if (value) return value;
+  }
+  return undefined;
+}
+
 async function findLodgeIdForMerchant(
   supa: ReturnType<typeof createServiceClient>,
   merchantId: string
@@ -61,10 +69,12 @@ export async function POST(request: NextRequest) {
   const raw = await request.text();
   const signature = request.headers.get("x-mooov-signature");
   const deliveryId = request.headers.get("x-mooov-delivery") ?? "";
-  const webhookSecret =
-    process.env.MOOOV_WEBHOOK_SIGNING_SECRET ??
-    process.env.MOOOV_WEBHOOK_SECRET ??
-    process.env.MOOOV_PLATFORM_WEBHOOK_SECRET;
+  const webhookSecret = firstNonEmptyEnv(
+    "MOOOV_PLATFORM_WEBHOOK_SIGNING_SECRET",
+    "MOOOV_WEBHOOK_SIGNING_SECRET",
+    "MOOOV_WEBHOOK_SECRET",
+    "MOOOV_PLATFORM_WEBHOOK_SECRET"
+  );
 
   if (!signature) {
     return NextResponse.json(
@@ -75,6 +85,7 @@ export async function POST(request: NextRequest) {
   if (!webhookSecret) {
     console.error("Mooov webhook signing secret env var not configured", {
       tried_vars: [
+        "MOOOV_PLATFORM_WEBHOOK_SIGNING_SECRET",
         "MOOOV_WEBHOOK_SIGNING_SECRET",
         "MOOOV_WEBHOOK_SECRET",
         "MOOOV_PLATFORM_WEBHOOK_SECRET",
