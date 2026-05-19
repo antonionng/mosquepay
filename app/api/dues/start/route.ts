@@ -19,7 +19,16 @@ interface StartDuesBody {
   // Path A: Stripe test PM (e.g. "pm_card_visa"). Omit for Path B
   // (Mooov returns provider.hosted_url for Mollie hosted checkout).
   payment_method?: string;
+  // Dues-cycle identifier. When provided, makes the request idempotent on the
+  // (lodge_id, member_id, period) tuple: caller-side retries collapse to the
+  // same payment_id and the same Mooov authorize. When omitted, falls back to
+  // a monotonic-time key (smoke tests, ad-hoc charges that should NOT collapse).
+  period?: string;
 }
+
+// Period must be safe to embed in a payment_id / idempotency_key. Conservative
+// charset keeps Mooov server-side validation happy and avoids URL-encoding gotchas.
+const PERIOD_RE = /^[A-Za-z0-9_-]{1,40}$/;
 
 interface PaymentIntentResponse {
   payment_id: string;
@@ -103,6 +112,12 @@ export async function POST(req: NextRequest) {
   ) {
     return NextResponse.json({ error: "missing required fields" }, { status: 400 });
   }
+  if (input.period !== undefined && !PERIOD_RE.test(input.period)) {
+    return NextResponse.json(
+      { error: "period must match /^[A-Za-z0-9_-]{1,40}$/" },
+      { status: 400 },
+    );
+  }
 
   let supa: ReturnType<typeof createServiceClient>;
   try {
@@ -137,8 +152,65 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const paymentId = `pay_${input.lodge_id}_${input.member_id}_${Date.now()}`;
-  const idempotencyKey = `dues_${input.member_id}_${paymentId}`;
+  // Idempotency key: deterministic when caller passes `period`, monotonic
+  // (Date.now) otherwise. Deterministic mode lets retries collapse to the
+  // same Mooov payment via the unique(lodge_id, idempotency_key) constraint
+  // -- preserves payment safety under client retries during a dues cycle.
+  const paymentId = input.period
+    ? `pay_${input.lodge_id}_${input.member_id}_${input.period}`
+    : `pay_${input.lodge_id}_${input.member_id}_${Date.now()}`;
+  const idempotencyKey = input.period
+    ? `dues_${input.member_id}_${input.period}`
+    : `dues_${input.member_id}_${paymentId}`;
+  const initialMetadata: Record<string, unknown> = {
+    source: input.period ? "lodgepay_dues_start" : "lodgepay_dev_quickstart",
+    ...(input.period ? { period: input.period } : {}),
+  };
+
+  // Replay short-circuit: in deterministic (period) mode, if this exact
+  // (lodge_id, idempotency_key) was already processed, return the persisted
+  // state without re-calling Mooov. This is the user-facing contract of
+  // idempotency: same input -> same payment.
+  if (input.period) {
+    const { data: existing, error: lookupError } = await supa
+      .schema("mooov")
+      .from("payment_attempts")
+      .select("payment_id, status, provider_ref, metadata, failure_reason")
+      .eq("lodge_id", input.lodge_id)
+      .eq("idempotency_key", idempotencyKey)
+      .maybeSingle<{
+        payment_id: string;
+        status: string;
+        provider_ref: string | null;
+        metadata: Record<string, unknown> | null;
+        failure_reason: string | null;
+      }>();
+    if (lookupError) {
+      console.error("dues_start idempotency lookup failed", {
+        lodge_id: input.lodge_id,
+        idempotency_key: idempotencyKey,
+        code: lookupError.code,
+        message: lookupError.message,
+      });
+      return NextResponse.json(
+        { error: "idempotency_lookup_failed", db_code: lookupError.code ?? null },
+        { status: 500 },
+      );
+    }
+    if (existing) {
+      const hostedUrl =
+        typeof existing.metadata?.hosted_url === "string"
+          ? (existing.metadata.hosted_url as string)
+          : null;
+      return NextResponse.json({
+        payment_id: existing.payment_id,
+        state: existing.status,
+        hosted_url: hostedUrl,
+        idempotent_replay: true,
+        failure_reason: existing.failure_reason,
+      });
+    }
+  }
 
   // Pre-flight: persist the attempt BEFORE talking to Mooov. If this
   // fails (RLS, FK miss on members, network), we must not call Mooov --
@@ -157,9 +229,40 @@ export async function POST(req: NextRequest) {
       intent: "dues",
       status: "pending",
       idempotency_key: idempotencyKey,
-      metadata: { source: "lodgepay_dev_quickstart" },
+      metadata: initialMetadata,
     });
   if (insertError) {
+    // 23505 = Postgres unique_violation. Two requests with the same
+    // (lodge_id, idempotency_key) raced past the lookup above; the loser
+    // should re-read and return the winner's row instead of erroring.
+    if (insertError.code === "23505" && input.period) {
+      const { data: raced } = await supa
+        .schema("mooov")
+        .from("payment_attempts")
+        .select("payment_id, status, provider_ref, metadata, failure_reason")
+        .eq("lodge_id", input.lodge_id)
+        .eq("idempotency_key", idempotencyKey)
+        .maybeSingle<{
+          payment_id: string;
+          status: string;
+          provider_ref: string | null;
+          metadata: Record<string, unknown> | null;
+          failure_reason: string | null;
+        }>();
+      if (raced) {
+        const hostedUrl =
+          typeof raced.metadata?.hosted_url === "string"
+            ? (raced.metadata.hosted_url as string)
+            : null;
+        return NextResponse.json({
+          payment_id: raced.payment_id,
+          state: raced.status,
+          hosted_url: hostedUrl,
+          idempotent_replay: true,
+          failure_reason: raced.failure_reason,
+        });
+      }
+    }
     console.error("dues_start preflight insert failed", {
       lodge_id: input.lodge_id,
       member_id: input.member_id,
@@ -204,6 +307,15 @@ export async function POST(req: NextRequest) {
     // can't undo the Mooov authorize, so log loudly and still return
     // 200 to the caller (with persisted: false). The eventual
     // payment.succeeded webhook gives us a second chance to reconcile.
+    //
+    // hosted_url is stashed in metadata so that an idempotent replay (caller
+    // retries with the same period) can return the same hosted checkout URL
+    // without re-calling Mooov. Without this, the replay would lose the URL.
+    const hostedUrl = result.provider?.hosted_url ?? null;
+    const persistedMetadata: Record<string, unknown> = {
+      ...initialMetadata,
+      ...(hostedUrl ? { hosted_url: hostedUrl } : {}),
+    };
     const { error: updateError, count: updateCount } = await supa
       .schema("mooov")
       .from("payment_attempts")
@@ -211,6 +323,7 @@ export async function POST(req: NextRequest) {
         {
           status: result.state,
           provider_ref: result.provider?.provider_ref ?? null,
+          metadata: persistedMetadata,
           authorized_at:
             result.state === "authorized" ? new Date().toISOString() : null,
           captured_at:
@@ -234,8 +347,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       payment_id: paymentId,
       state: result.state,
-      hosted_url: result.provider?.hosted_url ?? null,
+      hosted_url: hostedUrl,
       persisted: !updateError && (updateCount ?? 0) > 0,
+      idempotent_replay: false,
     });
   } catch (err) {
     if (err instanceof MooovApiError) {
