@@ -66,10 +66,23 @@ export async function POST(request: NextRequest) {
     process.env.MOOOV_WEBHOOK_SECRET ??
     process.env.MOOOV_PLATFORM_WEBHOOK_SECRET;
 
-  if (!signature || !webhookSecret) {
+  if (!signature) {
     return NextResponse.json(
-      { error: "Webhook signature is not configured." },
+      { error: "Missing X-Mooov-Signature header." },
       { status: 400 }
+    );
+  }
+  if (!webhookSecret) {
+    console.error("Mooov webhook signing secret env var not configured", {
+      tried_vars: [
+        "MOOOV_WEBHOOK_SIGNING_SECRET",
+        "MOOOV_WEBHOOK_SECRET",
+        "MOOOV_PLATFORM_WEBHOOK_SECRET",
+      ],
+    });
+    return NextResponse.json(
+      { error: "Webhook signing secret not configured." },
+      { status: 500 }
     );
   }
 
