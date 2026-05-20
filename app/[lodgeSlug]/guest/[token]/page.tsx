@@ -1,9 +1,7 @@
-import GuestInvitationPage, {
-  dynamic,
-  metadata,
-} from "@/app/g/[token]/page";
+import GuestInvitationPage, { metadata } from "@/app/g/[token]/page";
 
-export { dynamic, metadata };
+export const dynamic = "force-dynamic";
+export { metadata };
 
 export default async function LodgeScopedGuestInvitationPage({
   params,

@@ -1,9 +1,7 @@
-import PublicVisitPage, {
-  dynamic,
-  metadata,
-} from "@/app/visit/[slug]/page";
+import PublicVisitPage, { metadata } from "@/app/visit/[slug]/page";
 
-export { dynamic, metadata };
+export const dynamic = "force-dynamic";
+export { metadata };
 
 export default async function LodgeScopedVisitPage({
   params,

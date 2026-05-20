@@ -1,9 +1,7 @@
-import VisitorPortalPage, {
-  dynamic,
-  metadata,
-} from "@/app/visitor/[token]/page";
+import VisitorPortalPage, { metadata } from "@/app/visitor/[token]/page";
 
-export { dynamic, metadata };
+export const dynamic = "force-dynamic";
+export { metadata };
 
 export default async function LodgeScopedVisitorPortalPage({
   params,
