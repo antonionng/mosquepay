@@ -26,9 +26,27 @@ export type MooovErrorCategory =
   | "idempotency_conflict"
   | "invalid_request"
   | "unprocessable"
+  | "merchant_setup_required"
   | "rate_limited"
   | "server"
   | "network";
+
+export interface MooovMerchantSetupProvider {
+  id: string;
+  displayName: string;
+  status: string;
+}
+
+// Parsed payload of Mooov's typed 422 `merchant_not_charge_capable` response.
+// setupUrl is single-use and TTL-bounded (~1h); render as a button per
+// https://docs.mooov.money/errors/merchant_not_charge_capable, never auto-redirect.
+export interface MooovMerchantSetupHint {
+  setupUrl: string;
+  setupUrlExpiresAt: string;
+  providers: MooovMerchantSetupProvider[];
+  message?: string;
+  docsUrl?: string;
+}
 
 export class MooovApiError extends Error {
   constructor(
@@ -37,6 +55,7 @@ export class MooovApiError extends Error {
     public readonly body: string,
     public readonly method: string,
     public readonly path: string,
+    public readonly setupHint?: MooovMerchantSetupHint,
   ) {
     super(`mooov ${method} ${path} -> ${status} ${category}`);
     this.name = "MooovApiError";
@@ -147,6 +166,54 @@ function categorise(status: number): MooovErrorCategory {
   return "server";
 }
 
+function parseMerchantSetupHint(text: string): MooovMerchantSetupHint | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    (parsed as { error?: unknown }).error !== "merchant_not_charge_capable"
+  ) {
+    return undefined;
+  }
+  const obj = parsed as Record<string, unknown>;
+  const setupUrl = typeof obj.setup_url === "string" ? obj.setup_url : null;
+  const setupUrlExpiresAt =
+    typeof obj.setup_url_expires_at === "string" ? obj.setup_url_expires_at : null;
+  // Both fields are load-bearing for the "Finish setup on Mooov" CTA; without
+  // either, fall back to the generic unprocessable category so callers don't
+  // surface a half-formed hint.
+  if (!setupUrl || !setupUrlExpiresAt) return undefined;
+
+  const providers: MooovMerchantSetupProvider[] = Array.isArray(obj.providers)
+    ? obj.providers
+        .map((p): MooovMerchantSetupProvider | null => {
+          if (!p || typeof p !== "object") return null;
+          const pObj = p as Record<string, unknown>;
+          if (typeof pObj.id !== "string") return null;
+          return {
+            id: pObj.id,
+            displayName:
+              typeof pObj.display_name === "string" ? pObj.display_name : pObj.id,
+            status: typeof pObj.status === "string" ? pObj.status : "unknown",
+          };
+        })
+        .filter((p): p is MooovMerchantSetupProvider => p !== null)
+    : [];
+
+  return {
+    setupUrl,
+    setupUrlExpiresAt,
+    providers,
+    message: typeof obj.message === "string" ? obj.message : undefined,
+    docsUrl: typeof obj.docs_url === "string" ? obj.docs_url : undefined,
+  };
+}
+
 export async function callMooov<T>(
   baseUrl: string,
   key: MooovKey,
@@ -177,13 +244,18 @@ export async function callMooov<T>(
   }
   const text = await res.text();
   if (!res.ok) {
-    const category =
+    let category: MooovErrorCategory =
       res.status === 403 && text.includes("MERCHANT_GRANT_REVOKED")
         ? "grant_required"
         : res.status === 403 && text.includes("SCOPE_DENIED")
         ? "scope_denied"
         : categorise(res.status);
-    throw new MooovApiError(res.status, category, text, method, path);
+    let setupHint: MooovMerchantSetupHint | undefined;
+    if (res.status === 422) {
+      setupHint = parseMerchantSetupHint(text);
+      if (setupHint) category = "merchant_setup_required";
+    }
+    throw new MooovApiError(res.status, category, text, method, path, setupHint);
   }
   return text.length === 0 ? (undefined as T) : (JSON.parse(text) as T);
 }

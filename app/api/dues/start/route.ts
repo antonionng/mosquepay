@@ -90,11 +90,45 @@ function userStatusFor(category: MooovApiError["category"]): number {
       return 409;
     case "unprocessable":
       return 422;
+    case "merchant_setup_required":
+      return 422;
     case "rate_limited":
       return 429;
     default:
       return 502;
   }
+}
+
+// Read the merchant_setup hint persisted onto payment_attempts.metadata by
+// the catch branch below. Returned in its on-the-wire (snake_case) shape so
+// idempotent replays surface the same setup link the original 422 carried,
+// per https://docs.mooov.money/errors/merchant_not_charge_capable.
+function persistedSetupHint(
+  metadata: Record<string, unknown> | null,
+): {
+  setup_url: string;
+  setup_url_expires_at: string;
+  providers: Array<{ id: string; display_name: string; status: string }>;
+  message?: string;
+  docs_url?: string;
+} | null {
+  if (!metadata || typeof metadata !== "object") return null;
+  const ms = (metadata as Record<string, unknown>).merchant_setup;
+  if (!ms || typeof ms !== "object") return null;
+  const obj = ms as Record<string, unknown>;
+  const setupUrl = typeof obj.setup_url === "string" ? obj.setup_url : null;
+  const expiresAt =
+    typeof obj.setup_url_expires_at === "string" ? obj.setup_url_expires_at : null;
+  if (!setupUrl || !expiresAt) return null;
+  return {
+    setup_url: setupUrl,
+    setup_url_expires_at: expiresAt,
+    providers: Array.isArray(obj.providers)
+      ? (obj.providers as Array<{ id: string; display_name: string; status: string }>)
+      : [],
+    message: typeof obj.message === "string" ? obj.message : undefined,
+    docs_url: typeof obj.docs_url === "string" ? obj.docs_url : undefined,
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -202,12 +236,14 @@ export async function POST(req: NextRequest) {
         typeof existing.metadata?.hosted_url === "string"
           ? (existing.metadata.hosted_url as string)
           : null;
+      const setupHint = persistedSetupHint(existing.metadata);
       return NextResponse.json({
         payment_id: existing.payment_id,
         state: existing.status,
         hosted_url: hostedUrl,
         idempotent_replay: true,
         failure_reason: existing.failure_reason,
+        ...(setupHint ? { merchant_setup: setupHint } : {}),
       });
     }
   }
@@ -254,12 +290,14 @@ export async function POST(req: NextRequest) {
           typeof raced.metadata?.hosted_url === "string"
             ? (raced.metadata.hosted_url as string)
             : null;
+        const setupHint = persistedSetupHint(raced.metadata);
         return NextResponse.json({
           payment_id: raced.payment_id,
           state: raced.status,
           hosted_url: hostedUrl,
           idempotent_replay: true,
           failure_reason: raced.failure_reason,
+          ...(setupHint ? { merchant_setup: setupHint } : {}),
         });
       }
     }
@@ -358,7 +396,65 @@ export async function POST(req: NextRequest) {
         status: err.status,
         method: "POST",
         path: "/v1/payment_intents",
+        setup_url_expires_at: err.setupHint?.setupUrlExpiresAt ?? null,
       });
+
+      // merchant_not_charge_capable: surface Mooov's single-use, ~1h-TTL setup
+      // link so the admin UI can show a "Finish setup on Mooov" CTA. Persist
+      // the hint into payment_attempts.metadata.merchant_setup so idempotent
+      // replays (and the integrations page query) can recover it later.
+      if (err.category === "merchant_setup_required" && err.setupHint) {
+        const setupMetadata: Record<string, unknown> = {
+          ...initialMetadata,
+          merchant_setup: {
+            setup_url: err.setupHint.setupUrl,
+            setup_url_expires_at: err.setupHint.setupUrlExpiresAt,
+            providers: err.setupHint.providers.map((p) => ({
+              id: p.id,
+              display_name: p.displayName,
+              status: p.status,
+            })),
+            message: err.setupHint.message,
+            docs_url: err.setupHint.docsUrl,
+            recorded_at: new Date().toISOString(),
+          },
+        };
+        const { error: setupUpdateError } = await supa
+          .schema("mooov")
+          .from("payment_attempts")
+          .update({
+            status: "failed",
+            failure_reason: "merchant_setup_required",
+            metadata: setupMetadata,
+          })
+          .eq("payment_id", paymentId);
+        if (setupUpdateError) {
+          console.error("dues_start setup-required update failed", {
+            payment_id: paymentId,
+            code: setupUpdateError.code,
+            message: setupUpdateError.message,
+          });
+        }
+        return NextResponse.json(
+          {
+            error: "merchant_setup_required",
+            payment_id: paymentId,
+            merchant_setup: {
+              setup_url: err.setupHint.setupUrl,
+              setup_url_expires_at: err.setupHint.setupUrlExpiresAt,
+              providers: err.setupHint.providers.map((p) => ({
+                id: p.id,
+                display_name: p.displayName,
+                status: p.status,
+              })),
+              message: err.setupHint.message,
+              docs_url: err.setupHint.docsUrl,
+            },
+          },
+          { status: 422 },
+        );
+      }
+
       const { error: failUpdateError } = await supa
         .schema("mooov")
         .from("payment_attempts")
