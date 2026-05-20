@@ -8,7 +8,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "bootstrap:platform-owner": "node scripts/bootstrap-platform-owner.mjs"
+    "bootstrap:platform-owner": "node scripts/bootstrap-platform-owner.mjs",
+    "seed:installation-2026-06-02": "node scripts/seed-2026-06-02-installation.mjs",
+    "audit:crud": "node scripts/audit-crud.mjs",
+    "audit:crud:strict": "node scripts/audit-crud.mjs --strict"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",

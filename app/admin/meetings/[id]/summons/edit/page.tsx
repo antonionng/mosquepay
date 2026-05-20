@@ -5,6 +5,30 @@ import * as mockDb from "@/lib/mock-db";
 import { defaultAgendaItems, renderDefaultSummonsOpening } from "@/lib/summons/defaults";
 import { SummonsEditorClient } from "./summons-editor-client";
 
+function visitingOfficersFromSummons(
+  summons: Awaited<ReturnType<typeof db.getEventSummons>> | null
+) {
+  if (summons?.visiting_officers?.length) {
+    return summons.visiting_officers.map((officer) => ({
+      name: officer.name ?? "",
+      email: officer.email ?? "",
+      phone: officer.phone ?? "",
+    }));
+  }
+
+  if (summons?.visiting_officer_name) {
+    return [
+      {
+        name: summons.visiting_officer_name,
+        email: summons.visiting_officer_email ?? "",
+        phone: summons.visiting_officer_phone ?? "",
+      },
+    ];
+  }
+
+  return [{ name: "", email: "", phone: "" }];
+}
+
 export default async function EditMeetingSummonsPage({
   params,
 }: {
@@ -36,6 +60,7 @@ export default async function EditMeetingSummonsPage({
     <SummonsEditorClient
       eventId={id}
       eventTitle={event.title}
+      eventType={event.event_type}
       sendHistory={JSON.parse(JSON.stringify(sends))}
       initial={{
         issue_date:
@@ -49,6 +74,11 @@ export default async function EditMeetingSummonsPage({
         dining_time: summons?.dining_time ?? "",
         notices: summons?.notices ?? [],
         include_member_directory: summons?.include_member_directory ?? true,
+        visiting_officers: visitingOfficersFromSummons(summons),
+        next_meeting_date: summons?.next_meeting_date ?? "",
+        next_meeting_note: summons?.next_meeting_note ?? "",
+        master_elect_name: summons?.master_elect_name ?? "",
+        master_elect_qualification: summons?.master_elect_qualification ?? "",
       }}
     />
   );

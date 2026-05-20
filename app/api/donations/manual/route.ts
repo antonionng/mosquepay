@@ -1,3 +1,5 @@
+// crud-audit:ignore-update crud-audit:ignore-delete
+// Manual donation entry. Edits and deletions go through /api/donations/[id].
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";

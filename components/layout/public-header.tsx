@@ -18,7 +18,6 @@ type NavLink = {
 
 const marketingNavLinks = [
   { href: "/features", label: "Features" },
-  { href: "/pricing", label: "Pricing" },
   { href: "/contact", label: "Contact" },
 ];
 
@@ -136,7 +135,9 @@ export function PublicHeader({
     : marketingNavLinks;
 
   const withTenantQuery = (href: string) =>
-    queryTenantMode ? `${href}?lodge=${encodeURIComponent(lodgeSlug)}` : href;
+    isTenantMode && href.startsWith("/")
+      ? `${href}${href.includes("?") ? "&" : "?"}lodge=${encodeURIComponent(lodgeSlug)}`
+      : href;
 
   useEffect(() => {
     const handleScroll = () => {

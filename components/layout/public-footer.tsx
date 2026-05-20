@@ -11,7 +11,6 @@ import { defaultFooterSettings } from "@/lib/site-section-style";
 const marketingLinks = {
   main: [
     { href: "/features", label: "Features" },
-    { href: "/pricing", label: "Pricing" },
     { href: "/book-demo", label: "Book Demo" },
   ],
   secondary: [
@@ -82,8 +81,8 @@ export function PublicFooter({
   ];
   const footerGroups = isTenantMode ? tenantFooterGroups : marketingFooterGroups;
   const withTenantQuery = (href: string) =>
-    queryTenantMode && href.startsWith("/")
-      ? `${href}?lodge=${encodeURIComponent(lodgeSlug)}`
+    isTenantMode && href.startsWith("/")
+      ? `${href}${href.includes("?") ? "&" : "?"}lodge=${encodeURIComponent(lodgeSlug)}`
       : href;
 
   useEffect(() => {

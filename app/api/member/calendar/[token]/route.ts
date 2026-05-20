@@ -30,6 +30,7 @@ export async function GET(
     calendarName: lodge?.name ?? "Lodge calendar",
     events,
     origin,
+    lodgeSlug: lodge?.slug ?? null,
   });
 
   return new NextResponse(ics, {

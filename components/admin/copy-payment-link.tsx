@@ -3,12 +3,19 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Link2, Check } from "lucide-react";
+import { lodgeScopedEventPath } from "@/lib/public-links";
 
-export function CopyPaymentLink({ slug }: { slug: string }) {
+export function CopyPaymentLink({
+  lodgeSlug,
+  slug,
+}: {
+  lodgeSlug: string;
+  slug: string;
+}) {
   const [copied, setCopied] = useState(false);
 
   function copy() {
-    const url = `${window.location.origin}/events/${slug}/pay`;
+    const url = `${window.location.origin}${lodgeScopedEventPath(lodgeSlug, slug)}/pay`;
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);

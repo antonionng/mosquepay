@@ -28,6 +28,7 @@ export type Lodge = {
   custom_domain: string | null;
   custom_domain_verified_at: string | null;
   custom_domain_verification_token: string | null;
+  accepts_self_registration: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -260,6 +261,7 @@ export type Event = {
   enable_guest_tickets: boolean;
   guest_ticket_price: number | null;
   guest_ticket_description: string | null;
+  guest_policy: "blue_table" | "white_table" | "closed";
   featured_image_url: string | null;
   created_by: string | null;
   published: boolean;
@@ -947,6 +949,55 @@ export type EventGuest = {
   event_id: string;
   guest_name: string;
   dietary_requirements: string | null;
+  email: string | null;
+  phone: string | null;
+  guest_id: string | null;
+  guest_invitation_id: string | null;
+  source: "member_party" | "self_invite" | "admin_added" | "self_register";
+  welcome_email_sent_at: string | null;
+  created_at: string;
+};
+
+export type Guest = {
+  id: string;
+  lodge_id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  mother_lodge_name: string | null;
+  mother_lodge_number: string | null;
+  constitution: string | null;
+  rank: string | null;
+  dietary_requirements: string | null;
+  is_mason: boolean;
+  first_seen_event_id: string | null;
+  last_seen_event_id: string | null;
+  visit_count: number;
+  notes: string | null;
+  archived_at: string | null;
+  visitor_token_hash: string | null;
+  source: "admin" | "member_invite" | "self_invite_event" | "self_register";
+  email_confirmed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GuestInvitation = {
+  id: string;
+  lodge_id: string;
+  event_id: string;
+  inviter_member_id: string | null;
+  inviter_admin_user_id: string | null;
+  recipient_email: string | null;
+  recipient_name: string | null;
+  token_hash: string;
+  payer: "guest" | "inviter";
+  max_uses: number | null;
+  uses: number;
+  expires_at: string | null;
+  revoked_at: string | null;
+  last_used_at: string | null;
+  guest_id: string | null;
   created_at: string;
 };
 
@@ -999,8 +1050,22 @@ export type EventSummons = {
   dining_time: string | null;
   notices: string[];
   include_member_directory: boolean;
+  visiting_officer_name: string | null;
+  visiting_officer_email: string | null;
+  visiting_officer_phone: string | null;
+  visiting_officers: VisitingOfficer[];
+  next_meeting_date: string | null;
+  next_meeting_note: string | null;
+  master_elect_name: string | null;
+  master_elect_qualification: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type VisitingOfficer = {
+  name: string;
+  email?: string | null;
+  phone?: string | null;
 };
 
 export type EventSummonsSend = {

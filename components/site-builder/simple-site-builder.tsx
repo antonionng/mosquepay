@@ -45,6 +45,12 @@ import type {
 } from "@/lib/db/types";
 
 type Step = "template" | "edit" | "preview" | "publish";
+type WebsiteAiMode = "full" | "improve" | "add";
+type WebsiteAiDraft = {
+  page_title: string;
+  page_description: string | null;
+  sections: LodgeSiteSection[];
+};
 
 const SECTION_LABELS: Record<LodgeSiteSection["type"], string> = {
   hero: "Hero",
@@ -145,6 +151,17 @@ export function SimpleSiteBuilder({
   const [published, setPublished] = useState(initiallyPublished);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddPanel, setShowAddPanel] = useState(false);
+  const [websiteAiMode, setWebsiteAiMode] = useState<WebsiteAiMode>("full");
+  const [websiteAiSectionId, setWebsiteAiSectionId] = useState("");
+  const [websiteAiSectionType, setWebsiteAiSectionType] =
+    useState<LodgeSiteSection["type"]>("about");
+  const [websiteAiTone, setWebsiteAiTone] = useState("welcoming");
+  const [websiteAiAudience, setWebsiteAiAudience] = useState("prospective members");
+  const [websiteAiBrief, setWebsiteAiBrief] = useState("");
+  const [websiteAiFocus, setWebsiteAiFocus] = useState("");
+  const [websiteAiDraft, setWebsiteAiDraft] = useState<WebsiteAiDraft | null>(null);
+  const [websiteAiMessage, setWebsiteAiMessage] = useState<string | null>(null);
+  const [websiteAiBusy, setWebsiteAiBusy] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -308,6 +325,139 @@ export function SimpleSiteBuilder({
     setPublishing(false);
   }
 
+  async function draftWebsiteWithAi() {
+    setWebsiteAiBusy(true);
+    setWebsiteAiMessage(null);
+    try {
+      const selectedSection = orderedSections.find(
+        (section) => section.id === websiteAiSectionId
+      );
+      const sectionType =
+        websiteAiMode === "full"
+          ? undefined
+          : websiteAiMode === "improve"
+            ? selectedSection?.type
+            : websiteAiSectionType;
+      const res = await fetch(`/api/lodges/${lodgeSlug}/ai-draft`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tone: websiteAiTone,
+          audience: websiteAiAudience,
+          brief: websiteAiBrief,
+          focus: websiteAiFocus,
+          section_type: sectionType,
+          current_section: websiteAiMode === "improve" ? selectedSection : undefined,
+          existing_sections: orderedSections.map((section) => ({
+            type: section.type,
+            style: section.style,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Could not draft website content.");
+      const draft =
+        websiteAiMode === "full"
+          ? data.draft
+          : {
+              page_title: pageTitle,
+              page_description: pageDescription || null,
+              sections: [data.section],
+            };
+      setWebsiteAiDraft(draft);
+      setWebsiteAiMessage(
+        data.source === "fallback"
+          ? "Fallback website draft ready to review."
+          : "AI website draft ready to review."
+      );
+    } catch (error) {
+      setWebsiteAiMessage(
+        error instanceof Error ? error.message : "Could not draft website content."
+      );
+    } finally {
+      setWebsiteAiBusy(false);
+    }
+  }
+
+  function applyWebsiteAiDraft() {
+    if (!websiteAiDraft) return;
+    if (websiteAiMode === "full") {
+      setPageTitle(websiteAiDraft.page_title);
+      setPageDescription(websiteAiDraft.page_description ?? "");
+      setSections(
+        websiteAiDraft.sections.map((section, index) => ({
+          ...section,
+          order: index + 1,
+        }))
+      );
+      setStep("preview");
+      setWebsiteAiMessage("AI homepage draft applied. Save or edit before publishing.");
+      return;
+    }
+
+    const draftedSection = websiteAiDraft.sections[0];
+    if (!draftedSection) return;
+
+    if (websiteAiMode === "improve") {
+      const selectedSection = orderedSections.find(
+        (section) => section.id === websiteAiSectionId
+      );
+      if (!selectedSection) {
+        setWebsiteAiMessage("Choose a section to improve first.");
+        return;
+      }
+      setSections((prev) =>
+        prev.map((section) =>
+          section.id === selectedSection.id
+            ? {
+                ...section,
+                heading: draftedSection.heading,
+                body: draftedSection.body,
+                cta_label: draftedSection.cta_label,
+                cta_href: draftedSection.cta_href,
+                visible: draftedSection.visible,
+                style: draftedSection.style ?? section.style,
+              }
+            : section
+        )
+      );
+      setEditingId(selectedSection.id);
+      setStep("edit");
+      setWebsiteAiMessage("AI section rewrite applied. Review and save the draft.");
+      return;
+    }
+
+    const nextSection = {
+      ...draftedSection,
+      id: crypto.randomUUID(),
+      order: orderedSections.length + 1,
+    };
+    setSections((prev) => [...prev, nextSection]);
+    setEditingId(nextSection.id);
+    setStep("edit");
+    setWebsiteAiMessage("AI section added. Review and save the draft.");
+  }
+
+  function updateWebsiteAiDraft(patch: Partial<WebsiteAiDraft>) {
+    setWebsiteAiDraft((draft) => (draft ? { ...draft, ...patch } : draft));
+  }
+
+  function updateWebsiteAiDraftSection(
+    index: number,
+    patch: Partial<LodgeSiteSection>
+  ) {
+    setWebsiteAiDraft((draft) =>
+      draft
+        ? {
+            ...draft,
+            sections: draft.sections.map((section, sectionIndex) =>
+              sectionIndex === index ? { ...section, ...patch } : section
+            ),
+          }
+        : draft
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -406,6 +556,281 @@ export function SimpleSiteBuilder({
           </div>
         </div>
       ) : null}
+
+      <Card variant="panel" className="overflow-hidden p-0">
+        <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
+          <div>
+            <h3 className="dash-panel-header-title">AI website assistant</h3>
+            <p className="dash-panel-header-description">
+              Draft a full homepage, rewrite one section, or add a new block. AI changes stay in draft until you apply and save them.
+            </p>
+          </div>
+          <Sparkles className="h-5 w-5 text-amber-600" />
+        </div>
+        <CardContent className="space-y-4 border-t border-dash-border bg-dash-surface p-5">
+          <div className="grid gap-3 lg:grid-cols-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-dash-muted">AI task</label>
+              <select
+                value={websiteAiMode}
+                onChange={(event) => {
+                  setWebsiteAiMode(event.target.value as WebsiteAiMode);
+                  setWebsiteAiDraft(null);
+                  setWebsiteAiMessage(null);
+                }}
+                className="h-10 w-full rounded-lg border border-dash-border bg-dash-surface px-3 text-sm text-dash-text"
+              >
+                <option value="full">Draft full homepage</option>
+                <option value="improve">Improve selected section</option>
+                <option value="add">Add a new section</option>
+              </select>
+            </div>
+            {websiteAiMode === "improve" ? (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-dash-muted">
+                  Section to improve
+                </label>
+                <select
+                  value={websiteAiSectionId}
+                  onChange={(event) => setWebsiteAiSectionId(event.target.value)}
+                  className="h-10 w-full rounded-lg border border-dash-border bg-dash-surface px-3 text-sm text-dash-text"
+                >
+                  <option value="">Choose a section</option>
+                  {orderedSections.map((section) => (
+                    <option key={section.id} value={section.id}>
+                      {SECTION_LABELS[section.type]}: {section.heading}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : websiteAiMode === "add" ? (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-dash-muted">
+                  New section type
+                </label>
+                <select
+                  value={websiteAiSectionType}
+                  onChange={(event) =>
+                    setWebsiteAiSectionType(
+                      event.target.value as LodgeSiteSection["type"]
+                    )
+                  }
+                  className="h-10 w-full rounded-lg border border-dash-border bg-dash-surface px-3 text-sm text-dash-text"
+                >
+                  {Object.entries(SECTION_LABELS).map(([type, label]) => (
+                    <option key={type} value={type}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-dash-muted">Tone</label>
+                <select
+                  value={websiteAiTone}
+                  onChange={(event) => setWebsiteAiTone(event.target.value)}
+                  className="h-10 w-full rounded-lg border border-dash-border bg-dash-surface px-3 text-sm text-dash-text"
+                >
+                  <option value="welcoming">Welcoming</option>
+                  <option value="formal">Formal</option>
+                  <option value="traditional">Traditional</option>
+                  <option value="modern">Modern</option>
+                  <option value="community">Community</option>
+                </select>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-dash-muted">Audience</label>
+              <Input
+                value={websiteAiAudience}
+                onChange={(event) => setWebsiteAiAudience(event.target.value)}
+                placeholder="prospective members"
+              />
+            </div>
+          </div>
+          {websiteAiMode !== "full" ? (
+            <div className="grid gap-3 lg:grid-cols-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-dash-muted">Tone</label>
+                <select
+                  value={websiteAiTone}
+                  onChange={(event) => setWebsiteAiTone(event.target.value)}
+                  className="h-10 w-full rounded-lg border border-dash-border bg-dash-surface px-3 text-sm text-dash-text"
+                >
+                  <option value="welcoming">Welcoming</option>
+                  <option value="formal">Formal</option>
+                  <option value="traditional">Traditional</option>
+                  <option value="modern">Modern</option>
+                  <option value="community">Community</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-dash-muted">Focus</label>
+                <Input
+                  value={websiteAiFocus}
+                  onChange={(event) => setWebsiteAiFocus(event.target.value)}
+                  placeholder="e.g. visiting officers, charity, joining, dining"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-dash-muted">Focus</label>
+              <Input
+                value={websiteAiFocus}
+                onChange={(event) => setWebsiteAiFocus(event.target.value)}
+                placeholder="e.g. visiting officers, charity, joining, dining"
+              />
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-dash-muted">Brief</label>
+            <Textarea
+              rows={3}
+              value={websiteAiBrief}
+              onChange={(event) => setWebsiteAiBrief(event.target.value)}
+              placeholder="Tell AI what the lodge wants to say publicly."
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="primary"
+              onClick={draftWebsiteWithAi}
+              disabled={
+                websiteAiBusy ||
+                (websiteAiMode === "improve" && !websiteAiSectionId)
+              }
+              className="gap-2"
+            >
+              {websiteAiBusy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Wand2 className="h-4 w-4" />
+              )}
+              Draft with AI
+            </Button>
+            <Button
+              type="button"
+              variant="dashboard"
+              onClick={applyWebsiteAiDraft}
+              disabled={!websiteAiDraft}
+              className="gap-2"
+            >
+              <Check className="h-4 w-4" />
+              Apply to draft
+            </Button>
+          </div>
+          {websiteAiMessage ? (
+            <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-900">
+              {websiteAiMessage}
+            </div>
+          ) : null}
+          {websiteAiDraft ? (
+            <div className="rounded-2xl border border-dash-border bg-dash-surface-subtle p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-dash-muted">
+                Draft preview
+              </p>
+              {websiteAiMode === "full" ? (
+                <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-dash-muted">
+                      Page title
+                    </label>
+                    <Input
+                      value={websiteAiDraft.page_title}
+                      onChange={(event) =>
+                        updateWebsiteAiDraft({ page_title: event.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-dash-muted">
+                      SEO description
+                    </label>
+                    <Input
+                      value={websiteAiDraft.page_description ?? ""}
+                      onChange={(event) =>
+                        updateWebsiteAiDraft({
+                          page_description: event.target.value || null,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              ) : null}
+              <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                {websiteAiDraft.sections.map((section, index) => (
+                  <div
+                    key={`${section.type}-${index}`}
+                    className="space-y-3 rounded-xl border border-dash-border bg-white p-3 text-sm"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-dash-muted">
+                      {SECTION_LABELS[section.type]}
+                    </p>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-dash-muted">
+                        Heading
+                      </label>
+                      <Input
+                        value={section.heading}
+                        onChange={(event) =>
+                          updateWebsiteAiDraftSection(index, {
+                            heading: event.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-dash-muted">
+                        Body
+                      </label>
+                      <Textarea
+                        rows={4}
+                        value={section.body ?? ""}
+                        onChange={(event) =>
+                          updateWebsiteAiDraftSection(index, {
+                            body: event.target.value || null,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-dash-muted">
+                          CTA label
+                        </label>
+                        <Input
+                          value={section.cta_label ?? ""}
+                          onChange={(event) =>
+                            updateWebsiteAiDraftSection(index, {
+                              cta_label: event.target.value || null,
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-dash-muted">
+                          CTA path
+                        </label>
+                        <Input
+                          value={section.cta_href ?? ""}
+                          onChange={(event) =>
+                            updateWebsiteAiDraftSection(index, {
+                              cta_href: event.target.value || null,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
 
       <div className="dash-filter-bar flex flex-wrap items-center gap-2 py-3">
         {STEPS.map((s, i) => {

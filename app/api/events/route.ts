@@ -83,10 +83,14 @@ export async function POST(request: NextRequest) {
       enable_guest_tickets: body.enable_guest_tickets === true,
       guest_ticket_price: body.guest_ticket_price != null ? Number(body.guest_ticket_price) : null,
       guest_ticket_description: body.guest_ticket_description?.trim() ?? null,
+      guest_policy:
+        body.guest_policy === "white_table" || body.guest_policy === "closed"
+          ? body.guest_policy
+          : "blue_table",
       featured_image_url: null,
       created_by: null,
       published: body.published !== false,
-    };
+    } satisfies Omit<db.Event, "id" | "lodge_id" | "created_at" | "updated_at">;
 
     if (isSupabaseConfigured()) {
       const lodgeId = await db.resolveLodgeId(lodgeSlug);

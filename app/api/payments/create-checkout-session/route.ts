@@ -95,6 +95,12 @@ export async function POST(request: NextRequest) {
               event_id,
               guest_name: g.guest_name,
               dietary_requirements: g.dietary_requirements?.trim() || null,
+              email: null,
+              phone: null,
+              guest_id: null,
+              guest_invitation_id: null,
+              source: "member_party",
+              welcome_email_sent_at: null,
             }))
           );
         }

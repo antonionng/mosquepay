@@ -14,7 +14,6 @@ export default function PublicLayout({
   const isMarketingRoute =
     pathname === "/" ||
     pathname === "/features" ||
-    pathname === "/pricing" ||
     pathname === "/contact" ||
     pathname === "/book-demo";
 

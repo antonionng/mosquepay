@@ -121,3 +121,55 @@ export async function PATCH(
     );
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const _rejectMock = rejectIfMockDisabled();
+  if (_rejectMock) return _rejectMock;
+
+  const { id } = await params;
+  try {
+    const unauthorized = await requireAdminApiAuth();
+    if (unauthorized) return unauthorized;
+
+    const lodgeSlug = getLodgeSlugFromRequest(request);
+
+    if (isSupabaseConfigured()) {
+      const lodgeId = await db.resolveLodgeId(lodgeSlug);
+      if (!lodgeId) {
+        return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+      }
+      const existing = await db.getLeadById(id, lodgeId);
+      if (!existing) {
+        return NextResponse.json({ error: "Lead not found." }, { status: 404 });
+      }
+      const { deleted } = await db.deleteLead(id, lodgeId);
+      if (!deleted) {
+        return NextResponse.json({ error: "Lead not found." }, { status: 404 });
+      }
+      await writeAuditLog({
+        lodgeId,
+        action: "deleted",
+        entityType: "lead",
+        entityId: id,
+        summary: `Deleted lead ${existing.first_name} ${existing.last_name}`,
+        metadata: { email: existing.email, stage: existing.stage },
+      });
+      return NextResponse.json({ success: true });
+    }
+
+    const { deleted } = mockDb.deleteLead(id, { lodge_slug: lodgeSlug });
+    if (!deleted) {
+      return NextResponse.json({ error: "Lead not found." }, { status: 404 });
+    }
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    console.error("Leads DELETE API error:", e);
+    return NextResponse.json(
+      { error: "Something went wrong." },
+      { status: 500 }
+    );
+  }
+}

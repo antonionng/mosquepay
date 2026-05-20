@@ -1,3 +1,6 @@
+// crud-audit:ignore
+// Public RSVP submission endpoint. Admin lifecycle management happens via the
+// admin event surface; no PATCH/DELETE here by design.
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";

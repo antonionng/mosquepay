@@ -20,6 +20,7 @@ import {
   Send,
   Wallet,
   Award,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,11 +108,19 @@ const DUES_VARIANTS: Record<string, string> = {
   waived: "bg-slate-100 text-slate-600 border-slate-200",
 };
 
+interface OfficeRung {
+  id: string;
+  rung_label: string;
+  sort_order: number;
+  current_member_id: string | null;
+}
+
 interface Props {
   member: Member;
   dietaryHistory: DietaryEntry[];
   paymentHistory: PaymentEntry[];
   duesRecords: DuesEntry[];
+  offices?: OfficeRung[];
 }
 
 function buildEditForm(member: Member) {
@@ -127,8 +136,7 @@ function buildEditForm(member: Member) {
     country_list: member.country_list,
     royal_arch: member.royal_arch,
     honorary: member.honorary,
-    office_title: member.office_title ?? "",
-    officer_sort_order: member.officer_sort_order?.toString() ?? "",
+    office_rung_ids: [] as string[],
     directory_sort_order: member.directory_sort_order?.toString() ?? "",
     rank: member.rank ?? "",
     dietary_requirements: member.dietary_requirements ?? "",
@@ -164,6 +172,7 @@ export function MemberDetailClient({
   dietaryHistory,
   paymentHistory,
   duesRecords: initialDues,
+  offices: initialOffices = [],
 }: Props) {
   const router = useRouter();
   const [member, setMember] = useState(initialMember);
@@ -180,8 +189,24 @@ export function MemberDetailClient({
     action: "waive" | "mark_paid" | "mark_outstanding";
   } | null>(null);
   const [duesActionLoading, setDuesActionLoading] = useState(false);
+  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
+  const [removing, setRemoving] = useState(false);
 
-  const [editForm, setEditForm] = useState(() => buildEditForm(member));
+  const offices = initialOffices;
+  const currentRungIds = offices
+    .filter((o) => o.current_member_id === member.id)
+    .map((o) => o.id);
+
+  function buildEditFormWithOffice(m: Member) {
+    return {
+      ...buildEditForm(m),
+      office_rung_ids: offices
+        .filter((o) => o.current_member_id === m.id)
+        .map((o) => o.id),
+    };
+  }
+
+  const [editForm, setEditForm] = useState(() => buildEditFormWithOffice(member));
 
   async function handleSave() {
     setSaving(true);
@@ -202,8 +227,6 @@ export function MemberDetailClient({
           country_list: editForm.country_list,
           royal_arch: editForm.royal_arch,
           honorary: editForm.honorary,
-          office_title: emptyToNull(editForm.office_title),
-          officer_sort_order: numberOrNull(editForm.officer_sort_order),
           directory_sort_order: numberOrNull(editForm.directory_sort_order),
           rank: emptyToNull(editForm.rank),
           dietary_requirements: emptyToNull(editForm.dietary_requirements),
@@ -215,8 +238,30 @@ export function MemberDetailClient({
       if (!res.ok) {
         throw new Error(data.error ?? "Could not save member.");
       }
+
+      const previous = new Set(currentRungIds);
+      const next = new Set(editForm.office_rung_ids);
+      const toClear = [...previous].filter((id) => !next.has(id));
+      const toAssign = [...next].filter((id) => !previous.has(id));
+      await Promise.all([
+        ...toClear.map((id) =>
+          fetch(`/api/officer-ladder/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ current_member_id: null }),
+          })
+        ),
+        ...toAssign.map((id) =>
+          fetch(`/api/officer-ladder/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ current_member_id: member.id }),
+          })
+        ),
+      ]);
+
       setMember(data.member);
-      setEditForm(buildEditForm(data.member));
+      setEditForm(buildEditFormWithOffice(data.member));
       setEditing(false);
       setFeedback({ type: "success", message: "Member profile saved." });
       router.refresh();
@@ -248,6 +293,35 @@ export function MemberDetailClient({
         type: "error",
         message: emailError instanceof Error ? emailError.message : "Could not queue initiation email.",
       });
+    }
+  }
+
+  async function handleRemoveMember() {
+    setRemoving(true);
+    setFeedback(null);
+    try {
+      const res = await fetch(`/api/members/${member.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          (data && typeof data.error === "string" && data.error) ||
+            "Could not remove member."
+        );
+      }
+      setConfirmRemoveOpen(false);
+      router.push("/admin/members");
+      router.refresh();
+    } catch (removeError) {
+      setFeedback({
+        type: "error",
+        message:
+          removeError instanceof Error
+            ? removeError.message
+            : "Could not remove member.",
+      });
+      setRemoving(false);
     }
   }
 
@@ -339,13 +413,24 @@ export function MemberDetailClient({
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-3">
         <Button asChild variant="ghost" size="sm">
           <Link href="/admin/members" className="flex items-center gap-1.5 text-dash-muted">
             <ArrowLeft className="h-4 w-4" />
             Members
           </Link>
         </Button>
+        {!editing && (
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            onClick={() => setConfirmRemoveOpen(true)}
+          >
+            <Trash2 className="h-4 w-4 mr-1.5" />
+            Remove member
+          </Button>
+        )}
       </div>
 
       {feedback && (
@@ -504,26 +589,56 @@ export function MemberDetailClient({
                   <option value="MM">Master Mason</option>
                 </select>
               </div>
-              <div className="space-y-2">
-                <Label>Office title</Label>
-                <Input
-                  placeholder="e.g. Worshipful Master"
-                  value={editForm.office_title}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, office_title: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Officer order</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={editForm.officer_sort_order}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, officer_sort_order: e.target.value })
-                  }
-                />
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Offices held</Label>
+                <p className="text-xs text-dash-muted">
+                  Tick every office this brother currently holds. Leave all
+                  unticked if he holds no office.
+                </p>
+                <div className="grid max-h-72 grid-cols-1 gap-1 overflow-y-auto rounded-xl border border-dash-border bg-dash-surface p-3 sm:grid-cols-2">
+                  {[...offices]
+                    .sort((a, b) => a.sort_order - b.sort_order)
+                    .map((office) => {
+                      const checked = editForm.office_rung_ids.includes(office.id);
+                      const heldByOther =
+                        office.current_member_id !== null &&
+                        office.current_member_id !== member.id;
+                      return (
+                        <label
+                          key={office.id}
+                          className={cn(
+                            "flex cursor-pointer items-start gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-dash-surface-subtle",
+                            checked && "bg-blue-50 hover:bg-blue-50"
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            className="mt-0.5 h-4 w-4 rounded border-dash-border"
+                            checked={checked}
+                            onChange={(e) => {
+                              const set = new Set(editForm.office_rung_ids);
+                              if (e.target.checked) set.add(office.id);
+                              else set.delete(office.id);
+                              setEditForm({
+                                ...editForm,
+                                office_rung_ids: [...set],
+                              });
+                            }}
+                          />
+                          <span className="flex-1">
+                            <span className="font-medium text-dash-text">
+                              {office.rung_label}
+                            </span>
+                            {heldByOther && !checked ? (
+                              <span className="ml-1 text-xs text-amber-700">
+                                (ticking this will move it from current holder)
+                              </span>
+                            ) : null}
+                          </span>
+                        </label>
+                      );
+                    })}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Directory order</Label>
@@ -651,6 +766,12 @@ export function MemberDetailClient({
                   <p className="text-sm font-medium text-dash-text">
                     {member.office_title ?? "Not an officer"}
                   </p>
+                  <Link
+                    href="/admin/members?tab=offices"
+                    className="text-xs text-blue-700 hover:underline"
+                  >
+                    Manage all offices
+                  </Link>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -922,6 +1043,19 @@ export function MemberDetailClient({
           }
         />
       )}
+
+      <ConfirmActionDialog
+        open={confirmRemoveOpen}
+        onOpenChange={(open) => {
+          if (!removing) setConfirmRemoveOpen(open);
+        }}
+        title={`Remove ${member.full_name}?`}
+        description="The member will be marked as Excluded and removed from active membership. Their record, payment history, and audit trail are kept for compliance."
+        confirmLabel="Remove member"
+        loading={removing}
+        tone="danger"
+        onConfirm={handleRemoveMember}
+      />
     </div>
   );
 }

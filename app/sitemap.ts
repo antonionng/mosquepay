@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
+import { lodgeScopedEventPath } from "@/lib/public-links";
 
 function siteUrl(): string {
   const url =
@@ -14,7 +15,6 @@ const STATIC_PATHS = [
   "/",
   "/about",
   "/features",
-  "/pricing",
   "/contact",
   "/book-demo",
   "/privacy",
@@ -25,7 +25,6 @@ const STATIC_PATHS = [
   "/donate",
   "/venue",
   "/faq",
-  "/events",
   "/news",
 ] as const;
 
@@ -51,7 +50,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       for (const event of events) {
         if (new Date(event.event_date) < now) continue;
         dynamicEntries.push({
-          url: `${base}/events/${event.slug}?lodge=${encodeURIComponent(lodge.slug)}`,
+          url: `${base}${lodgeScopedEventPath(lodge.slug, event.slug)}`,
           lastModified: new Date(event.updated_at ?? event.created_at ?? now),
           changeFrequency: "weekly",
           priority: 0.8,

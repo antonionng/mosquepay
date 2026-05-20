@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Users,
   Search,
@@ -22,10 +22,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { parseMembersCsv, type ParsedMemberRow } from "@/lib/members/csv";
 import { MemberImportPreview } from "@/components/members/import-preview";
 import { MemberOrderPanel } from "@/components/members/officer-order";
+import { OfficesPanel, type OfficeRung } from "@/components/members/offices-panel";
 
 interface MemberRow {
   id: string;
@@ -65,14 +67,23 @@ const STATUS_VARIANTS: Record<string, string> = {
   excluded: "bg-red-50 text-red-700 border-red-200",
 };
 
-export function AdminMembersClient({ members }: { members: MemberRow[] }) {
+export function AdminMembersClient({
+  members,
+  offices = [],
+}: {
+  members: MemberRow[];
+  offices?: OfficeRung[];
+}) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab") === "offices" ? "offices" : "members";
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [quickFilter, setQuickFilter] = useState<string>("all");
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [previewRows, setPreviewRows] = useState<ParsedMemberRow[] | null>(null);
   const [showOrderPanel, setShowOrderPanel] = useState(false);
@@ -90,8 +101,6 @@ export function AdminMembersClient({ members }: { members: MemberRow[] }) {
     country_list: false,
     royal_arch: false,
     honorary: false,
-    office_title: "",
-    officer_sort_order: "",
     directory_sort_order: "",
     rank: "",
     dietary_requirements: "",
@@ -202,6 +211,7 @@ export function AdminMembersClient({ members }: { members: MemberRow[] }) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
+    setFormError(null);
     try {
       const res = await fetch("/api/members", {
         method: "POST",
@@ -215,10 +225,6 @@ export function AdminMembersClient({ members }: { members: MemberRow[] }) {
           county: formData.county || null,
           postcode: formData.postcode || null,
           country: formData.country || "United Kingdom",
-          office_title: formData.office_title || null,
-          officer_sort_order: formData.officer_sort_order
-            ? Number(formData.officer_sort_order)
-            : null,
           directory_sort_order: formData.directory_sort_order
             ? Number(formData.directory_sort_order)
             : null,
@@ -227,33 +233,40 @@ export function AdminMembersClient({ members }: { members: MemberRow[] }) {
           date_of_initiation: formData.date_of_initiation || null,
         }),
       });
-      if (res.ok) {
-        setShowForm(false);
-        setFormData({
-          full_name: "",
-          email: "",
-          phone: "",
-          address_line_1: "",
-          address_line_2: "",
-          city: "",
-          county: "",
-          postcode: "",
-          country: "United Kingdom",
-          country_list: false,
-          royal_arch: false,
-          honorary: false,
-          office_title: "",
-          officer_sort_order: "",
-          directory_sort_order: "",
-          rank: "",
-          dietary_requirements: "",
-          date_of_initiation: "",
-          membership_status: "active",
-        });
-        router.refresh();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          (data && typeof data.error === "string" && data.error) ||
+            `Could not add member (HTTP ${res.status}).`
+        );
       }
-    } catch {
-      /* handle error */
+      setShowForm(false);
+      setFormData({
+        full_name: "",
+        email: "",
+        phone: "",
+        address_line_1: "",
+        address_line_2: "",
+        city: "",
+        county: "",
+        postcode: "",
+        country: "United Kingdom",
+        country_list: false,
+        royal_arch: false,
+        honorary: false,
+        directory_sort_order: "",
+        rank: "",
+        dietary_requirements: "",
+        date_of_initiation: "",
+        membership_status: "active",
+      });
+      router.refresh();
+    } catch (submitError) {
+      setFormError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Could not add member. Please try again."
+      );
     } finally {
       setSaving(false);
     }
@@ -295,15 +308,37 @@ export function AdminMembersClient({ members }: { members: MemberRow[] }) {
             onClick={() => setShowOrderPanel(true)}
           >
             <ArrowDownUp className="mr-1.5 h-4 w-4" />
-            Order
+            Order directory
           </Button>
-          <Button variant="primary" size="sm" onClick={() => setShowForm(true)}>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              setFormError(null);
+              setShowForm(true);
+            }}
+          >
             <Plus className="h-4 w-4 mr-1.5" />
             Add Member
           </Button>
         </div>
       </div>
 
+      <Tabs defaultValue={initialTab} className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="members">Members</TabsTrigger>
+          <TabsTrigger value="offices">
+            Offices
+            <Badge
+              variant="outline"
+              className="ml-2 h-4 min-w-4 justify-center border-transparent bg-white/20 px-1 text-[10px] tabular-nums"
+            >
+              {offices.filter((o) => o.current_member_id).length}
+            </Badge>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="members" className="space-y-8">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card variant="kpi" className="dash-kpi-card rounded-xl p-5">
           <div className="flex items-start justify-between gap-3">
@@ -487,6 +522,21 @@ export function AdminMembersClient({ members }: { members: MemberRow[] }) {
           </table>
         </div>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="offices">
+          <OfficesPanel
+            offices={offices}
+            members={members
+              .filter((m) => m.membership_status === "active")
+              .map((m) => ({
+                id: m.id,
+                full_name: m.full_name,
+                rank: m.rank,
+              }))}
+          />
+        </TabsContent>
+      </Tabs>
 
       {previewRows && (
         <MemberImportPreview
@@ -516,7 +566,10 @@ export function AdminMembersClient({ members }: { members: MemberRow[] }) {
         <div className="fixed inset-0 z-50 flex justify-end">
           <div
             className="absolute inset-0 bg-dash-text/20 backdrop-blur-[2px]"
-            onClick={() => setShowForm(false)}
+            onClick={() => {
+              setShowForm(false);
+              setFormError(null);
+            }}
           />
           <div className="relative w-full max-w-md bg-dash-surface shadow-xl border-l border-dash-border overflow-y-auto">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-dash-border bg-dash-surface px-6 py-4">
@@ -525,13 +578,24 @@ export function AdminMembersClient({ members }: { members: MemberRow[] }) {
                 Add Member
               </h2>
               <button
-                onClick={() => setShowForm(false)}
+                onClick={() => {
+                  setShowForm(false);
+                  setFormError(null);
+                }}
                 className="rounded-lg p-1.5 text-dash-muted hover:bg-dash-surface-subtle hover:text-dash-text"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-5 p-6">
+              {formError && (
+                <div
+                  role="alert"
+                  className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+                >
+                  {formError}
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="full_name">Full name *</Label>
                 <Input
@@ -663,44 +727,23 @@ export function AdminMembersClient({ members }: { members: MemberRow[] }) {
               </div>
               <div className="space-y-3 rounded-xl border border-dash-border bg-dash-surface-subtle p-4">
                 <p className="text-sm font-semibold text-dash-text">
-                  Officer and directory settings
+                  Directory settings
+                </p>
+                <p className="text-xs text-dash-muted">
+                  Assign an office after creating the member — open the
+                  Offices tab on the Members page.
                 </p>
                 <div className="space-y-2">
-                  <Label htmlFor="office_title">Office title</Label>
+                  <Label htmlFor="directory_sort_order">Directory order</Label>
                   <Input
-                    id="office_title"
-                    placeholder="e.g. Worshipful Master"
-                    value={formData.office_title}
+                    id="directory_sort_order"
+                    type="number"
+                    min="0"
+                    value={formData.directory_sort_order}
                     onChange={(e) =>
-                      setFormData({ ...formData, office_title: e.target.value })
+                      setFormData({ ...formData, directory_sort_order: e.target.value })
                     }
                   />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="officer_sort_order">Officer order</Label>
-                    <Input
-                      id="officer_sort_order"
-                      type="number"
-                      min="0"
-                      value={formData.officer_sort_order}
-                      onChange={(e) =>
-                        setFormData({ ...formData, officer_sort_order: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="directory_sort_order">Directory order</Label>
-                    <Input
-                      id="directory_sort_order"
-                      type="number"
-                      min="0"
-                      value={formData.directory_sort_order}
-                      onChange={(e) =>
-                        setFormData({ ...formData, directory_sort_order: e.target.value })
-                      }
-                    />
-                  </div>
                 </div>
                 <label className="flex items-center gap-2 text-sm text-dash-muted">
                   <input
@@ -765,7 +808,14 @@ export function AdminMembersClient({ members }: { members: MemberRow[] }) {
                 <Button type="submit" variant="primary" className="flex-1" disabled={saving}>
                   {saving ? "Saving..." : "Add Member"}
                 </Button>
-                <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setShowForm(false);
+                    setFormError(null);
+                  }}
+                >
                   Cancel
                 </Button>
               </div>

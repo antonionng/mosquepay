@@ -27,6 +27,15 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["lucide-react", "date-fns", "@radix-ui/react-icons"],
   },
+  async redirects() {
+    return [
+      {
+        source: "/visit/:slug",
+        destination: "/:slug/visit",
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     return [
       {

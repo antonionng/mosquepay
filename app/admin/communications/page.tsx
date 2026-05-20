@@ -34,11 +34,12 @@ export default async function CommunicationsPage() {
   }
   const lodgeId = ctx.lodgeId;
 
-  const [templates, recentMessages, settings, members] = await Promise.all([
+  const [templates, recentMessages, settings, members, events] = await Promise.all([
     db.listMessageTemplates(lodgeId),
     db.listMessages(lodgeId, { limit: 50 }),
     db.listAutomationSettings(lodgeId),
     db.getMembers(lodgeId, { status: "active" }),
+    db.getEvents(lodgeId),
   ]);
 
   const automations = AUTOMATION_KEYS.map((key) => ({
@@ -64,6 +65,11 @@ export default async function CommunicationsPage() {
         active_members: members.filter((m) => m.membership_status === "active")
           .length,
       }}
+      events={events.map((event) => ({
+        id: event.id,
+        title: event.title,
+        event_date: event.event_date,
+      }))}
     />
   );
 }

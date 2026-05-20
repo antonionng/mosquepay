@@ -69,7 +69,6 @@ function adminHeaderMeta(pathname: string): { title: string; parent?: HeaderPare
   if (pathname.startsWith("/admin/templates"))
     return { title: "Template library", parent: { label: "Communications", href: "/admin/communications" } };
   if (pathname.startsWith("/admin/mentoring")) return { title: "Mentoring" };
-  if (pathname.startsWith("/admin/ai-assistant")) return { title: "AI Assistant" };
   if (pathname.startsWith("/admin/reports")) return { title: "Reports" };
   if (pathname.startsWith("/admin/audit-compliance")) return { title: "Audit & Compliance" };
   if (pathname.startsWith("/admin/audit"))

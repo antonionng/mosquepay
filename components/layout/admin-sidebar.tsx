@@ -16,7 +16,6 @@ import {
   Clock,
   Heart,
   Gift,
-  Sparkles,
   UserCheck,
   ShieldCheck,
   BarChart3,
@@ -30,6 +29,7 @@ import {
   Rocket,
   Building2,
   Globe,
+  UserPlus,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -38,6 +38,7 @@ const nav = [
   { href: "/admin/onboarding", label: "Get started", icon: Rocket, permission: "admin:all" },
   { href: "/admin/leads", label: "Candidates", icon: Users, permission: "meetings:write", flag: "candidate_crm" },
   { href: "/admin/members", label: "Members", icon: UserCheck, permission: "members:read" },
+  { href: "/admin/guests", label: "Guests", icon: UserPlus, permission: "members:read", flag: "guest_links" },
   { href: "/admin/meetings", label: "Meetings", icon: Clock, permission: "meetings:write" },
   { href: "/admin/communications", label: "Communications", icon: Megaphone, permission: "members:write" },
   { href: "/admin/website", label: "Website", icon: Globe, permission: "website:write" },
@@ -48,7 +49,6 @@ const nav = [
   { href: "/admin/gift-aid", label: "Gift Aid", icon: Shield, permission: "charity:write", flag: "gift_aid" },
   { href: "/admin/almoner", label: "Almoner", icon: HeartHandshake, permission: "welfare:read", flag: "almoner" },
   { href: "/admin/mentoring", label: "Mentoring", icon: GraduationCap, permission: "members:write", flag: "mentor" },
-  { href: "/admin/ai-assistant", label: "AI assistant", icon: Sparkles, permission: "members:write", flag: "ai" },
   { href: "/admin/reports", label: "Reports", icon: BarChart3, permission: "audit:read" },
   { href: "/admin/audit-compliance", label: "Audit & Compliance", icon: ShieldCheck, permission: "audit:read", flag: "audit" },
   { href: "/admin/platform", label: "Platform overview", icon: Building2, permission: "admin:all", platformOnly: true },
@@ -130,6 +130,7 @@ export function AdminSidebar() {
       "/admin/onboarding",
       "/admin/leads",
       "/admin/members",
+      "/admin/guests",
       "/admin/meetings",
       "/admin/communications",
       "/admin/website",
@@ -148,7 +149,6 @@ export function AdminSidebar() {
   );
   const manageNav = visibleNav.filter((item) =>
     [
-      "/admin/ai-assistant",
       "/admin/reports",
       "/admin/audit-compliance",
       "/admin/integrations",

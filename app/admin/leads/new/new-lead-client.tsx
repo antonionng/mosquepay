@@ -26,7 +26,7 @@ export function NewLeadClient() {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/leads", {
+      const res = await fetch("/api/admin/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),

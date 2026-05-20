@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { ImageUploadField } from "@/components/site-builder/image-upload-field";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -277,6 +278,16 @@ export function LodgeProfileSettings() {
                 className="border-dash-border bg-dash-surface text-dash-text placeholder:text-dash-faint"
               />
             </div>
+
+            <ImageUploadField
+              label="Lodge logo"
+              value={lodgeForm.logo_url ?? ""}
+              onChange={(value) =>
+                setLodgeForm((prev) => ({ ...prev, logo_url: value }))
+              }
+              onClear={() => setLodgeForm((prev) => ({ ...prev, logo_url: "" }))}
+              help="Used on the public website, digital member card, formal summons, and other lodge-branded pages. You can also manage this under Website → Brand."
+            />
 
             <div className="rounded-xl border border-dash-border bg-dash-surface-subtle p-4">
               <h3 className="text-sm font-semibold text-dash-text">

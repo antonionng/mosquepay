@@ -195,6 +195,12 @@ export const FEATURE_FLAGS: Record<
     description: "Provincial support desk and named contact.",
     default: true,
   },
+  guest_links: {
+    key: "guest_links",
+    label: "Guest links",
+    description: "Guest directory, member self-invite links, visitor portal.",
+    default: true,
+  },
 };
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;

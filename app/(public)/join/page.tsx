@@ -50,7 +50,7 @@ export default async function JoinPage({
                   <Link href="/book-demo">Book Demo</Link>
                 </Button>
                 <Button asChild variant="secondary">
-                  <Link href="/pricing">View Pricing</Link>
+                  <Link href="/contact">Talk to us</Link>
                 </Button>
               </div>
             </div>

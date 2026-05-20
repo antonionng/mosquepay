@@ -79,12 +79,14 @@ type ProviderMeta = {
   logo: string;
   blurb: string;
   fields: FieldDef[];
+  comingSoon?: boolean;
 };
 
 const PROVIDER_META: Record<Provider, ProviderMeta> = {
   google_calendar: {
     label: "Google Calendar",
     group: "Calendar",
+    comingSoon: true,
     logo: "/brand/integrations/google-calendar.svg",
     blurb:
       "Push lodge meetings to a shared Google Calendar. Paste an OAuth refresh token plus the target calendar ID.",
@@ -108,6 +110,7 @@ const PROVIDER_META: Record<Provider, ProviderMeta> = {
   outlook: {
     label: "Microsoft Outlook",
     group: "Calendar",
+    comingSoon: true,
     logo: "/brand/integrations/outlook.svg",
     blurb:
       "Sync meetings into a shared Outlook / Microsoft 365 calendar. Provide an app refresh token and target calendar.",
@@ -130,6 +133,7 @@ const PROVIDER_META: Record<Provider, ProviderMeta> = {
   mailchimp: {
     label: "Mailchimp",
     group: "Email",
+    comingSoon: true,
     logo: "/brand/integrations/mailchimp.svg",
     blurb:
       "Mirror your members and leads into a Mailchimp audience for newsletters.",
@@ -159,6 +163,7 @@ const PROVIDER_META: Record<Provider, ProviderMeta> = {
   brevo: {
     label: "Brevo (Sendinblue)",
     group: "Email",
+    comingSoon: true,
     logo: "/brand/integrations/brevo.png",
     blurb:
       "Send transactional and bulk emails through Brevo and sync contact lists.",
@@ -186,6 +191,7 @@ const PROVIDER_META: Record<Provider, ProviderMeta> = {
   xero: {
     label: "Xero",
     group: "Accounting",
+    comingSoon: true,
     logo: "/brand/integrations/xero.svg",
     blurb:
       "Push the treasurer ledger into Xero. Use a long-lived OAuth refresh token from your Xero app.",
@@ -214,6 +220,7 @@ const PROVIDER_META: Record<Provider, ProviderMeta> = {
   quickbooks: {
     label: "QuickBooks",
     group: "Accounting",
+    comingSoon: true,
     logo: "/brand/integrations/quickbooks.svg",
     blurb:
       "Push payments, dues and donations into QuickBooks Online. Provide an OAuth refresh token and realm ID.",
@@ -494,8 +501,12 @@ export function IntegrationsClient({
                   const meta = PROVIDER_META[provider];
                   const cred = credByProvider.get(provider);
                   const isOpen = open === provider;
+                  const comingSoon = meta.comingSoon === true;
                   return (
-                    <div key={provider} className="px-5 py-3">
+                    <div
+                      key={provider}
+                      className={comingSoon ? "px-5 py-3 opacity-75" : "px-5 py-3"}
+                    >
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
                           <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white ring-1 ring-slate-200">
@@ -511,7 +522,9 @@ export function IntegrationsClient({
                               {meta.label}
                             </p>
                             <p className="text-xs text-slate-500">
-                              {cred?.enabled
+                              {comingSoon
+                                ? "Coming soon"
+                                : cred?.enabled
                                 ? "Connected and enabled"
                                 : cred
                                 ? "Saved but disabled"
@@ -520,7 +533,14 @@ export function IntegrationsClient({
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {cred?.enabled ? (
+                          {comingSoon ? (
+                            <Badge
+                              variant="secondary"
+                              className="bg-amber-50 text-amber-800"
+                            >
+                              Coming soon
+                            </Badge>
+                          ) : cred?.enabled ? (
                             <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">
                               <CheckCircle2 className="mr-1 h-3 w-3" /> Active
                             </Badge>
@@ -529,35 +549,39 @@ export function IntegrationsClient({
                               <XCircle className="mr-1 h-3 w-3" /> Off
                             </Badge>
                           )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={busy === `save:${provider}`}
-                            onClick={() => toggleProvider(provider)}
-                          >
-                            {cred?.enabled ? "Disable" : "Enable"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() =>
-                              setOpen(isOpen ? null : provider)
-                            }
-                          >
-                            {isOpen ? (
-                              <>
-                                Hide <ChevronUp className="ml-1 h-3 w-3" />
-                              </>
-                            ) : (
-                              <>
-                                Configure <ChevronDown className="ml-1 h-3 w-3" />
-                              </>
-                            )}
-                          </Button>
+                          {!comingSoon && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={busy === `save:${provider}`}
+                                onClick={() => toggleProvider(provider)}
+                              >
+                                {cred?.enabled ? "Disable" : "Enable"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() =>
+                                  setOpen(isOpen ? null : provider)
+                                }
+                              >
+                                {isOpen ? (
+                                  <>
+                                    Hide <ChevronUp className="ml-1 h-3 w-3" />
+                                  </>
+                                ) : (
+                                  <>
+                                    Configure <ChevronDown className="ml-1 h-3 w-3" />
+                                  </>
+                                )}
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </div>
 
-                      {isOpen && (
+                      {isOpen && !comingSoon && (
                         <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
                           <p className="text-xs text-slate-600">{meta.blurb}</p>
                           <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">

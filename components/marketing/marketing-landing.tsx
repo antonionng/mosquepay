@@ -6,7 +6,6 @@ import { useState } from "react";
 
 const nav = [
   { href: "/features", label: "Features" },
-  { href: "/pricing", label: "Pricing" },
   { href: "/contact", label: "Contact" },
 ];
 
@@ -48,7 +47,6 @@ const footerCols = [
     title: "Explore",
     links: [
       { href: "/features", label: "Features" },
-      { href: "/pricing", label: "Pricing" },
       { href: "/book-demo", label: "Book a demo" },
     ],
   },
@@ -390,10 +388,10 @@ export function MarketingLanding() {
                 Book a demo
               </Link>
               <Link
-                href="/pricing"
+                href="/contact"
                 className="inline-flex min-h-[2.75rem] items-center justify-center rounded-lg border border-white/35 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
               >
-                View pricing
+                Talk to us
               </Link>
             </div>
           </div>
