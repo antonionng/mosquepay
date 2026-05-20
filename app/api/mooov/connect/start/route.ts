@@ -51,9 +51,18 @@ export async function GET(request: NextRequest) {
   url.searchParams.set("client_id", config.platformSlug);
   url.searchParams.set("redirect_uri", redirectUri);
   url.searchParams.set("state", state);
+  // Least-privilege scope set: only what we actually call from server code.
+  // Reintroducing customers:read / customers:write / webhooks:read bloats the
+  // lodge admin's consent screen with permissions we never exercise (Mooov
+  // renders one row per requested scope). Re-add ONLY when a real code path
+  // calls the corresponding endpoint. See e689a80 for the original rationale.
+  //
+  //   payments:write -> POST /v1/payment_intents (app/api/dues/start)
+  //   payments:read  -> reserved for the lodge UI's payment-history views
+  //   refunds:write  -> reserved for the upcoming refund workflow
   url.searchParams.set(
     "scope",
-    "payments:write payments:read refunds:write customers:read customers:write webhooks:read"
+    "payments:write payments:read refunds:write"
   );
   url.searchParams.set("mode", process.env.MOOOV_CONNECT_MODE ?? "test");
   const merchantHint = await loadExistingMerchantHint(ctx.lodgeId);
