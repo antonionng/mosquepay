@@ -7,6 +7,7 @@ import { Calendar, MapPin, ArrowRight } from "lucide-react";
 import { getDefaultLodgeSlug, resolveLodgeSlug } from "@/lib/tenant";
 import { marketingMetadata } from "@/lib/seo";
 import { lodgeScopedEventPath } from "@/lib/public-links";
+import { formatDate } from "@/lib/utils";
 
 export const metadata = marketingMetadata({
   title: "Masonic Event RSVP and Payment Software | LodgePay Events",
