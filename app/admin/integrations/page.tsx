@@ -90,16 +90,25 @@ async function getMooovPendingSetupHint(
   lodgeId: string,
 ): Promise<MooovSetupHint | null> {
   try {
+    // Read the LATEST attempt for this lodge unconditionally, then only
+    // surface the banner if THAT attempt is the merchant_setup_required
+    // failure. Filtering by failure_reason in the query is wrong: after a
+    // successful retry, the latest attempt has failure_reason=null but the
+    // latest *matching* row is still the older failed one, which would make
+    // the banner re-appear with stale info on a now-healthy merchant.
     const { data } = await createServiceClient()
       .schema("mooov")
       .from("payment_attempts")
-      .select("metadata")
+      .select("metadata,failure_reason")
       .eq("lodge_id", lodgeId)
-      .eq("failure_reason", "merchant_setup_required")
       .order("created_at", { ascending: false })
       .limit(1)
-      .maybeSingle<{ metadata: Record<string, unknown> | null }>();
-    if (!data?.metadata) return null;
+      .maybeSingle<{
+        metadata: Record<string, unknown> | null;
+        failure_reason: string | null;
+      }>();
+    if (!data || data.failure_reason !== "merchant_setup_required") return null;
+    if (!data.metadata) return null;
     const ms = (data.metadata as Record<string, unknown>).merchant_setup;
     if (!ms || typeof ms !== "object") return null;
     const obj = ms as Record<string, unknown>;
