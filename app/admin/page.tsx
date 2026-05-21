@@ -28,6 +28,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+export const dynamic = "force-dynamic";
+
 const CLOSED_STAGES = new Set(["initiated", "declined"]);
 
 type KpiAccent = "brand" | "brandLight" | "emerald" | "amber";

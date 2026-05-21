@@ -5,6 +5,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 const ENTITY_PATHS: Record<string, (id: string) => string> = {
   donation: (id) => `/admin/donations/${id}`,
   gift_aid_declaration: (id) => `/admin/gift-aid/${id}`,

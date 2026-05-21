@@ -12,6 +12,8 @@ import { ReportsClient } from "./reports-client";
 import type { Rsvp, EventSummonsSend } from "@/lib/db/types";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 
+export const dynamic = "force-dynamic";
+
 export default async function ReportsPage() {
   const ctx = await getAdminReadContext();
   if (ctx.mode !== "database" || !ctx.lodgeId) {

@@ -16,6 +16,8 @@ import {
 } from "@/components/admin/guests-directory-client";
 import { GuestSelfRegistrationCard } from "@/components/admin/guest-self-registration-card";
 
+export const dynamic = "force-dynamic";
+
 type KpiAccent = "blue" | "cyan" | "amber" | "emerald";
 
 const kpiAccentIcon: Record<KpiAccent, { wrap: string; icon: string }> = {

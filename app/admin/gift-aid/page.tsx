@@ -5,6 +5,8 @@ import { GiftAidClient } from "./gift-aid-client";
 import { isSuccessfulPaymentStatus } from "@/lib/reports";
 import type { GiftAidDeclaration } from "@/lib/db/types";
 
+export const dynamic = "force-dynamic";
+
 export default async function GiftAidPage() {
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";

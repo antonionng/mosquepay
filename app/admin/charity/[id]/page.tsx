@@ -3,6 +3,8 @@ import * as db from "@/lib/db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
 import { CharityCampaignDetailClient } from "./campaign-detail-client";
 
+export const dynamic = "force-dynamic";
+
 export default async function CampaignDetailPage({
   params,
 }: {

@@ -3,6 +3,8 @@ import * as mockDb from "@/lib/mock-db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
 import { AdminCharityClient } from "./charity-client";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminCharityPage() {
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
