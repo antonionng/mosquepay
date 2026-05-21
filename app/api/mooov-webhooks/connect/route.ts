@@ -215,6 +215,12 @@ async function projectConnectEvent(
 
   if (isPaymentCaptured) {
     if (!paymentId) return;
+    // Write-once on captured_at: only the FIRST payment.captured / payment.succeeded
+    // event for this payment_id should stamp the timestamp. Mooov can legitimately
+    // redeliver (e.g., the evt_refanout_* events we saw on 2026-05-21) and without
+    // this guard each redelivery would bump captured_at to "now", masking the real
+    // capture time. Status flip and downstream projection are still idempotent via
+    // getPaymentByMooovId() so a no-op update here is safe.
     await supa
       .schema("mooov")
       .from("payment_attempts")
@@ -223,7 +229,8 @@ async function projectConnectEvent(
         captured_at: new Date().toISOString(),
       })
       .eq("lodge_id", lodgeId)
-      .eq("payment_id", paymentId);
+      .eq("payment_id", paymentId)
+      .is("captured_at", null);
     // Now project to LP-side tables based on the recorded intent. We read
     // the attempt back AFTER the update so guest_descriptor + metadata
     // reflect everything /api/donations (or future /api/events checkout)
