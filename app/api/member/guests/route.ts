@@ -3,6 +3,8 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { createClient } from "@/lib/supabase/server";
 import * as db from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ invitations: [], events: [] });
