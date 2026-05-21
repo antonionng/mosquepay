@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
       "/v1/public/connect/token",
       {
         body: {
+          grant_type: "authorization_code",
           code,
           redirect_uri: redirectUri,
         },
