@@ -16,9 +16,21 @@ interface StartDuesBody {
   member_id: string;
   amount: number; // minor units (e.g. pence)
   currency: string;
-  // Path A: Stripe test PM (e.g. "pm_card_visa"). Omit for Path B
-  // (Mooov returns provider.hosted_url for Mollie hosted checkout).
+  // Path A: server-driven PM token (Stripe test PM like "pm_card_visa", or a
+  // real pm_*/ctok_* minted by the caller). Omit for Path B / Path C.
   payment_method?: string;
+  // Path C (Mooov's recommended path, per docs.mooov.money/connect-protocol §4.1):
+  // hosted Stripe Checkout via Mooov. Set `flow:"redirect"` + the two URLs and
+  // Mooov returns `provider.hosted_url` for the caller to window.location.assign.
+  // Keeps LodgePay at PCI SAQ A; 3DS / SCA / Apple Pay / Google Pay / Klarna /
+  // iDEAL / SEPA all handled by Stripe on the hosted page.
+  flow?: "server" | "redirect";
+  // Absolute https URLs (Mooov validates and 400s otherwise; localhost allowed
+  // in dev). Required by Mooov when flow="redirect"; we just pass through.
+  success_url?: string;
+  cancel_url?: string;
+  description?: string;
+  customer_email?: string;
   // Dues-cycle identifier. When provided, makes the request idempotent on the
   // (lodge_id, member_id, period) tuple: caller-side retries collapse to the
   // same payment_id and the same Mooov authorize. When omitted, falls back to
@@ -88,6 +100,11 @@ function userStatusFor(category: MooovApiError["category"]): number {
       return 502;
     case "idempotency_conflict":
       return 409;
+    case "invalid_request":
+      // 4xx from Mooov that aren't auth/grant/idempotency mean the caller
+      // built a malformed request (e.g. flow="redirect" without success_url).
+      // Surface as 400 so the caller knows it's THEIR bug, not Mooov down.
+      return 400;
     case "unprocessable":
       return 422;
     case "merchant_setup_required":
@@ -322,22 +339,28 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const mooovBody: Record<string, unknown> = {
+      payment_id: paymentId,
+      amount: input.amount,
+      currency: input.currency,
+      metadata: {
+        lodgepay_member_id: input.member_id,
+        lodge_id: input.lodge_id,
+      },
+    };
+    if (input.payment_method) mooovBody.payment_method = input.payment_method;
+    if (input.flow) mooovBody.flow = input.flow;
+    if (input.success_url) mooovBody.success_url = input.success_url;
+    if (input.cancel_url) mooovBody.cancel_url = input.cancel_url;
+    if (input.description) mooovBody.description = input.description;
+    if (input.customer_email) mooovBody.customer_email = input.customer_email;
     const result = await callMooovConnect<PaymentIntentResponse>(
       "POST",
       "/v1/payment_intents",
       {
         merchant: merchantId,
         idempotencyKey,
-        body: {
-          payment_id: paymentId,
-          amount: input.amount,
-          currency: input.currency,
-          payment_method: input.payment_method,
-          metadata: {
-            lodgepay_member_id: input.member_id,
-            lodge_id: input.lodge_id,
-          },
-        },
+        body: mooovBody,
       }
     );
 

@@ -203,6 +203,14 @@ function categorise(status: number): MooovErrorCategory {
   return "server";
 }
 
+// Mooov's typed 422 body wraps the hint under a top-level `error` object:
+//   { "error": { "type": "merchant_not_charge_capable",
+//                "code": "merchant_not_charge_capable",
+//                "message": "...", "setup_url": "...",
+//                "setup_url_expires_at": "...", "providers": [...],
+//                "docs_url": "...", "merchant_id": "..." } }
+// The integration doc lives at
+// https://docs.mooov.money/errors/merchant_not_charge_capable.
 function parseMerchantSetupHint(text: string): MooovMerchantSetupHint | undefined {
   let parsed: unknown;
   try {
@@ -210,14 +218,30 @@ function parseMerchantSetupHint(text: string): MooovMerchantSetupHint | undefine
   } catch {
     return undefined;
   }
-  if (
-    !parsed ||
-    typeof parsed !== "object" ||
-    (parsed as { error?: unknown }).error !== "merchant_not_charge_capable"
-  ) {
-    return undefined;
-  }
-  const obj = parsed as Record<string, unknown>;
+  if (!parsed || typeof parsed !== "object") return undefined;
+  const root = parsed as Record<string, unknown>;
+  const errVal = root.error;
+  // Accept both shapes for forward compat: a nested error object (today's
+  // wire format) or a flat top-level body with error as a string discriminator
+  // (the shape an earlier draft of the spec used). Either way, the discriminator
+  // must be "merchant_not_charge_capable".
+  const obj: Record<string, unknown> | null =
+    errVal && typeof errVal === "object"
+      ? (errVal as Record<string, unknown>)
+      : typeof errVal === "string" && errVal === "merchant_not_charge_capable"
+      ? root
+      : null;
+  if (!obj) return undefined;
+  const discriminator =
+    typeof obj.type === "string"
+      ? obj.type
+      : typeof obj.code === "string"
+      ? obj.code
+      : typeof errVal === "string"
+      ? errVal
+      : null;
+  if (discriminator !== "merchant_not_charge_capable") return undefined;
+
   const setupUrl = typeof obj.setup_url === "string" ? obj.setup_url : null;
   const setupUrlExpiresAt =
     typeof obj.setup_url_expires_at === "string" ? obj.setup_url_expires_at : null;
