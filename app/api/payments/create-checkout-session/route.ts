@@ -1,9 +1,47 @@
+// POST /api/payments/create-checkout-session
+//
+// Member-side event RSVP checkout, fronting three forms:
+//   * components/forms/event-rsvp-form.tsx   (full RSVP)
+//   * components/forms/standalone-pay-form.tsx (pay-only, no RSVP)
+//   * app/summons/[token]/rsvp-form.tsx        (summons-link RSVP)
+//
+// Payment surface: 100% Mooov (Mooov Connect -> hosted Stripe Checkout on
+// the lodge's connected PSP). No direct Stripe SDK calls and no fallback,
+// matching /api/donations (Phase 1) and /api/g/[token]/checkout (Phase 2).
+//
+// Mock-payment branch (mock_payment === true || ALLOW_MOCK_PAYMENTS) is
+// retained for local development and E2E tests: it skips Mooov entirely,
+// writes a synthetic public.payments row, and confirms the RSVP. Production
+// has ALLOW_MOCK_PAYMENTS unset so the only way to opt in is to pass the
+// flag explicitly from the client (also gated by the dev-only check below
+// that requires NODE_ENV !== "production").
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getDefaultLodgeSlug, getLodgeSlugFromRequest } from "@/lib/tenant";
+import { createServiceClient } from "@/lib/supabase/server";
+import { callMooovConnect, MooovApiError } from "@/lib/mooov";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+async function loadMooovMerchant(
+  supa: ReturnType<typeof createServiceClient>,
+  lodgeId: string,
+): Promise<string | null> {
+  const { data, error } = await supa
+    .schema("mooov")
+    .from("lodges")
+    .select("merchant_id, status")
+    .eq("id", lodgeId)
+    .maybeSingle<{ merchant_id: string; status: string }>();
+  if (error) throw error;
+  if (!data) return null;
+  if (data.status && data.status !== "active") return null;
+  return data.merchant_id ?? null;
+}
 
 export async function POST(request: NextRequest) {
   const _rejectMock = rejectIfMockDisabled();
@@ -35,15 +73,9 @@ export async function POST(request: NextRequest) {
     mock_payment,
   } = body;
 
-  const stripeSecret = process.env.STRIPE_SECRET_KEY;
   const shouldMockPayment =
-    mock_payment === true || process.env.ALLOW_MOCK_PAYMENTS === "true";
-  if (!stripeSecret && !shouldMockPayment) {
-    return NextResponse.json(
-      { error: "Payments are not configured. Please complete RSVP without payment or contact the lodge." },
-      { status: 503 }
-    );
-  }
+    process.env.NODE_ENV !== "production" &&
+    (mock_payment === true || process.env.ALLOW_MOCK_PAYMENTS === "true");
 
   try {
     const lodgeSlug = getLodgeSlugFromRequest(request);
@@ -52,7 +84,11 @@ export async function POST(request: NextRequest) {
 
     const meetingFeeVal = meeting_fee ?? 0;
     const guestTotalVal = guest_total ?? 0;
-    const total = (dining_total ?? 0) + meetingFeeVal + guestTotalVal + (charity_amount ?? 0) + (raffle_amount ?? 0);
+    const charityAmountVal = charity_amount ?? 0;
+    const raffleAmountVal = raffle_amount ?? 0;
+    const diningTotalVal = dining_total ?? 0;
+    const total =
+      diningTotalVal + meetingFeeVal + guestTotalVal + charityAmountVal + raffleAmountVal;
     if (!event_id || !user_email || total <= 0) {
       return NextResponse.json(
         { error: "Invalid payment request." },
@@ -132,9 +168,9 @@ export async function POST(request: NextRequest) {
         stripe_payment_intent_id: `mock_pi_${Date.now()}`,
         stripe_charge_id: null,
         stripe_customer_id: null,
-        dining_amount: dining_total ?? 0,
-        charity_amount: charity_amount ?? 0,
-        raffle_amount: raffle_amount ?? 0,
+        dining_amount: diningTotalVal,
+        charity_amount: charityAmountVal,
+        raffle_amount: raffleAmountVal,
         meeting_fee_amount: meetingFeeVal,
         guest_ticket_amount: guestTotalVal,
         total_amount: total,
@@ -183,103 +219,230 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (!stripeSecret) {
+    // Mooov path (production + non-mock dev). All five amount fields are
+    // aggregated into a single Mooov charge; the split is preserved on
+    // payment_attempts.guest_descriptor so the webhook handler can write
+    // the LP payments row with the same per-bucket breakdown the legacy
+    // Stripe handler used to populate.
+    if (!isSupabaseConfigured()) {
       return NextResponse.json(
-        { error: "Payments are not configured. Please complete RSVP without payment or contact the lodge." },
+        { error: "Payments are not configured." },
+        { status: 503 }
+      );
+    }
+    const lodgeId = await db.resolveLodgeId(lodgeSlug);
+    if (!lodgeId) {
+      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    }
+
+    let supa: ReturnType<typeof createServiceClient>;
+    try {
+      supa = createServiceClient();
+    } catch (err) {
+      console.error("checkout-session: supabase service client unavailable", {
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return NextResponse.json(
+        { error: "Payments are not configured." },
         { status: 503 }
       );
     }
 
-    const Stripe = (await import("stripe")).default;
-    const stripe = new Stripe(stripeSecret, { apiVersion: "2025-02-24.acacia" });
+    let merchantId: string | null;
+    try {
+      merchantId = await loadMooovMerchant(supa, lodgeId);
+    } catch (err) {
+      console.error("checkout-session: mooov merchant lookup failed", {
+        lodge_id: lodgeId,
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return NextResponse.json(
+        { error: "Could not look up payment processor for this lodge." },
+        { status: 500 }
+      );
+    }
+    if (!merchantId) {
+      return NextResponse.json(
+        {
+          error:
+            "This lodge has not finished setting up online payments yet. Please contact the lodge directly.",
+          code: "lodge_not_connected",
+        },
+        { status: 503 }
+      );
+    }
+
+    const totalMinor = Math.round(total * 100);
+    const currency = "GBP";
+    const paymentId = `evt_${lodgeId}_${rsvpId ?? "standalone"}_${Date.now().toString(36)}`;
+    const idempotencyKey = `evt_csk_${rsvpId ?? "standalone"}_${Date.now().toString(36)}`;
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+    const successUrl = `${siteUrl}/events/rsvp/success?payment_id=${encodeURIComponent(
+      paymentId
+    )}${lodgeQuery ? `&lodge=${encodeURIComponent(lodgeSlug)}` : ""}`;
+    const cancelUrl = `${siteUrl}/events${lodgeQuery}`;
+    const description = standalone
+      ? `Standalone payment${user_name ? ` -- ${user_name}` : ""}`
+      : `Event RSVP${user_name ? ` -- ${user_name}` : ""}`;
 
-    type LineItem = { price_data: { currency: string; unit_amount: number; product_data: { name: string } }; quantity: number };
-    const lineItems: LineItem[] = [];
+    const guestDescriptor: Record<string, unknown> = {
+      source: standalone ? "event_standalone" : "event_rsvp",
+      rsvp_id: rsvpId,
+      event_id,
+      lodge_slug: lodgeSlug,
+      donor_email: user_email,
+      donor_name: user_name ?? null,
+      dining_total: diningTotalVal,
+      meeting_fee: meetingFeeVal,
+      charity_amount: charityAmountVal,
+      raffle_amount: raffleAmountVal,
+      guest_total: guestTotalVal,
+      standalone: Boolean(standalone),
+      gift_aid: Boolean(gift_aid),
+      ...(gift_aid
+        ? {
+            gift_aid_donor_name: user_name ?? "",
+            gift_aid_donor_email: user_email,
+            gift_aid_address_line_1: gift_aid_address_line_1 ?? "",
+            gift_aid_address_line_2: gift_aid_address_line_2 ?? "",
+            gift_aid_city: gift_aid_city ?? "",
+            gift_aid_postcode: gift_aid_postcode ?? "",
+          }
+        : {}),
+    };
+    const initialMetadata: Record<string, unknown> = {
+      source: "lodgepay_event_checkout_session",
+      lodge_slug: lodgeSlug,
+      lodge_id: lodgeId,
+      intent: "event",
+      rsvp_id: rsvpId,
+      event_id,
+    };
 
-    if (meetingFeeVal > 0) {
-      lineItems.push({
-        price_data: {
-          currency: "gbp",
-          unit_amount: Math.round(meetingFeeVal * 100),
-          product_data: { name: "Meeting fee" },
-        },
-        quantity: 1,
+    const { error: insertError } = await supa
+      .schema("mooov")
+      .from("payment_attempts")
+      .insert({
+        payment_id: paymentId,
+        lodge_id: lodgeId,
+        member_id: null,
+        amount: totalMinor,
+        currency,
+        intent: "event",
+        status: "pending",
+        idempotency_key: idempotencyKey,
+        metadata: initialMetadata,
+        guest_descriptor: guestDescriptor,
       });
-    }
-    if (dining_total > 0) {
-      lineItems.push({
-        price_data: {
-          currency: "gbp",
-          unit_amount: Math.round(dining_total * 100),
-          product_data: { name: "Dining" },
-        },
-        quantity: 1,
+    if (insertError) {
+      console.error("checkout-session: preflight insert failed", {
+        lodge_id: lodgeId,
+        payment_id: paymentId,
+        code: insertError.code,
+        message: insertError.message,
       });
-    }
-    if (guestTotalVal > 0) {
-      lineItems.push({
-        price_data: {
-          currency: "gbp",
-          unit_amount: Math.round(guestTotalVal * 100),
-          product_data: { name: `Guest tickets (${Array.isArray(guests) ? guests.length : 0})` },
+      return NextResponse.json(
+        {
+          error: "Could not start payment.",
+          payment_id: paymentId,
+          db_code: insertError.code ?? null,
         },
-        quantity: 1,
-      });
-    }
-    if (charity_amount > 0) {
-      lineItems.push({
-        price_data: {
-          currency: "gbp",
-          unit_amount: Math.round(charity_amount * 100),
-          product_data: { name: "Charity donation" },
-        },
-        quantity: 1,
-      });
-    }
-    if (raffle_amount > 0) {
-      lineItems.push({
-        price_data: {
-          currency: "gbp",
-          unit_amount: Math.round(raffle_amount * 100),
-          product_data: { name: "Raffle contribution" },
-        },
-        quantity: 1,
-      });
+        { status: 500 }
+      );
     }
 
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      line_items: lineItems,
-      success_url: `${siteUrl}/events/rsvp/success?session_id={CHECKOUT_SESSION_ID}${
-        lodgeQuery ? `&lodge=${encodeURIComponent(lodgeSlug)}` : ""
-      }`,
-      cancel_url: `${siteUrl}/events${lodgeQuery}`,
-      customer_email: user_email,
-      metadata: {
-        lodge_slug: lodgeSlug,
-        event_id,
-        rsvp_id: rsvpId ?? "",
-        user_name: user_name ?? "",
-        standalone: standalone ? "true" : "false",
-        dining_total: String(dining_total ?? 0),
-        meeting_fee: String(meetingFeeVal),
-        guest_total: String(guestTotalVal),
-        charity_amount: String(charity_amount ?? 0),
-        raffle_amount: String(raffle_amount ?? 0),
-        gift_aid: gift_aid ? "true" : "false",
-        gift_aid_donor_name: gift_aid ? (user_name ?? "") : "",
-        gift_aid_donor_email: gift_aid ? (user_email ?? "") : "",
-        gift_aid_address_line_1: gift_aid ? (gift_aid_address_line_1 ?? "") : "",
-        gift_aid_address_line_2: gift_aid ? (gift_aid_address_line_2 ?? "") : "",
-        gift_aid_city: gift_aid ? (gift_aid_city ?? "") : "",
-        gift_aid_postcode: gift_aid ? (gift_aid_postcode ?? "") : "",
-      },
-    });
+    try {
+      const result = await callMooovConnect<{
+        payment_id: string;
+        state: "authorized" | "captured" | "processing" | "failed";
+        provider?: { provider: string; provider_ref?: string; hosted_url?: string };
+      }>("POST", "/v1/payment_intents", {
+        merchant: merchantId,
+        idempotencyKey,
+        body: {
+          payment_id: paymentId,
+          amount: totalMinor,
+          currency,
+          flow: "redirect",
+          success_url: successUrl,
+          cancel_url: cancelUrl,
+          description,
+          customer_email: user_email,
+          metadata: {
+            intent: "event",
+            lodge_id: lodgeId,
+            lodge_slug: lodgeSlug,
+            rsvp_id: rsvpId ?? "",
+            event_id,
+            standalone: standalone ? "true" : "false",
+          },
+        },
+      });
 
-    return NextResponse.json({ url: session.url });
+      const hostedUrl = result.provider?.hosted_url ?? null;
+      if (!hostedUrl) {
+        console.error("checkout-session: Mooov returned no hosted_url", {
+          payment_id: paymentId,
+          state: result.state,
+        });
+        return NextResponse.json(
+          { error: "Payment processor did not return a checkout URL." },
+          { status: 502 }
+        );
+      }
+
+      await supa
+        .schema("mooov")
+        .from("payment_attempts")
+        .update({
+          status: result.state,
+          provider_ref: result.provider?.provider_ref ?? null,
+          metadata: { ...initialMetadata, hosted_url: hostedUrl },
+        })
+        .eq("payment_id", paymentId);
+
+      return NextResponse.json({ url: hostedUrl, payment_id: paymentId });
+    } catch (err) {
+      if (err instanceof MooovApiError) {
+        console.error("checkout-session: Mooov call failed", {
+          payment_id: paymentId,
+          category: err.category,
+          status: err.status,
+        });
+        await supa
+          .schema("mooov")
+          .from("payment_attempts")
+          .update({ status: "failed", failure_reason: err.category })
+          .eq("payment_id", paymentId);
+        if (err.category === "merchant_setup_required" && err.setupHint) {
+          return NextResponse.json(
+            {
+              error:
+                "This lodge has not finished setting up online payments yet. Please contact the lodge directly.",
+              code: "lodge_setup_incomplete",
+              setup_url: err.setupHint.setupUrl,
+            },
+            { status: 503 }
+          );
+        }
+        return NextResponse.json(
+          { error: "Could not create payment session.", code: err.category },
+          { status: 502 }
+        );
+      }
+      console.error("checkout-session: unexpected error", err);
+      await supa
+        .schema("mooov")
+        .from("payment_attempts")
+        .update({ status: "failed", failure_reason: "unexpected_error" })
+        .eq("payment_id", paymentId);
+      return NextResponse.json(
+        { error: "Could not create payment session.", code: "unexpected_error" },
+        { status: 500 }
+      );
+    }
   } catch (e) {
-    console.error("Stripe session error:", e);
+    console.error("checkout-session: outer error", e);
     return NextResponse.json(
       { error: "Could not create payment session." },
       { status: 500 }

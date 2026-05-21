@@ -259,6 +259,8 @@ async function projectConnectEvent(
       await projectDonationCaptured(lodgeId, attempt);
     } else if (attempt.intent === "event") {
       await projectEventCaptured(lodgeId, attempt);
+    } else if (attempt.intent === "dues") {
+      await projectDuesCaptured(lodgeId, attempt);
     }
     return;
   }
@@ -503,6 +505,166 @@ async function projectEventCaptured(
       payment_id: payment.id,
       payment_completed: true,
       status: "confirmed",
+    });
+  }
+
+  // If the event RSVP form opted into Gift Aid for the charity portion,
+  // record the declaration the same way the legacy Stripe webhook did. We
+  // don't add a separate donations row -- the charity portion is already
+  // captured on payments.charity_amount and the gift-aid claim batcher
+  // joins on (lodge_id, donor_email).
+  const giftAid =
+    (attempt.guest_descriptor ?? ({} as Record<string, unknown>)).gift_aid;
+  if (giftAid === true || giftAid === "true") {
+    const g = attempt.guest_descriptor as Record<string, unknown>;
+    await db.addGiftAidDeclaration(lodgeId, {
+      donor_name:
+        typeof g.gift_aid_donor_name === "string"
+          ? g.gift_aid_donor_name
+          : donorName ?? "",
+      donor_email:
+        typeof g.gift_aid_donor_email === "string"
+          ? g.gift_aid_donor_email
+          : donorEmail,
+      donor_address_line_1:
+        typeof g.gift_aid_address_line_1 === "string"
+          ? g.gift_aid_address_line_1
+          : null,
+      donor_address_line_2:
+        typeof g.gift_aid_address_line_2 === "string"
+          ? g.gift_aid_address_line_2
+          : null,
+      donor_city:
+        typeof g.gift_aid_city === "string" ? g.gift_aid_city : null,
+      donor_postcode:
+        typeof g.gift_aid_postcode === "string" ? g.gift_aid_postcode : null,
+      donor_country: "United Kingdom",
+      declaration_text:
+        "I am a UK taxpayer and understand that if I pay less Income Tax and/or Capital Gains Tax than the amount of Gift Aid claimed on all my donations in that tax year it is my responsibility to pay any difference.",
+      declaration_confirmed: true,
+      confirmation_method: "online_checkout",
+      hmrc_eligible: true,
+    });
+  }
+}
+
+// Project a captured Mooov member-dues payment. Mirrors the legacy Stripe
+// webhook's handleDuesCompleted: writes a public.payments row, flips the
+// member_dues row to paid (linking to the new payment), and -- if the
+// dues record carried a charitable portion -- writes a donations row plus
+// gift-aid declaration link if one is on file for this member email.
+//
+// Idempotent on payments.mooov_payment_id (same gate the other intents use).
+async function projectDuesCaptured(
+  lodgeId: string,
+  attempt: {
+    payment_id: string;
+    amount: number;
+    currency: string;
+    guest_descriptor: Record<string, unknown> | null;
+    metadata: Record<string, unknown> | null;
+  }
+) {
+  const existing = await db.getPaymentByMooovId(attempt.payment_id);
+  if (existing) {
+    console.log("mooov webhook: dues payment already projected (idempotent)", {
+      payment_id: attempt.payment_id,
+    });
+    return;
+  }
+
+  const guest = (attempt.guest_descriptor ?? {}) as Record<string, unknown>;
+  const duesId = typeof guest.dues_id === "string" ? guest.dues_id : null;
+  if (!duesId) {
+    console.error("mooov webhook: dues payment missing dues_id in guest_descriptor", {
+      payment_id: attempt.payment_id,
+    });
+    return;
+  }
+
+  // We re-fetch the dues record so we have authoritative member_name /
+  // currency / charitable_amount, instead of trusting the snapshot the
+  // route captured at preflight time (could be hours/days ago if the
+  // member opened the hosted Checkout page in a browser tab and paid
+  // later).
+  const allDues = await db.getMemberDues(lodgeId);
+  const duesRecord = allDues.find((d) => d.id === duesId);
+  if (!duesRecord) {
+    console.error("mooov webhook: dues record not found for captured payment", {
+      payment_id: attempt.payment_id,
+      dues_id: duesId,
+    });
+    return;
+  }
+
+  const donorEmail =
+    typeof guest.donor_email === "string"
+      ? guest.donor_email
+      : duesRecord.member_email;
+  const donorName =
+    typeof guest.donor_name === "string"
+      ? guest.donor_name
+      : duesRecord.member_name ?? null;
+  const totalMajor = (attempt.amount ?? 0) / 100;
+  const currencyMajor = (attempt.currency ?? "GBP").toUpperCase();
+  const charitableAmount = duesRecord.charitable_amount ?? 0;
+  const completedAt = new Date().toISOString();
+
+  const payment = await db.addPayment(lodgeId, {
+    rsvp_id: null,
+    event_id: null,
+    user_email: donorEmail,
+    user_name: donorName,
+    stripe_payment_intent_id: null,
+    stripe_charge_id: null,
+    stripe_customer_id: null,
+    mooov_payment_id: attempt.payment_id,
+    dining_amount: 0,
+    charity_amount: charitableAmount,
+    raffle_amount: 0,
+    meeting_fee_amount: 0,
+    guest_ticket_amount: 0,
+    total_amount: totalMajor,
+    currency: currencyMajor,
+    charity_name: charitableAmount > 0 ? "Dues charitable portion" : null,
+    status: "succeeded",
+    refund_amount: 0,
+    refund_reason: null,
+    completed_at: completedAt,
+  });
+
+  const declaration =
+    charitableAmount > 0
+      ? await db.getActiveGiftAidDeclarationByEmail(lodgeId, donorEmail)
+      : null;
+  const giftAidStatus = declaration
+    ? "declared"
+    : charitableAmount > 0
+    ? "eligible"
+    : "unknown";
+
+  await db.updateMemberDuesStatus(duesId, lodgeId, {
+    status: "paid",
+    payment_id: payment.id,
+    gift_aid_declaration_id: declaration?.id ?? null,
+    gift_aid_status: giftAidStatus,
+    gift_aid_eligible_amount: charitableAmount,
+    paid_at: completedAt,
+  });
+
+  if (charitableAmount > 0) {
+    await db.addDonation(lodgeId, {
+      event_id: null,
+      payment_id: payment.id,
+      donor_name: donorName,
+      donor_email: donorEmail,
+      amount: charitableAmount,
+      currency: currencyMajor,
+      source: "dues_charitable_portion",
+      status: "completed",
+      gift_aid_declaration_id: declaration?.id ?? null,
+      gift_aid_status: giftAidStatus,
+      gift_aid_eligible_amount: declaration ? charitableAmount : 0,
     });
   }
 }
