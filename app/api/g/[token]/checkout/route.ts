@@ -500,7 +500,18 @@ async function handleDb(args: DbArgs) {
         code: "unexpected_error",
         // Temporary diagnostic so smoke-test failures don't require Vercel
         // log access. Safe to leave on -- this branch only fires on bugs.
-        err_message: err instanceof Error ? err.message : String(err),
+        err_message:
+          err instanceof Error
+            ? err.message
+            : (() => {
+                try {
+                  return JSON.stringify(err);
+                } catch {
+                  return String(err);
+                }
+              })(),
+        err_keys:
+          err && typeof err === "object" ? Object.keys(err as object) : null,
       },
       { status: 500 }
     );
