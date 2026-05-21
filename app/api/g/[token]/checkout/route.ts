@@ -452,12 +452,11 @@ async function handleDb(args: DbArgs) {
       })
       .eq("payment_id", paymentId);
 
-    // Stash the Mooov payment_id on the rsvp so admin views can correlate
-    // pending bookings to in-flight Mooov payments. payment_completed
-    // stays false until the webhook fires.
-    await db.updateRsvp(rsvp.id, invitation.lodge_id, {
-      payment_id: paymentId,
-    });
+    // rsvps.payment_id is a uuid FK to public.payments(id), which is only
+    // minted by the Mooov webhook projection when payment.captured arrives.
+    // Mooov's text payment_id (evt_*) lives on mooov.payment_attempts and is
+    // joinable via metadata.rsvp_id; we deliberately leave rsvps.payment_id
+    // null at this preflight step (matches the legacy Stripe-direct flow).
 
     return NextResponse.json({ url: hostedUrl, payment_id: paymentId });
   } catch (err) {
@@ -495,24 +494,7 @@ async function handleDb(args: DbArgs) {
       .update({ status: "failed", failure_reason: "unexpected_error" })
       .eq("payment_id", paymentId);
     return NextResponse.json(
-      {
-        error: "Could not start payment.",
-        code: "unexpected_error",
-        // Temporary diagnostic so smoke-test failures don't require Vercel
-        // log access. Safe to leave on -- this branch only fires on bugs.
-        err_message:
-          err instanceof Error
-            ? err.message
-            : (() => {
-                try {
-                  return JSON.stringify(err);
-                } catch {
-                  return String(err);
-                }
-              })(),
-        err_keys:
-          err && typeof err === "object" ? Object.keys(err as object) : null,
-      },
+      { error: "Could not start payment.", code: "unexpected_error" },
       { status: 500 }
     );
   }
