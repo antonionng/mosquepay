@@ -3,6 +3,12 @@
 // Outbound API calls use the single platform credential, plus Mooov-Merchant
 // for per-lodge on-behalf-of routing. Lodge admins never see per-lodge API keys.
 //
+// AUTH SCHEME (do not regress to Bearer): Mooov's gateway is HMAC-only and
+// 401s anything else (verified end-to-end with Mooov on 2026-05-21). The
+// canonical request, header set, and timestamp form are documented in
+// `authHeaders` below. The platform secret is the HMAC key — never put it
+// on the wire as a bearer token.
+//
 // Inbound webhooks are still HMAC verified with the platform webhook signing
 // secret using Mooov-Signature: t=<unix>,v1=<hex>.
 
@@ -136,20 +142,51 @@ export function sign(secret: string, canonical: string): string {
   return createHmac("sha256", secret).update(canonical).digest("hex");
 }
 
+// RFC3339 UTC timestamp with second precision, e.g. "2026-05-21T08:39:00Z".
+// Mooov's gateway enforces a ±5 min skew window against this header. Matching
+// their reference signer's "strip the .mmmZ suffix" form keeps the header
+// stable across language/runtime differences.
+export function mooovTimestamp(now: Date = new Date()): string {
+  return now.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+// Sign + assemble headers for a Mooov gateway request. Mooov's gateway only
+// accepts HMAC-signed requests; Bearer / Basic / Mooov-Key-Secret variants
+// all 401 with `{"error":"authentication required"}`. Scheme spec:
+//   https://docs.mooov.money/docs/connect-protocol (Auth section)
+//   pkg/platform/auth/apikey.go in the mooov repo
+//
+// Canonical request (four lines joined with literal \n, no trailing newline):
+//   METHOD
+//   PATH                                       # path only, no host, no query
+//   X-Mooov-Timestamp                          # the exact header value
+//   lowercase-hex(SHA-256(raw body))           # empty string "" on GET
+//
+// X-Mooov-Signature = lowercase-hex(HMAC-SHA256(secret, canonical)).
+// The secret is the hex *string* itself (UTF-8), NOT hex-decoded bytes.
 export function authHeaders(
   key: MooovKey,
-  _method: string,
-  _path: string,
-  _body: string,
+  method: string,
+  path: string,
+  body: string,
   idempotencyKey: string,
   merchant?: string,
+  timestamp: string = mooovTimestamp(),
 ): Record<string, string> {
+  const canonical = canonicalRequest(method, path, timestamp, body);
+  const signature = sign(key.secret, canonical);
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${key.secret}`,
-    "Mooov-Key-Id": key.keyId,
-    "Content-Type": "application/json",
+    "X-Mooov-Key-Id": key.keyId,
+    "X-Mooov-Timestamp": timestamp,
+    "X-Mooov-Signature": signature,
   };
-  headers["Idempotency-Key"] = idempotencyKey;
+  const upper = method.toUpperCase();
+  const isWrite =
+    upper === "POST" || upper === "PUT" || upper === "PATCH" || upper === "DELETE";
+  if (isWrite) {
+    headers["Content-Type"] = "application/json";
+    headers["Idempotency-Key"] = idempotencyKey;
+  }
   if (merchant) {
     headers["Mooov-Merchant"] = merchant;
   }
