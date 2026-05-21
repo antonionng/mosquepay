@@ -299,6 +299,10 @@ export type Payment = {
   stripe_payment_intent_id: string | null;
   stripe_charge_id: string | null;
   stripe_customer_id: string | null;
+  // Mooov-side caller-generated payment id (e.g. don_<lodge>_<rand>). Set on
+  // payments projected from Mooov webhook events. Mutually exclusive in
+  // practice with stripe_payment_intent_id during the Stripe -> Mooov cutover.
+  mooov_payment_id?: string | null;
   dining_amount: number;
   charity_amount: number;
   raffle_amount: number;

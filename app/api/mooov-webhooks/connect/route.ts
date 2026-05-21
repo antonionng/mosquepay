@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { verifyMooovWebhook } from "@/lib/mooov";
+import * as db from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -205,19 +206,62 @@ async function projectConnectEvent(
   event: MooovConnectEvent
 ) {
   const paymentId = event.data?.payment_id;
-  switch (event.type) {
-    case "payment.succeeded":
-      if (!paymentId) return;
-      await supa
-        .schema("mooov")
-        .from("payment_attempts")
-        .update({
-          status: "captured",
-          captured_at: new Date().toISOString(),
-        })
-        .eq("lodge_id", lodgeId)
-        .eq("payment_id", paymentId);
+  // Mooov emits "payment.succeeded" (server-flow / direct charge) and
+  // "payment.captured" (redirect-flow / hosted Stripe Checkout). Both mean
+  // the cardholder paid and the money has moved; treat them as the same
+  // terminal-success event.
+  const isPaymentCaptured =
+    event.type === "payment.succeeded" || event.type === "payment.captured";
+
+  if (isPaymentCaptured) {
+    if (!paymentId) return;
+    await supa
+      .schema("mooov")
+      .from("payment_attempts")
+      .update({
+        status: "captured",
+        captured_at: new Date().toISOString(),
+      })
+      .eq("lodge_id", lodgeId)
+      .eq("payment_id", paymentId);
+    // Now project to LP-side tables based on the recorded intent. We read
+    // the attempt back AFTER the update so guest_descriptor + metadata
+    // reflect everything /api/donations (or future /api/events checkout)
+    // stashed for us at preflight time.
+    const { data: attempt, error: readErr } = await supa
+      .schema("mooov")
+      .from("payment_attempts")
+      .select(
+        "payment_id, intent, amount, currency, guest_descriptor, metadata, member_id"
+      )
+      .eq("lodge_id", lodgeId)
+      .eq("payment_id", paymentId)
+      .maybeSingle<{
+        payment_id: string;
+        intent: string;
+        amount: number;
+        currency: string;
+        guest_descriptor: Record<string, unknown> | null;
+        metadata: Record<string, unknown> | null;
+        member_id: string | null;
+      }>();
+    if (readErr) {
+      console.error("mooov webhook: payment_attempts read-back failed", {
+        event_id: event.id,
+        payment_id: paymentId,
+        code: readErr.code,
+        message: readErr.message,
+      });
       return;
+    }
+    if (!attempt) return;
+    if (attempt.intent === "donation") {
+      await projectDonationCaptured(lodgeId, attempt);
+    }
+    return;
+  }
+
+  switch (event.type) {
     case "payment.failed":
       if (!paymentId) return;
       await supa
@@ -270,4 +314,107 @@ async function projectConnectEvent(
         .eq("id", lodgeId);
       return;
   }
+}
+
+// Project a captured Mooov donation into the LP-side donations / payments /
+// gift_aid_declarations tables. Mirrors the shape the legacy Stripe webhook
+// (app/api/payments/webhook/route.ts -> handleDonationCompleted) wrote, so
+// downstream admin views / Gift Aid claim batching keep working unchanged.
+//
+// Idempotent: getPaymentByMooovId() is the dedupe gate. A retried Mooov
+// webhook delivery (same payment_id) lands here twice; the second call
+// short-circuits.
+async function projectDonationCaptured(
+  lodgeId: string,
+  attempt: {
+    payment_id: string;
+    amount: number;
+    currency: string;
+    guest_descriptor: Record<string, unknown> | null;
+    metadata: Record<string, unknown> | null;
+  }
+) {
+  const existing = await db.getPaymentByMooovId(attempt.payment_id);
+  if (existing) {
+    console.log("mooov webhook: donation already projected (idempotent)", {
+      payment_id: attempt.payment_id,
+    });
+    return;
+  }
+
+  const guest = (attempt.guest_descriptor ?? {}) as Record<string, unknown>;
+  const donorEmail =
+    typeof guest.donor_email === "string" ? guest.donor_email : "";
+  const donorName = typeof guest.donor_name === "string" ? guest.donor_name : null;
+  const giftAid = guest.gift_aid === true || guest.gift_aid === "true";
+  // amount is stored as minor units (pence) on payment_attempts; LP-side
+  // schemas keep amounts in major units (pounds), matching the Stripe
+  // webhook's existing conversion (Stripe.amount_total / 100).
+  const amountMajor = (attempt.amount ?? 0) / 100;
+  const currencyMajor = (attempt.currency ?? "GBP").toUpperCase();
+  const completedAt = new Date().toISOString();
+
+  const payment = await db.addPayment(lodgeId, {
+    rsvp_id: null,
+    event_id: null,
+    user_email: donorEmail,
+    user_name: donorName,
+    stripe_payment_intent_id: null,
+    stripe_charge_id: null,
+    stripe_customer_id: null,
+    mooov_payment_id: attempt.payment_id,
+    dining_amount: 0,
+    charity_amount: amountMajor,
+    raffle_amount: 0,
+    meeting_fee_amount: 0,
+    guest_ticket_amount: 0,
+    total_amount: amountMajor,
+    currency: currencyMajor,
+    charity_name: null,
+    status: "succeeded",
+    refund_amount: 0,
+    refund_reason: null,
+    completed_at: completedAt,
+  });
+
+  let giftAidDeclarationId: string | null = null;
+  if (giftAid) {
+    const declaration = await db.addGiftAidDeclaration(lodgeId, {
+      donor_name: donorName ?? "",
+      donor_email: donorEmail,
+      donor_address_line_1:
+        typeof guest.gift_aid_address_line_1 === "string"
+          ? guest.gift_aid_address_line_1
+          : null,
+      donor_address_line_2:
+        typeof guest.gift_aid_address_line_2 === "string"
+          ? guest.gift_aid_address_line_2
+          : null,
+      donor_city:
+        typeof guest.gift_aid_city === "string" ? guest.gift_aid_city : null,
+      donor_postcode:
+        typeof guest.gift_aid_postcode === "string"
+          ? guest.gift_aid_postcode
+          : null,
+      donor_country: "United Kingdom",
+      declaration_text:
+        "I am a UK taxpayer and understand that if I pay less Income Tax and/or Capital Gains Tax than the amount of Gift Aid claimed on all my donations in that tax year it is my responsibility to pay any difference.",
+      declaration_confirmed: true,
+      confirmation_method: "online_checkout",
+      hmrc_eligible: true,
+    });
+    giftAidDeclarationId = declaration.id;
+  }
+
+  await db.addDonation(lodgeId, {
+    event_id: null,
+    payment_id: payment.id,
+    donor_name: donorName,
+    donor_email: donorEmail,
+    amount: amountMajor,
+    currency: (attempt.currency ?? "gbp").toLowerCase(),
+    source: "online_donation",
+    status: "completed",
+    gift_aid_declaration_id: giftAidDeclarationId,
+  });
 }

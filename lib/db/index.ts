@@ -735,6 +735,22 @@ export async function getPaymentByStripeId(
   return data as Payment | null;
 }
 
+// Lookup by Mooov-side payment id (e.g. don_<lodge>_<rand>). The Mooov webhook
+// handler uses this for idempotency when projecting payment.succeeded /
+// payment.captured into public.payments, the same way getPaymentByStripeId
+// is used in the legacy Stripe webhook path.
+export async function getPaymentByMooovId(
+  mooovPaymentId: string
+): Promise<Payment | null> {
+  const { data, error } = await db()
+    .from("payments")
+    .select("*")
+    .eq("mooov_payment_id", mooovPaymentId)
+    .maybeSingle();
+  if (error) throw error;
+  return data as Payment | null;
+}
+
 export async function getPaymentById(
   id: string,
   lodgeId: string
