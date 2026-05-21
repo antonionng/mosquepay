@@ -1,6 +1,11 @@
 // crud-audit:ignore
 // One-shot guest checkout endpoint reached via a tokenised invitation link.
 // Updates and deletions to the resulting guest/rsvp rows happen elsewhere.
+//
+// Payment surface: 100% Mooov (Mooov Connect -> hosted Stripe Checkout on
+// the lodge's connected PSP). No direct Stripe SDK calls and no fallback.
+// If the lodge has not connected Mooov the guest sees a 503 + clear copy
+// and the RSVP is rolled back to payment_pending without a Stripe session.
 import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured, shouldUseInMemoryMock } from "@/lib/db/with-fallback";
@@ -13,6 +18,24 @@ import {
   lodgeScopedGuestSuccessPath,
   lodgeScopedVisitorPath,
 } from "@/lib/public-links";
+import { createServiceClient } from "@/lib/supabase/server";
+import { callMooovConnect, MooovApiError } from "@/lib/mooov";
+
+async function loadMooovMerchant(
+  supa: ReturnType<typeof createServiceClient>,
+  lodgeId: string,
+): Promise<string | null> {
+  const { data, error } = await supa
+    .schema("mooov")
+    .from("lodges")
+    .select("merchant_id, status")
+    .eq("id", lodgeId)
+    .maybeSingle<{ merchant_id: string; status: string }>();
+  if (error) throw error;
+  if (!data) return null;
+  if (data.status && data.status !== "active") return null;
+  return data.merchant_id ?? null;
+}
 
 function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
@@ -256,99 +279,226 @@ async function handleDb(args: DbArgs) {
     return NextResponse.json({ ok: true, rsvp_id: rsvp.id });
   }
 
-  const stripeSecret = process.env.STRIPE_SECRET_KEY;
-  if (!stripeSecret) {
+  let supa: ReturnType<typeof createServiceClient>;
+  try {
+    supa = createServiceClient();
+  } catch (err) {
+    console.error("guest checkout: supabase service client unavailable", {
+      message: err instanceof Error ? err.message : String(err),
+    });
     return NextResponse.json(
       { error: "Payments are not configured for this lodge." },
       { status: 503 }
     );
   }
 
-  const Stripe = (await import("stripe")).default;
-  const stripe = new Stripe(stripeSecret, { apiVersion: "2025-02-24.acacia" });
+  let merchantId: string | null;
+  try {
+    merchantId = await loadMooovMerchant(supa, invitation.lodge_id);
+  } catch (err) {
+    console.error("guest checkout: mooov merchant lookup failed", {
+      lodge_id: invitation.lodge_id,
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return NextResponse.json(
+      { error: "Could not look up payment processor for this lodge." },
+      { status: 500 }
+    );
+  }
+  if (!merchantId) {
+    // The lodge has not finished Mooov Connect. The RSVP was already
+    // persisted above with status='payment_pending'; we surface a 503 so
+    // the public guest page can render a clear message and an admin can
+    // complete onboarding before re-sharing the invite link.
+    return NextResponse.json(
+      {
+        error:
+          "This lodge has not finished setting up online payments yet. Please contact the lodge directly.",
+        code: "lodge_not_connected",
+      },
+      { status: 503 }
+    );
+  }
+
   const siteUrl = siteUrlFor(args.request);
+  // Mooov takes amount in minor units (pence). Aggregate the line items
+  // (meeting_fee + dining + charity) into a single total -- Mooov's
+  // hosted Stripe Checkout shows the description we pass plus the total.
+  // We keep the split on payment_attempts.guest_descriptor so the Mooov
+  // webhook handler can write the LP `payments` row with the same
+  // breakdown the legacy Stripe webhook used to (dining_amount /
+  // meeting_fee_amount / charity_amount on public.payments).
+  const totalMinor = Math.round(
+    (args.meetingFee + args.diningTotal + args.charityAmount) * 100
+  );
+  const currency = "GBP";
+  const paymentId = `evt_${invitation.lodge_id}_${rsvp.id}_${Date.now().toString(36)}`;
+  const idempotencyKey = `evt_rsvp_${rsvp.id}_${Date.now().toString(36)}`;
+  const description = event.title
+    ? `${event.title}${args.fullName ? ` -- ${args.fullName}` : ""}`
+    : "Event booking";
+  const lodgeSlug = lodge?.slug ?? "lodge";
+  const successUrl = `${siteUrl}${lodgeScopedGuestSuccessPath(
+    lodgeSlug,
+    args.token
+  )}`;
+  const cancelUrl = `${siteUrl}${lodgeScopedGuestPath(lodgeSlug, args.token)}`;
 
-  type LineItem = {
-    price_data: {
-      currency: string;
-      unit_amount: number;
-      product_data: { name: string };
-    };
-    quantity: number;
+  // guest_descriptor carries everything the Mooov webhook handler needs to
+  // project this charge into LP-side rows when payment.captured arrives.
+  // Mirrors the Stripe metadata bag the legacy webhook used to read.
+  const guestDescriptor: Record<string, unknown> = {
+    source: "event_guest",
+    rsvp_id: rsvp.id,
+    event_id: event.id,
+    guest_id: guestRecord.id,
+    guest_invitation_id: invitation.id,
+    lodge_slug: lodgeSlug,
+    donor_email: args.email,
+    donor_name: args.fullName,
+    dining_total: args.diningTotal,
+    meeting_fee: args.meetingFee,
+    charity_amount: args.charityAmount,
+    guest_total: 0,
+    raffle_amount: 0,
+    standalone: false,
   };
-  const lineItems: LineItem[] = [];
-  const currency = "gbp";
+  const initialMetadata: Record<string, unknown> = {
+    source: "lodgepay_guest_checkout",
+    lodge_slug: lodgeSlug,
+    lodge_id: invitation.lodge_id,
+    intent: "event",
+    rsvp_id: rsvp.id,
+    event_id: event.id,
+  };
+  const { error: insertError } = await supa
+    .schema("mooov")
+    .from("payment_attempts")
+    .insert({
+      payment_id: paymentId,
+      lodge_id: invitation.lodge_id,
+      member_id: null,
+      amount: totalMinor,
+      currency,
+      intent: "event",
+      status: "pending",
+      idempotency_key: idempotencyKey,
+      metadata: initialMetadata,
+      guest_descriptor: guestDescriptor,
+    });
+  if (insertError) {
+    console.error("guest checkout: preflight insert failed", {
+      lodge_id: invitation.lodge_id,
+      payment_id: paymentId,
+      code: insertError.code,
+      message: insertError.message,
+    });
+    return NextResponse.json(
+      {
+        error: "Could not start payment.",
+        payment_id: paymentId,
+        db_code: insertError.code ?? null,
+      },
+      { status: 500 }
+    );
+  }
 
-  if (args.meetingFee > 0) {
-    lineItems.push({
-      price_data: {
+  try {
+    const result = await callMooovConnect<{
+      payment_id: string;
+      state: "authorized" | "captured" | "processing" | "failed";
+      provider?: { provider: string; provider_ref?: string; hosted_url?: string };
+    }>("POST", "/v1/payment_intents", {
+      merchant: merchantId,
+      idempotencyKey,
+      body: {
+        payment_id: paymentId,
+        amount: totalMinor,
         currency,
-        unit_amount: Math.round(args.meetingFee * 100),
-        product_data: {
-          name: event.meeting_fee_description ?? "Meeting fee",
+        flow: "redirect",
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        description,
+        customer_email: args.email ?? undefined,
+        metadata: {
+          intent: "event",
+          lodge_id: invitation.lodge_id,
+          lodge_slug: lodgeSlug,
+          rsvp_id: rsvp.id,
+          event_id: event.id,
         },
       },
-      quantity: 1,
     });
-  }
-  if (args.diningTotal > 0) {
-    lineItems.push({
-      price_data: {
-        currency,
-        unit_amount: Math.round(args.diningTotal * 100),
-        product_data: { name: "Dining" },
-      },
-      quantity: 1,
-    });
-  }
-  if (args.charityAmount > 0) {
-    lineItems.push({
-      price_data: {
-        currency,
-        unit_amount: Math.round(args.charityAmount * 100),
-        product_data: {
-          name: event.charity_name
-            ? `Donation: ${event.charity_name}`
-            : "Charity donation",
-        },
-      },
-      quantity: 1,
-    });
-  }
 
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    payment_method_types: ["card"],
-    line_items: lineItems,
-    customer_email: args.email ?? undefined,
-    success_url: `${siteUrl}${lodgeScopedGuestSuccessPath(
-      lodge?.slug ?? "lodge",
-      args.token
-    )}`,
-    cancel_url: `${siteUrl}${lodgeScopedGuestPath(
-      lodge?.slug ?? "lodge",
-      args.token
-    )}`,
-    metadata: {
-      type: "guest_invitation",
-      lodge_slug: lodge?.slug ?? "",
-      event_id: event.id,
-      rsvp_id: rsvp.id,
-      guest_invitation_id: invitation.id,
-      guest_id: guestRecord.id,
-      user_name: args.fullName,
-      user_email: args.email ?? "",
-      dining_total: String(args.diningTotal),
-      meeting_fee: String(args.meetingFee),
-      guest_total: "0",
-      charity_amount: String(args.charityAmount),
-      raffle_amount: "0",
-      gift_aid: "false",
-      standalone: "false",
-    },
-  });
+    const hostedUrl = result.provider?.hosted_url ?? null;
+    if (!hostedUrl) {
+      console.error("guest checkout: Mooov returned no hosted_url", {
+        payment_id: paymentId,
+        state: result.state,
+      });
+      return NextResponse.json(
+        { error: "Payment processor did not return a checkout URL." },
+        { status: 502 }
+      );
+    }
 
-  return NextResponse.json({ url: session.url });
+    await supa
+      .schema("mooov")
+      .from("payment_attempts")
+      .update({
+        status: result.state,
+        provider_ref: result.provider?.provider_ref ?? null,
+        metadata: { ...initialMetadata, hosted_url: hostedUrl },
+      })
+      .eq("payment_id", paymentId);
+
+    // Stash the Mooov payment_id on the rsvp so admin views can correlate
+    // pending bookings to in-flight Mooov payments. payment_completed
+    // stays false until the webhook fires.
+    await db.updateRsvp(rsvp.id, invitation.lodge_id, {
+      payment_id: paymentId,
+    });
+
+    return NextResponse.json({ url: hostedUrl, payment_id: paymentId });
+  } catch (err) {
+    if (err instanceof MooovApiError) {
+      console.error("guest checkout: Mooov call failed", {
+        payment_id: paymentId,
+        category: err.category,
+        status: err.status,
+      });
+      await supa
+        .schema("mooov")
+        .from("payment_attempts")
+        .update({ status: "failed", failure_reason: err.category })
+        .eq("payment_id", paymentId);
+      if (err.category === "merchant_setup_required" && err.setupHint) {
+        return NextResponse.json(
+          {
+            error:
+              "This lodge has not finished setting up online payments yet. Please contact the lodge directly.",
+            code: "lodge_setup_incomplete",
+            setup_url: err.setupHint.setupUrl,
+          },
+          { status: 503 }
+        );
+      }
+      return NextResponse.json(
+        { error: "Could not start payment.", code: err.category },
+        { status: 502 }
+      );
+    }
+    console.error("guest checkout: unexpected error", err);
+    await supa
+      .schema("mooov")
+      .from("payment_attempts")
+      .update({ status: "failed", failure_reason: "unexpected_error" })
+      .eq("payment_id", paymentId);
+    return NextResponse.json(
+      { error: "Could not start payment." },
+      { status: 500 }
+    );
+  }
 }
 
 type MockArgs = {

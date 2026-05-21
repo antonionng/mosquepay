@@ -257,6 +257,8 @@ async function projectConnectEvent(
     if (!attempt) return;
     if (attempt.intent === "donation") {
       await projectDonationCaptured(lodgeId, attempt);
+    } else if (attempt.intent === "event") {
+      await projectEventCaptured(lodgeId, attempt);
     }
     return;
   }
@@ -417,4 +419,90 @@ async function projectDonationCaptured(
     status: "completed",
     gift_aid_declaration_id: giftAidDeclarationId,
   });
+}
+
+// Project a captured Mooov event-guest payment into LP public.payments +
+// flip the RSVP to payment_completed/confirmed. Mirrors the legacy Stripe
+// webhook's handleRsvpPaymentCompleted (with the same dining/charity/
+// meeting_fee/guest_total split on the payments row).
+//
+// Idempotent on payments.mooov_payment_id; a duplicate Mooov webhook
+// delivery for the same payment_id short-circuits.
+async function projectEventCaptured(
+  lodgeId: string,
+  attempt: {
+    payment_id: string;
+    amount: number;
+    currency: string;
+    guest_descriptor: Record<string, unknown> | null;
+    metadata: Record<string, unknown> | null;
+  }
+) {
+  const existing = await db.getPaymentByMooovId(attempt.payment_id);
+  if (existing) {
+    console.log("mooov webhook: event payment already projected (idempotent)", {
+      payment_id: attempt.payment_id,
+    });
+    return;
+  }
+
+  const guest = (attempt.guest_descriptor ?? {}) as Record<string, unknown>;
+  const rsvpId = typeof guest.rsvp_id === "string" ? guest.rsvp_id : null;
+  const eventId = typeof guest.event_id === "string" ? guest.event_id : null;
+  if (!eventId) {
+    console.error("mooov webhook: event payment missing event_id in guest_descriptor", {
+      payment_id: attempt.payment_id,
+    });
+    return;
+  }
+  const donorEmail =
+    typeof guest.donor_email === "string" ? guest.donor_email : "";
+  const donorName = typeof guest.donor_name === "string" ? guest.donor_name : null;
+  // Line-item split (pounds) preserved from the guest_descriptor. Falling
+  // back to 0 keeps the projection safe if a future caller forgot a field.
+  const numField = (k: string) =>
+    typeof guest[k] === "number"
+      ? (guest[k] as number)
+      : typeof guest[k] === "string"
+      ? Number(guest[k]) || 0
+      : 0;
+  const diningTotal = numField("dining_total");
+  const meetingFee = numField("meeting_fee");
+  const charityAmount = numField("charity_amount");
+  const guestTotal = numField("guest_total");
+  const raffleAmount = numField("raffle_amount");
+  const totalMajor = (attempt.amount ?? 0) / 100;
+  const currencyMajor = (attempt.currency ?? "GBP").toUpperCase();
+  const completedAt = new Date().toISOString();
+
+  const payment = await db.addPayment(lodgeId, {
+    rsvp_id: rsvpId,
+    event_id: eventId,
+    user_email: donorEmail,
+    user_name: donorName,
+    stripe_payment_intent_id: null,
+    stripe_charge_id: null,
+    stripe_customer_id: null,
+    mooov_payment_id: attempt.payment_id,
+    dining_amount: diningTotal,
+    charity_amount: charityAmount,
+    raffle_amount: raffleAmount,
+    meeting_fee_amount: meetingFee,
+    guest_ticket_amount: guestTotal,
+    total_amount: totalMajor,
+    currency: currencyMajor,
+    charity_name: null,
+    status: "succeeded",
+    refund_amount: 0,
+    refund_reason: null,
+    completed_at: completedAt,
+  });
+
+  if (rsvpId) {
+    await db.updateRsvp(rsvpId, lodgeId, {
+      payment_id: payment.id,
+      payment_completed: true,
+      status: "confirmed",
+    });
+  }
 }
