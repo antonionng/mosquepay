@@ -7,6 +7,10 @@ import {
   MooovSetupRequiredBanner,
   type MooovSetupHint,
 } from "@/components/admin/mooov-setup-required-banner";
+import {
+  MooovRepairRequiredBanner,
+  type MooovRepairRequiredHint,
+} from "@/components/admin/mooov-repair-required-banner";
 
 export const dynamic = "force-dynamic";
 
@@ -41,8 +45,10 @@ export default async function IntegrationsPage({
       getMooovConnection(ctx.lodgeId),
       getMooovPendingSetupHint(ctx.lodgeId),
     ]);
+  const repairHint = buildRepairHintFromConnection(mooovConnection);
   return (
     <div className="space-y-6">
+      {repairHint ? <MooovRepairRequiredBanner hint={repairHint} /> : null}
       {mooovSetupHint ? <MooovSetupRequiredBanner hint={mooovSetupHint} /> : null}
       <IntegrationsClient
         lodgeSlug={ctx.lodgeSlug}
@@ -54,6 +60,36 @@ export default async function IntegrationsPage({
       />
     </div>
   );
+}
+
+// Build the repair-required banner inputs from the latest
+// mooov.lodges row. Returns null unless status='needs_repair' was set by
+// the connect webhook in response to a payment.failed:account_invalid.
+function buildRepairHintFromConnection(
+  conn: Awaited<ReturnType<typeof getMooovConnection>>
+): MooovRepairRequiredHint | null {
+  if (!conn || conn.status !== "needs_repair") return null;
+  const meta = conn.metadata ?? {};
+  const lastFailureAt =
+    typeof meta.last_failure_at === "string" ? meta.last_failure_at : undefined;
+  const lastFailureReason =
+    typeof meta.last_failure_reason === "string"
+      ? meta.last_failure_reason
+      : undefined;
+  // Mooov's allowlist today: lodgepayments.co.uk, www.lodgepayments.co.uk,
+  // *.vercel.app. Pin to www.lodgepayments.co.uk so the auto-bounce works
+  // for tenants on the lodge subdomain too (admin always lives on www).
+  const returnUrl =
+    (process.env.MOOOV_REDIRECT_BASE_URL ??
+      process.env.NEXT_PUBLIC_SITE_URL ??
+      "https://www.lodgepayments.co.uk").replace(/\/$/, "") +
+    "/admin/integrations";
+  return {
+    portalBaseUrl: process.env.MOOOV_PORTAL_BASE,
+    returnUrl,
+    lastFailureAt,
+    lastFailureReason,
+  };
 }
 
 async function getMooovConnection(lodgeId: string) {

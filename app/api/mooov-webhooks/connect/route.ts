@@ -19,7 +19,15 @@ type MooovConnectEvent = {
     payment_id?: string;
     amount?: number;
     currency?: string;
+    // Mooov gateway-prod-00027-mn5+ (2026-05-22) populates these three
+    // fields on payment.failed. failure_reason is the human Stripe
+    // message, failure_code is the stable enum to switch on
+    // (e.g. "account_invalid", "checkout_abandoned"), failure_category
+    // is the bucket (provider | fraud | validation | ...).
+    // Absent on success events to keep the happy-path payload tight.
     failure_reason?: string;
+    failure_code?: string;
+    failure_category?: string;
     [key: string]: unknown;
   };
 };
@@ -274,21 +282,69 @@ async function projectConnectEvent(
   }
 
   switch (event.type) {
-    case "payment.failed":
+    case "payment.failed": {
       if (!paymentId) return;
+      const failureReason =
+        typeof event.data?.failure_reason === "string"
+          ? event.data.failure_reason
+          : null;
+      const failureCode =
+        typeof event.data?.failure_code === "string"
+          ? event.data.failure_code
+          : null;
+      const failureCategory =
+        typeof event.data?.failure_category === "string"
+          ? event.data.failure_category
+          : null;
+
       await supa
         .schema("mooov")
         .from("payment_attempts")
         .update({
           status: "failed",
-          failure_reason:
-            typeof event.data?.failure_reason === "string"
-              ? event.data.failure_reason
-              : null,
+          failure_reason: failureReason,
         })
         .eq("lodge_id", lodgeId)
         .eq("payment_id", paymentId);
+
+      // account_invalid means the lodge's underlying PSP connection got
+      // severed (typically: the lodge clicked "Disconnect" from inside
+      // their Stripe dashboard, or Stripe's risk team paused the
+      // connection). Mooov can't fix this server-side -- the lodge admin
+      // has to walk through Mooov's portal repair flow. Flip the lodge
+      // row to needs_repair so /admin/integrations renders the deep-link
+      // banner. Other failure codes (checkout_abandoned, etc.) are
+      // expected wear-and-tear and don't change the connection state.
+      if (failureCode === "account_invalid") {
+        const { data: existing } = await supa
+          .schema("mooov")
+          .from("lodges")
+          .select("metadata")
+          .eq("id", lodgeId)
+          .maybeSingle<{ metadata: Record<string, unknown> | null }>();
+        const mergedMetadata: Record<string, unknown> = {
+          ...(existing?.metadata ?? {}),
+          last_failure_at: new Date().toISOString(),
+          last_failure_code: failureCode,
+          last_failure_category: failureCategory ?? undefined,
+          last_failure_reason: failureReason ?? undefined,
+          last_failure_event_id: event.id,
+        };
+        const { error: updateErr } = await supa
+          .schema("mooov")
+          .from("lodges")
+          .update({ status: "needs_repair", metadata: mergedMetadata })
+          .eq("id", lodgeId);
+        if (updateErr) {
+          console.error("mooov webhook: account_invalid lodge update failed", {
+            event_id: event.id,
+            lodge_id: lodgeId,
+            message: updateErr.message,
+          });
+        }
+      }
       return;
+    }
     case "payment.refunded":
       if (!paymentId) return;
       await supa
