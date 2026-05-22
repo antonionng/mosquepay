@@ -10,6 +10,7 @@ import {
   Download,
   Loader2,
   Plug,
+  PlugZap,
   RefreshCw,
   Trash2,
   XCircle,
@@ -281,6 +282,7 @@ export function IntegrationsClient({
   const [feedback, setFeedback] = useState<string | null>(initialFeedback ?? null);
   const [open, setOpen] = useState<Provider | null>(null);
   const [disconnectingProvider, setDisconnectingProvider] = useState<Provider | null>(null);
+  const [confirmMooovDisconnect, setConfirmMooovDisconnect] = useState(false);
   const [drafts, setDrafts] = useState<Record<Provider, Record<string, string>>>(
     {
       google_calendar: {},
@@ -377,6 +379,29 @@ export function IntegrationsClient({
     }
   }
 
+  async function disconnectMooov() {
+    setBusy("delete:mooov");
+    try {
+      const res = await fetch("/api/mooov/disconnect", { method: "POST" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.error ?? "Could not disconnect Mooov.");
+      }
+      setFeedback(
+        body.revoked_remotely === false
+          ? "Mooov already revoked on their side. Local state cleared."
+          : "Mooov disconnected."
+      );
+      router.refresh();
+    } catch (error) {
+      setFeedback(
+        error instanceof Error ? error.message : "Disconnect failed."
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function processQueue() {
     setBusy("process");
     try {
@@ -451,6 +476,14 @@ export function IntegrationsClient({
                       <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">
                         <CheckCircle2 className="mr-1 h-3 w-3" /> Connected
                       </Badge>
+                    ) : mooovConnection?.status === "revoked" ? (
+                      <Badge variant="outline" className="bg-slate-100 text-slate-700">
+                        <XCircle className="mr-1 h-3 w-3" /> Disconnected
+                      </Badge>
+                    ) : mooovConnection?.status === "needs_repair" ? (
+                      <Badge variant="outline" className="bg-amber-100 text-amber-800">
+                        <XCircle className="mr-1 h-3 w-3" /> Needs repair
+                      </Badge>
                     ) : mooovConnection ? (
                       <Badge variant="outline">
                         <XCircle className="mr-1 h-3 w-3" /> {mooovConnection.status}
@@ -473,16 +506,39 @@ export function IntegrationsClient({
                   ) : null}
                 </div>
               </div>
-              <a href="/api/mooov/connect/start">
-                <Button size="sm" variant={mooovConnection ? "outline" : "primary"}>
-                  {mooovConnection ? (
-                    <RefreshCw className="mr-1 h-3 w-3" />
-                  ) : (
-                    <Plug className="mr-1 h-3 w-3" />
-                  )}
-                  {mooovConnection ? "Reconnect Mooov" : "Connect Mooov"}
-                </Button>
-              </a>
+              <div className="flex flex-wrap items-center gap-2">
+                <a href="/api/mooov/connect/start">
+                  <Button size="sm" variant={mooovConnection ? "outline" : "primary"}>
+                    {mooovConnection ? (
+                      <RefreshCw className="mr-1 h-3 w-3" />
+                    ) : (
+                      <Plug className="mr-1 h-3 w-3" />
+                    )}
+                    {mooovConnection?.status === "active"
+                      ? "Reconnect Mooov"
+                      : mooovConnection
+                        ? "Reconnect Mooov"
+                        : "Connect Mooov"}
+                  </Button>
+                </a>
+                {mooovConnection &&
+                (mooovConnection.status === "active" ||
+                  mooovConnection.status === "needs_repair") ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setConfirmMooovDisconnect(true)}
+                    disabled={busy === "delete:mooov"}
+                  >
+                    {busy === "delete:mooov" ? (
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    ) : (
+                      <PlugZap className="mr-1 h-3 w-3" />
+                    )}
+                    Disconnect
+                  </Button>
+                ) : null}
+              </div>
             </div>
           </div>
 
@@ -754,6 +810,23 @@ export function IntegrationsClient({
           </div>
         </TabsContent>
       </Tabs>
+      <ConfirmActionDialog
+        open={confirmMooovDisconnect}
+        onOpenChange={(open) => !open && setConfirmMooovDisconnect(false)}
+        title="Disconnect Mooov?"
+        description={
+          "This revokes the lodge's Mooov grant. New dues, donations, and event payments will fail until you reconnect. " +
+          "Existing payments, refunds, and historical reports are unaffected. " +
+          "You can reconnect any time -- the same merchant account is reused on reconnect."
+        }
+        confirmLabel="Disconnect Mooov"
+        tone="danger"
+        loading={busy === "delete:mooov"}
+        onConfirm={async () => {
+          await disconnectMooov();
+          setConfirmMooovDisconnect(false);
+        }}
+      />
       <ConfirmActionDialog
         open={disconnectingProvider !== null}
         onOpenChange={(open) => !open && setDisconnectingProvider(null)}
