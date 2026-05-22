@@ -59,18 +59,13 @@ const nav = [
   { href: "/admin/settings", label: "Settings", icon: Settings, permission: "admin:all" },
 ];
 
+// Mirror of ROLE_PERMISSIONS in lib/auth/permissions.ts -- kept in sync by
+// hand so client-side sidebar filtering matches server-side authorization.
+// If you change a role here, change it in lib/auth/permissions.ts too.
 const rolePermissions: Record<string, string[]> = {
   super_admin: ["admin:all"],
   operator: ["admin:all"],
-  secretary: [
-    "members:read",
-    "members:write",
-    "meetings:write",
-    "summons:write",
-    "website:write",
-    "audit:read",
-    "welfare:read",
-  ],
+  secretary: ["admin:all"],
   treasurer: ["payments:write", "audit:read"],
   charity_steward: ["charity:write", "audit:read"],
   membership_officer: ["members:read", "members:write", "audit:read"],

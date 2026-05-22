@@ -46,15 +46,14 @@ export type AdminRole =
 const ROLE_PERMISSIONS: Record<AdminRole, AdminPermission[]> = {
   super_admin: ["admin:all"],
   operator: ["admin:all"],
-  secretary: [
-    "members:read",
-    "members:write",
-    "meetings:write",
-    "summons:write",
-    "website:write",
-    "audit:read",
-    "welfare:read",
-  ],
+  // Secretary is the de facto owner of a lodge: the person who provisions
+  // the LodgePay account and is accountable for everything that happens
+  // under it (members, meetings, payments, charity, welfare, settings).
+  // Tenant isolation is still enforced by admin_users.lodge_id, so this
+  // "admin:all" is scoped to the secretary's own lodge -- not platform-wide.
+  // Platform-wide god mode lives on super_admin / operator rows with
+  // lodge_id == null (see getCurrentAdminScope).
+  secretary: ["admin:all"],
   treasurer: ["payments:write", "audit:read"],
   charity_steward: ["charity:write", "audit:read"],
   membership_officer: ["members:read", "members:write", "audit:read"],

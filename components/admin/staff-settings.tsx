@@ -44,7 +44,8 @@ const ROLE_OPTIONS: Array<{
   {
     value: "secretary",
     label: "Secretary",
-    description: "Members, meetings, summons, website, and audit trail.",
+    description:
+      "Full access to this lodge: members, meetings, payments, charity, welfare, website, and settings.",
   },
   {
     value: "treasurer",
