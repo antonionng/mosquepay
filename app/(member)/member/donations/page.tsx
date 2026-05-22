@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   Heart,
   CheckCircle2,
@@ -28,6 +29,33 @@ interface DonationData {
   donations: Donation[];
 }
 
+interface MemberSummary {
+  full_name?: string;
+  email?: string;
+}
+
+/**
+ * Builds a donate-page URL that pre-fills the member's email/name and
+ * optionally opens the Gift Aid section. The lodge slug is passed when
+ * known so cross-tenant resolution works whether the member is on the
+ * lodge subdomain or the bare host. When lodge slug isn't known we fall
+ * back to host/cookie resolution on the donate page itself.
+ */
+function buildDonateHref(opts: {
+  lodgeSlug?: string | null;
+  email?: string;
+  name?: string;
+  giftAid?: boolean;
+}) {
+  const params = new URLSearchParams();
+  if (opts.lodgeSlug) params.set("lodge", opts.lodgeSlug);
+  if (opts.email) params.set("email", opts.email);
+  if (opts.name) params.set("name", opts.name);
+  if (opts.giftAid) params.set("gift_aid", "1");
+  const qs = params.toString();
+  return qs ? `/donate?${qs}` : "/donate";
+}
+
 function SkeletonCard() {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm animate-pulse">
@@ -40,6 +68,8 @@ function SkeletonCard() {
 
 export default function MemberDonationsPage() {
   const [data, setData] = useState<DonationData | null>(null);
+  const [member, setMember] = useState<MemberSummary | null>(null);
+  const [lodgeSlug, setLodgeSlug] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -55,6 +85,8 @@ export default function MemberDonationsPage() {
               donations: [],
             }
           );
+          setMember(d.user ?? null);
+          setLodgeSlug(d.lodgeSlug ?? null);
         }
       } catch {
         setData({ totalThisYear: 0, giftAidDeclared: false, donations: [] });
@@ -65,6 +97,26 @@ export default function MemberDonationsPage() {
     load();
   }, []);
 
+  const donateHref = useMemo(
+    () =>
+      buildDonateHref({
+        lodgeSlug,
+        email: member?.email,
+        name: member?.full_name,
+      }),
+    [lodgeSlug, member?.email, member?.full_name]
+  );
+  const giftAidHref = useMemo(
+    () =>
+      buildDonateHref({
+        lodgeSlug,
+        email: member?.email,
+        name: member?.full_name,
+        giftAid: true,
+      }),
+    [lodgeSlug, member?.email, member?.full_name]
+  );
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-start justify-between">
@@ -72,9 +124,11 @@ export default function MemberDonationsPage() {
           <h1 className="text-2xl font-bold text-slate-900">Donations</h1>
           <p className="text-slate-500 mt-1">Your charitable contributions</p>
         </div>
-        <Button variant="primary">
-          <Heart className="h-4 w-4 mr-2" />
-          Make a Donation
+        <Button variant="primary" asChild>
+          <Link href={donateHref}>
+            <Heart className="h-4 w-4 mr-2" />
+            Make a Donation
+          </Link>
         </Button>
       </div>
 
@@ -153,9 +207,12 @@ export default function MemberDonationsPage() {
                 <>
                   <p className="text-base font-semibold text-slate-700">Not declared</p>
                   <p className="text-xs text-slate-400 mt-1">
-                    <button className="text-blue-600 hover:text-blue-700 font-medium">
+                    <Link
+                      href={giftAidHref}
+                      className="text-blue-600 hover:text-blue-700 font-medium"
+                    >
                       Set up Gift Aid
-                    </button>{" "}
+                    </Link>{" "}
                     to boost donations by 25%
                   </p>
                 </>
@@ -209,9 +266,11 @@ export default function MemberDonationsPage() {
                   <p className="text-xs text-slate-400 mt-1">
                     Make your first donation to support the lodge
                   </p>
-                  <Button variant="primary" size="sm" className="mt-4">
-                    <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                    Donate Now
+                  <Button variant="primary" size="sm" className="mt-4" asChild>
+                    <Link href={donateHref}>
+                      <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                      Donate Now
+                    </Link>
                   </Button>
                 </div>
               )}

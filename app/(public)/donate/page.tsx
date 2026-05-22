@@ -14,11 +14,20 @@ function DonatePageContent() {
   const lodge = searchParams.get("lodge") ?? "";
   const lodgeQuery = lodge ? `?lodge=${encodeURIComponent(lodge)}` : "";
 
+  // Optional URL pre-fill: the member portal links here from
+  // /member/donations with the signed-in member's email/name and a
+  // gift_aid hint when they clicked "Set up Gift Aid". Defaulting from
+  // the URL on first render (vs syncing in an effect) avoids the
+  // "field briefly empty, then jumps" flash some users see.
+  const initialEmail = searchParams.get("email") ?? "";
+  const initialName = searchParams.get("name") ?? "";
+  const initialGiftAid = searchParams.get("gift_aid") === "1";
+
   const [amount, setAmount] = useState<number>(0);
   const [customAmount, setCustomAmount] = useState("");
-  const [donorName, setDonorName] = useState("");
-  const [donorEmail, setDonorEmail] = useState("");
-  const [giftAid, setGiftAid] = useState(false);
+  const [donorName, setDonorName] = useState(initialName);
+  const [donorEmail, setDonorEmail] = useState(initialEmail);
+  const [giftAid, setGiftAid] = useState(initialGiftAid);
   const [giftAidConfirmed, setGiftAidConfirmed] = useState(false);
   const [addressLine1, setAddressLine1] = useState("");
   const [addressLine2, setAddressLine2] = useState("");

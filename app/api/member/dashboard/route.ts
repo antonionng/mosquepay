@@ -32,6 +32,7 @@ export async function GET() {
           full_name: user.user_metadata?.full_name ?? null,
           email: user.email,
         },
+        lodgeSlug: null,
         upcomingEvents: 0,
         outstandingDues: 0,
         recentPaymentsTotal: 0,
@@ -45,6 +46,19 @@ export async function GET() {
           donations: [],
         },
       });
+    }
+
+    // Look up the lodge slug so the client can build cross-tenant URLs
+    // (e.g. /donate?lodge=<slug>) that work whether the member is on the
+    // lodge subdomain or the bare host. Tolerate a lookup failure --
+    // the dashboard doesn't depend on this and the donate page will fall
+    // back to host/cookie resolution.
+    let lodgeSlug: string | null = null;
+    try {
+      const lodge = await db.getLodgeById(member.lodge_id);
+      lodgeSlug = lodge?.slug ?? null;
+    } catch {
+      // non-fatal
     }
 
     const [upcomingEventRows, allEvents, payments, donations, duesRecords, lodgeDues, rsvps, summonsLinks] = await Promise.all([
@@ -165,6 +179,7 @@ export async function GET() {
         membership_status: member.membership_status,
         portal_token: member.portal_token,
       },
+      lodgeSlug,
       nextEvent: nextEvent
         ? {
             id: nextEvent.id,
