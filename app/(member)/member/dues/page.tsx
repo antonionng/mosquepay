@@ -61,29 +61,12 @@ export default function MemberDuesPage() {
         const res = await fetch("/api/member/dashboard");
         if (res.ok) {
           const data = await res.json();
-          setDues(
-            data.dues ?? {
-              annualAmount: 150,
-              status: "outstanding",
-              paidAmount: 0,
-              dueDate: new Date().toISOString(),
-              allowInstalments: false,
-              instalmentCount: 12,
-              instalmentFrequency: "monthly",
-              history: [],
-            }
-          );
+          setDues(data.dues ?? null);
+        } else {
+          setDues(null);
         }
       } catch {
-        setDues({
-          annualAmount: 150,
-          status: "outstanding",
-          paidAmount: 0,
-          allowInstalments: false,
-          instalmentCount: 12,
-          instalmentFrequency: "monthly",
-          history: [],
-        });
+        setDues(null);
       } finally {
         setLoading(false);
       }
@@ -92,7 +75,13 @@ export default function MemberDuesPage() {
   }, []);
 
   async function handlePay(mode: "payment" | "subscription") {
-    if (!dues?.duesId || !dues?.memberEmail) return;
+    if (!dues?.duesId || !dues?.memberEmail) {
+      setError(
+        "We couldn't load your dues record. Please refresh the page, or contact your lodge secretary if this persists."
+      );
+      setPayMode(null);
+      return;
+    }
     setPaying(true);
     setError(null);
     try {
@@ -139,6 +128,25 @@ export default function MemberDuesPage() {
           <SkeletonBlock />
           <SkeletonBlock />
         </div>
+      ) : !dues ? (
+        <>
+          {error && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-800">
+              {error}
+            </div>
+          )}
+          <div className="rounded-2xl border border-slate-200 bg-white p-10 shadow-sm text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-slate-50 mb-3">
+              <Wallet className="h-6 w-6 text-slate-300" />
+            </div>
+            <p className="text-sm font-medium text-slate-700">
+              No dues record found
+            </p>
+            <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+              We couldn&apos;t find a dues record for your account. If you believe this is wrong, please contact your lodge secretary.
+            </p>
+          </div>
+        </>
       ) : (
         <>
           {error && (
