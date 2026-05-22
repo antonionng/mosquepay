@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle, CheckCircle2, Lock } from "lucide-react";
@@ -117,24 +118,29 @@ function MemberAcceptInviteForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+    <div className="admin-dashboard-light flex min-h-screen items-center justify-center bg-dash-bg px-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-xl font-bold text-white shadow-lg">
-            LP
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900">Accept your invite</h1>
-          <p className="mt-2 text-sm text-slate-500">
+        <div className="text-center mb-8 flex flex-col items-center">
+          <Image
+            src="/brand/lodgepay-admin-signin.png"
+            alt="LodgePay"
+            width={1024}
+            height={1024}
+            priority
+            className="mb-6 h-36 w-36 object-contain"
+          />
+          <h1 className="text-3xl font-semibold tracking-tight text-dash-text">Accept your invite</h1>
+          <p className="mt-2 text-sm text-dash-muted">
             Set a password to activate your member portal
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+        <div className="admin-surface p-8">
           {status === "checking" ? (
             <div className="space-y-3">
-              <div className="h-5 w-48 animate-pulse rounded bg-slate-100" />
-              <div className="h-11 animate-pulse rounded-xl bg-slate-100" />
-              <div className="h-11 animate-pulse rounded-xl bg-slate-100" />
+              <div className="h-5 w-48 animate-pulse rounded bg-dash-surface-subtle" />
+              <div className="h-11 animate-pulse rounded-xl bg-dash-surface-subtle" />
+              <div className="h-11 animate-pulse rounded-xl bg-dash-surface-subtle" />
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -142,8 +148,8 @@ function MemberAcceptInviteForm() {
                 <div
                   className={
                     status === "saved"
-                      ? "flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
-                      : "flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700"
+                      ? "flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
+                      : "flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
                   }
                 >
                   {status === "saved" ? (
@@ -158,9 +164,10 @@ function MemberAcceptInviteForm() {
               <div className="space-y-2">
                 <Label htmlFor="password">New password</Label>
                 <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-dash-faint" />
                   <Input
                     id="password"
+                    variant="dashboard"
                     type="password"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
@@ -175,9 +182,10 @@ function MemberAcceptInviteForm() {
               <div className="space-y-2">
                 <Label htmlFor="confirm-password">Confirm password</Label>
                 <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-dash-faint" />
                   <Input
                     id="confirm-password"
+                    variant="dashboard"
                     type="password"
                     value={confirmPassword}
                     onChange={(event) => setConfirmPassword(event.target.value)}
@@ -191,7 +199,7 @@ function MemberAcceptInviteForm() {
 
               <Button
                 type="submit"
-                variant="primary"
+                variant="brand"
                 className="w-full"
                 disabled={saving || status === "error"}
               >
@@ -201,11 +209,11 @@ function MemberAcceptInviteForm() {
           )}
         </div>
 
-        <p className="mt-6 text-center text-sm text-slate-500">
+        <p className="mt-6 text-center text-sm text-dash-muted">
           Already activated?{" "}
           <Link
             href="/member/login"
-            className="font-medium text-blue-600 transition-colors hover:text-blue-700"
+            className="font-medium text-brand transition-colors hover:text-brand-dark"
           >
             Sign in
           </Link>
@@ -219,8 +227,8 @@ export default function MemberAcceptInvitePage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-800" />
+        <div className="admin-dashboard-light flex min-h-screen items-center justify-center bg-dash-bg px-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-dash-border border-t-brand" />
         </div>
       }
     >

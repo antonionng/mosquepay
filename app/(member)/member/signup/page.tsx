@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,18 +59,18 @@ export default function MemberSignupPage() {
 
   if (success) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+      <div className="admin-dashboard-light flex min-h-screen items-center justify-center bg-dash-bg px-4">
         <div className="w-full max-w-md text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100">
             <CheckCircle2 className="h-7 w-7 text-emerald-600" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">Check your email</h1>
-          <p className="mt-3 text-sm text-slate-500 leading-relaxed">
-            We&apos;ve sent a verification link to <strong className="text-slate-700">{email}</strong>.
+          <h1 className="text-2xl font-bold text-dash-text">Check your email</h1>
+          <p className="mt-3 text-sm leading-relaxed text-dash-muted">
+            We&apos;ve sent a verification link to <strong className="text-dash-text">{email}</strong>.
             Please click the link to activate your account.
           </p>
           <Link href="/member/login">
-            <Button variant="primary" className="mt-8">
+            <Button variant="brand" className="mt-8">
               Back to sign in
             </Button>
           </Link>
@@ -79,25 +80,30 @@ export default function MemberSignupPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+    <div className="admin-dashboard-light flex min-h-screen items-center justify-center bg-dash-bg px-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-xl font-bold text-white shadow-lg">
-            LP
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900">Create your account</h1>
-          <p className="mt-2 text-sm text-slate-500">
+        <div className="text-center mb-8 flex flex-col items-center">
+          <Image
+            src="/brand/lodgepay-admin-signin.png"
+            alt="LodgePay"
+            width={1024}
+            height={1024}
+            priority
+            className="mb-6 h-36 w-36 object-contain"
+          />
+          <h1 className="text-3xl font-semibold tracking-tight text-dash-text">Create your account</h1>
+          <p className="mt-2 text-sm text-dash-muted">
             Optional access for past summons, RSVPs, dues, and profile details
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        <div className="admin-surface p-8">
+          <div className="mb-6 rounded-xl border border-[hsl(var(--dash-ring)/0.25)] bg-[hsl(var(--dash-ring)/0.06)] px-4 py-3 text-sm text-[hsl(var(--dash-ring-dark))]">
             You can still use secure email links without an account. Sign up if you want a permanent member dashboard.
           </div>
 
           {error && (
-            <div className="mb-6 flex items-center gap-2 rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700">
+            <div className="mb-6 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
               <AlertCircle className="h-4 w-4 shrink-0" />
               {error}
             </div>
@@ -107,9 +113,10 @@ export default function MemberSignupPage() {
             <div className="space-y-2">
               <Label htmlFor="fullName">Full name</Label>
               <div className="relative">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-dash-faint" />
                 <Input
                   id="fullName"
+                  variant="dashboard"
                   type="text"
                   placeholder="John Smith"
                   value={fullName}
@@ -123,9 +130,10 @@ export default function MemberSignupPage() {
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-dash-faint" />
                 <Input
                   id="email"
+                  variant="dashboard"
                   type="email"
                   placeholder="you@example.com"
                   value={email}
@@ -139,9 +147,10 @@ export default function MemberSignupPage() {
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-dash-faint" />
                 <Input
                   id="password"
+                  variant="dashboard"
                   type="password"
                   placeholder="Min. 6 characters"
                   value={password}
@@ -153,10 +162,10 @@ export default function MemberSignupPage() {
               <div className="flex items-center gap-2 text-xs">
                 <span
                   className={`h-1.5 flex-1 rounded-full ${
-                    passwordReady ? "bg-emerald-500" : "bg-slate-200"
+                    passwordReady ? "bg-emerald-500" : "bg-dash-border"
                   }`}
                 />
-                <span className={passwordReady ? "text-emerald-700" : "text-slate-400"}>
+                <span className={passwordReady ? "text-emerald-700" : "text-dash-faint"}>
                   {passwordReady ? "Strong enough" : "At least 6 characters"}
                 </span>
               </div>
@@ -165,9 +174,10 @@ export default function MemberSignupPage() {
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm password</Label>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-dash-faint" />
                 <Input
                   id="confirmPassword"
+                  variant="dashboard"
                   type="password"
                   placeholder="Re-enter password"
                   value={confirmPassword}
@@ -183,7 +193,7 @@ export default function MemberSignupPage() {
 
             <Button
               type="submit"
-              variant="primary"
+              variant="brand"
               className="w-full"
               disabled={loading}
             >
@@ -202,11 +212,11 @@ export default function MemberSignupPage() {
           </form>
         </div>
 
-        <p className="mt-6 text-center text-sm text-slate-500">
+        <p className="mt-6 text-center text-sm text-dash-muted">
           Already have an account?{" "}
           <Link
             href="/member/login"
-            className="font-medium text-blue-600 hover:text-blue-700 transition-colors"
+            className="font-medium text-brand transition-colors hover:text-brand-dark"
           >
             Sign in
           </Link>

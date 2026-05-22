@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,19 +48,24 @@ function MemberLoginContent() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+    <div className="admin-dashboard-light flex min-h-screen items-center justify-center bg-dash-bg px-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-xl font-bold text-white shadow-lg">
-            LP
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900">Welcome back</h1>
-          <p className="mt-2 text-sm text-slate-500">Sign in to your member portal</p>
+        <div className="text-center mb-8 flex flex-col items-center">
+          <Image
+            src="/brand/lodgepay-admin-signin.png"
+            alt="LodgePay"
+            width={1024}
+            height={1024}
+            priority
+            className="mb-6 h-36 w-36 object-contain"
+          />
+          <h1 className="text-3xl font-semibold tracking-tight text-dash-text">Welcome back</h1>
+          <p className="mt-2 text-sm text-dash-muted">Sign in to your member portal</p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+        <div className="admin-surface p-8">
           {error && (
-            <div className="mb-6 flex items-center gap-2 rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700">
+            <div className="mb-6 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
               <AlertCircle className="h-4 w-4 shrink-0" />
               {error}
             </div>
@@ -69,9 +75,10 @@ function MemberLoginContent() {
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-dash-faint" />
                 <Input
                   id="email"
+                  variant="dashboard"
                   type="email"
                   placeholder="you@example.com"
                   value={email}
@@ -86,9 +93,10 @@ function MemberLoginContent() {
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-dash-faint" />
                 <Input
                   id="password"
+                  variant="dashboard"
                   type="password"
                   placeholder="••••••••"
                   value={password}
@@ -101,7 +109,7 @@ function MemberLoginContent() {
 
             <Button
               type="submit"
-              variant="primary"
+              variant="brand"
               className="w-full"
               disabled={loading}
             >
@@ -120,11 +128,11 @@ function MemberLoginContent() {
           </form>
         </div>
 
-        <p className="mt-6 text-center text-sm text-slate-500">
+        <p className="mt-6 text-center text-sm text-dash-muted">
           Don&apos;t have an account?{" "}
           <Link
             href="/member/signup"
-            className="font-medium text-blue-600 hover:text-blue-700 transition-colors"
+            className="font-medium text-brand transition-colors hover:text-brand-dark"
           >
             Create one
           </Link>
@@ -138,8 +146,8 @@ export default function MemberLoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-800" />
+        <div className="admin-dashboard-light flex min-h-screen items-center justify-center bg-dash-bg px-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-dash-border border-t-brand" />
         </div>
       }
     >
