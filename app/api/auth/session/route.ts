@@ -3,6 +3,7 @@ import { hasDummySession } from "@/lib/auth/dummy";
 import {
   getCurrentAdminContextAny,
   getCurrentAdminScope,
+  getEffectivePermissions,
 } from "@/lib/auth/permissions";
 import { getAllFlagsForLodge, FEATURE_FLAGS } from "@/lib/feature-flags";
 
@@ -20,9 +21,20 @@ export async function GET() {
       // fall back to defaults
     }
   }
+  // effectivePermissions = role-derived perms + per-row extras, computed
+  // server-side so the client sidebar can't drift from authorization.
+  const adminResponse = admin
+    ? {
+        ...admin,
+        effectivePermissions: getEffectivePermissions(
+          admin.role,
+          admin.permissions
+        ),
+      }
+    : null;
   return NextResponse.json({
     authenticated: ok || Boolean(admin),
-    admin,
+    admin: adminResponse,
     scope,
     flags,
   });

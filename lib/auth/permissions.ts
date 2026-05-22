@@ -67,12 +67,40 @@ const ROLE_PERMISSIONS: Record<AdminRole, AdminPermission[]> = {
   ],
 };
 
+/**
+ * Returns the canonical permission set for a role. The default fallback
+ * matches what roleHasPermission used to do implicitly -- unknown role
+ * strings get treated as secretary so a misconfigured admin_users row
+ * doesn't accidentally lock a real lodge owner out of their own lodge.
+ */
+export function getRolePermissions(role: string | null | undefined): AdminPermission[] {
+  const normalized = (role ?? "secretary") as AdminRole;
+  return ROLE_PERMISSIONS[normalized] ?? ROLE_PERMISSIONS.secretary;
+}
+
+/**
+ * Combines the role-derived permissions with any per-row overrides stored
+ * on admin_users.permissions. This is the set the client sidebar uses to
+ * decide what to render, and it should always agree with what the server
+ * actually allows (see requireAdminPermission).
+ */
+export function getEffectivePermissions(
+  role: string | null | undefined,
+  extras: readonly string[] | null | undefined
+): AdminPermission[] {
+  const base = getRolePermissions(role);
+  if (!extras || extras.length === 0) return base;
+  return Array.from(new Set<AdminPermission>([
+    ...base,
+    ...(extras as AdminPermission[]),
+  ]));
+}
+
 export function roleHasPermission(
   role: string | null | undefined,
   permission: AdminPermission
 ) {
-  const normalized = (role ?? "secretary") as AdminRole;
-  const permissions = ROLE_PERMISSIONS[normalized] ?? ROLE_PERMISSIONS.secretary;
+  const permissions = getRolePermissions(role);
   return permissions.includes("admin:all") || permissions.includes(permission);
 }
 

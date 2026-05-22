@@ -59,29 +59,12 @@ const nav = [
   { href: "/admin/settings", label: "Settings", icon: Settings, permission: "admin:all" },
 ];
 
-// Mirror of ROLE_PERMISSIONS in lib/auth/permissions.ts -- kept in sync by
-// hand so client-side sidebar filtering matches server-side authorization.
-// If you change a role here, change it in lib/auth/permissions.ts too.
-const rolePermissions: Record<string, string[]> = {
-  super_admin: ["admin:all"],
-  operator: ["admin:all"],
-  secretary: ["admin:all"],
-  treasurer: ["payments:write", "audit:read"],
-  charity_steward: ["charity:write", "audit:read"],
-  membership_officer: ["members:read", "members:write", "audit:read"],
-  almoner: ["members:read", "welfare:read", "welfare:write", "audit:read"],
-  master: [
-    "members:read",
-    "meetings:write",
-    "summons:write",
-    "website:write",
-    "audit:read",
-  ],
-};
-
-function canSee(role: string, permission?: string) {
+// The sidebar derives visibility from the effective permission set the
+// server computes in /api/auth/session (see getEffectivePermissions in
+// lib/auth/permissions.ts). That keeps client filtering and server-side
+// authorization in lockstep -- there is no client-side role map to drift.
+function canSee(permissions: readonly string[], permission?: string) {
   if (!permission) return true;
-  const permissions = rolePermissions[role] ?? rolePermissions.secretary;
   return permissions.includes("admin:all") || permissions.includes(permission);
 }
 
@@ -94,7 +77,13 @@ export function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [role, setRole] = useState("super_admin");
+  // Default to admin:all so we don't briefly hide nav items for a real
+  // admin during the session fetch (visible flicker is worse than briefly
+  // showing an item that turns out to be hidden -- the server still
+  // enforces authorization on the destination route either way).
+  const [permissions, setPermissions] = useState<readonly string[]>([
+    "admin:all",
+  ]);
   const [flags, setFlags] = useState<Record<string, boolean>>({});
   const [scopeKind, setScopeKind] = useState<string>("none");
 
@@ -104,7 +93,9 @@ export function AdminSidebar() {
       .then((res) => res.json())
       .then((data) => {
         if (!active) return;
-        if (data.admin?.role) setRole(data.admin.role);
+        if (Array.isArray(data.admin?.effectivePermissions)) {
+          setPermissions(data.admin.effectivePermissions);
+        }
         if (data.flags && typeof data.flags === "object") setFlags(data.flags);
         if (data.scope?.kind) setScopeKind(data.scope.kind);
       })
@@ -117,7 +108,7 @@ export function AdminSidebar() {
   const canSeePlatformOnly = scopeKind === "platform" || scopeKind === "dummy";
   const visibleNav = nav.filter(
     (item) =>
-      canSee(role, item.permission) &&
+      canSee(permissions, item.permission) &&
       flagAllows(flags, item.flag) &&
       (!item.platformOnly || canSeePlatformOnly)
   );
