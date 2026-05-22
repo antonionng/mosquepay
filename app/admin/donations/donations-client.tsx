@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { formatDate, cn } from "@/lib/utils";
 import { DASH_TABLE } from "@/lib/admin-dash-table";
@@ -33,7 +33,12 @@ import {
   Banknote,
   Filter,
   Plus,
+  Link2,
+  Copy,
+  Check,
+  ExternalLink,
 } from "lucide-react";
+import { DEFAULT_LODGE_SLUG } from "@/lib/tenant";
 
 type Donation = {
   id: string;
@@ -88,13 +93,38 @@ function donationStatusBadge(status: string) {
 export function AdminDonationsClient({
   donations,
   giftAidDeclarations,
+  lodgeSlug,
+  paymentsConnected,
 }: {
   donations: Donation[];
   giftAidDeclarations: GiftAidDeclaration[];
+  lodgeSlug: string;
+  paymentsConnected: boolean;
 }) {
   const [sourceFilter, setSourceFilter] = useState("all");
   const [giftAidFilter, setGiftAidFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [donationUrl, setDonationUrl] = useState("");
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  useEffect(() => {
+    const lodgeQuery =
+      lodgeSlug && lodgeSlug !== DEFAULT_LODGE_SLUG
+        ? `?lodge=${encodeURIComponent(lodgeSlug)}`
+        : "";
+    setDonationUrl(`${window.location.origin}/donate${lodgeQuery}`);
+  }, [lodgeSlug]);
+
+  async function copyDonationLink() {
+    if (!donationUrl) return;
+    try {
+      await navigator.clipboard.writeText(donationUrl);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      // clipboard may be unavailable in unsupported browsers
+    }
+  }
 
   const totalAmount = donations
     .filter((d) => d.status === "completed")
@@ -256,6 +286,77 @@ export function AdminDonationsClient({
           );
         })}
       </div>
+
+      <Card variant="panel" className="overflow-hidden p-0">
+        <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
+          <div className="flex flex-1 items-start gap-3">
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/10">
+              <Link2 className="h-4 w-4 text-blue-600" aria-hidden />
+            </div>
+            <div>
+              <h2 className="dash-panel-header-title">Donation link</h2>
+              <p className="dash-panel-header-description">
+                Share this page with donors. Payments route to your lodge&rsquo;s
+                connected payment account.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="border-t border-dash-border bg-dash-surface p-4 md:p-5">
+          {!paymentsConnected && (
+            <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+              <div className="flex-1">
+                <p className="font-medium">Connect payments to accept donations.</p>
+                <p className="mt-0.5 text-xs text-amber-800">
+                  Donors who follow this link won&rsquo;t be able to complete a
+                  donation until this lodge connects Mooov in Integrations.
+                </p>
+              </div>
+              <Button asChild size="sm" variant="outline" className="shrink-0">
+                <Link href="/admin/integrations">Open integrations</Link>
+              </Button>
+            </div>
+          )}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <code className="flex-1 truncate rounded-xl border border-dash-border bg-dash-surface-subtle px-3 py-2 text-xs text-dash-text">
+              {donationUrl || "Loading…"}
+            </code>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={copyDonationLink}
+                disabled={!donationUrl}
+                className="gap-2"
+              >
+                {linkCopied ? (
+                  <>
+                    <Check className="h-3.5 w-3.5 text-emerald-600" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3.5 w-3.5" />
+                    Copy link
+                  </>
+                )}
+              </Button>
+              <Button asChild variant="dashboard" size="sm" className="gap-2">
+                <a
+                  href={donationUrl || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-disabled={!donationUrl}
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Open
+                </a>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Card>
 
       <div className="dash-filter-bar flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         <div className="relative min-w-[200px] flex-1">
