@@ -62,7 +62,9 @@ export function EventGuestsPanel({
   const [creating, setCreating] = useState(false);
   const [recipientName, setRecipientName] = useState("");
   const [recipientEmail, setRecipientEmail] = useState("");
+  const [sendEmail, setSendEmail] = useState(true);
   const [latestUrl, setLatestUrl] = useState<string | null>(null);
+  const [latestEmailSent, setLatestEmailSent] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function load() {
@@ -96,14 +98,17 @@ export function EventGuestsPanel({
     setError(null);
     setCreating(true);
     setLatestUrl(null);
+    setLatestEmailSent(null);
     try {
+      const trimmedEmail = recipientEmail.trim();
       const res = await fetch(`/api/admin/events/${eventId}/guest-invitations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           recipient_name: recipientName.trim() || null,
-          recipient_email: recipientEmail.trim() || null,
+          recipient_email: trimmedEmail || null,
           payer: "guest",
+          send_email: sendEmail && trimmedEmail.length > 0,
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -111,6 +116,7 @@ export function EventGuestsPanel({
         throw new Error(body?.error ?? "Could not generate link.");
       }
       setLatestUrl(body.url ?? null);
+      setLatestEmailSent(typeof body.email_sent === "boolean" ? body.email_sent : null);
       setRecipientName("");
       setRecipientEmail("");
       await load();
@@ -194,6 +200,18 @@ export function EventGuestsPanel({
                 />
               </div>
             </div>
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                id="send-guest-email"
+                type="checkbox"
+                checked={sendEmail}
+                onChange={(event) => setSendEmail(event.target.checked)}
+                className="h-4 w-4 rounded border-dash-border"
+              />
+              <label htmlFor="send-guest-email" className="text-sm text-dash-muted">
+                Email the invite to the recipient automatically (requires an email above)
+              </label>
+            </div>
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <Button
                 type="button"
@@ -218,7 +236,9 @@ export function EventGuestsPanel({
             {latestUrl ? (
               <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm">
                 <p className="font-medium text-blue-900">
-                  Guest link ready. Share it however you like.
+                  {latestEmailSent
+                    ? "Guest link generated and emailed to the recipient."
+                    : "Guest link ready. Share it however you like."}
                 </p>
                 <div className="mt-2 flex items-center gap-2">
                   <code className="flex-1 truncate rounded bg-white px-2 py-1 text-xs text-blue-900">

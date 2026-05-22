@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { verifyMooovWebhook } from "@/lib/mooov";
 import * as db from "@/lib/db";
+import { sendGuestWelcomeEmail } from "@/lib/email/guest";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -513,6 +514,41 @@ async function projectEventCaptured(
       payment_completed: true,
       status: "confirmed",
     });
+  }
+
+  // Fire the guest welcome email after a successful capture so paid guests
+  // get the same confirmation that free RSVPs receive in /api/g/[token]/checkout.
+  // Best-effort: any Resend failure is logged but does not fail the webhook
+  // (idempotency on payments.mooov_payment_id keeps replays safe).
+  if (donorEmail) {
+    try {
+      const [event, lodge] = await Promise.all([
+        db.getEventById(eventId, lodgeId),
+        db.getLodgeById(lodgeId),
+      ]);
+      if (event) {
+        const totalPaid =
+          diningTotal + meetingFee + charityAmount + guestTotal + raffleAmount;
+        await sendGuestWelcomeEmail({
+          toEmail: donorEmail,
+          toName: donorName ?? donorEmail,
+          lodgeName: lodge?.name ?? "the lodge",
+          eventTitle: event.title,
+          eventDate: event.event_date,
+          eventTime: event.event_time,
+          location: event.location,
+          dressCode: event.dress_code,
+          totalPaid,
+          currency: currencyMajor,
+        });
+      }
+    } catch (welcomeErr) {
+      console.error("mooov webhook: guest welcome email failed", {
+        payment_id: attempt.payment_id,
+        message:
+          welcomeErr instanceof Error ? welcomeErr.message : String(welcomeErr),
+      });
+    }
   }
 
   // If the event RSVP form opted into Gift Aid for the charity portion,

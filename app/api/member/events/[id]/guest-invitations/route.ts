@@ -10,12 +10,12 @@ import {
   hashGuestInvitationToken,
 } from "@/lib/guest-tokens";
 import { buildPublicUrl, lodgeScopedGuestPath } from "@/lib/public-links";
+import { sendGuestInviteEmail } from "@/lib/email/guest";
 
-async function buildGuestUrl(request: NextRequest, lodgeId: string, token: string) {
+async function buildGuestUrl(request: NextRequest, lodge: db.Lodge | null, token: string) {
   const base = (
     process.env.NEXT_PUBLIC_SITE_URL ?? request.nextUrl.origin
   ).replace(/\/$/, "");
-  const lodge = await db.getLodgeById(lodgeId);
   return buildPublicUrl(base, lodgeScopedGuestPath(lodge?.slug ?? "lodge", token));
 }
 
@@ -80,6 +80,7 @@ export async function POST(
     const recipientEmail = String(body.recipient_email ?? "").trim() || null;
     const payer: "guest" | "inviter" =
       body.payer === "inviter" ? "inviter" : "guest";
+    const sendEmail = body.send_email !== false;
 
     const event = await db.getEventById(eventId, member.lodge_id);
     if (!event) {
@@ -107,9 +108,30 @@ export async function POST(
       expires_at: null,
     });
 
+    const lodge = await db.getLodgeById(member.lodge_id);
+    const inviteUrl = await buildGuestUrl(request, lodge, token);
+
+    let emailSent = false;
+    if (sendEmail && recipientEmail) {
+      const result = await sendGuestInviteEmail({
+        toEmail: recipientEmail,
+        toName: recipientName ?? recipientEmail,
+        lodgeName: lodge?.name ?? "the Lodge",
+        eventTitle: event.title,
+        eventDate: event.event_date,
+        eventTime: event.event_time,
+        location: event.location,
+        dressCode: event.dress_code,
+        inviterName: member.full_name,
+        inviteUrl,
+      });
+      emailSent = Boolean(result.sent);
+    }
+
     return NextResponse.json({
       invitation,
-      url: await buildGuestUrl(request, member.lodge_id, token),
+      url: inviteUrl,
+      email_sent: emailSent,
     });
   } catch (error) {
     console.error("Member guest invitation POST error:", error);

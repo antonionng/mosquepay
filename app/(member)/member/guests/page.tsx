@@ -10,6 +10,8 @@ import {
   Ban,
   CheckCircle2,
   ExternalLink,
+  RefreshCcw,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -59,6 +61,16 @@ export default function MemberGuestsPage() {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [events, setEvents] = useState<EventLite[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reissueModal, setReissueModal] = useState<
+    | {
+        inv: Invitation;
+        url: string | null;
+        emailSent: boolean | null;
+        busy: boolean;
+        error: string | null;
+      }
+    | null
+  >(null);
 
   useEffect(() => {
     let active = true;
@@ -97,6 +109,63 @@ export default function MemberGuestsPage() {
       await navigator.clipboard.writeText(text);
     } catch {
       // ignore
+    }
+  }
+
+  // Token URLs are not retrievable after the initial create call (token
+  // hashes are one-way). To let a member share a link they previously
+  // generated, we revoke the old invitation and issue a fresh one with the
+  // same recipient, returning the new URL via this modal.
+  async function reissueLink(inv: Invitation) {
+    setReissueModal({ inv, url: null, emailSent: null, busy: true, error: null });
+    try {
+      const res = await fetch(
+        `/api/member/events/${inv.event_id}/guest-invitations`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipient_name: inv.recipient_name,
+            recipient_email: inv.recipient_email,
+            payer: inv.payer,
+            send_email: false,
+          }),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error ?? "Could not reissue link.");
+      }
+      if (!inv.revoked_at) {
+        await fetch(
+          `/api/member/events/${inv.event_id}/guest-invitations?invitation_id=${inv.id}`,
+          { method: "DELETE" }
+        ).catch(() => {});
+      }
+      setReissueModal({
+        inv,
+        url: data.url ?? null,
+        emailSent: typeof data.email_sent === "boolean" ? data.email_sent : null,
+        busy: false,
+        error: null,
+      });
+      const newInvitation: Invitation = data.invitation;
+      setInvitations((prev) => {
+        const updated = prev.map((p) =>
+          p.id === inv.id
+            ? { ...p, revoked_at: new Date().toISOString() }
+            : p
+        );
+        return newInvitation ? [newInvitation, ...updated] : updated;
+      });
+    } catch (err) {
+      setReissueModal({
+        inv,
+        url: null,
+        emailSent: null,
+        busy: false,
+        error: err instanceof Error ? err.message : "Something went wrong.",
+      });
     }
   }
 
@@ -232,14 +301,11 @@ export default function MemberGuestsPage() {
                                 type="button"
                                 size="sm"
                                 variant="ghost"
-                                onClick={() =>
-                                  copy(
-                                    `${window.location.origin}/g/(see admin)`
-                                  )
-                                }
-                                title="Copy link"
+                                onClick={() => reissueLink(inv)}
+                                title="Reissue link"
                               >
-                                <Copy className="h-3.5 w-3.5" />
+                                <RefreshCcw className="mr-1 h-3.5 w-3.5" />
+                                Reissue link
                               </Button>
                               {event ? (
                                 <Link href={`/member/events`}>
@@ -290,6 +356,64 @@ export default function MemberGuestsPage() {
           </div>
         )}
       </section>
+
+      {reissueModal ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4"
+          onClick={() => setReissueModal(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-base font-semibold text-slate-950">
+                  Reissue guest link
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  We do not store usable copies of previous links. This creates
+                  a new private link with the same recipient details and
+                  revokes the old one.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReissueModal(null)}
+                className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {reissueModal.busy ? (
+              <p className="mt-5 text-sm text-slate-500">Generating new link...</p>
+            ) : reissueModal.error ? (
+              <p className="mt-5 text-sm text-red-700">{reissueModal.error}</p>
+            ) : reissueModal.url ? (
+              <div className="mt-5 space-y-3 rounded-xl border border-blue-200 bg-blue-50 p-4">
+                <p className="text-sm font-medium text-blue-900">
+                  Fresh guest link ready. The old link is now revoked.
+                </p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 truncate rounded bg-white px-2 py-1 text-xs text-blue-900">
+                    {reissueModal.url}
+                  </code>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="primary"
+                    onClick={() => reissueModal.url && copy(reissueModal.url)}
+                  >
+                    <Copy className="mr-1 h-3.5 w-3.5" />
+                    Copy
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -70,6 +70,7 @@ export function PlatformConsoleManager({
     role: "super_admin",
     lodge_id: lodges[0]?.id ?? "",
     province_id: provinces[0]?.id ?? "",
+    send_invite: false,
   });
 
   const lodgeById = useMemo(
@@ -77,7 +78,7 @@ export function PlatformConsoleManager({
     [lodges]
   );
 
-  function setField(key: keyof typeof form, value: string) {
+  function setField<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
@@ -85,6 +86,7 @@ export function PlatformConsoleManager({
     event.preventDefault();
     setBusy(true);
     setMessage(null);
+    const requestedInvite = form.send_invite;
     try {
       const res = await fetch("/api/admin/platform/admins", {
         method: "POST",
@@ -96,18 +98,22 @@ export function PlatformConsoleManager({
           role: form.role,
           lodge_id: form.lodge_id || null,
           province_id: form.province_id || null,
+          send_invite: form.send_invite,
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "Could not send invite.");
-      const inviteText = data.invite?.sent
-        ? "Invite sent."
-        : `Membership saved. ${data.invite?.error ?? "Invite email was not sent."}`;
+      if (!res.ok) throw new Error(data.error ?? "Could not save admin.");
+      let inviteText = "Admin record saved. Use the Invite button to email an access link.";
+      if (requestedInvite) {
+        inviteText = data.invite?.sent
+          ? "Admin saved and invite email sent."
+          : `Admin saved. Invite email was not sent: ${data.invite?.error ?? "unknown error"}`;
+      }
       setMessage(inviteText);
       setForm((prev) => ({ ...prev, full_name: "", email: "" }));
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not send invite.");
+      setMessage(error instanceof Error ? error.message : "Could not save admin.");
     } finally {
       setBusy(false);
     }
@@ -230,6 +236,21 @@ export function PlatformConsoleManager({
             ))}
           </SelectField>
 
+          <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-dash-border bg-dash-surface-subtle px-3 py-3 text-sm text-dash-text">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 rounded border-dash-border text-dash-ring focus:ring-dash-ring"
+              checked={form.send_invite}
+              onChange={(event) => setField("send_invite", event.target.checked)}
+            />
+            <span>
+              Email an invite link now
+              <span className="ml-2 text-dash-muted">
+                (otherwise just save the record. You can email the invite later.)
+              </span>
+            </span>
+          </label>
+
           {message ? (
             <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
               {message}
@@ -242,7 +263,7 @@ export function PlatformConsoleManager({
             ) : (
               <Send className="mr-2 h-4 w-4" />
             )}
-            Save and invite
+            {form.send_invite ? "Save and invite" : "Save"}
           </Button>
         </form>
       </Card>

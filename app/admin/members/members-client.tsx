@@ -107,6 +107,7 @@ export function AdminMembersClient({
     date_of_initiation: "",
     membership_status: "active",
   });
+  const [sendPortalInvite, setSendPortalInvite] = useState(false);
 
   const filtered = members.filter((m) => {
     const matchSearch =
@@ -240,6 +241,38 @@ export function AdminMembersClient({
             `Could not add member (HTTP ${res.status}).`
         );
       }
+      // If the admin opted in to invite the new member to the portal we
+      // chain the create with a Resend-powered invite. The invite endpoint
+      // is idempotent so retrying is safe; we surface a soft error rather
+      // than failing the create.
+      const memberId =
+        data && data.member && typeof data.member.id === "string"
+          ? data.member.id
+          : null;
+      if (sendPortalInvite && memberId) {
+        try {
+          const inviteRes = await fetch(`/api/members/${memberId}/invite`, {
+            method: "POST",
+          });
+          if (!inviteRes.ok) {
+            const inviteData = await inviteRes.json().catch(() => ({}));
+            throw new Error(
+              (inviteData && typeof inviteData.error === "string" && inviteData.error) ||
+                "Member was created but the portal invite could not be sent."
+            );
+          }
+        } catch (inviteError) {
+          setFormError(
+            inviteError instanceof Error
+              ? inviteError.message
+              : "Member was created but the portal invite could not be sent."
+          );
+          // Member exists; refresh the list but keep the panel open so the
+          // admin can retry from the member detail page.
+          router.refresh();
+          return;
+        }
+      }
       setShowForm(false);
       setFormData({
         full_name: "",
@@ -260,6 +293,7 @@ export function AdminMembersClient({
         date_of_initiation: "",
         membership_status: "active",
       });
+      setSendPortalInvite(false);
       router.refresh();
     } catch (submitError) {
       setFormError(
@@ -804,9 +838,28 @@ export function AdminMembersClient({
                   On this date the member will receive an email with a payment link for membership fees.
                 </p>
               </div>
+              <label className="flex items-start gap-2 rounded-xl border border-dash-border bg-dash-surface-subtle p-4 text-sm text-dash-muted">
+                <input
+                  type="checkbox"
+                  checked={sendPortalInvite}
+                  onChange={(e) => setSendPortalInvite(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-dash-border"
+                />
+                <span>
+                  <span className="block font-semibold text-dash-text">
+                    Send member portal invite immediately
+                  </span>
+                  We&apos;ll email them a Resend-powered invite to set their
+                  password and access the member portal.
+                </span>
+              </label>
               <div className="flex gap-3 pt-2">
                 <Button type="submit" variant="primary" className="flex-1" disabled={saving}>
-                  {saving ? "Saving..." : "Add Member"}
+                  {saving
+                    ? "Saving..."
+                    : sendPortalInvite
+                      ? "Add member & send invite"
+                      : "Add Member"}
                 </Button>
                 <Button
                   type="button"

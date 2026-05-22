@@ -47,7 +47,24 @@ export default function MemberEventsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch("/api/events?lodge=covenant-4344");
+        // Resolve the member's home lodge slug from the session so we don't
+        // hardcode covenant-4344 (which would show the wrong events for any
+        // member belonging to a different lodge on the platform).
+        let lodgeQuery = "";
+        try {
+          const sessionRes = await fetch("/api/auth/member/session");
+          if (sessionRes.ok) {
+            const sessionData = await sessionRes.json();
+            const slug =
+              typeof sessionData?.user?.lodge_slug === "string"
+                ? sessionData.user.lodge_slug
+                : null;
+            if (slug) lodgeQuery = `?lodge=${encodeURIComponent(slug)}`;
+          }
+        } catch {
+          // Falls back to host-derived tenant in proxy.ts.
+        }
+        const res = await fetch(`/api/events${lodgeQuery}`);
         if (res.ok) {
           const data = await res.json();
           const list = Array.isArray(data) ? data : data.events ?? [];

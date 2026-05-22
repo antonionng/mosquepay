@@ -1,17 +1,20 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import {
+  STAFF_ADMIN_COOKIE,
+  verifyStaffAdminCookie,
+} from "@/lib/auth/staff-cookie";
 
 const SESSION_COOKIE = "covenant_admin_session";
-const STAFF_ADMIN_COOKIE = "covenant_staff_admin_session";
 const SESSION_SECRET =
   process.env.SESSION_SECRET ?? "covenant-dummy-secret-change-in-production";
 
 const SUPABASE_AUTH_COOKIE_PREFIX = "sb-";
 
-function verifyCookieAuth(token: string, subject = "admin"): boolean {
+function verifyDummyCookie(token: string): boolean {
   const encoder = new TextEncoder();
-  const data = encoder.encode(subject + SESSION_SECRET);
+  const data = encoder.encode("admin" + SESSION_SECRET);
   const expected = Buffer.from(data).toString("base64url");
   return token === expected && token.length > 0;
 }
@@ -40,10 +43,9 @@ export function proxy(request: NextRequest) {
   ) {
     const token = request.cookies.get(SESSION_COOKIE)?.value;
     const staffToken = request.cookies.get(STAFF_ADMIN_COOKIE)?.value;
-    if (
-      (!token || !verifyCookieAuth(token)) &&
-      (!staffToken || !verifyCookieAuth(staffToken, "staff-admin"))
-    ) {
+    const dummyOk = !!token && verifyDummyCookie(token);
+    const staffOk = !!verifyStaffAdminCookie(staffToken);
+    if (!dummyOk && !staffOk) {
       const login = new URL("/admin/login", request.url);
       login.searchParams.set("from", path);
       return NextResponse.redirect(login);
@@ -52,7 +54,7 @@ export function proxy(request: NextRequest) {
 
   if (path.startsWith("/operator") && path !== "/operator/login") {
     const token = request.cookies.get(SESSION_COOKIE)?.value;
-    if (!token || !verifyCookieAuth(token)) {
+    if (!token || !verifyDummyCookie(token)) {
       const login = new URL("/operator/login", request.url);
       login.searchParams.set("from", path);
       return NextResponse.redirect(login);

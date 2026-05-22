@@ -16,6 +16,7 @@ import {
   hashGuestInvitationToken,
 } from "@/lib/guest-tokens";
 import { buildPublicUrl, lodgeScopedGuestPath } from "@/lib/public-links";
+import { sendGuestInviteEmail } from "@/lib/email/guest";
 
 function buildGuestUrl(request: NextRequest, lodgeSlug: string, token: string) {
   const base = (
@@ -82,6 +83,7 @@ export async function POST(
     const expiresAt = body.expires_at
       ? new Date(body.expires_at).toISOString()
       : null;
+    const sendEmail = body.send_email !== false;
 
     const token = generateGuestInvitationToken();
     const tokenHash = hashGuestInvitationToken(token);
@@ -117,17 +119,38 @@ export async function POST(
         expires_at: expiresAt,
       });
 
+      const inviteUrl = buildGuestUrl(request, lodgeSlug, token);
+      let emailSent = false;
+      if (sendEmail && recipientEmail) {
+        const lodge = await db.getLodgeById(lodgeId);
+        const result = await sendGuestInviteEmail({
+          toEmail: recipientEmail,
+          toName: recipientName ?? recipientEmail,
+          lodgeName: lodge?.name ?? lodgeSlug,
+          eventTitle: event.title,
+          eventDate: event.event_date,
+          eventTime: event.event_time,
+          location: event.location,
+          dressCode: event.dress_code,
+          inviterName: null,
+          inviteUrl,
+        });
+        emailSent = Boolean(result.sent);
+      }
+
       await writeAuditLog({
         lodgeId,
         action: "created",
         entityType: "guest_invitation",
         entityId: invitation.id,
         summary: `Generated guest link for ${event.title}`,
+        metadata: { email_sent: emailSent, payer },
       });
 
       return NextResponse.json({
         invitation,
-        url: buildGuestUrl(request, lodgeSlug, token),
+        url: inviteUrl,
+        email_sent: emailSent,
       });
     }
 
@@ -165,6 +188,7 @@ export async function POST(
     return NextResponse.json({
       invitation,
       url: buildGuestUrl(request, lodgeSlug, token),
+      email_sent: false,
     });
   } catch (error) {
     console.error("Guest invitation POST error:", error);

@@ -31,13 +31,16 @@ export function ProvisionLodgeClient({ provinces }: { provinces: Province[] }) {
     secretary_name: "",
     secretary_email: "",
     province_id: "",
+    send_invite: false,
   });
 
-  function update<K extends keyof typeof form>(key: K, value: string) {
+  function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((prev) => ({
       ...prev,
       [key]: value,
-      ...(key === "name" && !prev.slug.trim()
+      ...(key === "name" &&
+      typeof value === "string" &&
+      !prev.slug.trim()
         ? { slug: slugify(value) }
         : {}),
     }));
@@ -50,6 +53,7 @@ export function ProvisionLodgeClient({ provinces }: { provinces: Province[] }) {
     }
     setBusy(true);
     try {
+      const requestedInvite = form.send_invite;
       const res = await fetch("/api/admin/platform/lodges", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -61,15 +65,22 @@ export function ProvisionLodgeClient({ provinces }: { provinces: Province[] }) {
           secretary_name: form.secretary_name.trim() || null,
           secretary_email: form.secretary_email.trim() || null,
           province_id: form.province_id || null,
+          send_invite: form.send_invite,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Could not create lodge.");
-      setFeedback(
-        data.invite?.sent
+      let feedbackMessage = "Lodge created.";
+      if (form.secretary_email && requestedInvite) {
+        feedbackMessage = data.invite?.sent
           ? `Lodge created. Invite sent to ${form.secretary_email}.`
-          : `Lodge created. ${data.invite?.error ? `Invite failed: ${data.invite.error}` : "Add officers from the lodge admin."}`
-      );
+          : `Lodge created. Invite failed: ${data.invite?.error ?? "unknown error"}`;
+      } else if (form.secretary_email) {
+        feedbackMessage = `Lodge created with secretary ${form.secretary_email}. Send the invite from the lodge admin when ready.`;
+      } else {
+        feedbackMessage = "Lodge created. Add officers from the lodge admin.";
+      }
+      setFeedback(feedbackMessage);
       setForm({
         name: "",
         slug: "",
@@ -78,6 +89,7 @@ export function ProvisionLodgeClient({ provinces }: { provinces: Province[] }) {
         secretary_name: "",
         secretary_email: "",
         province_id: "",
+        send_invite: false,
       });
       router.refresh();
     } catch (error) {
@@ -181,6 +193,22 @@ export function ProvisionLodgeClient({ provinces }: { provinces: Province[] }) {
             ))}
           </select>
         </div>
+        {form.secretary_email.trim() ? (
+          <label className="md:col-span-2 flex cursor-pointer items-start gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              checked={form.send_invite}
+              onChange={(e) => update("send_invite", e.target.checked)}
+            />
+            <span>
+              Email the secretary an invite link now
+              <span className="ml-2 text-slate-500">
+                (otherwise the record is created without sending an email)
+              </span>
+            </span>
+          </label>
+        ) : null}
       </div>
 
       {feedback && (

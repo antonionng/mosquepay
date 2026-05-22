@@ -22,14 +22,20 @@ export function MemberGuestInviteButton({
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [payer, setPayer] = useState<"guest" | "inviter">("guest");
+  const [sendEmail, setSendEmail] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [generated, setGenerated] = useState<string | null>(null);
+  const [emailSent, setEmailSent] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   function reset() {
     setName("");
     setEmail("");
+    setPayer("guest");
+    setSendEmail(true);
     setGenerated(null);
+    setEmailSent(null);
     setError(null);
   }
 
@@ -42,7 +48,9 @@ export function MemberGuestInviteButton({
     setError(null);
     setSubmitting(true);
     setGenerated(null);
+    setEmailSent(null);
     try {
+      const trimmedEmail = email.trim();
       const res = await fetch(
         `/api/member/events/${eventId}/guest-invitations`,
         {
@@ -50,8 +58,9 @@ export function MemberGuestInviteButton({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             recipient_name: name.trim() || null,
-            recipient_email: email.trim() || null,
-            payer: "guest",
+            recipient_email: trimmedEmail || null,
+            payer,
+            send_email: sendEmail && trimmedEmail.length > 0,
           }),
         }
       );
@@ -60,6 +69,7 @@ export function MemberGuestInviteButton({
         throw new Error(data?.error ?? "Could not generate guest link.");
       }
       setGenerated(data.url ?? null);
+      setEmailSent(typeof data.email_sent === "boolean" ? data.email_sent : null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -106,7 +116,6 @@ export function MemberGuestInviteButton({
                   Generate a private link to invite a brother or visitor to
                   {" "}
                   <span className="font-medium text-slate-700">{eventTitle}</span>.
-                  They will pay their own dining and meeting fees.
                 </p>
               </div>
               <button
@@ -121,7 +130,9 @@ export function MemberGuestInviteButton({
             {generated ? (
               <div className="mt-5 space-y-3 rounded-xl border border-blue-200 bg-blue-50 p-4">
                 <p className="text-sm font-medium text-blue-900">
-                  Your guest link is ready. Share it however you like.
+                  {emailSent
+                    ? "Your guest link has been emailed to the recipient."
+                    : "Your guest link is ready. Share it however you like."}
                 </p>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 truncate rounded bg-white px-2 py-1 text-xs text-blue-900">
@@ -162,6 +173,57 @@ export function MemberGuestInviteButton({
                     placeholder="brother@example.com"
                   />
                 </div>
+                <fieldset className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <legend className="px-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    Who pays?
+                  </legend>
+                  <label className="flex items-start gap-2 text-sm text-slate-700">
+                    <input
+                      type="radio"
+                      name="payer"
+                      value="guest"
+                      checked={payer === "guest"}
+                      onChange={() => setPayer("guest")}
+                      className="mt-1 h-3.5 w-3.5"
+                    />
+                    <span>
+                      <span className="font-medium">Guest pays</span>
+                      <span className="block text-xs text-slate-500">
+                        Your guest will be charged for their dining and meeting fees.
+                      </span>
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-2 text-sm text-slate-700">
+                    <input
+                      type="radio"
+                      name="payer"
+                      value="inviter"
+                      checked={payer === "inviter"}
+                      onChange={() => setPayer("inviter")}
+                      className="mt-1 h-3.5 w-3.5"
+                    />
+                    <span>
+                      <span className="font-medium">I&apos;ll cover them</span>
+                      <span className="block text-xs text-slate-500">
+                        Add their name + dining choice to your own RSVP party
+                        when you book; they only pay any optional charity at
+                        their link.
+                      </span>
+                    </span>
+                  </label>
+                </fieldset>
+                <label className="flex items-start gap-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={sendEmail}
+                    onChange={(event) => setSendEmail(event.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-300"
+                  />
+                  <span>
+                    Email the invite to the guest automatically (requires the
+                    email above).
+                  </span>
+                </label>
                 {error ? (
                   <p className="text-sm text-destructive">{error}</p>
                 ) : null}

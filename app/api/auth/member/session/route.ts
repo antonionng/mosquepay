@@ -21,6 +21,19 @@ export async function GET() {
       (await db.getMemberByAuthUserId(user.id)) ??
       (user.email ? await db.getMemberByEmailAcrossLodges(user.email) : null);
 
+    // Resolve the lodge slug for the member's home lodge so the member
+    // portal can scope tenant-aware fetches without falling back to the
+    // hardcoded covenant-4344 default.
+    let lodgeSlug: string | null = null;
+    if (member?.lodge_id) {
+      try {
+        const lodge = await db.getLodgeById(member.lodge_id);
+        lodgeSlug = lodge?.slug ?? null;
+      } catch (lodgeErr) {
+        console.error("member session: lodge slug lookup failed", lodgeErr);
+      }
+    }
+
     return NextResponse.json({
       user: {
         id: user.id,
@@ -29,6 +42,7 @@ export async function GET() {
         phone: member?.phone ?? null,
         dietary_requirements: member?.dietary_requirements ?? null,
         lodge_id: member?.lodge_id ?? null,
+        lodge_slug: lodgeSlug,
         rank: member?.rank ?? null,
         membership_status: member?.membership_status ?? null,
       },
