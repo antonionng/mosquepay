@@ -383,7 +383,10 @@ export async function POST(request: NextRequest) {
       if (!hostedUrl) {
         console.error("checkout-session: Mooov returned no hosted_url", {
           payment_id: paymentId,
+          merchant_id: merchantId,
           state: result.state,
+          provider: result.provider ?? null,
+          full_response: result,
         });
         return NextResponse.json(
           { error: "Payment processor did not return a checkout URL." },
