@@ -92,11 +92,8 @@ function LoginForm() {
           </Button>
         </form>
       </div>
-      
-      <p className="mt-6 text-center text-xs text-slate-500">
-        Default: admin@covenantlodge.org.uk / admin
-      </p>
-      <p className="mt-4 text-center">
+
+      <p className="mt-6 text-center">
         <Link href="/" className="text-sm text-dash-muted transition-colors hover:text-brand">
           ← Back to site
         </Link>
