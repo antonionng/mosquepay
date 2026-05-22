@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
       : "";
   const secretaryName =
     typeof body.secretary_name === "string" ? body.secretary_name.trim() : "Secretary";
+  const sendInvite = body.send_invite === true;
 
   if (secretaryEmail) {
     try {
@@ -83,12 +84,16 @@ export async function POST(request: NextRequest) {
           active: true,
           lodge_id: lodge.id,
         }));
-      const result = await sendStaffInvite({
-        request,
-        staff,
-        lodgeName: lodge.name,
-      });
-      invite = { ...result, staff_id: staff.id };
+      if (sendInvite) {
+        const result = await sendStaffInvite({
+          request,
+          staff,
+          lodgeName: lodge.name,
+        });
+        invite = { ...result, staff_id: staff.id };
+      } else {
+        invite = { sent: false, error: null, staff_id: staff.id };
+      }
     } catch (err) {
       invite = {
         sent: false,

@@ -80,6 +80,7 @@ export async function POST(request: NextRequest) {
   const fullName = cleanName(body.full_name);
   const role = cleanRole(body.role);
   const active = body.active !== false;
+  const sendInvite = body.send_invite === true;
 
   if (!email || !fullName) {
     return NextResponse.json(
@@ -106,16 +107,22 @@ export async function POST(request: NextRequest) {
     metadata: { role: staff.role, scoped_lodge_id: staff.lodge_id },
   });
 
-  const invite = await sendStaffInvite({ request, staff, lodgeSlug });
-  if (invite.sent) {
-    await writeAuditLog({
-      lodgeId,
-      action: "invited",
-      entityType: "admin_user",
-      entityId: staff.id,
-      summary: `Sent staff invite to ${staff.email}`,
-      metadata: { via: "resend" },
-    });
+  let invite: { sent: boolean; error: string | null } = {
+    sent: false,
+    error: null,
+  };
+  if (sendInvite) {
+    invite = await sendStaffInvite({ request, staff, lodgeSlug });
+    if (invite.sent) {
+      await writeAuditLog({
+        lodgeId,
+        action: "invited",
+        entityType: "admin_user",
+        entityId: staff.id,
+        summary: `Sent staff invite to ${staff.email}`,
+        metadata: { via: "resend" },
+      });
+    }
   }
 
   return NextResponse.json({ staff, invite }, { status: 201 });

@@ -1,9 +1,24 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { hasDummySession } from "@/lib/auth/dummy";
 import { isPlatformOwnerEmail } from "@/lib/auth/platform-owner";
+import {
+  STAFF_ADMIN_COOKIE,
+  verifyStaffAdminCookie,
+} from "@/lib/auth/staff-cookie";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
+
+async function getStaffAdminCookieEmail(): Promise<string | null> {
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get(STAFF_ADMIN_COOKIE)?.value;
+    return verifyStaffAdminCookie(token)?.email ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export type AdminPermission =
   | "admin:all"
@@ -81,6 +96,51 @@ export async function getCurrentAdminContext(lodgeId?: string | null) {
 }
 
 export async function getCurrentStaffAdminContext(lodgeId?: string | null) {
+  // Prefer the signed staff session cookie as the authoritative identity:
+  // it is issued by /api/auth/login only after a successful Supabase auth
+  // and matched admin_users row, so its email is trustworthy. Using it as
+  // the source of truth means an expired/missing Supabase access token does
+  // not break admin API access -- which previously caused 401s on /api/*
+  // even though the proxy still allowed the page to render.
+  const cookieEmail = await getStaffAdminCookieEmail();
+
+  // Platform owner short-circuit. Platform-owner status is determined purely
+  // from env config (PLATFORM_OWNER_EMAILS), not the database, so we can
+  // grant god mode without touching admin_users. This makes the env-listed
+  // platform owner immune to transient admin_users lookup failures (RLS
+  // misconfig, network blips, malformed `.or()` filter, etc) which used to
+  // silently strip super_admin and surface as a generic 401 on every admin
+  // write endpoint.
+  if (cookieEmail && isPlatformOwnerEmail(cookieEmail)) {
+    return {
+      email: cookieEmail,
+      role: "super_admin" as AdminRole,
+      permissions: [] as AdminPermission[],
+    };
+  }
+
+  if (cookieEmail && isSupabaseConfigured()) {
+    try {
+      const admin = await db.getAdminUserByEmail(cookieEmail, lodgeId);
+      if (admin) {
+        return {
+          email: admin.email,
+          role: admin.role as AdminRole,
+          permissions: (admin.permissions ?? []) as AdminPermission[],
+        };
+      }
+    } catch (error) {
+      // Log so this stops manifesting as a silent 401 in production. We
+      // intentionally fall through to the Supabase-session path below so a
+      // non-platform admin with a still-valid Supabase access token isn't
+      // locked out by a transient cookie-path failure.
+      console.error(
+        "[permissions] getAdminUserByEmail failed for staff cookie",
+        { email: cookieEmail, lodgeId, error }
+      );
+    }
+  }
+
   if (!isSupabaseConfigured()) return null;
 
   try {
@@ -91,22 +151,27 @@ export async function getCurrentStaffAdminContext(lodgeId?: string | null) {
     } = await supabase.auth.getUser();
     if (error || !user?.email) return null;
 
-    const admin = await db.getAdminUserByEmail(user.email, lodgeId);
-    if (!admin && isPlatformOwnerEmail(user.email)) {
+    if (isPlatformOwnerEmail(user.email)) {
       return {
         email: user.email,
-        role: "super_admin",
-        permissions: [],
+        role: "super_admin" as AdminRole,
+        permissions: [] as AdminPermission[],
       };
     }
+
+    const admin = await db.getAdminUserByEmail(user.email, lodgeId);
     if (!admin) return null;
 
     return {
       email: admin.email,
-      role: admin.role,
-      permissions: admin.permissions ?? [],
+      role: admin.role as AdminRole,
+      permissions: (admin.permissions ?? []) as AdminPermission[],
     };
-  } catch {
+  } catch (error) {
+    console.error(
+      "[permissions] supabase-session admin lookup failed",
+      { lodgeId, error }
+    );
     return null;
   }
 }
@@ -163,22 +228,46 @@ export async function getCurrentAdminScope(): Promise<AdminScope> {
 
   if (!isSupabaseConfigured()) return { kind: "none" };
 
-  try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
-    if (error || !user?.email) return { kind: "none" };
+  // Resolve the actor email from the signed staff cookie when present.
+  // This decouples admin scope resolution from the Supabase access token
+  // lifetime; a lapsed token no longer flips the scope to "none" while a
+  // valid staff session cookie is still in effect.
+  const cookieEmail = await getStaffAdminCookieEmail();
 
-    const memberships = await db.listAdminUsersByEmail(user.email);
-    if (memberships.length === 0 && isPlatformOwnerEmail(user.email)) {
-      return {
-        kind: "platform",
-        email: user.email,
-        role: "super_admin",
-      };
+  let actorEmail: string | null = cookieEmail;
+  if (!actorEmail) {
+    try {
+      const supabase = await createClient();
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser();
+      if (error || !user?.email) return { kind: "none" };
+      actorEmail = user.email;
+    } catch (error) {
+      console.error(
+        "[permissions] supabase getUser failed while resolving admin scope",
+        { error }
+      );
+      return { kind: "none" };
     }
+  }
+
+  // Platform owner short-circuit: matches the same env-config check used in
+  // getCurrentStaffAdminContext. Doing this before the admin_users lookup
+  // means a thrown listAdminUsersByEmail (RLS, network, etc) can no longer
+  // silently downgrade the env-listed platform owner to `kind: "none"`,
+  // which previously cascaded into 401s across every admin write endpoint.
+  if (isPlatformOwnerEmail(actorEmail)) {
+    return {
+      kind: "platform",
+      email: actorEmail,
+      role: "super_admin",
+    };
+  }
+
+  try {
+    const memberships = await db.listAdminUsersByEmail(actorEmail);
     if (memberships.length === 0) return { kind: "none" };
 
     const platformAdmin = memberships.find(
@@ -208,7 +297,11 @@ export async function getCurrentAdminScope(): Promise<AdminScope> {
     }
 
     return { kind: "none" };
-  } catch {
+  } catch (error) {
+    console.error(
+      "[permissions] listAdminUsersByEmail failed while resolving admin scope",
+      { email: actorEmail, error }
+    );
     return { kind: "none" };
   }
 }

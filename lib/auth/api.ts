@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { hasDummySession } from "@/lib/auth/dummy";
 import {
+  getCurrentAdminScope,
   getCurrentStaffAdminContext,
   requireAdminPermission,
   type AdminPermission,
@@ -19,7 +20,22 @@ export async function requireAdminApiAuth() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
-export const requireOperatorApiAuth = requireAdminApiAuth;
+export async function requireOperatorApiAuth() {
+  const scope = await getCurrentAdminScope();
+  if (scope.kind === "none") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (
+    (scope.kind === "dummy" || scope.kind === "platform") &&
+    (scope.role === "super_admin" || scope.role === "operator")
+  ) {
+    return null;
+  }
+  return NextResponse.json(
+    { error: "Platform-level access required." },
+    { status: 403 }
+  );
+}
 
 export async function requireAdminApiPermission(
   permission: AdminPermission,

@@ -113,6 +113,7 @@ export async function POST(request: NextRequest) {
 
   const email = cleanEmail(body.email);
   const fullName = cleanName(body.full_name);
+  const sendInvite = body.send_invite === true;
   if (!email || !fullName) {
     return NextResponse.json(
       { error: "Name and email are required." },
@@ -134,17 +135,21 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
-    const invite = await sendStaffInvite({
-      request,
-      staff,
-      lodgeName: "LodgePay platform",
-    });
+    const invite = sendInvite
+      ? await sendStaffInvite({
+          request,
+          staff,
+          lodgeName: "LodgePay platform",
+        })
+      : { sent: false, error: null as string | null };
     await writeAuditLog({
       lodgeId: null,
-      action: "platform_admin_invited",
+      action: sendInvite ? "platform_admin_invited" : "platform_admin_created",
       entityType: "admin_user",
       entityId: staff.id,
-      summary: `${scopeEmail(guard.scope)} invited ${email} to the platform team`,
+      summary: sendInvite
+        ? `${scopeEmail(guard.scope)} invited ${email} to the platform team`
+        : `${scopeEmail(guard.scope)} added ${email} to the platform team (no invite email)`,
       metadata: { role, invite_sent: invite.sent, invite_error: invite.error },
     });
     return NextResponse.json({ staff: [staff], invite }, { status: 201 });
@@ -191,21 +196,25 @@ export async function POST(request: NextRequest) {
     )
   ).filter(Boolean) as db.AdminUser[];
 
-  const invite = await sendStaffInvite({
-    request,
-    staff: staff[0],
-    lodgeName:
-      scopeType === "province"
-        ? `${lodges.length} lodges on LodgePay`
-        : lodges[0].name,
-  });
+  const invite = sendInvite
+    ? await sendStaffInvite({
+        request,
+        staff: staff[0],
+        lodgeName:
+          scopeType === "province"
+            ? `${lodges.length} lodges on LodgePay`
+            : lodges[0].name,
+      })
+    : { sent: false, error: null as string | null };
 
   await writeAuditLog({
     lodgeId: scopeType === "lodge" ? lodges[0].id : null,
-    action: "tenant_admin_invited",
+    action: sendInvite ? "tenant_admin_invited" : "tenant_admin_created",
     entityType: "admin_user",
     entityId: staff[0]?.id ?? null,
-    summary: `${scopeEmail(guard.scope)} assigned ${email} to ${lodges.length} tenant(s)`,
+    summary: sendInvite
+      ? `${scopeEmail(guard.scope)} invited ${email} to ${lodges.length} tenant(s)`
+      : `${scopeEmail(guard.scope)} assigned ${email} to ${lodges.length} tenant(s) (no invite email)`,
     metadata: {
       role,
       scope_type: scopeType,

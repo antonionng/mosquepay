@@ -1,4 +1,5 @@
 import type { Event } from "@/lib/db/types";
+import { lodgeScopedEventPath } from "@/lib/public-links";
 
 const CRLF = "\r\n";
 
@@ -45,10 +46,12 @@ export function eventsToIcs({
   calendarName,
   events,
   origin,
+  lodgeSlug,
 }: {
   calendarName: string;
   events: Event[];
   origin: string;
+  lodgeSlug?: string | null;
 }): string {
   const now = toIcsDateTime(new Date().toISOString());
   const lines: string[] = [];
@@ -70,10 +73,13 @@ export function eventsToIcs({
     }
     const dtend = toIcsDateTime(endDate.toISOString());
 
+    const eventUrl = lodgeSlug
+      ? `${origin}${lodgeScopedEventPath(lodgeSlug, event.slug)}`
+      : `${origin}/events/${event.slug}`;
     const description = [
       event.description,
       event.dress_code ? `Dress: ${event.dress_code}` : null,
-      `RSVP: ${origin}/events/${event.slug}`,
+      `RSVP: ${eventUrl}`,
     ]
       .filter(Boolean)
       .join("\\n\\n");
@@ -91,7 +97,7 @@ export function eventsToIcs({
       lines.push(fold(`LOCATION:${escape(fullLocation)}`));
     }
     lines.push(fold(`DESCRIPTION:${escape(description)}`));
-    lines.push(fold(`URL:${origin}/events/${event.slug}`));
+    lines.push(fold(`URL:${eventUrl}`));
     lines.push("END:VEVENT");
   }
 

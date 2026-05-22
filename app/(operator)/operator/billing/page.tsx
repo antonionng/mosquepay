@@ -12,6 +12,7 @@ import { listLodges, getLodgeSubscription } from "@/lib/db";
 import type { Lodge, LodgeSubscription } from "@/lib/db/types";
 import { formatDate } from "@/lib/utils";
 import { getPlanDefinition } from "@/lib/billing/plans";
+import { requireOperatorPageAccess } from "@/lib/auth/operator-page";
 
 type LodgeWithSub = {
   lodge: Lodge;
@@ -69,6 +70,8 @@ function statusBadge(status: string) {
 }
 
 export default async function BillingPage() {
+  await requireOperatorPageAccess();
+
   const data = await getBillingData();
 
   const withSub = data.filter((d) => d.subscription);

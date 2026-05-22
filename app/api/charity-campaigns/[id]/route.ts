@@ -76,3 +76,51 @@ export async function PATCH(
     );
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const unauthorized = await requireAdminApiAuth();
+  if (unauthorized) return unauthorized;
+
+  const { id } = await params;
+  try {
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json(
+        { error: "Database not configured." },
+        { status: 503 }
+      );
+    }
+
+    const lodgeSlug = getLodgeSlugFromRequest(request);
+    const lodgeId = await db.resolveLodgeId(lodgeSlug);
+    if (!lodgeId) {
+      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    }
+    const forbidden = await requireAdminApiPermission("charity:write", lodgeId);
+    if (forbidden) return forbidden;
+
+    const campaign = await db.updateCharityCampaign(id, lodgeId, {
+      status: "paused",
+      end_date: new Date().toISOString(),
+    });
+    if (!campaign) {
+      return NextResponse.json({ error: "Campaign not found." }, { status: 404 });
+    }
+    await writeAuditLog({
+      lodgeId,
+      action: "archived",
+      entityType: "charity_campaign",
+      entityId: campaign.id,
+      summary: `Archived charity campaign ${campaign.name}`,
+    });
+    return NextResponse.json({ campaign });
+  } catch (error) {
+    console.error("Charity campaign DELETE error:", error);
+    return NextResponse.json(
+      { error: "Failed to archive campaign." },
+      { status: 500 }
+    );
+  }
+}

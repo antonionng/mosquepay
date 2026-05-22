@@ -1,3 +1,6 @@
+// crud-audit:ignore
+// Member-side RSVP submission. Lives as a single POST against the parent
+// event; admin RSVP management uses /api/rsvps and /api/admin endpoints.
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";

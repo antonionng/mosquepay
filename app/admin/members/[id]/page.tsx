@@ -36,10 +36,11 @@ export default async function AdminMemberDetailPage({
   const member = await db.getMemberById(id, lodgeId);
   if (!member) notFound();
 
-  const [dietaryHistory, paymentHistory, duesRecords] = await Promise.all([
+  const [dietaryHistory, paymentHistory, duesRecords, offices] = await Promise.all([
     db.getRsvpDietaryByEmail(member.email, lodgeId),
     db.getPaymentsByEmail(member.email, lodgeId),
     db.getMemberDues(lodgeId, { memberEmail: member.email }),
+    db.listOfficerLadder(lodgeId),
   ]);
 
   return (
@@ -48,6 +49,7 @@ export default async function AdminMemberDetailPage({
       dietaryHistory={JSON.parse(JSON.stringify(dietaryHistory))}
       paymentHistory={JSON.parse(JSON.stringify(paymentHistory))}
       duesRecords={JSON.parse(JSON.stringify(duesRecords))}
+      offices={JSON.parse(JSON.stringify(offices))}
     />
   );
 }

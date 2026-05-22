@@ -10,6 +10,7 @@ import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { listLodges } from "@/lib/db";
 import type { Lodge } from "@/lib/db/types";
+import { requireOperatorPageAccess } from "@/lib/auth/operator-page";
 
 async function getOperatorStats() {
   let lodges: Lodge[] = [];
@@ -30,6 +31,8 @@ async function getOperatorStats() {
 }
 
 export default async function OperatorDashboard() {
+  await requireOperatorPageAccess();
+
   const stats = await getOperatorStats();
 
   const kpis = [

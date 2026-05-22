@@ -3,6 +3,8 @@ import * as mockDb from "@/lib/mock-db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
 import { AdminPaymentsClient } from "./payments-client";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminPaymentsPage() {
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";

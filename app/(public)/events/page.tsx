@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { formatDate } from "@/lib/utils";
+import { notFound } from "next/navigation";
 import { isSupabaseConfigured, shouldUseInMemoryMock } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { Calendar, MapPin, ArrowRight } from "lucide-react";
 import { getDefaultLodgeSlug, resolveLodgeSlug } from "@/lib/tenant";
 import { marketingMetadata } from "@/lib/seo";
+import { lodgeScopedEventPath } from "@/lib/public-links";
+import { formatDate } from "@/lib/utils";
 
 export const metadata = marketingMetadata({
   title: "Masonic Event RSVP and Payment Software | LodgePay Events",
@@ -20,66 +22,27 @@ export const metadata = marketingMetadata({
   ],
 });
 
-export default async function EventsPage({
-  searchParams,
+type LinkMode = "query" | "scoped";
+
+export async function EventsPageContent({
+  lodge,
+  linkMode = "query",
 }: {
-  searchParams: Promise<{ lodge?: string }>;
+  lodge?: string;
+  linkMode?: LinkMode;
 }) {
-  const { lodge } = await searchParams;
   const isTenantMode = Boolean(lodge);
   const lodgeSlug = resolveLodgeSlug(lodge);
   const defaultSlug = getDefaultLodgeSlug();
-  const withLodgeQuery = (href: string) =>
-    lodgeSlug === defaultSlug ? href : `${href}?lodge=${encodeURIComponent(lodgeSlug)}`;
+  const withLodgeLink = (href: string) => {
+    if (linkMode === "scoped" && href.startsWith("/events/")) {
+      return lodgeScopedEventPath(lodgeSlug, href.replace("/events/", ""));
+    }
+    return lodgeSlug === defaultSlug ? href : `${href}?lodge=${encodeURIComponent(lodgeSlug)}`;
+  };
 
   if (!isTenantMode) {
-    const productEvents = [
-      {
-        id: "webinar-ops",
-        title: "LodgePay Operations Webinar",
-        event_date: "2026-05-12T18:00:00.000Z",
-        event_type: "webinar",
-        location: "Online",
-      },
-      {
-        id: "demo-clinic",
-        title: "Live Demo Clinic: Payments + Candidate CRM",
-        event_date: "2026-05-20T12:00:00.000Z",
-        event_type: "product_demo",
-        location: "Online",
-      },
-    ];
-
-    return (
-      <div className="public-page">
-        <section className="public-hero">
-          <div className="public-hero-shell">
-            <div className="public-hero-copy">
-              <p className="public-kicker">LodgePay Events</p>
-              <h1 className="public-hero-title">Webinars and product walkthroughs.</h1>
-            </div>
-          </div>
-        </section>
-        <section className="public-section">
-          <div className="container-full">
-            <div className="grid gap-6 md:grid-cols-2">
-              {productEvents.map((event) => (
-                <div key={event.id} className="public-grid-card">
-                  <p className="text-sm font-medium text-blue-600">{formatDate(event.event_date)}</p>
-                  <h2 className="mt-3 text-xl font-semibold text-slate-950">{event.title}</h2>
-                  <p className="mt-2 text-sm text-slate-600">{event.location}</p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-10">
-              <Link href="/book-demo" className="text-sm font-medium text-blue-600 hover:underline">
-                Prefer a dedicated session? Book demo.
-              </Link>
-            </div>
-          </div>
-        </section>
-      </div>
-    );
+    notFound();
   }
 
   const useDb = isSupabaseConfigured();
@@ -148,7 +111,7 @@ export default async function EventsPage({
               {events.map((e) => (
                 <Link
                   key={e.id}
-                  href={withLodgeQuery(`/events/${e.slug}`)}
+                  href={withLodgeLink(`/events/${e.slug}`)}
                   className="group public-grid-card block h-full"
                 >
                   <div className="mb-5 flex items-center justify-between gap-3">
@@ -189,7 +152,7 @@ export default async function EventsPage({
               <h3 className="mb-2 text-xl font-semibold text-slate-900">No upcoming events</h3>
               <p className="text-slate-600 max-w-md mx-auto">
                 Check back soon for upcoming lodge meetings and social events, or{" "}
-                <Link href={withLodgeQuery("/contact")} className="text-blue-600 hover:underline">
+                <Link href={withLodgeLink("/contact")} className="text-blue-600 hover:underline">
                   get in touch
                 </Link>{" "}
                 to learn more.
@@ -200,4 +163,13 @@ export default async function EventsPage({
       </section>
     </div>
   );
+}
+
+export default async function EventsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ lodge?: string }>;
+}) {
+  const { lodge } = await searchParams;
+  return <EventsPageContent lodge={lodge} />;
 }

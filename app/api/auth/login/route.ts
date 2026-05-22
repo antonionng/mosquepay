@@ -3,16 +3,11 @@ import { setDummySession, validateDummyCredentials } from "@/lib/auth/dummy";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-
-const STAFF_ADMIN_COOKIE = "covenant_staff_admin_session";
-const SESSION_SECRET =
-  process.env.SESSION_SECRET ?? "covenant-dummy-secret-change-in-production";
-
-function signStaffAdminSession() {
-  const encoder = new TextEncoder();
-  const data = encoder.encode("staff-admin" + SESSION_SECRET);
-  return Buffer.from(data).toString("base64url");
-}
+import {
+  STAFF_ADMIN_COOKIE,
+  signStaffAdminCookie,
+} from "@/lib/auth/staff-cookie";
+import { isPlatformOwnerEmail } from "@/lib/auth/platform-owner";
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,8 +46,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Platform owners (configured via PLATFORM_OWNER_EMAILS) are allowed to
+    // sign in even without a corresponding admin_users row. The rest of the
+    // permissions stack already treats them as super_admin via the staff
+    // cookie, so issuing the cookie here is sufficient. This unblocks any
+    // additional platform owner you add through env without having to seed
+    // admin_users by hand or run the bootstrap script.
     const admin = await db.getAdminUserByEmail(data.user.email);
-    if (!admin) {
+    const isPlatformOwner = isPlatformOwnerEmail(data.user.email);
+    if (!admin && !isPlatformOwner) {
       await supabase.auth.signOut();
       return NextResponse.json(
         { error: "This account is not an active admin user." },
@@ -60,15 +62,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!admin.auth_user_id) {
+    if (admin && !admin.auth_user_id) {
       await db.updateAdminUser(admin.id, { auth_user_id: data.user.id });
     }
 
+    const cookieEmail = admin?.email ?? data.user.email;
+    const responseRole = admin?.role ?? "super_admin";
     const response = NextResponse.json({
       success: true,
-      admin: { email: admin.email, role: admin.role },
+      admin: { email: cookieEmail, role: responseRole },
     });
-    response.cookies.set(STAFF_ADMIN_COOKIE, signStaffAdminSession(), {
+    response.cookies.set(STAFF_ADMIN_COOKIE, signStaffAdminCookie(cookieEmail), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",

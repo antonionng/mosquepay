@@ -118,6 +118,17 @@ export default async function MeetingSummonsPage({
   const issueDate = summons?.issue_date ?? new Date().toISOString();
   const secretaryName = lodge?.secretary_name ?? "Secretary";
   const openingText = summons?.opening_text ?? renderDefaultSummonsOpening(event, lodge);
+  const visitingOfficers = summons?.visiting_officers?.length
+    ? summons.visiting_officers
+    : summons?.visiting_officer_name
+      ? [
+          {
+            name: summons.visiting_officer_name,
+            email: summons.visiting_officer_email,
+            phone: summons.visiting_officer_phone,
+          },
+        ]
+      : [];
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 print:max-w-none print:space-y-4">
@@ -226,6 +237,21 @@ export default async function MeetingSummonsPage({
               <li key={item}>{item}</li>
             ))}
           </ol>
+          {(summons?.master_elect_name || summons?.master_elect_qualification) && (
+            <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
+              {summons?.master_elect_name && (
+                <p>
+                  <span className="font-semibold">Master Elect:</span>{" "}
+                  {summons.master_elect_name}
+                </p>
+              )}
+              {summons?.master_elect_qualification && (
+                <p className="mt-1 text-slate-600">
+                  {summons.master_elect_qualification}
+                </p>
+              )}
+            </div>
+          )}
         </section>
 
         <section className="grid break-inside-avoid gap-6 border-b border-slate-300 py-6 sm:grid-cols-2">
@@ -287,6 +313,33 @@ export default async function MeetingSummonsPage({
             {lodge?.charity_donation_url && (
               <p className="mt-4 text-sm text-slate-700">
                 Charity donations: {lodge.charity_donation_url}
+              </p>
+            )}
+            {visitingOfficers.length > 0 && (
+              <div className="mt-4 text-sm text-slate-700">
+                <p className="font-semibold uppercase tracking-wide text-slate-500">
+                  Visiting Officer{visitingOfficers.length === 1 ? "" : "s"}
+                </p>
+                <div className="mt-2 space-y-3">
+                  {visitingOfficers.map((officer, index) => (
+                    <div key={`${officer.name}-${index}`}>
+                      {officer.name && <p>{officer.name}</p>}
+                      {officer.email && (
+                        <p className="text-slate-600">Email: {officer.email}</p>
+                      )}
+                      {officer.phone && (
+                        <p className="text-slate-600">Tel: {officer.phone}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {summons?.next_meeting_date && (
+              <p className="mt-4 text-sm text-slate-700">
+                <span className="font-semibold">Next regular meeting:</span>{" "}
+                {formatDate(summons.next_meeting_date)}
+                {summons.next_meeting_note ? ` — ${summons.next_meeting_note}` : ""}
               </p>
             )}
           </div>

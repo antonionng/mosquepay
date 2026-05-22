@@ -34,11 +34,50 @@ export async function POST(request: NextRequest) {
     body.audience ?? "active_members";
   const templateKey: string | null = body.template_key ?? null;
   const dryRun: boolean = body.dry_run === true;
+  const recipientEmail =
+    typeof body.recipient_email === "string"
+      ? body.recipient_email.trim().toLowerCase()
+      : "";
+  const recipientName =
+    typeof body.recipient_name === "string" ? body.recipient_name.trim() : "";
 
   const lodge = await db.getLodgeById(lodgeId);
   let recipients: Awaited<ReturnType<typeof sendBatch>> | null = null;
 
-  if (audience === "leads") {
+  if (recipientEmail) {
+    const name = recipientName || recipientEmail;
+    const firstName = name.split(/\s+/)[0] || name;
+    const list = [
+      {
+        email: recipientEmail,
+        name,
+        member_id: null,
+        lead_id: null,
+        context: {
+          first_name: firstName,
+          last_name: name.split(/\s+/).slice(1).join(" "),
+          full_name: name,
+          email: recipientEmail,
+          lodge_name: lodge?.name ?? "the lodge",
+        },
+      },
+    ];
+    if (dryRun) {
+      return NextResponse.json({
+        dry_run: true,
+        audience_count: list.length,
+      });
+    }
+    recipients = await sendBatch({
+      lodgeId,
+      templateKey,
+      subject,
+      htmlBody: html,
+      recipients: list,
+      audienceLabel: "selected_recipient",
+    });
+  } else if (audience === "leads") {
+
     const leads = await db.getLeads(lodgeId);
     const list = leads
       .filter((l) => l.email)

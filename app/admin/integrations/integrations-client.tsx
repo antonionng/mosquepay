@@ -3,17 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Calendar,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
   Copy,
   Download,
   Loader2,
-  Mail,
   Plug,
+  RefreshCw,
   Trash2,
-  Wallet,
   XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -61,6 +59,12 @@ type Job = {
   last_error: string | null;
 };
 
+type MooovConnection = {
+  merchantId: string;
+  status: string;
+  metadata: Record<string, unknown>;
+} | null;
+
 type FieldDef = {
   key: string;
   label: string;
@@ -72,16 +76,18 @@ type FieldDef = {
 type ProviderMeta = {
   label: string;
   group: "Calendar" | "Email" | "Accounting";
-  icon: typeof Plug;
+  logo: string;
   blurb: string;
   fields: FieldDef[];
+  comingSoon?: boolean;
 };
 
 const PROVIDER_META: Record<Provider, ProviderMeta> = {
   google_calendar: {
     label: "Google Calendar",
     group: "Calendar",
-    icon: Calendar,
+    comingSoon: true,
+    logo: "/brand/integrations/google-calendar.svg",
     blurb:
       "Push lodge meetings to a shared Google Calendar. Paste an OAuth refresh token plus the target calendar ID.",
     fields: [
@@ -104,7 +110,8 @@ const PROVIDER_META: Record<Provider, ProviderMeta> = {
   outlook: {
     label: "Microsoft Outlook",
     group: "Calendar",
-    icon: Calendar,
+    comingSoon: true,
+    logo: "/brand/integrations/outlook.svg",
     blurb:
       "Sync meetings into a shared Outlook / Microsoft 365 calendar. Provide an app refresh token and target calendar.",
     fields: [
@@ -126,7 +133,8 @@ const PROVIDER_META: Record<Provider, ProviderMeta> = {
   mailchimp: {
     label: "Mailchimp",
     group: "Email",
-    icon: Mail,
+    comingSoon: true,
+    logo: "/brand/integrations/mailchimp.svg",
     blurb:
       "Mirror your members and leads into a Mailchimp audience for newsletters.",
     fields: [
@@ -155,7 +163,8 @@ const PROVIDER_META: Record<Provider, ProviderMeta> = {
   brevo: {
     label: "Brevo (Sendinblue)",
     group: "Email",
-    icon: Mail,
+    comingSoon: true,
+    logo: "/brand/integrations/brevo.png",
     blurb:
       "Send transactional and bulk emails through Brevo and sync contact lists.",
     fields: [
@@ -182,7 +191,8 @@ const PROVIDER_META: Record<Provider, ProviderMeta> = {
   xero: {
     label: "Xero",
     group: "Accounting",
-    icon: Wallet,
+    comingSoon: true,
+    logo: "/brand/integrations/xero.svg",
     blurb:
       "Push the treasurer ledger into Xero. Use a long-lived OAuth refresh token from your Xero app.",
     fields: [
@@ -210,7 +220,8 @@ const PROVIDER_META: Record<Provider, ProviderMeta> = {
   quickbooks: {
     label: "QuickBooks",
     group: "Accounting",
-    icon: Wallet,
+    comingSoon: true,
+    logo: "/brand/integrations/quickbooks.svg",
     blurb:
       "Push payments, dues and donations into QuickBooks Online. Provide an OAuth refresh token and realm ID.",
     fields: [
@@ -255,15 +266,19 @@ export function IntegrationsClient({
   lodgeName,
   credentials,
   jobs,
+  mooovConnection,
+  initialFeedback,
 }: {
   lodgeSlug: string;
   lodgeName: string;
   credentials: Credential[];
   jobs: Job[];
+  mooovConnection: MooovConnection;
+  initialFeedback?: string | null;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(initialFeedback ?? null);
   const [open, setOpen] = useState<Provider | null>(null);
   const [disconnectingProvider, setDisconnectingProvider] = useState<Provider | null>(null);
   const [drafts, setDrafts] = useState<Record<Provider, Record<string, string>>>(
@@ -418,6 +433,59 @@ export function IntegrationsClient({
         </TabsList>
 
         <TabsContent value="providers" className="space-y-4">
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-start gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/brand/mooov-logo.png"
+                  alt="Mooov"
+                  className="mt-0.5 h-6 w-auto"
+                />
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-base font-semibold text-slate-900">
+                      Mooov Connect
+                    </h2>
+                    {mooovConnection?.status === "active" ? (
+                      <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">
+                        <CheckCircle2 className="mr-1 h-3 w-3" /> Connected
+                      </Badge>
+                    ) : mooovConnection ? (
+                      <Badge variant="outline">
+                        <XCircle className="mr-1 h-3 w-3" /> {mooovConnection.status}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline">
+                        <XCircle className="mr-1 h-3 w-3" /> Not connected
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Connect this lodge to Mooov for dues and payment processing.
+                    LodgePay uses the platform credential, while each lodge grants
+                    its own merchant access.
+                  </p>
+                  {mooovConnection?.merchantId ? (
+                    <p className="mt-2 font-mono text-[11px] text-slate-500">
+                      Merchant: {mooovConnection.merchantId}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+              <a href="/api/mooov/connect/start">
+                <Button size="sm" variant={mooovConnection ? "outline" : "primary"}>
+                  {mooovConnection ? (
+                    <RefreshCw className="mr-1 h-3 w-3" />
+                  ) : (
+                    <Plug className="mr-1 h-3 w-3" />
+                  )}
+                  {mooovConnection ? "Reconnect Mooov" : "Connect Mooov"}
+                </Button>
+              </a>
+            </div>
+          </div>
+
           {Object.entries(grouped).map(([groupName, providers]) => (
             <div
               key={groupName}
@@ -432,19 +500,31 @@ export function IntegrationsClient({
                 {providers.map((provider) => {
                   const meta = PROVIDER_META[provider];
                   const cred = credByProvider.get(provider);
-                  const Icon = meta.icon;
                   const isOpen = open === provider;
+                  const comingSoon = meta.comingSoon === true;
                   return (
-                    <div key={provider} className="px-5 py-3">
+                    <div
+                      key={provider}
+                      className={comingSoon ? "px-5 py-3 opacity-75" : "px-5 py-3"}
+                    >
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
-                          <Icon className="h-5 w-5 text-slate-400" />
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white ring-1 ring-slate-200">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={meta.logo}
+                              alt={`${meta.label} logo`}
+                              className="h-5 w-5 object-contain"
+                            />
+                          </div>
                           <div>
                             <p className="text-sm font-medium text-slate-900">
                               {meta.label}
                             </p>
                             <p className="text-xs text-slate-500">
-                              {cred?.enabled
+                              {comingSoon
+                                ? "Coming soon"
+                                : cred?.enabled
                                 ? "Connected and enabled"
                                 : cred
                                 ? "Saved but disabled"
@@ -453,7 +533,14 @@ export function IntegrationsClient({
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {cred?.enabled ? (
+                          {comingSoon ? (
+                            <Badge
+                              variant="secondary"
+                              className="bg-amber-50 text-amber-800"
+                            >
+                              Coming soon
+                            </Badge>
+                          ) : cred?.enabled ? (
                             <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">
                               <CheckCircle2 className="mr-1 h-3 w-3" /> Active
                             </Badge>
@@ -462,35 +549,39 @@ export function IntegrationsClient({
                               <XCircle className="mr-1 h-3 w-3" /> Off
                             </Badge>
                           )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={busy === `save:${provider}`}
-                            onClick={() => toggleProvider(provider)}
-                          >
-                            {cred?.enabled ? "Disable" : "Enable"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() =>
-                              setOpen(isOpen ? null : provider)
-                            }
-                          >
-                            {isOpen ? (
-                              <>
-                                Hide <ChevronUp className="ml-1 h-3 w-3" />
-                              </>
-                            ) : (
-                              <>
-                                Configure <ChevronDown className="ml-1 h-3 w-3" />
-                              </>
-                            )}
-                          </Button>
+                          {!comingSoon && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={busy === `save:${provider}`}
+                                onClick={() => toggleProvider(provider)}
+                              >
+                                {cred?.enabled ? "Disable" : "Enable"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() =>
+                                  setOpen(isOpen ? null : provider)
+                                }
+                              >
+                                {isOpen ? (
+                                  <>
+                                    Hide <ChevronUp className="ml-1 h-3 w-3" />
+                                  </>
+                                ) : (
+                                  <>
+                                    Configure <ChevronDown className="ml-1 h-3 w-3" />
+                                  </>
+                                )}
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </div>
 
-                      {isOpen && (
+                      {isOpen && !comingSoon && (
                         <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
                           <p className="text-xs text-slate-600">{meta.blurb}</p>
                           <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">

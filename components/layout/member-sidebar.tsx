@@ -15,12 +15,14 @@ import {
   Menu,
   X,
   IdCard,
+  UserPlus,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
 const nav = [
   { href: "/member", label: "Dashboard", icon: LayoutDashboard },
   { href: "/member/events", label: "Events", icon: Calendar },
+  { href: "/member/guests", label: "Guests", icon: UserPlus },
   { href: "/member/payments", label: "Payments", icon: CreditCard },
   { href: "/member/dues", label: "Dues", icon: Wallet },
   { href: "/member/donations", label: "Donations", icon: Heart },

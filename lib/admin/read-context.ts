@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { isSupabaseConfigured, shouldUseInMemoryMock } from "@/lib/db/with-fallback";
 import { getDefaultLodgeId, resolveLodgeId } from "@/lib/db/helpers";
 import { getLodgeById } from "@/lib/db";
@@ -21,6 +22,11 @@ export type AdminReadContext =
   | { mode: "database"; lodgeId: string | null; lodgeSlug: string };
 
 export async function getAdminReadContext(): Promise<AdminReadContext> {
+  const scope = await getCurrentAdminScope();
+  if (scope.kind === "none") {
+    redirect("/admin/login");
+  }
+
   if (shouldUseInMemoryMock()) {
     return { mode: "mock" };
   }
@@ -34,7 +40,6 @@ export async function getAdminReadContext(): Promise<AdminReadContext> {
   }
 
   const cookieStore = await cookies();
-  const scope = await getCurrentAdminScope();
 
   if (scope.kind === "lodge") {
     const selectedCookieSlug = cookieStore.get(ADMIN_LODGE_COOKIE)?.value;

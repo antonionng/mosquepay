@@ -68,6 +68,7 @@ export type MockLodge = {
   custom_domain: string | null;
   custom_domain_verified_at: string | null;
   custom_domain_verification_token: string | null;
+  accepts_self_registration: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -118,6 +119,7 @@ const lodges: MockLodge[] = [
     custom_domain: null,
     custom_domain_verified_at: null,
     custom_domain_verification_token: null,
+    accepts_self_registration: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   },
@@ -231,6 +233,7 @@ export function upsertLodge(
     custom_domain: input.custom_domain ?? null,
     custom_domain_verified_at: input.custom_domain_verified_at ?? null,
     custom_domain_verification_token: input.custom_domain_verification_token ?? null,
+    accepts_self_registration: input.accepts_self_registration ?? false,
     created_at: now,
     updated_at: now,
   };
@@ -416,6 +419,24 @@ export function updateLead(
   return leads[i];
 }
 
+export function deleteLead(
+  id: string,
+  opts?: { lodge_slug?: string }
+): { deleted: boolean } {
+  assertInMemoryMock();
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  const i = leads.findIndex((l) => l.id === id && l.lodge_slug === lodgeSlug);
+  if (i === -1) return { deleted: false };
+  leads.splice(i, 1);
+  for (let j = leadActivities.length - 1; j >= 0; j--) {
+    const a = leadActivities[j];
+    if (a.lead_id === id && a.lodge_slug === lodgeSlug) {
+      leadActivities.splice(j, 1);
+    }
+  }
+  return { deleted: true };
+}
+
 export function updateLeadActivity(
   id: string,
   updates: Partial<Pick<MockLeadActivity, "title" | "description" | "meeting_date" | "attendees" | "due_date" | "completed">>,
@@ -520,6 +541,7 @@ export type MockEvent = LodgeScoped & {
   enable_guest_tickets: boolean;
   guest_ticket_price: number | null;
   guest_ticket_description: string | null;
+  guest_policy: "blue_table" | "white_table" | "closed";
   featured_image_url: string | null;
   published: boolean;
   sequence_id: string | null;
@@ -730,13 +752,32 @@ export type MockEventGuest = LodgeScoped & {
   event_id: string;
   guest_name: string;
   dietary_requirements: string | null;
+  email: string | null;
+  phone: string | null;
+  guest_id: string | null;
+  guest_invitation_id: string | null;
+  source: "member_party" | "self_invite" | "admin_added";
+  welcome_email_sent_at: string | null;
   created_at: string;
 };
 
 const eventGuests: MockEventGuest[] = [];
 
+export type MockEventGuestInput = {
+  rsvp_id: string | null;
+  event_id: string;
+  guest_name: string;
+  dietary_requirements: string | null;
+  email?: string | null;
+  phone?: string | null;
+  guest_id?: string | null;
+  guest_invitation_id?: string | null;
+  source?: MockEventGuest["source"];
+  lodge_slug?: string;
+};
+
 export function addEventGuests(
-  guests: Omit<MockEventGuest, "id" | "created_at" | "lodge_slug">[] & { lodge_slug?: string }[],
+  guests: MockEventGuestInput[],
   lodgeSlug?: string
 ): MockEventGuest[] {
   assertInMemoryMock();
@@ -744,8 +785,17 @@ export function addEventGuests(
   return guests.map((g) => {
     const guest: MockEventGuest = {
       id: uuid(),
-      ...g,
-      lodge_slug: slug,
+      rsvp_id: g.rsvp_id,
+      event_id: g.event_id,
+      guest_name: g.guest_name,
+      dietary_requirements: g.dietary_requirements,
+      email: g.email ?? null,
+      phone: g.phone ?? null,
+      guest_id: g.guest_id ?? null,
+      guest_invitation_id: g.guest_invitation_id ?? null,
+      source: g.source ?? "member_party",
+      welcome_email_sent_at: null,
+      lodge_slug: withLodgeSlug(g.lodge_slug ?? slug),
       created_at: new Date().toISOString(),
     };
     eventGuests.push(guest);
@@ -763,6 +813,406 @@ export function getGuestsByEvent(eventId: string, opts?: { lodge_slug?: string }
   assertInMemoryMock();
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   return eventGuests.filter((g) => g.event_id === eventId && g.lodge_slug === lodgeSlug);
+}
+
+export function listEventGuestsForLodge(
+  opts?: { lodge_slug?: string; eventId?: string; guestId?: string }
+): MockEventGuest[] {
+  assertInMemoryMock();
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return eventGuests
+    .filter((g) => g.lodge_slug === lodgeSlug)
+    .filter((g) => (opts?.eventId ? g.event_id === opts.eventId : true))
+    .filter((g) => (opts?.guestId ? g.guest_id === opts.guestId : true));
+}
+
+// --- Guests directory + guest invitations ---
+export type MockGuest = LodgeScoped & {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  mother_lodge_name: string | null;
+  mother_lodge_number: string | null;
+  constitution: string | null;
+  rank: string | null;
+  dietary_requirements: string | null;
+  is_mason: boolean;
+  first_seen_event_id: string | null;
+  last_seen_event_id: string | null;
+  visit_count: number;
+  notes: string | null;
+  archived_at: string | null;
+  visitor_token_hash: string | null;
+  source: "admin" | "member_invite" | "self_invite_event" | "self_register";
+  email_confirmed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+const guestsDirectory: MockGuest[] = [];
+
+export function listGuests(opts?: {
+  lodge_slug?: string;
+  search?: string;
+  includeArchived?: boolean;
+}): MockGuest[] {
+  assertInMemoryMock();
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  let list = guestsDirectory.filter((g) => g.lodge_slug === lodgeSlug);
+  if (!opts?.includeArchived) {
+    list = list.filter((g) => g.archived_at === null);
+  }
+  if (opts?.search) {
+    const term = opts.search.toLowerCase();
+    list = list.filter(
+      (g) =>
+        g.full_name.toLowerCase().includes(term) ||
+        (g.email ?? "").toLowerCase().includes(term) ||
+        (g.mother_lodge_name ?? "").toLowerCase().includes(term)
+    );
+  }
+  return list;
+}
+
+export function getGuestById(id: string, opts?: { lodge_slug?: string }): MockGuest | null {
+  assertInMemoryMock();
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return guestsDirectory.find((g) => g.id === id && g.lodge_slug === lodgeSlug) ?? null;
+}
+
+export function createGuestRecord(
+  data: Partial<Omit<MockGuest, "id" | "created_at" | "updated_at" | "lodge_slug">> & {
+    full_name: string;
+    lodge_slug?: string;
+  }
+): MockGuest {
+  assertInMemoryMock();
+  const now = new Date().toISOString();
+  const guest: MockGuest = {
+    id: uuid(),
+    lodge_slug: withLodgeSlug(data.lodge_slug),
+    full_name: data.full_name,
+    email: data.email ?? null,
+    phone: data.phone ?? null,
+    mother_lodge_name: data.mother_lodge_name ?? null,
+    mother_lodge_number: data.mother_lodge_number ?? null,
+    constitution: data.constitution ?? null,
+    rank: data.rank ?? null,
+    dietary_requirements: data.dietary_requirements ?? null,
+    is_mason: data.is_mason ?? true,
+    first_seen_event_id: data.first_seen_event_id ?? null,
+    last_seen_event_id: data.last_seen_event_id ?? null,
+    visit_count: data.visit_count ?? 0,
+    notes: data.notes ?? null,
+    archived_at: data.archived_at ?? null,
+    visitor_token_hash: data.visitor_token_hash ?? null,
+    source: data.source ?? "admin",
+    email_confirmed_at: data.email_confirmed_at ?? null,
+    created_at: now,
+    updated_at: now,
+  };
+  guestsDirectory.push(guest);
+  return guest;
+}
+
+export function updateGuestRecord(
+  id: string,
+  patch: Partial<Omit<MockGuest, "id" | "lodge_slug" | "created_at">>,
+  opts?: { lodge_slug?: string }
+): MockGuest | null {
+  assertInMemoryMock();
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  const guest = guestsDirectory.find(
+    (g) => g.id === id && g.lodge_slug === lodgeSlug
+  );
+  if (!guest) return null;
+  Object.assign(guest, patch, { updated_at: new Date().toISOString() });
+  return guest;
+}
+
+export function upsertGuest(
+  input: {
+    full_name: string;
+    email?: string | null;
+    phone?: string | null;
+    mother_lodge_name?: string | null;
+    mother_lodge_number?: string | null;
+    constitution?: string | null;
+    rank?: string | null;
+    dietary_requirements?: string | null;
+    is_mason?: boolean;
+    event_id?: string | null;
+    lodge_slug?: string;
+    source?:
+      | "admin"
+      | "member_invite"
+      | "self_invite_event"
+      | "self_register";
+    recordVisit?: boolean;
+  }
+): MockGuest {
+  assertInMemoryMock();
+  const lodgeSlug = withLodgeSlug(input.lodge_slug);
+  const email = input.email?.trim() || null;
+  const fullName = input.full_name.trim();
+  const motherLodgeName = input.mother_lodge_name?.trim() || null;
+
+  const existing = guestsDirectory.find((g) => {
+    if (g.lodge_slug !== lodgeSlug) return false;
+    if (email && g.email) return g.email.toLowerCase() === email.toLowerCase();
+    if (!email) {
+      const sameName = g.full_name.toLowerCase() === fullName.toLowerCase();
+      const sameMother =
+        (g.mother_lodge_name ?? null) === (motherLodgeName ?? null);
+      return sameName && sameMother;
+    }
+    return false;
+  });
+
+  const recordVisit = input.recordVisit !== false;
+
+  if (existing) {
+    return updateGuestRecord(
+      existing.id,
+      {
+        full_name: fullName || existing.full_name,
+        email: email ?? existing.email,
+        phone: input.phone?.trim() ?? existing.phone,
+        mother_lodge_name: motherLodgeName ?? existing.mother_lodge_name,
+        mother_lodge_number:
+          input.mother_lodge_number?.trim() ?? existing.mother_lodge_number,
+        constitution: input.constitution?.trim() ?? existing.constitution,
+        rank: input.rank?.trim() ?? existing.rank,
+        dietary_requirements:
+          input.dietary_requirements?.trim() ?? existing.dietary_requirements,
+        is_mason: input.is_mason ?? existing.is_mason,
+        visit_count: recordVisit
+          ? existing.visit_count + 1
+          : existing.visit_count,
+        last_seen_event_id: recordVisit
+          ? (input.event_id ?? existing.last_seen_event_id)
+          : existing.last_seen_event_id,
+        first_seen_event_id:
+          existing.first_seen_event_id ?? input.event_id ?? null,
+      },
+      { lodge_slug: lodgeSlug }
+    )!;
+  }
+
+  return createGuestRecord({
+    full_name: fullName,
+    email,
+    phone: input.phone?.trim() || null,
+    mother_lodge_name: motherLodgeName,
+    mother_lodge_number: input.mother_lodge_number?.trim() || null,
+    constitution: input.constitution?.trim() || null,
+    rank: input.rank?.trim() || null,
+    dietary_requirements: input.dietary_requirements?.trim() || null,
+    is_mason: input.is_mason ?? true,
+    visit_count: recordVisit ? 1 : 0,
+    first_seen_event_id: input.event_id ?? null,
+    last_seen_event_id: recordVisit ? (input.event_id ?? null) : null,
+    notes: null,
+    archived_at: null,
+    visitor_token_hash: null,
+    source: input.source ?? "admin",
+    email_confirmed_at: null,
+    lodge_slug: lodgeSlug,
+  });
+}
+
+export function archiveGuestRecord(
+  id: string,
+  opts?: { lodge_slug?: string }
+): MockGuest | null {
+  return updateGuestRecord(
+    id,
+    { archived_at: new Date().toISOString() },
+    opts
+  );
+}
+
+export function restoreGuestRecord(
+  id: string,
+  opts?: { lodge_slug?: string }
+): MockGuest | null {
+  return updateGuestRecord(id, { archived_at: null }, opts);
+}
+
+export function hardDeleteGuestRecordIfUnused(
+  id: string,
+  opts?: { lodge_slug?: string }
+): boolean {
+  assertInMemoryMock();
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  const idx = guestsDirectory.findIndex(
+    (g) => g.id === id && g.lodge_slug === lodgeSlug
+  );
+  if (idx === -1) return false;
+  if ((guestsDirectory[idx].visit_count ?? 0) > 0) return false;
+  guestsDirectory.splice(idx, 1);
+  return true;
+}
+
+export function getGuestByVisitorTokenHash(
+  tokenHash: string,
+  opts?: { lodge_slug?: string }
+): MockGuest | null {
+  assertInMemoryMock();
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return (
+    guestsDirectory.find(
+      (g) => g.visitor_token_hash === tokenHash && g.lodge_slug === lodgeSlug
+    ) ?? null
+  );
+}
+
+export function setGuestVisitorTokenHash(
+  id: string,
+  tokenHash: string,
+  opts?: { lodge_slug?: string }
+): MockGuest | null {
+  return updateGuestRecord(id, { visitor_token_hash: tokenHash }, opts);
+}
+
+export type MockGuestInvitation = LodgeScoped & {
+  id: string;
+  event_id: string;
+  inviter_member_id: string | null;
+  inviter_admin_user_id: string | null;
+  recipient_email: string | null;
+  recipient_name: string | null;
+  token_hash: string;
+  payer: "guest" | "inviter";
+  max_uses: number | null;
+  uses: number;
+  expires_at: string | null;
+  revoked_at: string | null;
+  last_used_at: string | null;
+  guest_id: string | null;
+  created_at: string;
+};
+
+const guestInvitations: MockGuestInvitation[] = [];
+
+export function createGuestInvitation(
+  data: Omit<
+    MockGuestInvitation,
+    | "id"
+    | "uses"
+    | "created_at"
+    | "last_used_at"
+    | "revoked_at"
+    | "guest_id"
+    | "lodge_slug"
+  > & {
+    lodge_slug?: string;
+    guest_id?: string | null;
+    uses?: number;
+  }
+): MockGuestInvitation {
+  assertInMemoryMock();
+  const { lodge_slug: providedSlug, guest_id, ...rest } = data;
+  const inv: MockGuestInvitation = {
+    id: uuid(),
+    lodge_slug: withLodgeSlug(providedSlug),
+    uses: data.uses ?? 0,
+    last_used_at: null,
+    revoked_at: null,
+    guest_id: guest_id ?? null,
+    created_at: new Date().toISOString(),
+    ...rest,
+  };
+  guestInvitations.push(inv);
+  return inv;
+}
+
+export function getGuestInvitationByTokenHash(
+  tokenHash: string
+): MockGuestInvitation | null {
+  assertInMemoryMock();
+  return guestInvitations.find((i) => i.token_hash === tokenHash) ?? null;
+}
+
+export function listGuestInvitationsForEvent(
+  eventId: string,
+  opts?: { lodge_slug?: string }
+): MockGuestInvitation[] {
+  assertInMemoryMock();
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return guestInvitations
+    .filter((i) => i.event_id === eventId && i.lodge_slug === lodgeSlug)
+    .sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+}
+
+export function getGuestInvitationById(
+  id: string,
+  opts?: { lodge_slug?: string }
+): MockGuestInvitation | null {
+  assertInMemoryMock();
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return (
+    guestInvitations.find(
+      (i) => i.id === id && i.lodge_slug === lodgeSlug
+    ) ?? null
+  );
+}
+
+export function listGuestInvitationsForGuest(
+  guestId: string,
+  opts?: { lodge_slug?: string }
+): MockGuestInvitation[] {
+  assertInMemoryMock();
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return guestInvitations
+    .filter((i) => i.guest_id === guestId && i.lodge_slug === lodgeSlug)
+    .sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+}
+
+export function listGuestInvitationsForMember(
+  memberId: string,
+  opts?: { lodge_slug?: string }
+): MockGuestInvitation[] {
+  assertInMemoryMock();
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  return guestInvitations
+    .filter(
+      (i) => i.inviter_member_id === memberId && i.lodge_slug === lodgeSlug
+    )
+    .sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+}
+
+export function recordGuestInvitationUse(id: string): MockGuestInvitation | null {
+  assertInMemoryMock();
+  const inv = guestInvitations.find((i) => i.id === id);
+  if (!inv) return null;
+  inv.uses += 1;
+  inv.last_used_at = new Date().toISOString();
+  return inv;
+}
+
+export function revokeGuestInvitation(
+  id: string,
+  opts?: { lodge_slug?: string }
+): MockGuestInvitation | null {
+  assertInMemoryMock();
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  const inv = guestInvitations.find(
+    (i) => i.id === id && i.lodge_slug === lodgeSlug
+  );
+  if (!inv) return null;
+  inv.revoked_at = new Date().toISOString();
+  return inv;
 }
 
 // --- Members ---
@@ -1149,7 +1599,7 @@ function seedData() {
     }
   });
 
-  const guestMeetingDefaults = { enable_meeting_fee: false, meeting_fee_amount: null, meeting_fee_description: null, enable_guest_tickets: false, guest_ticket_price: null, guest_ticket_description: null };
+  const guestMeetingDefaults = { enable_meeting_fee: false, meeting_fee_amount: null, meeting_fee_description: null, enable_guest_tickets: false, guest_ticket_price: null, guest_ticket_description: null, guest_policy: "blue_table" as const };
   const seedEvents: Array<AddEventInput> = [
     { title: "Regular Meeting – April", slug: "regular-meeting-april", description: "Monthly regular meeting with ceremony.", event_type: "regular_meeting", event_date: daysFromNow(5), event_time: "18:30", location: "Mark Masons' Hall", temple_room: "Temple 1", dress_code: "Dark lounge suit", enable_rsvp: true, rsvp_deadline: daysFromNow(3), max_attendees: 60, enable_payments: true, enable_dining_rsvp: true, dining_price: 45, dining_description: "Three course festive board", enable_charity_donation: true, charity_name: "Masonic Charitable Foundation", charity_description: "Support MCF", charity_suggested_amounts: [5, 10, 20], charity_allow_custom: true, enable_raffle_donation: true, raffle_description: "Charity raffle", raffle_suggested_amounts: [2, 5, 10], raffle_allow_custom: true, ...guestMeetingDefaults, enable_guest_tickets: true, guest_ticket_price: 45, guest_ticket_description: "Guest dining ticket", featured_image_url: null, published: true },
     { title: "Installation Meeting", slug: "installation-meeting", description: "Annual installation of the new Worshipful Master.", event_type: "installation", event_date: daysFromNow(30), event_time: "16:00", location: "Mark Masons' Hall", temple_room: "Grand Temple", dress_code: "Morning dress", enable_rsvp: true, rsvp_deadline: daysFromNow(25), max_attendees: 120, enable_payments: true, enable_dining_rsvp: true, dining_price: 65, dining_description: "Four course installation banquet", enable_charity_donation: true, charity_name: "London Grand Rank Benevolent Fund", charity_description: null, charity_suggested_amounts: [10, 25, 50], charity_allow_custom: true, enable_raffle_donation: true, raffle_description: "Grand raffle", raffle_suggested_amounts: [5, 10], raffle_allow_custom: false, ...guestMeetingDefaults, enable_guest_tickets: true, guest_ticket_price: 65, guest_ticket_description: "Guest banquet ticket", featured_image_url: null, published: true },

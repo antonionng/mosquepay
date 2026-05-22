@@ -11,6 +11,7 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { listLodges, getPayments, getLeads } from "@/lib/db";
 import type { Lodge, Payment, Lead } from "@/lib/db/types";
 import { formatDateTime } from "@/lib/utils";
+import { requireOperatorPageAccess } from "@/lib/auth/operator-page";
 
 type AuditEntry = {
   id: string;
@@ -87,6 +88,8 @@ function auditIcon(type: string) {
 }
 
 export default async function SupportPage() {
+  await requireOperatorPageAccess();
+
   const { lodges, audit } = await getSupportData();
 
   return (

@@ -31,6 +31,7 @@ export async function GET(
     calendarName: `${lodge.name} - Public events`,
     events,
     origin,
+    lodgeSlug: lodge.slug,
   });
   return new NextResponse(ics, {
     headers: {

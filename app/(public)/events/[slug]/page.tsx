@@ -9,6 +9,7 @@ import { EventRsvpForm } from "@/components/forms/event-rsvp-form";
 import { ArrowLeft, Calendar, MapPin, Clock, Users } from "lucide-react";
 import { getDefaultLodgeSlug, resolveLodgeSlug } from "@/lib/tenant";
 import { SOCIAL_SHARE_IMAGE, SITE_ORIGIN } from "@/lib/seo";
+import { lodgeScopedEventPath, lodgeScopedEventsPath } from "@/lib/public-links";
 
 function siteUrl(): string {
   const url =
@@ -72,19 +73,25 @@ function eventDateTimeValue(date: string, time: string | null) {
   return `${new Date(date).toISOString().slice(0, 10)}T${time}`;
 }
 
-export default async function EventPage({
-  params,
-  searchParams,
+type LinkMode = "query" | "scoped";
+
+export async function EventPageContent({
+  slug,
+  lodge,
+  linkMode = "query",
 }: {
-  params: Promise<{ slug: string }>;
-  searchParams: Promise<{ lodge?: string }>;
+  slug: string;
+  lodge?: string;
+  linkMode?: LinkMode;
 }) {
-  const { slug } = await params;
-  const { lodge } = await searchParams;
   const lodgeSlug = resolveLodgeSlug(lodge);
   const defaultSlug = getDefaultLodgeSlug();
-  const withLodgeQuery = (href: string) =>
-    lodgeSlug === defaultSlug ? href : `${href}?lodge=${encodeURIComponent(lodgeSlug)}`;
+  const withLodgeLink = (href: string) => {
+    if (linkMode === "scoped" && href === "/events") {
+      return lodgeScopedEventsPath(lodgeSlug);
+    }
+    return lodgeSlug === defaultSlug ? href : `${href}?lodge=${encodeURIComponent(lodgeSlug)}`;
+  };
 
   const event = await loadEvent(slug, lodgeSlug);
   if (!event) notFound();
@@ -104,7 +111,10 @@ export default async function EventPage({
         }
       : undefined,
     image: event.featured_image_url ? [event.featured_image_url] : undefined,
-    url: `${siteUrl()}/events/${slug}`,
+    url:
+      linkMode === "scoped"
+        ? `${siteUrl()}${lodgeScopedEventPath(lodgeSlug, slug)}`
+        : `${siteUrl()}/events/${slug}`,
   };
 
   const hasPayments =
@@ -124,7 +134,7 @@ export default async function EventPage({
       <section className="public-hero">
         <div className="container-full relative z-10 max-w-4xl px-6 pb-16 pt-32 md:pb-20 md:pt-40">
           <Link 
-            href={withLodgeQuery("/events")}
+            href={withLodgeLink("/events")}
             className="mb-8 inline-flex items-center gap-2 text-sm text-white/60 transition-colors hover:text-blue-200"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -231,4 +241,16 @@ export default async function EventPage({
       </section>
     </div>
   );
+}
+
+export default async function EventPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ lodge?: string }>;
+}) {
+  const { slug } = await params;
+  const { lodge } = await searchParams;
+  return <EventPageContent slug={slug} lodge={lodge} />;
 }

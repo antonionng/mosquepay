@@ -1,3 +1,24 @@
+// DEPRECATED -- LEGACY STRIPE WEBHOOK HANDLER (frozen 2026-05-21).
+//
+// As of the Mooov cutover (Phases 1-4), no LodgePay code path mints new
+// Stripe Checkout Sessions or PaymentIntents. Every active surface
+// (donations, events guest-checkout, member event RSVPs, dues) now goes
+// through Mooov -> hosted Stripe Checkout on the lodge's connected PSP,
+// projected via app/api/mooov-webhooks/connect/route.ts.
+//
+// This handler stays alive ONLY to reconcile historical, pre-cutover
+// Stripe payments:
+//   * checkout.session.completed / payment_intent.payment_failed for any
+//     legacy Stripe session that was already in-flight (open browser tab)
+//     when the cutover landed.
+//   * charge.refunded for refunds issued against historical Stripe-direct
+//     payments via the Stripe dashboard.
+//
+// Plan to delete this file (and the `stripe` npm dep + STRIPE_SECRET_KEY +
+// STRIPE_WEBHOOK_SECRET env vars) once we're confident no historical
+// Stripe-side reconciliation is still arriving -- conservatively, 90 days
+// after the cutover completes. Search for "DEPRECATED -- LEGACY STRIPE
+// WEBHOOK HANDLER" to find this comment.
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
@@ -30,6 +51,17 @@ export async function POST(request: NextRequest) {
     console.error("Webhook signature verification failed:", e);
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
+
+  // Quiet observability: every Stripe event arriving here is now legacy
+  // (no LodgePay code path creates new Stripe-direct charges). Logging
+  // the type + id lets ops confirm when the historical reconciliation
+  // tail goes to zero, at which point this handler can be deleted (see
+  // DEPRECATED comment at top of file).
+  console.log("legacy Stripe webhook received", {
+    event_id: event.id,
+    event_type: event.type,
+    livemode: event.livemode,
+  });
 
   try {
     switch (event.type) {

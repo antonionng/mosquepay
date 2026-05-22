@@ -4,6 +4,8 @@ import { getAdminReadContext } from "@/lib/admin/read-context";
 import { AdminMeetingsClient } from "./meetings-client";
 import { getMeetingReadiness } from "@/lib/meetings/readiness";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminMeetingsPage() {
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";

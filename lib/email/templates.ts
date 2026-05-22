@@ -310,6 +310,14 @@ export function renderSummonsEmail({
   agendaItems,
   menuItems,
   notices,
+  masterElectName,
+  masterElectQualification,
+  visitingOfficers,
+  visitingOfficerName,
+  visitingOfficerEmail,
+  visitingOfficerPhone,
+  nextMeetingDate,
+  nextMeetingNote,
 }: {
   memberName: string;
   lodgeName: string;
@@ -322,7 +330,85 @@ export function renderSummonsEmail({
   agendaItems: string[];
   menuItems: string[];
   notices: string[];
+  masterElectName?: string | null;
+  masterElectQualification?: string | null;
+  visitingOfficers?: Array<{
+    name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  }> | null;
+  visitingOfficerName?: string | null;
+  visitingOfficerEmail?: string | null;
+  visitingOfficerPhone?: string | null;
+  nextMeetingDate?: string | null;
+  nextMeetingNote?: string | null;
 }) {
+  const masterElectBlock =
+    masterElectName || masterElectQualification
+      ? `<div style="margin-top:16px;border-radius:14px;border:1px solid ${brand.border};background:${brand.surfaceSubtle};padding:14px 16px;">
+          ${
+            masterElectName
+              ? `<p style="margin:0;color:${brand.ink};font-size:14px;font-weight:700;">Master Elect: ${escapeEmailHtml(masterElectName)}</p>`
+              : ""
+          }
+          ${
+            masterElectQualification
+              ? `<p style="margin:${masterElectName ? "6px" : "0"} 0 0;color:${brand.muted};font-size:14px;line-height:1.7;">${escapeEmailHtml(masterElectQualification)}</p>`
+              : ""
+          }
+        </div>`
+      : "";
+
+  const safeVisitingOfficers =
+    visitingOfficers?.filter(
+      (officer) => officer.name || officer.email || officer.phone
+    ) ?? [];
+  const legacyVisitingOfficers =
+    safeVisitingOfficers.length === 0 &&
+    (visitingOfficerName || visitingOfficerEmail || visitingOfficerPhone)
+      ? [
+          {
+            name: visitingOfficerName,
+            email: visitingOfficerEmail,
+            phone: visitingOfficerPhone,
+          },
+        ]
+      : [];
+  const allVisitingOfficers = [...safeVisitingOfficers, ...legacyVisitingOfficers];
+  const voRows = allVisitingOfficers.map((officer, index) => {
+    const heading =
+      allVisitingOfficers.length === 1
+        ? "Visiting Officer"
+        : `Visiting Officer ${index + 1}`;
+
+    return `<div style="margin:${index === 0 ? "0" : "12px"} 0 0;">
+      ${
+        officer.name
+          ? `<p style="margin:0;color:${brand.ink};font-size:14px;font-weight:700;">${heading}: ${escapeEmailHtml(officer.name)}</p>`
+          : `<p style="margin:0;color:${brand.ink};font-size:14px;font-weight:700;">${heading}</p>`
+      }
+      ${
+        officer.email
+          ? `<p style="margin:6px 0 0;color:${brand.muted};font-size:14px;line-height:1.6;">Email: ${escapeEmailHtml(officer.email)}</p>`
+          : ""
+      }
+      ${
+        officer.phone
+          ? `<p style="margin:4px 0 0;color:${brand.muted};font-size:14px;line-height:1.6;">Tel: ${escapeEmailHtml(officer.phone)}</p>`
+          : ""
+      }
+    </div>`;
+  });
+  if (nextMeetingDate) {
+    voRows.push(
+      `<p style="margin:10px 0 0;color:${brand.muted};font-size:14px;line-height:1.6;"><strong style="color:${brand.ink};">Next regular meeting:</strong> ${escapeEmailHtml(formatDate(nextMeetingDate))}${nextMeetingNote ? ` — ${escapeEmailHtml(nextMeetingNote)}` : ""}</p>`
+    );
+  }
+
+  const closingBlock = voRows.length
+    ? `<div style="margin-top:22px;border-radius:14px;border:1px solid ${brand.border};background:${brand.surfaceSubtle};padding:14px 16px;">${voRows.join("")}</div>`
+    : "";
+
   return renderShell({
     eyebrow: "Meeting summons",
     title: eventTitle,
@@ -348,6 +434,7 @@ export function renderSummonsEmail({
       <div style="border-top:1px solid ${brand.border};padding-top:22px;">
         <h2 style="margin:0;color:${brand.ink};font-size:18px;">Lodge Business</h2>
         ${listItems(agendaItems, true)}
+        ${masterElectBlock}
       </div>
       ${
         menuItems.length
@@ -364,6 +451,7 @@ export function renderSummonsEmail({
               .join("")}</div>`
           : ""
       }
+      ${closingBlock}
     `,
   });
 }

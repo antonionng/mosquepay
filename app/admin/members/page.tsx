@@ -3,6 +3,8 @@ import * as mockDb from "@/lib/mock-db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
 import { AdminMembersClient } from "./members-client";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminMembersPage() {
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
@@ -14,9 +16,12 @@ export default async function AdminMembersPage() {
       ? await db.getMembers(lodgeId)
       : [];
 
+  const offices = lodgeId ? await db.listOfficerLadder(lodgeId) : [];
+
   return (
     <AdminMembersClient
       members={JSON.parse(JSON.stringify(members))}
+      offices={JSON.parse(JSON.stringify(offices))}
     />
   );
 }

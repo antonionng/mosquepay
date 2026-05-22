@@ -6,6 +6,7 @@ import * as db from "@/lib/db";
 import { formatDate } from "@/lib/utils";
 import { defaultAgendaItems, renderDefaultSummonsOpening } from "@/lib/summons/defaults";
 import type { Member } from "@/lib/db/types";
+import { SummonsRsvpForm } from "./rsvp-form";
 
 type DirectoryMember = Pick<
   Member,
@@ -76,6 +77,12 @@ export default async function PublicSummonsPage({
   ]);
 
   if (!event) notFound();
+
+  const existingRsvp = await db.getRsvpByEventAndEmail(
+    event.id,
+    accessLink.recipient_email,
+    accessLink.lodge_id
+  );
 
   const officers = members
     .filter((member) => member.office_title)
@@ -186,6 +193,56 @@ export default async function PublicSummonsPage({
             )}
           </section>
         )}
+
+        {event.enable_rsvp ? (
+          <section id="rsvp" className="border-b border-slate-300 py-6">
+            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">
+                Private member RSVP
+              </p>
+              <h2 className="mt-2 text-xl font-semibold text-slate-950">
+                Reply as {accessLink.recipient_name ?? accessLink.recipient_email}
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                This summons link is unique to you, so you do not need to enter
+                your name or email address again.
+              </p>
+              <div className="mt-5">
+                <SummonsRsvpForm
+                  token={token}
+                  eventId={event.id}
+                  lodgeSlug={lodge?.slug ?? ""}
+                  recipientName={
+                    accessLink.recipient_name ?? accessLink.recipient_email
+                  }
+                  recipientEmail={accessLink.recipient_email}
+                  enableDining={event.enable_dining_rsvp}
+                  diningPrice={event.dining_price}
+                  diningDescription={event.dining_description}
+                  enablePayments={event.enable_payments}
+                  enableMeetingFee={event.enable_meeting_fee}
+                  meetingFeeAmount={event.meeting_fee_amount}
+                  meetingFeeDescription={event.meeting_fee_description}
+                  enableGuestTickets={event.enable_guest_tickets}
+                  guestTicketPrice={event.guest_ticket_price}
+                  guestTicketDescription={event.guest_ticket_description}
+                  initial={{
+                    attending_ceremony:
+                      existingRsvp?.status === "apologies"
+                        ? false
+                        : (existingRsvp?.attending_ceremony ?? true),
+                    attending_dining:
+                      existingRsvp?.attending_dining ??
+                      event.enable_dining_rsvp,
+                    dietary_requirements:
+                      existingRsvp?.dietary_requirements ?? "",
+                    special_requests: existingRsvp?.special_requests ?? "",
+                  }}
+                />
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         {summons?.include_member_directory !== false && (
           <section className="py-6">

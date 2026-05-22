@@ -17,6 +17,7 @@ import { formatDate } from "@/lib/utils";
 import type { Lodge, LodgeSubscription } from "@/lib/db/types";
 import { getPlanDefinition } from "@/lib/billing/plans";
 import { LodgeDetailActions } from "./actions";
+import { requireOperatorPageAccess } from "@/lib/auth/operator-page";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -51,6 +52,8 @@ async function getLodgeData(slug: string) {
 }
 
 export default async function LodgeDetailPage({ params }: Props) {
+  await requireOperatorPageAccess();
+
   const { slug } = await params;
   const { lodge, subscription, eventsCount, leadsCount, paymentsTotal } =
     await getLodgeData(slug);

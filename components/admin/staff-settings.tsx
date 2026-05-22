@@ -88,6 +88,7 @@ function emptyForm() {
     email: "",
     role: "secretary" as StaffRole,
     active: true,
+    send_invite: false,
   };
 }
 
@@ -144,20 +145,27 @@ export function StaffSettings() {
       const res = await fetch("/api/admin/staff", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          full_name: form.full_name,
+          email: form.email,
+          role: form.role,
+          active: form.active,
+          send_invite: form.send_invite,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data.error ?? "Could not create staff user.");
       }
+      const requestedInvite = form.send_invite;
       setForm(emptyForm());
-      setMessage({
-        type: "success",
-        text:
-          data.invite?.sent === false
-            ? `Staff user created, but the invite was not sent: ${data.invite.error}`
-            : "Staff user created and invite sent.",
-      });
+      let text = "Staff user created. Use the Invite button to email an access link.";
+      if (requestedInvite) {
+        text = data.invite?.sent
+          ? "Staff user created and invite email sent."
+          : `Staff user created, but the invite was not sent: ${data.invite?.error ?? "unknown error"}`;
+      }
+      setMessage({ type: "success", text });
       await loadStaff();
     } catch (error) {
       setMessage({
@@ -311,9 +319,30 @@ export function StaffSettings() {
               Add Staff
             </Button>
           </div>
-          <p className="mt-3 text-xs leading-5 text-dash-muted">
-            Operators are platform-wide. Other roles are scoped to the selected lodge.
-          </p>
+          <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-dash-text">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-dash-border text-dash-ring focus:ring-dash-ring"
+                checked={form.send_invite}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    send_invite: event.target.checked,
+                  }))
+                }
+              />
+              <span>
+                Email an invite link now
+                <span className="ml-2 text-dash-muted">
+                  (otherwise just create the record and send later with the Invite button)
+                </span>
+              </span>
+            </label>
+            <p className="text-xs leading-5 text-dash-muted">
+              Operators are platform-wide. Other roles are scoped to the selected lodge.
+            </p>
+          </div>
         </form>
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">

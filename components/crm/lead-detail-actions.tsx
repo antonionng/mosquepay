@@ -21,6 +21,7 @@ import {
   UserPlus,
   ExternalLink,
   Loader2,
+  Trash2,
 } from "lucide-react";
 
 type ActivityType = "note" | "meeting" | "phone_call" | "email" | "task";
@@ -60,6 +61,27 @@ export function LeadDetailActions({
   const [convertError, setConvertError] = useState<string | null>(null);
   const [stageError, setStageError] = useState<string | null>(null);
   const [confirmConvertOpen, setConfirmConvertOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleDelete() {
+    setDeleteError(null);
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/leads/${leadId}`, { method: "DELETE" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.error ?? "Could not delete lead.");
+      }
+      router.push("/admin/leads");
+      router.refresh();
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : "Could not delete lead.");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function handleStageChange() {
     if (!newStage || newStage === currentStage) return;
@@ -241,6 +263,25 @@ export function LeadDetailActions({
           </button>
         )}
       </div>
+      <div className="border-t border-dash-border pt-4">
+        <button
+          type="button"
+          onClick={() => setConfirmDeleteOpen(true)}
+          disabled={deleting}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-red-700 transition-colors hover:bg-red-50 disabled:opacity-60"
+        >
+          {deleting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Trash2 className="h-4 w-4" />
+          )}
+          Delete lead
+        </button>
+        {deleteError && (
+          <p className="mt-1 px-3 text-xs text-red-600">{deleteError}</p>
+        )}
+      </div>
+
       <ConfirmActionDialog
         open={confirmConvertOpen}
         onOpenChange={setConfirmConvertOpen}
@@ -252,6 +293,19 @@ export function LeadDetailActions({
         onConfirm={async () => {
           await handleConvert();
           setConfirmConvertOpen(false);
+        }}
+      />
+      <ConfirmActionDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title="Delete this lead?"
+        description={`This permanently removes ${fullName} and any timeline activity from the candidate pipeline. This cannot be undone.`}
+        confirmLabel="Delete lead"
+        tone="danger"
+        loading={deleting}
+        onConfirm={async () => {
+          await handleDelete();
+          setConfirmDeleteOpen(false);
         }}
       />
     </div>

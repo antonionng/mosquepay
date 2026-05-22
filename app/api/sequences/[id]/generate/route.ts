@@ -157,6 +157,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         enable_guest_tickets: false,
         guest_ticket_price: null,
         guest_ticket_description: null,
+        guest_policy: "blue_table",
         featured_image_url: null,
         created_by: null,
         published: false,

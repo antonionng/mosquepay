@@ -68,6 +68,21 @@ type Automation = {
   last_run_at: string | null;
 };
 
+type EventLite = {
+  id: string;
+  title: string;
+  event_date: string;
+};
+
+type CommunicationCategory =
+  | "members_newsletter"
+  | "post_meeting_recap"
+  | "event_reminder"
+  | "candidate_follow_up"
+  | "dues_reminder"
+  | "welfare_check_in"
+  | "charity_appeal";
+
 type MarketplaceTemplate = {
   template_key: string;
   name: string;
@@ -92,22 +107,35 @@ const statusColor: Record<string, "success" | "warning" | "destructive" | "secon
   skipped: "secondary",
 };
 
+const AI_CATEGORIES: Array<{ value: CommunicationCategory; label: string }> = [
+  { value: "members_newsletter", label: "Members newsletter" },
+  { value: "post_meeting_recap", label: "Post-meeting recap" },
+  { value: "event_reminder", label: "Event reminder" },
+  { value: "candidate_follow_up", label: "Candidate follow-up" },
+  { value: "dues_reminder", label: "Dues reminder" },
+  { value: "welfare_check_in", label: "Welfare check-in" },
+  { value: "charity_appeal", label: "Charity appeal" },
+];
+
 export function CommunicationsClient({
   templates,
   messages,
   automations,
   marketplaceTemplates,
   audienceCounts,
+  events,
 }: {
   templates: Template[];
   messages: Message[];
   automations: Automation[];
   marketplaceTemplates: MarketplaceTemplate[];
   audienceCounts: { active_members: number };
+  events: EventLite[];
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("ai-draft");
   const blank = useMemo(
     () => templates.find((t) => t.template_key === "system.newsletter.blank") ?? templates[0],
     [templates]
@@ -132,6 +160,11 @@ export function CommunicationsClient({
     subject: string;
     audience: string;
   } | null>(null);
+  const [aiCategory, setAiCategory] =
+    useState<CommunicationCategory>("members_newsletter");
+  const [aiEventId, setAiEventId] = useState(events[0]?.id ?? "");
+  const [aiNotes, setAiNotes] = useState("");
+  const [aiNotesForAdmin, setAiNotesForAdmin] = useState<string[]>([]);
 
   function openCreateTemplate() {
     setEditor({
@@ -209,6 +242,81 @@ export function CommunicationsClient({
       html_body: t.html_body,
       audience: draft.audience,
     });
+  }
+
+  async function draftWithAi() {
+    setBusy("ai-draft");
+    setFeedback(null);
+    setAiNotesForAdmin([]);
+    try {
+      const res = await fetch("/api/ai/communications-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: aiCategory,
+          event_id: aiEventId,
+          notes: aiNotes,
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? "Could not draft communication.");
+      setDraft((current) => ({
+        ...current,
+        template_key: "",
+        subject: body.draft.subject,
+        html_body: body.draft.html_body,
+        audience: body.draft.recommended_audience,
+      }));
+      setAiNotesForAdmin(body.draft.admin_notes ?? []);
+      setActiveTab("newsletter");
+      setFeedback(
+        body.source === "ai"
+          ? "AI draft applied to the newsletter composer."
+          : "Fallback draft applied to the newsletter composer."
+      );
+    } catch (error) {
+      setFeedback(
+        error instanceof Error ? error.message : "Could not draft communication."
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function draftTemplateWithAi() {
+    setBusy("ai-template");
+    setFeedback(null);
+    try {
+      const res = await fetch("/api/ai/communications-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: aiCategory,
+          event_id: aiEventId,
+          notes:
+            aiNotes ||
+            "Draft a reusable communications template. Keep merge tags and make it suitable for lodge admins to adapt later.",
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? "Could not draft template.");
+      setEditor({
+        mode: "create",
+        template_key: `custom.ai-${aiCategory.replaceAll("_", "-")}`,
+        name:
+          AI_CATEGORIES.find((category) => category.value === aiCategory)?.label ??
+          "AI template",
+        subject: body.draft.subject,
+        html_body: body.draft.html_body,
+      });
+      setAiNotesForAdmin(body.draft.admin_notes ?? []);
+      setActiveTab("templates");
+      setFeedback("AI draft opened as a new editable template.");
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : "Could not draft template.");
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function send(dry: boolean) {
@@ -330,8 +438,9 @@ export function CommunicationsClient({
         </div>
       )}
 
-      <Tabs defaultValue="newsletter">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
+          <TabsTrigger value="ai-draft">AI draft</TabsTrigger>
           <TabsTrigger value="newsletter">Newsletter</TabsTrigger>
           <TabsTrigger value="automations">Automations</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
@@ -339,10 +448,139 @@ export function CommunicationsClient({
           <TabsTrigger value="library">Library</TabsTrigger>
         </TabsList>
 
+        <TabsContent value="ai-draft">
+          <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-5 shadow-sm">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+                    <Sparkles className="h-5 w-5 text-amber-600" />
+                    AI communications draft
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Generate a first draft, then continue in the normal newsletter composer,
+                    template editor, audience preview, and send history.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                <Field label="Draft type">
+                  <select
+                    value={aiCategory}
+                    onChange={(e) =>
+                      setAiCategory(e.target.value as CommunicationCategory)
+                    }
+                    className="h-10 w-full rounded-lg border border-amber-200 bg-white px-3 text-sm"
+                  >
+                    {AI_CATEGORIES.map((category) => (
+                      <option key={category.value} value={category.value}>
+                        {category.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Related meeting or event">
+                  <select
+                    value={aiEventId}
+                    onChange={(e) => setAiEventId(e.target.value)}
+                    className="h-10 w-full rounded-lg border border-amber-200 bg-white px-3 text-sm"
+                  >
+                    <option value="">No event</option>
+                    {events.map((event) => (
+                      <option key={event.id} value={event.id}>
+                        {event.title} (
+                        {new Date(event.event_date).toLocaleDateString("en-GB")})
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+              <Field label="Prompt notes">
+                <textarea
+                  rows={5}
+                  value={aiNotes}
+                  onChange={(e) => setAiNotes(e.target.value)}
+                  className="w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm"
+                  placeholder="Key points, tone, deadline, CTA, audience context, or anything the Secretary wants included."
+                />
+              </Field>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button onClick={draftWithAi} disabled={busy === "ai-draft"}>
+                  {busy === "ai-draft" ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-2 h-4 w-4" />
+                  )}
+                  Draft newsletter
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={draftTemplateWithAi}
+                  disabled={busy === "ai-template"}
+                >
+                  {busy === "ai-template" ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Pencil className="mr-2 h-4 w-4" />
+                  )}
+                  Draft reusable template
+                </Button>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-sm font-semibold text-slate-900">Where AI connects</p>
+              <div className="mt-3 space-y-3 text-sm text-slate-600">
+                <p>
+                  <strong>Newsletter:</strong> AI fills subject, body, and recommended
+                  audience, then you preview and send normally.
+                </p>
+                <p>
+                  <strong>Templates:</strong> AI can create a reusable template that you
+                  review and save into the template library.
+                </p>
+                <p>
+                  <strong>Automations:</strong> automated birthday and post-meeting sends
+                  still use the template library, so improving templates improves automation
+                  output too.
+                </p>
+                <p>
+                  <strong>History:</strong> every sent AI-assisted email is logged in the
+                  same message history.
+                </p>
+              </div>
+              {aiNotesForAdmin.length > 0 && (
+                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-slate-700">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    AI review notes
+                  </p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    {aiNotesForAdmin.map((note, index) => (
+                      <li key={index}>{note}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        </TabsContent>
+
         <TabsContent value="newsletter">
           <div className="grid gap-4 lg:grid-cols-3">
             <div className="space-y-3 lg:col-span-2">
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-slate-900">
+                    Newsletter composer
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setActiveTab("ai-draft")}
+                  >
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Use AI draft
+                  </Button>
+                </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="Template">
                     <select

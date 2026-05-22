@@ -29,6 +29,7 @@ export default async function EditEventPage({
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
   const lodgeId = ctx.mode === "database" ? ctx.lodgeId : null;
+  const lodgeSlug = ctx.mode === "database" ? ctx.lodgeSlug : "covenant-4344";
   const event = useMock
     ? mockDb.getEventById(id)
     : lodgeId
@@ -114,7 +115,7 @@ export default async function EditEventPage({
           </Link>
         </Button>
         {event.enable_payments && (
-          <CopyPaymentLink slug={event.slug} />
+          <CopyPaymentLink lodgeSlug={lodgeSlug} slug={event.slug} />
         )}
       </div>
 

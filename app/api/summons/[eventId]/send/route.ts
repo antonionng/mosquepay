@@ -96,7 +96,6 @@ export async function POST(request: NextRequest, { params }: Params) {
     );
     const resend = new Resend(resendKey);
     const venue = [event.location, event.temple_room].filter(Boolean).join(", ");
-    const rsvpUrl = `${siteUrl}/events/${event.slug}?lodge=${encodeURIComponent(lodgeSlug)}`;
     const agendaItems = summons?.agenda_items?.length
       ? summons.agenda_items
       : defaultAgendaItems();
@@ -111,6 +110,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       try {
         const token = randomBytes(32).toString("base64url");
         const summonsUrl = `${siteUrl}/summons/${token}`;
+        const rsvpUrl = `${summonsUrl}#rsvp`;
         if (testRecipientEmail) {
           testUrls.push({
             email: member.email,
@@ -144,6 +144,14 @@ export async function POST(request: NextRequest, { params }: Params) {
             agendaItems,
             menuItems,
             notices,
+            masterElectName: summons?.master_elect_name ?? null,
+            masterElectQualification: summons?.master_elect_qualification ?? null,
+            visitingOfficers: summons?.visiting_officers ?? [],
+            visitingOfficerName: summons?.visiting_officer_name ?? null,
+            visitingOfficerEmail: summons?.visiting_officer_email ?? null,
+            visitingOfficerPhone: summons?.visiting_officer_phone ?? null,
+            nextMeetingDate: summons?.next_meeting_date ?? null,
+            nextMeetingNote: summons?.next_meeting_note ?? null,
           }),
         });
 

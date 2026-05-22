@@ -31,9 +31,9 @@ const faqs = [
       "Yes. Multi-lodge support is a core feature. Each lodge gets its own branded website, member directory, and payment settings, while provincial administrators get a unified oversight panel with cross-lodge reporting, candidate pipeline visibility, and financial summaries.",
   },
   {
-    question: "How is pricing structured? Are there any hidden fees?",
+    question: "How are plans structured? Are there any hidden fees?",
     answer:
-      "LodgePay offers transparent per-lodge pricing with no hidden costs. Stripe payment processing fees are standard (passed through at cost). There are no setup fees, and you can start with a free trial to explore the full platform before committing. Volume discounts are available for provincial rollouts.",
+      "LodgePay offers transparent per-lodge plans with no hidden costs. Stripe payment processing fees are standard and passed through at cost. There are no setup fees, and you can start with a trial to explore the full platform before committing. Volume discounts are available for provincial rollouts.",
   },
   {
     question: "We're new to digital lodge management. Do you offer onboarding support?",

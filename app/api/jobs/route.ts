@@ -1,3 +1,6 @@
+// crud-audit:ignore
+// Job queue surface. Jobs enqueue via POST and progress automatically; they
+// are not mutated by hand through this API.
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";

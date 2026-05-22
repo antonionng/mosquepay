@@ -38,6 +38,7 @@ export const ENTITLEMENT_KEYS = [
   "ai",
   "integrations",
   "mentor",
+  "guest_links",
 ] as const;
 
 export type EntitlementKey = (typeof ENTITLEMENT_KEYS)[number];
@@ -73,6 +74,7 @@ const ESSENTIALS_ENTITLEMENTS: EntitlementKey[] = [
   "treasurer_reports",
   "secretary_reports",
   "charity",
+  "guest_links",
 ];
 
 const COMPLETE_EXTRA_ENTITLEMENTS: EntitlementKey[] = [

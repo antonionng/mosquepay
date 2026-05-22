@@ -14,8 +14,6 @@ export type OrderableMember = {
   directory_sort_order: number | null;
 };
 
-type Mode = "officer" | "directory";
-
 export function MemberOrderPanel({
   members,
   onClose,
@@ -24,16 +22,10 @@ export function MemberOrderPanel({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("officer");
-  const [list, setList] = useState<OrderableMember[]>(() => sorted(members, "officer"));
+  const [list, setList] = useState<OrderableMember[]>(() => sorted(members));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-
-  function changeMode(next: Mode) {
-    setMode(next);
-    setList(sorted(members, next));
-  }
 
   function move(id: string, delta: number) {
     setList((prev) => {
@@ -54,14 +46,10 @@ export function MemberOrderPanel({
       await Promise.all(
         list.map((m, idx) => {
           const order = idx + 1;
-          const update =
-            mode === "officer"
-              ? { officer_sort_order: order }
-              : { directory_sort_order: order };
           return fetch(`/api/members/${m.id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(update),
+            body: JSON.stringify({ directory_sort_order: order }),
           });
         })
       );
@@ -88,10 +76,11 @@ export function MemberOrderPanel({
         <div className="flex items-center justify-between border-b border-dash-border bg-dash-surface-subtle px-6 py-4">
           <div>
             <h2 className="text-lg font-semibold text-dash-text">
-              Order {mode === "officer" ? "officers" : "directory"}
+              Order directory
             </h2>
             <p className="text-xs text-dash-muted">
-              Use the arrows to set the order shown on summons.
+              Drag the order members appear in the summons directory list.
+              Officer positions are managed in the Offices tab.
             </p>
           </div>
           <button
@@ -102,36 +91,14 @@ export function MemberOrderPanel({
           </button>
         </div>
 
-        <div className="flex items-center gap-1 border-b border-dash-border bg-dash-surface px-6 py-3">
-          <Button
-            type="button"
-            size="sm"
-            variant={mode === "officer" ? "primary" : "ghost"}
-            onClick={() => changeMode("officer")}
-          >
-            Officers
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={mode === "directory" ? "primary" : "ghost"}
-            onClick={() => changeMode("directory")}
-          >
-            Directory
-          </Button>
-        </div>
-
         <CardContent className="flex-1 overflow-y-auto bg-dash-surface p-4">
           {list.length === 0 ? (
             <p className="px-2 py-6 text-center text-sm text-dash-muted">
-              No members{mode === "officer" ? " with an office title" : ""} yet.
+              No members yet.
             </p>
           ) : (
             <ol className="space-y-1">
               {list
-                .filter((m) =>
-                  mode === "officer" ? Boolean(m.office_title) : true
-                )
                 .map((m, idx, visible) => (
                   <li
                     key={m.id}
@@ -214,15 +181,8 @@ export function MemberOrderPanel({
   );
 }
 
-function sorted(members: OrderableMember[], mode: Mode): OrderableMember[] {
+function sorted(members: OrderableMember[]): OrderableMember[] {
   const copy = [...members];
-  if (mode === "officer") {
-    return copy.sort(
-      (a, b) =>
-        (a.officer_sort_order ?? 9999) - (b.officer_sort_order ?? 9999) ||
-        a.full_name.localeCompare(b.full_name)
-    );
-  }
   return copy.sort(
     (a, b) =>
       (a.directory_sort_order ?? 9999) - (b.directory_sort_order ?? 9999) ||

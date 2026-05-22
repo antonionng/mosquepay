@@ -37,6 +37,8 @@ import type {
   EventRitualRole,
   OfficerLadderRung,
   EventGuest,
+  Guest,
+  GuestInvitation,
   Member,
   EventSummons,
   EventSummonsSend,
@@ -451,6 +453,19 @@ export async function updateLead(
   return data as Lead | null;
 }
 
+export async function deleteLead(
+  id: string,
+  lodgeId: string
+): Promise<{ deleted: boolean }> {
+  const { error, count } = await db()
+    .from("leads")
+    .delete({ count: "exact" })
+    .eq("id", id)
+    .eq("lodge_id", lodgeId);
+  if (error) throw error;
+  return { deleted: (count ?? 0) > 0 };
+}
+
 // ---------------------------------------------------------------------------
 // Lead Activities
 // ---------------------------------------------------------------------------
@@ -727,6 +742,22 @@ export async function getPaymentByStripeId(
     .from("payments")
     .select("*")
     .eq("stripe_payment_intent_id", stripePaymentIntentId)
+    .maybeSingle();
+  if (error) throw error;
+  return data as Payment | null;
+}
+
+// Lookup by Mooov-side payment id (e.g. don_<lodge>_<rand>). The Mooov webhook
+// handler uses this for idempotency when projecting payment.succeeded /
+// payment.captured into public.payments, the same way getPaymentByStripeId
+// is used in the legacy Stripe webhook path.
+export async function getPaymentByMooovId(
+  mooovPaymentId: string
+): Promise<Payment | null> {
+  const { data, error } = await db()
+    .from("payments")
+    .select("*")
+    .eq("mooov_payment_id", mooovPaymentId)
     .maybeSingle();
   if (error) throw error;
   return data as Payment | null;
@@ -2797,6 +2828,24 @@ export async function upsertOfficerLadderRung(
   return row as OfficerLadderRung;
 }
 
+export async function patchOfficerLadderRung(
+  id: string,
+  lodgeId: string,
+  patch: Partial<Pick<OfficerLadderRung,
+    "current_member_id" | "successor_member_id" | "notes" | "rung_label" | "sort_order"
+  >>
+): Promise<OfficerLadderRung> {
+  const { data, error } = await db()
+    .from("officer_ladder")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("lodge_id", lodgeId)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as OfficerLadderRung;
+}
+
 export async function deleteOfficerLadderRung(
   id: string,
   lodgeId: string
@@ -3491,4 +3540,384 @@ export async function getPlatformLodgeStats(): Promise<PlatformLodgeStats[]> {
     });
   }
   return stats;
+}
+
+// ---------------------------------------------------------------------------
+// Guests directory and guest invitations
+// ---------------------------------------------------------------------------
+
+export async function listGuests(
+  lodgeId: string,
+  opts?: { search?: string; includeArchived?: boolean }
+): Promise<Guest[]> {
+  let query = db()
+    .from("guests")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .order("last_seen_event_id", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false });
+  if (!opts?.includeArchived) {
+    query = query.is("archived_at", null);
+  }
+  if (opts?.search) {
+    const term = `%${opts.search}%`;
+    query = query.or(
+      `full_name.ilike.${term},email.ilike.${term},mother_lodge_name.ilike.${term}`
+    );
+  }
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as Guest[];
+}
+
+export async function getGuestById(
+  id: string,
+  lodgeId: string
+): Promise<Guest | null> {
+  const { data, error } = await db()
+    .from("guests")
+    .select("*")
+    .eq("id", id)
+    .eq("lodge_id", lodgeId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as Guest | null) ?? null;
+}
+
+export async function findGuestByEmail(
+  lodgeId: string,
+  email: string
+): Promise<Guest | null> {
+  const { data, error } = await db()
+    .from("guests")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .ilike("email", email)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as Guest | null) ?? null;
+}
+
+export async function findGuestByNameAndLodge(
+  lodgeId: string,
+  fullName: string,
+  motherLodgeName: string | null
+): Promise<Guest | null> {
+  let query = db()
+    .from("guests")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .ilike("full_name", fullName)
+    .limit(1);
+  if (motherLodgeName) {
+    query = query.ilike("mother_lodge_name", motherLodgeName);
+  } else {
+    query = query.is("mother_lodge_name", null);
+  }
+  const { data, error } = await query.maybeSingle();
+  if (error) throw error;
+  return (data as Guest | null) ?? null;
+}
+
+export async function createGuest(
+  lodgeId: string,
+  guest: Partial<Omit<Guest, "id" | "lodge_id" | "created_at" | "updated_at">> & {
+    full_name: string;
+  }
+): Promise<Guest> {
+  const { data, error } = await db()
+    .from("guests")
+    .insert({ ...guest, lodge_id: lodgeId })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as Guest;
+}
+
+export async function updateGuest(
+  id: string,
+  lodgeId: string,
+  patch: Partial<Omit<Guest, "id" | "lodge_id" | "created_at">>
+): Promise<Guest> {
+  const { data, error } = await db()
+    .from("guests")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("lodge_id", lodgeId)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as Guest;
+}
+
+export async function archiveGuest(
+  id: string,
+  lodgeId: string
+): Promise<Guest> {
+  return updateGuest(id, lodgeId, {
+    archived_at: new Date().toISOString(),
+  });
+}
+
+export async function restoreGuest(
+  id: string,
+  lodgeId: string
+): Promise<Guest> {
+  return updateGuest(id, lodgeId, { archived_at: null });
+}
+
+export async function hardDeleteGuestIfUnused(
+  id: string,
+  lodgeId: string
+): Promise<{ deleted: boolean }> {
+  const guest = await getGuestById(id, lodgeId);
+  if (!guest) return { deleted: false };
+  if ((guest.visit_count ?? 0) > 0) return { deleted: false };
+  const { error } = await db()
+    .from("guests")
+    .delete()
+    .eq("id", id)
+    .eq("lodge_id", lodgeId);
+  if (error) throw error;
+  return { deleted: true };
+}
+
+export async function setGuestVisitorTokenHash(
+  id: string,
+  lodgeId: string,
+  tokenHash: string
+): Promise<Guest> {
+  return updateGuest(id, lodgeId, { visitor_token_hash: tokenHash });
+}
+
+export async function getGuestByVisitorTokenHash(
+  tokenHash: string
+): Promise<Guest | null> {
+  const { data, error } = await db()
+    .from("guests")
+    .select("*")
+    .eq("visitor_token_hash", tokenHash)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as Guest | null) ?? null;
+}
+
+export async function upsertGuest(
+  lodgeId: string,
+  input: {
+    full_name: string;
+    email?: string | null;
+    phone?: string | null;
+    mother_lodge_name?: string | null;
+    mother_lodge_number?: string | null;
+    constitution?: string | null;
+    rank?: string | null;
+    dietary_requirements?: string | null;
+    is_mason?: boolean;
+    event_id?: string | null;
+    source?:
+      | "admin"
+      | "member_invite"
+      | "self_invite_event"
+      | "self_register";
+    /** When true, bumps visit_count and updates last_seen_event_id. Defaults to true. */
+    recordVisit?: boolean;
+  }
+): Promise<Guest> {
+  const email = input.email?.trim() || null;
+  const fullName = input.full_name.trim();
+  const motherLodgeName = input.mother_lodge_name?.trim() || null;
+  const recordVisit = input.recordVisit !== false;
+
+  const existing = email
+    ? await findGuestByEmail(lodgeId, email)
+    : await findGuestByNameAndLodge(lodgeId, fullName, motherLodgeName);
+
+  if (existing) {
+    return updateGuest(existing.id, lodgeId, {
+      full_name: fullName || existing.full_name,
+      email: email ?? existing.email,
+      phone: input.phone?.trim() ?? existing.phone,
+      mother_lodge_name: motherLodgeName ?? existing.mother_lodge_name,
+      mother_lodge_number:
+        input.mother_lodge_number?.trim() ?? existing.mother_lodge_number,
+      constitution: input.constitution?.trim() ?? existing.constitution,
+      rank: input.rank?.trim() ?? existing.rank,
+      dietary_requirements:
+        input.dietary_requirements?.trim() ?? existing.dietary_requirements,
+      is_mason: input.is_mason ?? existing.is_mason,
+      visit_count: recordVisit ? existing.visit_count + 1 : existing.visit_count,
+      last_seen_event_id: recordVisit
+        ? (input.event_id ?? existing.last_seen_event_id)
+        : existing.last_seen_event_id,
+      first_seen_event_id:
+        existing.first_seen_event_id ?? input.event_id ?? null,
+    });
+  }
+
+  return createGuest(lodgeId, {
+    full_name: fullName,
+    email,
+    phone: input.phone?.trim() || null,
+    mother_lodge_name: motherLodgeName,
+    mother_lodge_number: input.mother_lodge_number?.trim() || null,
+    constitution: input.constitution?.trim() || null,
+    rank: input.rank?.trim() || null,
+    dietary_requirements: input.dietary_requirements?.trim() || null,
+    is_mason: input.is_mason ?? true,
+    visit_count: recordVisit ? 1 : 0,
+    first_seen_event_id: input.event_id ?? null,
+    last_seen_event_id: recordVisit ? (input.event_id ?? null) : null,
+    notes: null,
+    archived_at: null,
+    source: input.source ?? "admin",
+  });
+}
+
+export async function createGuestInvitation(
+  lodgeId: string,
+  data: Omit<
+    GuestInvitation,
+    | "id"
+    | "lodge_id"
+    | "uses"
+    | "created_at"
+    | "last_used_at"
+    | "revoked_at"
+    | "guest_id"
+  > & { uses?: number; guest_id?: string | null }
+): Promise<GuestInvitation> {
+  const { data: row, error } = await db()
+    .from("guest_invitations")
+    .insert({ ...data, lodge_id: lodgeId, uses: data.uses ?? 0 })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return row as GuestInvitation;
+}
+
+export async function getGuestInvitationByTokenHash(
+  tokenHash: string
+): Promise<GuestInvitation | null> {
+  const { data, error } = await db()
+    .from("guest_invitations")
+    .select("*")
+    .eq("token_hash", tokenHash)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as GuestInvitation | null) ?? null;
+}
+
+export async function getGuestInvitationById(
+  id: string,
+  lodgeId: string
+): Promise<GuestInvitation | null> {
+  const { data, error } = await db()
+    .from("guest_invitations")
+    .select("*")
+    .eq("id", id)
+    .eq("lodge_id", lodgeId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as GuestInvitation | null) ?? null;
+}
+
+export async function listGuestInvitationsForGuest(
+  guestId: string,
+  lodgeId: string
+): Promise<GuestInvitation[]> {
+  const { data, error } = await db()
+    .from("guest_invitations")
+    .select("*")
+    .eq("guest_id", guestId)
+    .eq("lodge_id", lodgeId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as GuestInvitation[];
+}
+
+export async function listGuestInvitationsForEvent(
+  eventId: string,
+  lodgeId: string
+): Promise<GuestInvitation[]> {
+  const { data, error } = await db()
+    .from("guest_invitations")
+    .select("*")
+    .eq("event_id", eventId)
+    .eq("lodge_id", lodgeId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as GuestInvitation[];
+}
+
+export async function listGuestInvitationsForMember(
+  memberId: string,
+  lodgeId: string
+): Promise<GuestInvitation[]> {
+  const { data, error } = await db()
+    .from("guest_invitations")
+    .select("*")
+    .eq("inviter_member_id", memberId)
+    .eq("lodge_id", lodgeId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as GuestInvitation[];
+}
+
+export async function recordGuestInvitationUse(
+  id: string,
+  currentUses: number
+): Promise<GuestInvitation | null> {
+  const { data, error } = await db()
+    .from("guest_invitations")
+    .update({
+      uses: currentUses + 1,
+      last_used_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  return (data as GuestInvitation | null) ?? null;
+}
+
+export async function revokeGuestInvitation(
+  id: string,
+  lodgeId: string
+): Promise<void> {
+  const { error } = await db()
+    .from("guest_invitations")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("lodge_id", lodgeId);
+  if (error) throw error;
+}
+
+export async function listEventGuestsForLodge(
+  lodgeId: string,
+  opts?: { eventId?: string; guestId?: string }
+): Promise<EventGuest[]> {
+  let query = db()
+    .from("event_guests")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .order("created_at", { ascending: false });
+  if (opts?.eventId) query = query.eq("event_id", opts.eventId);
+  if (opts?.guestId) query = query.eq("guest_id", opts.guestId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as EventGuest[];
+}
+
+export async function markEventGuestWelcomeSent(
+  ids: string[],
+  lodgeId: string
+): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await db()
+    .from("event_guests")
+    .update({ welcome_email_sent_at: new Date().toISOString() })
+    .in("id", ids)
+    .eq("lodge_id", lodgeId);
+  if (error) throw error;
 }
