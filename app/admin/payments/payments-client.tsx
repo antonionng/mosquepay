@@ -49,6 +49,7 @@ type Payment = {
   refund_amount: number;
   status: string;
   charity_name: string | null;
+  mooov_payment_id?: string | null;
   stripe_payment_intent_id: string | null;
   created_at: string;
 };
