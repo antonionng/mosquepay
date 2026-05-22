@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import { useViewerSession } from "@/lib/hooks/use-viewer-session";
 
 const nav = [
   { href: "/features", label: "Features" },
@@ -69,6 +70,8 @@ const footerCols = [
 
 export function MarketingLanding() {
   const [open, setOpen] = useState(false);
+  const viewer = useViewerSession();
+  const isAuthed = viewer.status === "admin" || viewer.status === "member";
 
   return (
     <div className="min-h-screen bg-dash-bg text-dash-text antialiased">
@@ -104,12 +107,26 @@ export function MarketingLanding() {
             >
               Book a demo
             </Link>
-            <Link
-              href="/admin/login"
-              className="rounded-lg bg-dash-ring px-4 py-2.5 text-sm font-semibold text-white shadow-dash transition-colors hover:bg-dash-ring-dark"
-            >
-              Login
-            </Link>
+            {viewer.status === "loading" ? (
+              <span
+                aria-hidden
+                className="h-[2.625rem] w-24 animate-pulse rounded-lg bg-dash-border/60"
+              />
+            ) : isAuthed && viewer.destination ? (
+              <Link
+                href={viewer.destination}
+                className="rounded-lg bg-dash-ring px-4 py-2.5 text-sm font-semibold text-white shadow-dash transition-colors hover:bg-dash-ring-dark"
+              >
+                {viewer.label ?? "Open dashboard"}
+              </Link>
+            ) : (
+              <Link
+                href="/admin/login"
+                className="rounded-lg bg-dash-ring px-4 py-2.5 text-sm font-semibold text-white shadow-dash transition-colors hover:bg-dash-ring-dark"
+              >
+                Login
+              </Link>
+            )}
           </div>
 
           <button
@@ -143,13 +160,23 @@ export function MarketingLanding() {
                 >
                   Book a demo
                 </Link>
-                <Link
-                  href="/admin/login"
-                  className="rounded-lg bg-dash-ring py-2.5 text-center text-sm font-semibold text-white"
-                  onClick={() => setOpen(false)}
-                >
-                  Login
-                </Link>
+                {isAuthed && viewer.destination ? (
+                  <Link
+                    href={viewer.destination}
+                    className="rounded-lg bg-dash-ring py-2.5 text-center text-sm font-semibold text-white"
+                    onClick={() => setOpen(false)}
+                  >
+                    {viewer.label ?? "Open dashboard"}
+                  </Link>
+                ) : (
+                  <Link
+                    href="/admin/login"
+                    className="rounded-lg bg-dash-ring py-2.5 text-center text-sm font-semibold text-white"
+                    onClick={() => setOpen(false)}
+                  >
+                    Login
+                  </Link>
+                )}
               </div>
             </nav>
           </div>

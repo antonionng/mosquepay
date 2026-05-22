@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { resolveLodgeSlug } from "@/lib/tenant";
 import type { LodgeSiteHeaderSettings } from "@/lib/db/types";
 import { defaultHeaderSettings } from "@/lib/site-section-style";
+import { useViewerSession } from "@/lib/hooks/use-viewer-session";
 
 type NavLink = {
   href: string;
@@ -102,6 +103,8 @@ export function PublicHeader({
   const searchParams = useSearchParams();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const viewer = useViewerSession();
+  const isAuthed = viewer.status === "admin" || viewer.status === "member";
   const [branding, setBranding] = useState<LodgeBranding | null>(initialBranding);
   const [hostTenantSlug, setHostTenantSlug] = useState<string | null>(initialTenantSlug);
   const [customNavLinks, setCustomNavLinks] = useState<NavLink[]>(
@@ -224,12 +227,26 @@ export function PublicHeader({
             >
               Book a demo
             </Link>
-            <Link
-              href="/admin/login"
-              className="rounded-lg bg-dash-ring px-4 py-2.5 text-sm font-semibold text-white shadow-dash transition-colors hover:bg-dash-ring-dark"
-            >
-              Login
-            </Link>
+            {viewer.status === "loading" ? (
+              <span
+                aria-hidden
+                className="h-[2.625rem] w-24 animate-pulse rounded-lg bg-dash-border/60"
+              />
+            ) : isAuthed && viewer.destination ? (
+              <Link
+                href={viewer.destination}
+                className="rounded-lg bg-dash-ring px-4 py-2.5 text-sm font-semibold text-white shadow-dash transition-colors hover:bg-dash-ring-dark"
+              >
+                {viewer.label ?? "Open dashboard"}
+              </Link>
+            ) : (
+              <Link
+                href="/admin/login"
+                className="rounded-lg bg-dash-ring px-4 py-2.5 text-sm font-semibold text-white shadow-dash transition-colors hover:bg-dash-ring-dark"
+              >
+                Login
+              </Link>
+            )}
           </div>
 
           <button
@@ -263,13 +280,23 @@ export function PublicHeader({
                 >
                   Book a demo
                 </Link>
-                <Link
-                  href="/admin/login"
-                  className="rounded-lg bg-dash-ring py-2.5 text-center text-sm font-semibold text-white"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  Login
-                </Link>
+                {isAuthed && viewer.destination ? (
+                  <Link
+                    href={viewer.destination}
+                    className="rounded-lg bg-dash-ring py-2.5 text-center text-sm font-semibold text-white"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    {viewer.label ?? "Open dashboard"}
+                  </Link>
+                ) : (
+                  <Link
+                    href="/admin/login"
+                    className="rounded-lg bg-dash-ring py-2.5 text-center text-sm font-semibold text-white"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    Login
+                  </Link>
+                )}
               </div>
             </nav>
           </div>
@@ -400,13 +427,30 @@ export function PublicHeader({
               </Button>
             ) : null}
             {!isTenantMode ? (
-              <Button
-                asChild
-                size="sm"
-                className="bg-dash-ring text-white hover:bg-dash-ring-dark"
-              >
-                <Link href="/admin/login">Login</Link>
-              </Button>
+              viewer.status === "loading" ? (
+                <span
+                  aria-hidden
+                  className="h-9 w-24 animate-pulse rounded-md bg-dash-border/60"
+                />
+              ) : isAuthed && viewer.destination ? (
+                <Button
+                  asChild
+                  size="sm"
+                  className="bg-dash-ring text-white hover:bg-dash-ring-dark"
+                >
+                  <Link href={viewer.destination}>
+                    {viewer.label ?? "Open dashboard"}
+                  </Link>
+                </Button>
+              ) : (
+                <Button
+                  asChild
+                  size="sm"
+                  className="bg-dash-ring text-white hover:bg-dash-ring-dark"
+                >
+                  <Link href="/admin/login">Login</Link>
+                </Button>
+              )
             ) : null}
           </div>
         </nav>
@@ -471,11 +515,22 @@ export function PublicHeader({
             </div>
           ) : null}
             {!isTenantMode ? (
-              <Button asChild className="mt-2 w-full bg-dash-ring text-white hover:bg-dash-ring-dark">
-                <Link href="/admin/login" onClick={() => setMobileOpen(false)}>
-                  Login
-                </Link>
-              </Button>
+              isAuthed && viewer.destination ? (
+                <Button asChild className="mt-2 w-full bg-dash-ring text-white hover:bg-dash-ring-dark">
+                  <Link
+                    href={viewer.destination}
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    {viewer.label ?? "Open dashboard"}
+                  </Link>
+                </Button>
+              ) : (
+                <Button asChild className="mt-2 w-full bg-dash-ring text-white hover:bg-dash-ring-dark">
+                  <Link href="/admin/login" onClick={() => setMobileOpen(false)}>
+                    Login
+                  </Link>
+                </Button>
+              )
             ) : null}
         </nav>
       </div>
