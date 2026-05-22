@@ -2,8 +2,9 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +15,8 @@ function AcceptInviteForm() {
   const searchParams = useSearchParams();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [status, setStatus] = useState<"checking" | "ready" | "saved" | "error">(
     "checking"
   );
@@ -116,9 +119,19 @@ function AcceptInviteForm() {
     }
   }
 
+  const inputsDisabled = status === "error" && !password;
+
   return (
     <div className="w-full max-w-sm">
-      <div className="mb-8 text-center">
+      <div className="mb-8 flex flex-col items-center text-center">
+        <Image
+          src="/brand/lodgepay-admin-signin.png"
+          alt="LodgePay"
+          width={1024}
+          height={1024}
+          priority
+          className="mb-6 h-44 w-44 object-contain"
+        />
         <h1 className="text-3xl font-semibold tracking-tight text-dash-text">
           Accept Your Invite
         </h1>
@@ -154,30 +167,33 @@ function AcceptInviteForm() {
 
             <div className="space-y-2">
               <Label htmlFor="password">New password</Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                required
-                minLength={8}
-                disabled={status === "error" && !password}
+                show={showPassword}
+                onToggleShow={() => setShowPassword((current) => !current)}
+                placeholder="At least 8 characters"
+                disabled={inputsDisabled}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm-password">Confirm password</Label>
-              <Input
+              <PasswordInput
                 id="confirm-password"
-                type="password"
                 value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
-                required
-                minLength={8}
-                disabled={status === "error" && !password}
+                show={showConfirmPassword}
+                onToggleShow={() =>
+                  setShowConfirmPassword((current) => !current)
+                }
+                placeholder="Re-enter your new password"
+                disabled={inputsDisabled}
               />
             </div>
             <Button
               type="submit"
+              variant="brand"
               className="w-full"
               disabled={saving || status === "error"}
             >
@@ -188,17 +204,66 @@ function AcceptInviteForm() {
       </div>
 
       <p className="mt-6 text-center">
-        <Link href="/admin/login" className="text-sm text-dash-muted hover:text-blue-600">
-          Back to admin login
+        <Link
+          href="/admin/login"
+          className="text-sm text-dash-muted transition-colors hover:text-brand"
+        >
+          ← Back to admin login
         </Link>
       </p>
     </div>
   );
 }
 
+function PasswordInput({
+  id,
+  value,
+  onChange,
+  show,
+  onToggleShow,
+  placeholder,
+  disabled,
+}: {
+  id: string;
+  value: string;
+  onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  show: boolean;
+  onToggleShow: () => void;
+  placeholder?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="relative">
+      <Input
+        id={id}
+        variant="dashboard"
+        type={show ? "text" : "password"}
+        value={value}
+        onChange={onChange}
+        required
+        minLength={8}
+        disabled={disabled}
+        placeholder={placeholder}
+        autoComplete="new-password"
+        className="pr-11"
+      />
+      <button
+        type="button"
+        onClick={onToggleShow}
+        aria-label={show ? "Hide password" : "Show password"}
+        aria-pressed={show}
+        tabIndex={-1}
+        className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-dash-muted transition-colors hover:text-dash-text focus-visible:text-dash-text focus-visible:outline-none"
+      >
+        {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </button>
+    </div>
+  );
+}
+
 export default function AcceptInvitePage() {
   return (
-    <div className="admin-shell flex min-h-screen items-center justify-center p-6">
+    <div className="admin-dashboard-light flex min-h-screen items-center justify-center bg-dash-bg p-6">
       <Suspense fallback={<div className="text-dash-muted">Loading...</div>}>
         <AcceptInviteForm />
       </Suspense>
