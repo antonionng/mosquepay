@@ -271,21 +271,21 @@ export function AdminPaymentsClient({
     if (kind === "payments") {
       downloadCsv(
         "payments-received.csv",
-        ["Date", "Name", "Email", "Amount", "Status", "Stripe intent"],
+        ["Date", "Name", "Email", "Amount", "Status", "Mooov reference"],
         succeeded.map((p) => [
           p.created_at,
           p.user_name,
           p.user_email,
           p.total_amount,
           p.status,
-          p.stripe_payment_intent_id,
+          p.mooov_payment_id ?? p.stripe_payment_intent_id,
         ])
       );
     }
     if (kind === "dining") {
       downloadCsv(
         "dining-income.csv",
-        ["Date", "Name", "Email", "Dining amount", "Status", "Stripe intent"],
+        ["Date", "Name", "Email", "Dining amount", "Status", "Mooov reference"],
         payments
           .filter((p) => p.dining_amount > 0)
           .map((p) => [
@@ -294,7 +294,7 @@ export function AdminPaymentsClient({
             p.user_email,
             p.dining_amount,
             p.status,
-            p.stripe_payment_intent_id,
+            p.mooov_payment_id ?? p.stripe_payment_intent_id,
           ])
       );
     }
@@ -316,7 +316,7 @@ export function AdminPaymentsClient({
     if (kind === "refunds") {
       downloadCsv(
         "refunds.csv",
-        ["Date", "Name", "Email", "Refund amount", "Status", "Stripe intent"],
+        ["Date", "Name", "Email", "Refund amount", "Status", "Mooov reference"],
         payments
           .filter((p) => p.refund_amount > 0 || p.status === "refunded")
           .map((p) => [
@@ -325,7 +325,7 @@ export function AdminPaymentsClient({
             p.user_email,
             p.refund_amount,
             p.status,
-            p.stripe_payment_intent_id,
+            p.mooov_payment_id ?? p.stripe_payment_intent_id,
           ])
       );
     }
@@ -344,10 +344,10 @@ export function AdminPaymentsClient({
         ])
       );
     }
-    if (kind === "stripe") {
+    if (kind === "reconciliation") {
       downloadCsv(
-        "stripe-reconciliation.csv",
-        ["Date", "Name", "Email", "Gross", "Dining", "Charity", "Raffle", "Refund", "Status", "Stripe intent"],
+        "payment-reconciliation.csv",
+        ["Date", "Name", "Email", "Gross", "Dining", "Charity", "Raffle", "Refund", "Status", "Mooov reference"],
         payments.map((p) => [
           p.created_at,
           p.user_name,
@@ -358,7 +358,7 @@ export function AdminPaymentsClient({
           p.raffle_amount,
           p.refund_amount,
           p.status,
-          p.stripe_payment_intent_id,
+          p.mooov_payment_id ?? p.stripe_payment_intent_id,
         ])
       );
     }
@@ -414,7 +414,7 @@ export function AdminPaymentsClient({
           <div>
             <h2 className="text-base font-semibold text-dash-text">Treasurer Exports</h2>
             <p className="mt-1 text-sm text-dash-muted">
-              Export dues, payments, dining, charity, refunds, Gift Aid, and Stripe reconciliation.
+              Export dues, payments, dining, charity, refunds, Gift Aid, and Mooov reconciliation.
             </p>
             <p className="mt-2 text-xs text-dash-faint">
               Outstanding dues £{duesOutstanding.toFixed(2)} · Dining £{diningIncome.toFixed(2)} · Charity £{charityIncome.toFixed(2)}
@@ -428,7 +428,7 @@ export function AdminPaymentsClient({
               ["charity", "Charity Totals"],
               ["refunds", "Refunds"],
               ["gift-aid", "Gift Aid"],
-              ["stripe", "Stripe Reconciliation"],
+              ["reconciliation", "Mooov Reconciliation"],
             ].map(([kind, label]) => (
               <Button
                 key={kind}
@@ -584,9 +584,9 @@ export function AdminPaymentsClient({
                                 </p>
                               </div>
                             </div>
-                            {p.stripe_payment_intent_id && (
+                            {(p.mooov_payment_id ?? p.stripe_payment_intent_id) && (
                               <p className="mt-3 text-xs text-dash-text-muted">
-                                Stripe ID: {p.stripe_payment_intent_id}
+                                Payment reference: {p.mooov_payment_id ?? p.stripe_payment_intent_id}
                               </p>
                             )}
                             <div className="mt-3">

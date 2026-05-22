@@ -99,24 +99,18 @@ export default async function AdminPaymentDetailPage({
           </Card>
 
           <Card variant="panel" className="space-y-2 p-5">
-            <h2 className="text-base font-semibold text-dash-text">Stripe</h2>
-            {payment.stripe_payment_intent_id ? (
+            <h2 className="text-base font-semibold text-dash-text">Mooov</h2>
+            {payment.mooov_payment_id ? (
               <p className="break-all text-sm text-dash-text">
-                Payment intent: <span className="font-mono">{payment.stripe_payment_intent_id}</span>
+                Mooov reference: <span className="font-mono">{payment.mooov_payment_id}</span>
+              </p>
+            ) : payment.stripe_payment_intent_id ? (
+              <p className="break-all text-sm text-dash-text">
+                Payment reference: <span className="font-mono">{payment.stripe_payment_intent_id}</span>
               </p>
             ) : (
-              <p className="text-sm text-dash-text-muted">No Stripe payment intent recorded.</p>
+              <p className="text-sm text-dash-text-muted">No payment reference recorded.</p>
             )}
-            {payment.stripe_charge_id ? (
-              <p className="break-all text-xs text-dash-text-muted">
-                Charge: <span className="font-mono">{payment.stripe_charge_id}</span>
-              </p>
-            ) : null}
-            {payment.stripe_customer_id ? (
-              <p className="break-all text-xs text-dash-text-muted">
-                Customer: <span className="font-mono">{payment.stripe_customer_id}</span>
-              </p>
-            ) : null}
           </Card>
 
           {auditLogs.length > 0 ? (

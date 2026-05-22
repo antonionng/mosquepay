@@ -439,9 +439,9 @@ export function DonationDetailClient({
               <Badge variant={STATUS_TONE[payment.status] ?? "secondary"} className="capitalize">
                 {payment.status}
               </Badge>
-              {payment.stripe_payment_intent_id ? (
+              {(payment.mooov_payment_id ?? payment.stripe_payment_intent_id) ? (
                 <p className="break-all text-xs text-dash-text-muted">
-                  Stripe: {payment.stripe_payment_intent_id}
+                  Mooov reference: {payment.mooov_payment_id ?? payment.stripe_payment_intent_id}
                 </p>
               ) : null}
               <p className="text-xs text-dash-text-muted">{formatDate(payment.created_at)}</p>
@@ -452,7 +452,7 @@ export function DonationDetailClient({
                 <CreditCard className="h-4 w-4" /> Payment
               </h2>
               <p className="text-sm text-dash-text-muted">
-                No Stripe payment linked. This is recorded as an offline donation.
+                No online payment linked. This is recorded as an offline donation.
               </p>
             </Card>
           )}

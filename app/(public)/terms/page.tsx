@@ -28,7 +28,7 @@ const sections = [
   {
     title: "Payments and financial records",
     body: [
-      "LodgePay supports payment and donation workflows through third-party payment providers such as Stripe. Payment availability, settlement, refunds, chargebacks, and card processing are subject to the payment provider's own terms.",
+      "LodgePay supports payment and donation workflows through Mooov, our payments partner. Payment availability, settlement, refunds, chargebacks, and card processing are subject to Mooov's own terms and the terms of any underlying payment processor Mooov uses.",
       "Treasurer tools, ledgers, reports, bank imports, and reconciliation views are operational aids. Customers remain responsible for reviewing their accounts, tax position, Gift Aid records, and statutory obligations.",
     ],
   },

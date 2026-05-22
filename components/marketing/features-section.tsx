@@ -344,8 +344,8 @@ const features = [
     eyebrow: "Payments and Gift Aid",
     title: "Keep payments clear from checkout to audit",
     description:
-      "Accept event fees, dues, and donations through Stripe-powered checkout. Gift Aid declarations and webhook-verified payment statuses keep finance records easier to trust.",
-    highlights: ["Stripe checkout", "Gift Aid capture", "Verified status"],
+      "Accept event fees, dues, and donations through Mooov-powered checkout. Gift Aid declarations and webhook-verified payment statuses keep finance records easier to trust.",
+    highlights: ["Mooov checkout", "Gift Aid capture", "Verified status"],
     Illustration: PaymentsIllustration,
   },
   {

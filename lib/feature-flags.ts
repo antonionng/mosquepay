@@ -78,7 +78,7 @@ export const FEATURE_FLAGS: Record<
   payments: {
     key: "payments",
     label: "Payments",
-    description: "Stripe-backed checkout and reconciliation.",
+    description: "Mooov-backed checkout and reconciliation.",
     default: true,
   },
   dues: {

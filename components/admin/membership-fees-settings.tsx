@@ -276,7 +276,7 @@ export function MembershipFeesSettings() {
                 <div>
                   <p className="text-sm font-medium text-dash-text">Allow instalment payments</p>
                   <p className="text-xs text-dash-muted">
-                    Let members split their annual dues via Stripe subscription
+                    Let members split their annual dues into a Mooov subscription
                   </p>
                 </div>
               </div>

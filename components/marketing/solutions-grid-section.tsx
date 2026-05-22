@@ -24,7 +24,7 @@ const solutions = [
     icon: CreditCard,
     title: "Payment Processing",
     description:
-      "Stripe-powered checkout for event fees, dues, and donations with webhook-verified status tracking.",
+      "Mooov-powered checkout for event fees, dues, and donations with webhook-verified status tracking.",
     tags: "Finance, Operations",
   },
   {

@@ -82,7 +82,7 @@ export default async function FAQPage({
       },
       {
         q: "Do you support event and dues payments?",
-        a: "Yes. Stripe-backed checkout supports event payments, donations, and recurring dues scenarios.",
+        a: "Yes. Mooov-backed checkout supports event payments, donations, and recurring dues scenarios.",
       },
       {
         q: "Can we edit our website ourselves?",

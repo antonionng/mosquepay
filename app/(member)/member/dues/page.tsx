@@ -353,10 +353,10 @@ export default function MemberDuesPage() {
         title={payMode === "subscription" ? "Set up instalments?" : "Pay dues in full?"}
         description={
           payMode === "subscription"
-            ? `You will be taken to Stripe to set up ${dues?.instalmentCount ?? 0} instalments.`
-            : `You will be taken to Stripe to pay £${outstanding.toFixed(2)} securely.`
+            ? `You will be taken to secure checkout to set up ${dues?.instalmentCount ?? 0} instalments.`
+            : `You will be taken to secure checkout to pay £${outstanding.toFixed(2)}.`
         }
-        confirmLabel={payMode === "subscription" ? "Continue to Stripe" : "Pay securely"}
+        confirmLabel={payMode === "subscription" ? "Continue to secure checkout" : "Pay securely"}
         loading={paying}
         onConfirm={() => {
           if (payMode) void handlePay(payMode);

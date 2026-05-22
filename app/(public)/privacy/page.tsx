@@ -35,7 +35,7 @@ const sections = [
   {
     title: "Payments and third parties",
     body: [
-      "Payment processing is handled by Stripe or another configured payment provider. LodgePay stores payment status, references, receipts, and reconciliation information, but full card details are handled by the payment provider.",
+      "Payment processing is handled by Mooov, our payments partner. LodgePay stores payment status, references, receipts, and reconciliation information, but full card details are handled by Mooov and its underlying payment processors. We never see or store your card number.",
       "We may use trusted service providers for hosting, email delivery, analytics, storage, logging, support, and security. These providers are used only where needed to deliver and protect the service.",
     ],
   },

@@ -256,7 +256,7 @@ function TreasurerView({ r }: { r: TreasurerReport }) {
   function exportReconciliation() {
     downloadCsv(
       "treasurer-payments-reconciliation.csv",
-      ["Payment ID", "Customer", "Total", "Refunded", "Status", "Completed", "Stripe PI"],
+      ["Payment ID", "Customer", "Total", "Refunded", "Status", "Completed", "Mooov reference"],
       r.reconciliation.map((p) => [
         p.id,
         p.user_name ?? "",
@@ -264,7 +264,7 @@ function TreasurerView({ r }: { r: TreasurerReport }) {
         p.refunded,
         p.status,
         p.completed_at ?? "",
-        p.stripe_payment_intent_id ?? "",
+        p.mooov_payment_id ?? p.stripe_payment_intent_id ?? "",
       ])
     );
   }
@@ -328,7 +328,7 @@ function TreasurerView({ r }: { r: TreasurerReport }) {
         <Card variant="panel" className="overflow-hidden p-0">
           <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
             <div>
-              <h2 className="dash-panel-header-title">Stripe reconciliation</h2>
+              <h2 className="dash-panel-header-title">Mooov reconciliation</h2>
               <p className="dash-panel-header-description">Recent payments with refunds.</p>
             </div>
             <Button variant="dashboard" size="sm" onClick={exportReconciliation} disabled={r.reconciliation.length === 0}>

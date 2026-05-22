@@ -13,17 +13,17 @@ const faqs = [
   {
     question: "What is LodgePay and how does it differ from other lodge tools?",
     answer:
-      "LodgePay is an all-in-one SaaS platform purpose-built for lodge operations. Unlike generic website builders or payment tools, it combines a branded website builder, event management with RSVP, Stripe-powered payment processing with Gift Aid, and a full candidate CRM. Each lodge has its own tenant-isolated space while provinces can oversee the whole portfolio.",
+      "LodgePay is an all-in-one SaaS platform purpose-built for lodge operations. Unlike generic website builders or payment tools, it combines a branded website builder, event management with RSVP, Mooov-powered payment processing with Gift Aid, and a full candidate CRM. Each lodge has its own tenant-isolated space while provinces can oversee the whole portfolio.",
   },
   {
     question: "How does the payment processing and Gift Aid capture work?",
     answer:
-      "LodgePay integrates with Stripe for secure payment processing. Event fees, annual dues, and charitable donations are all handled through a unified checkout. Gift Aid declarations are captured at the point of donation, and every transaction is tracked with webhook-verified status updates so your Treasurer has a complete, auditable financial record.",
+      "LodgePay integrates with Mooov for secure payment processing. Event fees, annual dues, and charitable donations are all handled through a unified checkout. Gift Aid declarations are captured at the point of donation, and every transaction is tracked with webhook-verified status updates so your Treasurer has a complete, auditable financial record.",
   },
   {
     question: "Is our lodge data secure?",
     answer:
-      "Absolutely. LodgePay uses tenant-isolated databases so each lodge's data is completely separate. Authentication is handled through industry-standard protocols, and all payment processing goes through PCI-compliant Stripe infrastructure. Your data is encrypted at rest and in transit.",
+      "Absolutely. LodgePay uses tenant-isolated databases so each lodge's data is completely separate. Authentication is handled through industry-standard protocols, and all payment processing goes through Mooov's PCI-compliant infrastructure. Your data is encrypted at rest and in transit.",
   },
   {
     question: "Can we use LodgePay for multiple lodges in our province?",
@@ -33,7 +33,7 @@ const faqs = [
   {
     question: "How are plans structured? Are there any hidden fees?",
     answer:
-      "LodgePay offers transparent per-lodge plans with no hidden costs. Stripe payment processing fees are standard and passed through at cost. There are no setup fees, and you can start with a trial to explore the full platform before committing. Volume discounts are available for provincial rollouts.",
+      "LodgePay offers transparent per-lodge plans with no hidden costs. Mooov payment processing fees are standard and passed through at cost. There are no setup fees, and you can start with a trial to explore the full platform before committing. Volume discounts are available for provincial rollouts.",
   },
   {
     question: "We're new to digital lodge management. Do you offer onboarding support?",

@@ -62,6 +62,7 @@ export type TreasurerReport = {
     refunded: number;
     status: string;
     completed_at: string | null;
+    mooov_payment_id: string | null;
     stripe_payment_intent_id: string | null;
   }>;
 };
@@ -240,6 +241,7 @@ export function buildTreasurerReport({
       refunded: p.refund_amount,
       status: p.status,
       completed_at: p.completed_at,
+      mooov_payment_id: p.mooov_payment_id ?? null,
       stripe_payment_intent_id: p.stripe_payment_intent_id,
     })),
   };
