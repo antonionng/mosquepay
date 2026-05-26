@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
       enable_dining_rsvp: body.enable_dining_rsvp === true,
       dining_price: body.dining_price != null ? Number(body.dining_price) : null,
       dining_description: body.dining_description?.trim() ?? null,
+      dining_waived_for_all: body.dining_waived_for_all === true,
       enable_charity_donation: body.enable_charity_donation === true,
       charity_name: body.charity_name?.trim() ?? null,
       charity_description: body.charity_description?.trim() ?? null,

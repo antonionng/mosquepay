@@ -15,6 +15,9 @@ export type GuestRow = {
   mother_lodge_name: string | null;
   mother_lodge_number: string | null;
   is_mason: boolean;
+  guest_category?: "guest" | "honorary_guest";
+  dining_waived?: boolean;
+  guest_dining_amount?: number | null;
   visit_count: number;
   archived_at: string | null;
   created_at: string;
@@ -151,6 +154,16 @@ export function GuestsDirectoryClient({
                     >
                       {guest.full_name}
                     </Link>
+                    {guest.guest_category === "honorary_guest" ? (
+                      <span className="ml-2 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-violet-700">
+                        Honorary
+                      </span>
+                    ) : null}
+                    {guest.dining_waived ? (
+                      <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-800">
+                        Comp dining
+                      </span>
+                    ) : null}
                     {guest.is_mason ? (
                       <span className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-700">
                         Mason

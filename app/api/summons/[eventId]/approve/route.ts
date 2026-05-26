@@ -7,6 +7,7 @@ import {
   requireAdminApiAuth,
   requireAdminApiPermission,
 } from "@/lib/auth/api";
+import { buildRecipientsPreview } from "@/lib/fees/recipients-preview";
 import { getCurrentAdminContextAny } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit";
 
@@ -58,6 +59,27 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     const admin = await getCurrentAdminContextAny(lodgeId);
+
+    const [members, honoraryGuests, feeDefaults, overrides] = await Promise.all([
+      db.getMembers(lodgeId, { status: "active" }),
+      db.listHonoraryGuests(lodgeId),
+      db.getLodgeFeeDefaults(lodgeId),
+      db.listEventFeeOverrides(lodgeId, eventId),
+    ]);
+    const preview = buildRecipientsPreview({
+      members,
+      honoraryGuests,
+      event,
+      defaults: feeDefaults,
+      includeMembers: true,
+      includeHonoraryGuests: summons.include_honorary_guests !== false,
+      overrides,
+    });
+
+    await db.upsertEventSummons(lodgeId, eventId, {
+      recipient_snapshot: preview as unknown as Record<string, unknown>,
+    });
+
     const updated = await db.setEventSummonsStatus(eventId, lodgeId, "approved", {
       summons_approved_at: new Date().toISOString(),
       summons_approved_by_email: admin?.email ?? null,

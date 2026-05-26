@@ -106,6 +106,15 @@ export async function POST(request: NextRequest) {
     dietary_requirements: trimOrNull(body.dietary_requirements),
     is_mason: parseBoolean(body.is_mason, true),
     notes: trimOrNull(body.notes),
+    guest_category:
+      body.guest_category === "honorary_guest"
+        ? ("honorary_guest" as const)
+        : ("guest" as const),
+    guest_dining_amount:
+      body.guest_dining_amount != null && body.guest_dining_amount !== ""
+        ? Number(body.guest_dining_amount)
+        : null,
+    dining_waived: body.dining_waived === true,
   };
 
   if (isSupabaseConfigured()) {

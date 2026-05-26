@@ -21,6 +21,7 @@ import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getDefaultLodgeSlug, getLodgeSlugFromRequest } from "@/lib/tenant";
+import { resolveCheckoutFeesForMember } from "@/lib/fees/server-resolve";
 import { createServiceClient } from "@/lib/supabase/server";
 import { callMooovConnect, MooovApiError } from "@/lib/mooov";
 
@@ -82,11 +83,41 @@ export async function POST(request: NextRequest) {
     const lodgeQuery =
       lodgeSlug === getDefaultLodgeSlug() ? "" : `?lodge=${encodeURIComponent(lodgeSlug)}`;
 
-    const meetingFeeVal = meeting_fee ?? 0;
-    const guestTotalVal = guest_total ?? 0;
+    const guestList = Array.isArray(guests)
+      ? guests.filter(
+          (g: { guest_name?: string }) =>
+            g && typeof g.guest_name === "string" && g.guest_name.trim()
+        )
+      : [];
+
+    let meetingFeeVal = meeting_fee ?? 0;
+    let guestTotalVal = guest_total ?? 0;
+    let diningTotalVal = dining_total ?? 0;
+
+    if (isSupabaseConfigured()) {
+      const lodgeId = await db.resolveLodgeId(lodgeSlug);
+      if (lodgeId) {
+        const event = await db.getEventById(event_id, lodgeId);
+        if (event) {
+          const resolved = await resolveCheckoutFeesForMember({
+            lodgeId,
+            event,
+            memberEmail: String(user_email).trim().toLowerCase(),
+            attendingCeremony: attending_ceremony !== false,
+            attendingDining: attending_dining === true,
+            guests: guestList.map((g: { guest_name: string }) => ({
+              guest_name: g.guest_name.trim(),
+            })),
+          });
+          meetingFeeVal = resolved.meetingFee;
+          diningTotalVal = resolved.diningTotal;
+          guestTotalVal = resolved.guestTotal;
+        }
+      }
+    }
+
     const charityAmountVal = charity_amount ?? 0;
     const raffleAmountVal = raffle_amount ?? 0;
-    const diningTotalVal = dining_total ?? 0;
     const total =
       diningTotalVal + meetingFeeVal + guestTotalVal + charityAmountVal + raffleAmountVal;
     if (!event_id || !user_email || total <= 0) {

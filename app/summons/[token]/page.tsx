@@ -68,11 +68,12 @@ export default async function PublicSummonsPage({
     notFound();
   }
 
-  const [event, lodge, summons, members] = await Promise.all([
+  const [event, lodge, summons, members, feeDefaults] = await Promise.all([
     db.getEventById(accessLink.event_id, accessLink.lodge_id),
     db.getLodgeById(accessLink.lodge_id),
     db.getEventSummons(accessLink.event_id, accessLink.lodge_id),
     db.getMembers(accessLink.lodge_id, { status: "active" }),
+    db.getLodgeFeeDefaults(accessLink.lodge_id),
     db.recordEventSummonsAccess(accessLink.id, accessLink.access_count),
   ]);
 
@@ -82,6 +83,10 @@ export default async function PublicSummonsPage({
     event.id,
     accessLink.recipient_email,
     accessLink.lodge_id
+  );
+
+  const memberProfile = members.find(
+    (m) => m.email.toLowerCase() === accessLink.recipient_email.toLowerCase()
   );
 
   const officers = members
@@ -149,12 +154,14 @@ export default async function PublicSummonsPage({
                   key={member.id}
                   className="flex justify-between gap-4 border-b border-slate-100 pb-1"
                 >
-                  <span>
+                  <span className="font-semibold uppercase text-slate-800">
+                    {member.office_title}
+                  </span>
+                  <span className="text-right text-slate-700">
                     {member.rank ? `${member.rank} ` : ""}
                     {member.full_name}
                     {memberSuffix(member) ? ` ${memberSuffix(member)}` : ""}
                   </span>
-                  <span className="font-semibold uppercase">{member.office_title}</span>
                 </div>
               ))}
             </div>
@@ -226,6 +233,8 @@ export default async function PublicSummonsPage({
                   enableGuestTickets={event.enable_guest_tickets}
                   guestTicketPrice={event.guest_ticket_price}
                   guestTicketDescription={event.guest_ticket_description}
+                  memberProfile={memberProfile ?? null}
+                  feeDefaults={feeDefaults}
                   initial={{
                     attending_ceremony:
                       existingRsvp?.status === "apologies"

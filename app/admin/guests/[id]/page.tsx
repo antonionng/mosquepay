@@ -105,7 +105,16 @@ export default async function AdminGuestProfilePage({
         <div>
           <h1 className="admin-page-title">{guest.full_name}</h1>
           <p className="admin-page-copy">
-            {guest.is_mason ? "Visiting brother" : "Guest"}
+            {guest.guest_category === "honorary_guest"
+              ? "Honorary guest"
+              : guest.is_mason
+                ? "Visiting brother"
+                : "Guest"}
+            {guest.dining_waived
+              ? " · dines complimentary"
+              : guest.guest_dining_amount != null
+                ? ` · dining £${guest.guest_dining_amount}`
+                : ""}
             {guest.mother_lodge_name
               ? ` - ${guest.mother_lodge_name}${
                   guest.mother_lodge_number
@@ -132,6 +141,9 @@ export default async function AdminGuestProfilePage({
             constitution: guest.constitution ?? "",
             rank: guest.rank ?? "",
             dietary_requirements: guest.dietary_requirements ?? "",
+            guest_category: guest.guest_category ?? "guest",
+            guest_dining_amount: guest.guest_dining_amount?.toString() ?? "",
+            dining_waived: guest.dining_waived ?? false,
             is_mason: guest.is_mason,
             notes: guest.notes ?? "",
           }}

@@ -65,6 +65,7 @@ type MeetingEvent = {
   enable_dining_rsvp: boolean;
   dining_price: number | null;
   dining_description: string | null;
+  dining_waived_for_all: boolean;
   enable_charity_donation: boolean;
   charity_name: string | null;
   charity_description: string | null;
@@ -179,9 +180,35 @@ export function AdminMeetingsClient({
 
   function openNewMeetingForm() {
     setEditingMeetingId(null);
-    setMeetingForm(emptyMeetingForm());
     setFormError(null);
     setFormOpen(true);
+    void (async () => {
+      const base = emptyMeetingForm();
+      try {
+        const res = await fetch("/api/settings/lodge-fees");
+        if (res.ok) {
+          const data = await res.json();
+          const fees = data.fees ?? {};
+          setMeetingForm({
+            ...base,
+            enable_meeting_fee: fees.default_member_levy_amount != null,
+            meeting_fee_amount: formatMoneyInput(fees.default_member_levy_amount),
+            enable_guest_tickets: fees.default_guest_dining_amount != null,
+            guest_ticket_price: formatMoneyInput(fees.default_guest_dining_amount),
+            enable_dining_rsvp: fees.default_member_dining_amount != null,
+            dining_price: formatMoneyInput(fees.default_member_dining_amount),
+            enable_payments:
+              fees.default_member_levy_amount != null ||
+              fees.default_guest_dining_amount != null ||
+              fees.default_member_dining_amount != null,
+          });
+          return;
+        }
+      } catch {
+        /* use empty defaults */
+      }
+      setMeetingForm(base);
+    })();
   }
 
   function openEditMeetingForm(meeting: MeetingEvent) {

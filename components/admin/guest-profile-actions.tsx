@@ -11,7 +11,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { GuestFormDialog } from "@/components/admin/guest-form-dialog";
+import { GuestFormDialog, type GuestFormValues } from "@/components/admin/guest-form-dialog";
 import { GuestInviteToEventDialog } from "@/components/admin/guest-invite-to-event-dialog";
 
 type Props = {
@@ -21,18 +21,7 @@ type Props = {
   visitCount: number;
   archivedAt: string | null;
   hasVisitorToken: boolean;
-  initialValues: {
-    full_name: string;
-    email: string;
-    phone: string;
-    mother_lodge_name: string;
-    mother_lodge_number: string;
-    constitution: string;
-    rank: string;
-    dietary_requirements: string;
-    is_mason: boolean;
-    notes: string;
-  };
+  initialValues: Partial<GuestFormValues>;
 };
 
 export function GuestProfileActions({

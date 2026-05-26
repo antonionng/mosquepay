@@ -262,6 +262,7 @@ export type Event = {
   guest_ticket_price: number | null;
   guest_ticket_description: string | null;
   guest_policy: "blue_table" | "white_table" | "closed";
+  dining_waived_for_all: boolean;
   featured_image_url: string | null;
   created_by: string | null;
   published: boolean;
@@ -277,6 +278,31 @@ export type Event = {
 };
 
 export type SummonsStatus = "none" | "draft" | "approved" | "sent";
+
+/**
+ * Per-event override of fee resolution for a single member or honorary
+ * guest. Used when a recipient should pay a different amount (or
+ * complimentary) for one specific meeting only, distinct from their
+ * profile-level levy_waived/dining_waived flags.
+ *
+ * Resolution order is: event_fee_overrides -> event.dining_waived_for_all
+ * -> profile waivers -> profile custom amount -> event price -> lodge default.
+ */
+export type EventFeeOverride = {
+  id: string;
+  lodge_id: string;
+  event_id: string;
+  subject_type: "member" | "guest";
+  subject_id: string;
+  levy_amount: number | null;
+  dining_amount: number | null;
+  levy_waived: boolean;
+  dining_waived: boolean;
+  note: string | null;
+  created_by_email: string | null;
+  created_at: string;
+  updated_at: string;
+};
 
 /**
  * A recurring meeting recipe for a lodge. The sequence captures the
@@ -480,6 +506,29 @@ export type CharityCampaign = {
   updated_at: string;
 };
 
+export type LodgeFeeDefaults = {
+  lodge_id: string;
+  default_member_levy_amount: number | null;
+  default_member_dining_amount: number | null;
+  default_guest_dining_amount: number | null;
+  currency: string;
+  updated_at: string;
+};
+
+export type LodgeMasonicYear = {
+  id: string;
+  lodge_id: string;
+  label: string;
+  start_date: string;
+  end_date: string;
+  annual_dues_amount: number | null;
+  is_current: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GuestCategory = "guest" | "honorary_guest";
+
 export type LodgeDues = {
   id: string;
   lodge_id: string;
@@ -520,6 +569,9 @@ export type MemberDues = {
   paid_at: string | null;
   reminder_sent_at: string | null;
   reminder_count: number;
+  is_pro_rata: boolean;
+  full_year_amount: number | null;
+  waiver_reason: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -1025,6 +1077,9 @@ export type Guest = {
   constitution: string | null;
   rank: string | null;
   dietary_requirements: string | null;
+  guest_category: GuestCategory;
+  guest_dining_amount: number | null;
+  dining_waived: boolean;
   is_mason: boolean;
   first_seen_event_id: string | null;
   last_seen_event_id: string | null;
@@ -1078,6 +1133,13 @@ export type Member = {
   directory_sort_order: number | null;
   rank: string | null;
   dietary_requirements: string | null;
+  member_levy_amount: number | null;
+  member_dining_amount: number | null;
+  levy_waived: boolean;
+  dining_waived: boolean;
+  fee_use_custom: boolean;
+  annual_dues_waived: boolean;
+  annual_dues_waiver_reason: string | null;
   date_of_initiation: string | null;
   date_of_birth: string | null;
   date_of_passing: string | null;
@@ -1114,6 +1176,8 @@ export type EventSummons = {
   next_meeting_note: string | null;
   master_elect_name: string | null;
   master_elect_qualification: string | null;
+  include_honorary_guests: boolean;
+  recipient_snapshot: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 };

@@ -7,6 +7,12 @@ import * as db from "@/lib/db";
 import { getLodgeSlugFromRequest } from "@/lib/tenant";
 import { writeAuditLog } from "@/lib/audit";
 import {
+  generateGuestInvitationToken,
+  hashGuestInvitationToken,
+} from "@/lib/guest-tokens";
+import { buildPublicUrl, lodgeScopedGuestPath } from "@/lib/public-links";
+import { sendGuestInviteEmail } from "@/lib/email/guest";
+import {
   lodgePayFromEmail,
   renderSummonsEmail,
 } from "@/lib/email/templates";
@@ -51,11 +57,12 @@ export async function POST(request: NextRequest, { params }: Params) {
     const forbidden = await requireAdminApiPermission("summons:write", lodgeId);
     if (forbidden) return forbidden;
 
-    const [event, lodge, summons, members] = await Promise.all([
+    const [event, lodge, summons, members, feeDefaults] = await Promise.all([
       db.getEventById(eventId, lodgeId),
       db.getLodgeById(lodgeId),
       db.getEventSummons(eventId, lodgeId),
       db.getMembers(lodgeId, { status: "active" }),
+      db.getLodgeFeeDefaults(lodgeId),
     ]);
 
     if (!event) {
@@ -170,6 +177,65 @@ export async function POST(request: NextRequest, { params }: Params) {
       }
     }
 
+    let honoraryGuestInvitesSent = 0;
+
+    if (!testRecipientEmail && summons?.include_honorary_guests !== false) {
+      const honoraryGuests = await db.listHonoraryGuests(lodgeId);
+      for (const guest of honoraryGuests) {
+        if (!guest.email) continue;
+        try {
+          const existing = await db.listGuestInvitationsForEvent(eventId, lodgeId);
+          const already = existing.some(
+            (inv) =>
+              inv.recipient_email?.toLowerCase() === guest.email?.toLowerCase() &&
+              !inv.revoked_at
+          );
+          if (already) continue;
+
+          const guestToken = generateGuestInvitationToken();
+          const tokenHash = hashGuestInvitationToken(guestToken);
+          await db.createGuestInvitation(lodgeId, {
+            event_id: eventId,
+            inviter_member_id: null,
+            inviter_admin_user_id: null,
+            recipient_email: guest.email,
+            recipient_name: guest.full_name,
+            token_hash: tokenHash,
+            payer: "guest",
+            max_uses: 1,
+            expires_at: null,
+            guest_id: guest.id,
+          });
+
+          const inviteUrl = buildPublicUrl(
+            siteUrl.replace(/\/$/, ""),
+            lodgeScopedGuestPath(lodge?.slug ?? lodgeSlug, guestToken)
+          );
+          const result = await sendGuestInviteEmail({
+            toEmail: guest.email,
+            toName: guest.full_name,
+            lodgeName: lodge?.name ?? "your lodge",
+            eventTitle: event.title,
+            eventDate: event.event_date,
+            eventTime: event.event_time,
+            location: event.location,
+            dressCode: event.dress_code,
+            inviterName: null,
+            inviteUrl,
+          });
+          if (result.sent) honoraryGuestInvitesSent++;
+        } catch (guestInviteError) {
+          failures.push({
+            email: guest.email,
+            message:
+              guestInviteError instanceof Error
+                ? guestInviteError.message
+                : "Honorary guest invite failed",
+          });
+        }
+      }
+    }
+
     const send = await db.createEventSummonsSend(lodgeId, {
       event_id: event.id,
       summons_id: summons?.id ?? null,
@@ -196,6 +262,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         recipient_count: recipients.length,
         sent_count: sentCount,
         failed_count: failures.length,
+        honorary_guest_invites_sent: honoraryGuestInvitesSent,
         test_recipient_email: testRecipientEmail || null,
       },
     });

@@ -145,6 +145,13 @@ export async function POST(request: NextRequest) {
     const skipped: { member_email: string; reason: string }[] = [];
 
     for (const member of targets) {
+      if (member.annual_dues_waived === true) {
+        skipped.push({
+          member_email: member.email,
+          reason: "Annual dues waived on profile",
+        });
+        continue;
+      }
       const key = `${member.email}|${periodStart}|${periodEnd}`;
       if (existingKeys.has(key)) {
         skipped.push({ member_email: member.email, reason: "Already billed for this period" });

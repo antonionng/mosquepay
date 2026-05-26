@@ -25,6 +25,9 @@ const EDITABLE_KEYS = [
   "dietary_requirements",
   "is_mason",
   "notes",
+  "guest_category",
+  "guest_dining_amount",
+  "dining_waived",
 ] as const;
 
 type EditableKey = (typeof EDITABLE_KEYS)[number];
@@ -41,6 +44,19 @@ function pickPatch(body: Record<string, unknown>) {
     if (!(key in body)) continue;
     if (key === "is_mason") {
       patch.is_mason = Boolean(body.is_mason);
+    } else if (key === "dining_waived") {
+      patch.dining_waived = Boolean(body.dining_waived);
+    } else if (key === "guest_category") {
+      const cat = body.guest_category;
+      if (cat === "guest" || cat === "honorary_guest") {
+        patch.guest_category = cat;
+      }
+    } else if (key === "guest_dining_amount") {
+      if (body.guest_dining_amount === null || body.guest_dining_amount === "") {
+        patch.guest_dining_amount = null;
+      } else {
+        patch.guest_dining_amount = Number(body.guest_dining_amount);
+      }
     } else if (key === "full_name") {
       const next = trimOrNull(body.full_name);
       if (next) patch.full_name = next;

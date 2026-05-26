@@ -38,6 +38,7 @@ export type MeetingForm = {
   enable_dining_rsvp: boolean;
   dining_price: string;
   dining_description: string;
+  dining_waived_for_all: boolean;
   enable_charity_donation: boolean;
   charity_name: string;
   charity_description: string;
@@ -68,6 +69,7 @@ export type MeetingFormMeeting = {
   enable_dining_rsvp: boolean;
   dining_price: number | null;
   dining_description: string | null;
+  dining_waived_for_all: boolean;
   enable_charity_donation: boolean;
   charity_name: string | null;
   charity_description: string | null;
@@ -153,6 +155,7 @@ export function emptyMeetingForm(): MeetingForm {
     enable_dining_rsvp: false,
     dining_price: "",
     dining_description: "",
+    dining_waived_for_all: false,
     enable_charity_donation: false,
     charity_name: "",
     charity_description: "",
@@ -184,6 +187,7 @@ export function formFromMeeting(meeting: MeetingFormMeeting): MeetingForm {
     enable_dining_rsvp: meeting.enable_dining_rsvp,
     dining_price: formatMoneyInput(meeting.dining_price),
     dining_description: meeting.dining_description ?? "",
+    dining_waived_for_all: meeting.dining_waived_for_all === true,
     enable_charity_donation: meeting.enable_charity_donation,
     charity_name: meeting.charity_name ?? "",
     charity_description: meeting.charity_description ?? "",
@@ -533,6 +537,31 @@ export function MeetingFormDrawer({
                   }
                 />
               </div>
+              {form.enable_dining_rsvp && (
+                <label className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm text-amber-900 sm:col-span-2">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={form.dining_waived_for_all}
+                    onChange={(event) =>
+                      updateForm({
+                        dining_waived_for_all: event.target.checked,
+                      })
+                    }
+                  />
+                  <div>
+                    <p className="font-semibold">
+                      Waive dining for everyone at this meeting
+                    </p>
+                    <p className="text-xs text-amber-800">
+                      Useful for events where the lodge covers dining (e.g. an
+                      installation). Members and guests are shown as
+                      complimentary on the recipients panel and dining will
+                      not be charged at checkout.
+                    </p>
+                  </div>
+                </label>
+              )}
             </div>
           </section>
 

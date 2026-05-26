@@ -70,10 +70,27 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Unsupported dues action." }, { status: 400 });
       }
 
-      const record = await db.updateMemberDuesStatus(duesId, lodgeId, {
+      const rawNote =
+        typeof body.waiver_reason === "string"
+          ? body.waiver_reason.trim()
+          : typeof body.note === "string"
+            ? body.note.trim()
+            : "";
+      const waiverReason = rawNote ? rawNote.slice(0, 500) : null;
+
+      const updates: Parameters<typeof db.updateMemberDuesStatus>[2] = {
         status: nextStatus,
         paid_at: nextStatus === "paid" ? new Date().toISOString() : null,
-      });
+      };
+      if (nextStatus === "waived") {
+        updates.waiver_reason = waiverReason;
+      } else if (nextStatus === "outstanding") {
+        // Reopening a waived record clears any prior reason so the audit
+        // trail does not appear to still apply.
+        updates.waiver_reason = null;
+      }
+
+      const record = await db.updateMemberDuesStatus(duesId, lodgeId, updates);
       if (!record) {
         return NextResponse.json({ error: "Dues record not found." }, { status: 404 });
       }
@@ -83,7 +100,12 @@ export async function POST(request: NextRequest) {
         entityType: "dues",
         entityId: record.id,
         summary: `Updated dues for ${record.member_email}`,
-        metadata: { status: nextStatus },
+        metadata: {
+          status: nextStatus,
+          ...(nextStatus === "waived" && waiverReason
+            ? { waiver_reason: waiverReason }
+            : {}),
+        },
       });
       return NextResponse.json({ dues: record });
     }

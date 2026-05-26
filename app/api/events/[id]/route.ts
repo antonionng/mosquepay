@@ -42,6 +42,8 @@ export async function PATCH(
         body.dining_price == null || body.dining_price === "" ? null : Number(body.dining_price);
     }
     if (body.dining_description != null) updates.dining_description = body.dining_description.trim() || null;
+    if (typeof body.dining_waived_for_all === "boolean")
+      updates.dining_waived_for_all = body.dining_waived_for_all;
     if (typeof body.enable_charity_donation === "boolean") updates.enable_charity_donation = body.enable_charity_donation;
     if (body.charity_name != null) updates.charity_name = body.charity_name.trim() || null;
     if (body.charity_description != null) updates.charity_description = body.charity_description.trim() || null;

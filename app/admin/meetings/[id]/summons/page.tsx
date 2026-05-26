@@ -213,12 +213,14 @@ export default async function MeetingSummonsPage({
                   key={member.id}
                   className="flex justify-between gap-4 border-b border-slate-100 pb-1"
                 >
-                  <span>
+                  <span className="font-semibold uppercase text-slate-800">
+                    {member.office_title}
+                  </span>
+                  <span className="text-right text-slate-700">
                     {member.rank ? `${member.rank} ` : ""}
                     {member.full_name}
                     {memberSuffix(member) ? ` ${memberSuffix(member)}` : ""}
                   </span>
-                  <span className="font-semibold uppercase">{member.office_title}</span>
                 </div>
               ))}
             </div>

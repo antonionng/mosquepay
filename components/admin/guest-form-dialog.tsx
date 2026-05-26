@@ -24,6 +24,9 @@ export type GuestFormValues = {
   constitution: string;
   rank: string;
   dietary_requirements: string;
+  guest_category: "guest" | "honorary_guest";
+  guest_dining_amount: string;
+  dining_waived: boolean;
   is_mason: boolean;
   notes: string;
 };
@@ -37,6 +40,9 @@ const EMPTY: GuestFormValues = {
   constitution: "",
   rank: "",
   dietary_requirements: "",
+  guest_category: "guest",
+  guest_dining_amount: "",
+  dining_waived: false,
   is_mason: true,
   notes: "",
 };
@@ -91,7 +97,12 @@ export function GuestFormDialog({
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify({
+          ...values,
+          guest_dining_amount: values.guest_dining_amount.trim()
+            ? Number(values.guest_dining_amount)
+            : null,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -202,7 +213,7 @@ export function GuestFormDialog({
           </div>
 
           <div className="sm:col-span-2 space-y-1.5">
-            <Label htmlFor="dietary_requirements">Dietary requirements</Label>
+            <Label htmlFor="dietary_requirements">Dietary requirements & allergies</Label>
             <Input
               id="dietary_requirements"
               value={values.dietary_requirements}
@@ -211,6 +222,52 @@ export function GuestFormDialog({
               }
               placeholder="Vegetarian, no nuts..."
             />
+          </div>
+
+          <div className="sm:col-span-2 space-y-2 rounded-lg border border-slate-200 p-3">
+            <Label>Guest type</Label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                checked={values.guest_category === "guest"}
+                onChange={() => update("guest_category", "guest")}
+              />
+              Guest (invited per meeting)
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                checked={values.guest_category === "honorary_guest"}
+                onChange={() => update("guest_category", "honorary_guest")}
+              />
+              Honorary guest (included on every summons)
+            </label>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="guest_dining_amount">Dining fee override (£)</Label>
+            <Input
+              id="guest_dining_amount"
+              type="number"
+              step="0.01"
+              min="0"
+              value={values.guest_dining_amount}
+              onChange={(event) => update("guest_dining_amount", event.target.value)}
+              placeholder="Lodge default"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 self-end pb-2">
+            <input
+              id="dining_waived"
+              type="checkbox"
+              checked={values.dining_waived}
+              onChange={(event) => update("dining_waived", event.target.checked)}
+              className="h-4 w-4 rounded border-slate-300"
+            />
+            <Label htmlFor="dining_waived" className="font-normal">
+              Dines complimentary
+            </Label>
           </div>
 
           <div className="sm:col-span-2 flex items-center gap-2">

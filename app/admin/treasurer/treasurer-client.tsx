@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -31,6 +31,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MembershipFeesSettings } from "@/components/admin/membership-fees-settings";
+import { LodgeFeeDefaultsSettings } from "@/components/admin/lodge-fee-defaults-settings";
+import { MasonicYearSettings } from "@/components/admin/masonic-year-settings";
+import { NextDuesPanel } from "@/components/admin/next-dues-panel";
+import { cn } from "@/lib/utils";
 
 type LedgerEntry = {
   source_id: string;
@@ -138,6 +142,26 @@ export function TreasurerClient({
           | "annually") ?? "monthly",
     };
   });
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/settings/masonic-year");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.current) {
+          setBulkForm((f) => ({
+            ...f,
+            period_start: data.current.start_date?.slice(0, 10) ?? f.period_start,
+            period_end: data.current.end_date?.slice(0, 10) ?? f.period_end,
+            amount: data.current.annual_dues_amount ?? f.amount,
+          }));
+        }
+      } catch {
+        /* keep defaults */
+      }
+    })();
+  }, []);
 
   const totals = useMemo(() => {
     let inflow = 0;
@@ -272,7 +296,10 @@ export function TreasurerClient({
       <Tabs defaultValue="ledger">
         <TabsList>
           <TabsTrigger value="ledger">Ledger</TabsTrigger>
+          <TabsTrigger value="next-dues">Next dues</TabsTrigger>
           <TabsTrigger value="fees">Membership fees</TabsTrigger>
+          <TabsTrigger value="meeting-fees">Meeting & dining</TabsTrigger>
+          <TabsTrigger value="masonic-year">Masonic year</TabsTrigger>
           <TabsTrigger value="dues-run">Bulk dues run</TabsTrigger>
           <TabsTrigger value="instalments">Instalments</TabsTrigger>
         </TabsList>
@@ -322,10 +349,18 @@ export function TreasurerClient({
                 ) : (
                   ledger.slice(0, 200).map((row) => {
                     const href = ledgerHref(row.source_type, row.source_id);
+                    const isWaived = row.status === "waived";
+                    const waiverReason =
+                      isWaived && typeof row.metadata?.waiver_reason === "string"
+                        ? (row.metadata.waiver_reason as string)
+                        : null;
                     return (
                       <TableRow
                         key={`${row.source_type}-${row.source_id}`}
-                        className={href ? "cursor-pointer hover:bg-slate-50" : undefined}
+                        className={cn(
+                          href && "cursor-pointer hover:bg-slate-50",
+                          isWaived && "bg-slate-50/40 text-slate-500"
+                        )}
                         onClick={
                           href ? () => router.push(href) : undefined
                         }
@@ -346,14 +381,25 @@ export function TreasurerClient({
                           </span>
                         </TableCell>
                         <TableCell className="text-sm">
-                          <p className="font-medium text-slate-900">
+                          <p className={cn(
+                            "font-medium text-slate-900",
+                            isWaived && "text-slate-500"
+                          )}>
                             {row.contact_name ?? "—"}
                           </p>
                           <p className="text-xs text-slate-500">
                             {row.contact_email ?? ""}
                           </p>
+                          {waiverReason && (
+                            <p className="mt-0.5 text-xs italic text-slate-400">
+                              Waived: {waiverReason}
+                            </p>
+                          )}
                         </TableCell>
-                        <TableCell className="text-right font-semibold tabular-nums">
+                        <TableCell className={cn(
+                          "text-right font-semibold tabular-nums",
+                          isWaived && "line-through decoration-slate-300"
+                        )}>
                           £{Number(row.amount).toFixed(2)}
                         </TableCell>
                         <TableCell>
@@ -375,8 +421,20 @@ export function TreasurerClient({
           )}
         </TabsContent>
 
+        <TabsContent value="next-dues" className="space-y-4">
+          <NextDuesPanel />
+        </TabsContent>
+
         <TabsContent value="fees" className="space-y-4">
           <MembershipFeesSettings />
+        </TabsContent>
+
+        <TabsContent value="meeting-fees" className="space-y-4">
+          <LodgeFeeDefaultsSettings />
+        </TabsContent>
+
+        <TabsContent value="masonic-year" className="space-y-4">
+          <MasonicYearSettings />
         </TabsContent>
 
         <TabsContent value="dues-run" className="space-y-4">

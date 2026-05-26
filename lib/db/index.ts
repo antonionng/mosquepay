@@ -15,6 +15,8 @@ import type {
   BlogPost,
   CharityCampaign,
   LodgeDues,
+  LodgeFeeDefaults,
+  LodgeMasonicYear,
   MemberDues,
   MemberDuesInstalment,
   MeetingCollection,
@@ -43,6 +45,7 @@ import type {
   EventSummons,
   EventSummonsSend,
   EventSummonsAccessLink,
+  EventFeeOverride,
   MeetingSequence,
   SummonsStatus,
   Province,
@@ -600,7 +603,8 @@ type AddEventOptional =
   | "summons_auto_drafted_at"
   | "summons_approved_at"
   | "summons_approved_by_email"
-  | "summons_last_sent_at";
+  | "summons_last_sent_at"
+  | "dining_waived_for_all";
 
 export async function addEvent(
   lodgeId: string,
@@ -1394,20 +1398,26 @@ export async function createMemberDues(
     | "updated_at"
     | "reminder_sent_at"
     | "reminder_count"
+    | "is_pro_rata"
+    | "full_year_amount"
     | "charitable_amount"
     | "gift_aid_declaration_id"
     | "gift_aid_status"
     | "gift_aid_eligible_amount"
+    | "waiver_reason"
   > &
     Partial<
       Pick<
         MemberDues,
         | "reminder_sent_at"
         | "reminder_count"
+        | "is_pro_rata"
+        | "full_year_amount"
         | "charitable_amount"
         | "gift_aid_declaration_id"
         | "gift_aid_status"
         | "gift_aid_eligible_amount"
+        | "waiver_reason"
       >
     >
 ): Promise<MemberDues> {
@@ -1435,6 +1445,7 @@ export async function updateMemberDuesStatus(
       | "gift_aid_declaration_id"
       | "gift_aid_status"
       | "gift_aid_eligible_amount"
+      | "waiver_reason"
     >
   >
 ): Promise<MemberDues | null> {
@@ -1773,6 +1784,13 @@ export async function createMember(
     | "progression_signed_off_raising"
     | "archived_at"
     | "archived_reason"
+    | "member_levy_amount"
+    | "member_dining_amount"
+    | "levy_waived"
+    | "dining_waived"
+    | "fee_use_custom"
+    | "annual_dues_waived"
+    | "annual_dues_waiver_reason"
   > &
     Partial<
       Pick<
@@ -1786,6 +1804,13 @@ export async function createMember(
         | "progression_signed_off_raising"
         | "archived_at"
         | "archived_reason"
+        | "member_levy_amount"
+        | "member_dining_amount"
+        | "levy_waived"
+        | "dining_waived"
+        | "fee_use_custom"
+        | "annual_dues_waived"
+        | "annual_dues_waiver_reason"
       >
     >
 ): Promise<Member> {
@@ -2053,6 +2078,67 @@ export async function setEventSummonsStatus(
     .maybeSingle();
   if (error) throw error;
   return data as Event | null;
+}
+
+// ---------------------------------------------------------------------------
+// Event fee overrides
+//
+// Per-recipient overrides of levy/dining for a single event. Used by the
+// recipients panel to mark "complimentary at this meeting only" for an
+// individual member or honorary guest, without changing their profile
+// defaults.
+// ---------------------------------------------------------------------------
+
+export async function listEventFeeOverrides(
+  lodgeId: string,
+  eventId: string
+): Promise<EventFeeOverride[]> {
+  const { data, error } = await db()
+    .from("event_fee_overrides")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .eq("event_id", eventId);
+  if (error) throw error;
+  return (data ?? []) as EventFeeOverride[];
+}
+
+export async function upsertEventFeeOverride(
+  lodgeId: string,
+  data: Omit<
+    EventFeeOverride,
+    "id" | "lodge_id" | "created_at" | "updated_at"
+  >
+): Promise<EventFeeOverride> {
+  const { data: row, error } = await db()
+    .from("event_fee_overrides")
+    .upsert(
+      {
+        ...data,
+        lodge_id: lodgeId,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "event_id,subject_type,subject_id" }
+    )
+    .select("*")
+    .single();
+  if (error) throw error;
+  return row as EventFeeOverride;
+}
+
+export async function deleteEventFeeOverride(
+  lodgeId: string,
+  eventId: string,
+  subjectType: "member" | "guest",
+  subjectId: string
+): Promise<void> {
+  const { error } = await db()
+    .from("event_fee_overrides")
+    .delete()
+    .eq("lodge_id", lodgeId)
+    .eq("event_id", eventId)
+    .eq("subject_type", subjectType)
+    .eq("subject_id", subjectId);
+  if (error) throw error;
 }
 
 export async function recordEventSummonsAccess(
@@ -3548,7 +3634,11 @@ export async function getPlatformLodgeStats(): Promise<PlatformLodgeStats[]> {
 
 export async function listGuests(
   lodgeId: string,
-  opts?: { search?: string; includeArchived?: boolean }
+  opts?: {
+    search?: string;
+    includeArchived?: boolean;
+    guestCategory?: "guest" | "honorary_guest";
+  }
 ): Promise<Guest[]> {
   let query = db()
     .from("guests")
@@ -3558,6 +3648,9 @@ export async function listGuests(
     .order("created_at", { ascending: false });
   if (!opts?.includeArchived) {
     query = query.is("archived_at", null);
+  }
+  if (opts?.guestCategory) {
+    query = query.eq("guest_category", opts.guestCategory);
   }
   if (opts?.search) {
     const term = `%${opts.search}%`;
@@ -3920,4 +4013,114 @@ export async function markEventGuestWelcomeSent(
     .in("id", ids)
     .eq("lodge_id", lodgeId);
   if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
+// Lodge fee defaults & masonic year
+// ---------------------------------------------------------------------------
+
+export async function getLodgeFeeDefaults(
+  lodgeId: string
+): Promise<LodgeFeeDefaults | null> {
+  const { data, error } = await db()
+    .from("lodge_fee_defaults")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as LodgeFeeDefaults | null) ?? null;
+}
+
+export async function upsertLodgeFeeDefaults(
+  lodgeId: string,
+  input: Omit<LodgeFeeDefaults, "lodge_id" | "updated_at">
+): Promise<LodgeFeeDefaults> {
+  const { data, error } = await db()
+    .from("lodge_fee_defaults")
+    .upsert(
+      {
+        lodge_id: lodgeId,
+        ...input,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "lodge_id" }
+    )
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as LodgeFeeDefaults;
+}
+
+export async function listLodgeMasonicYears(
+  lodgeId: string
+): Promise<LodgeMasonicYear[]> {
+  const { data, error } = await db()
+    .from("lodge_masonic_years")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .order("start_date", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as LodgeMasonicYear[];
+}
+
+export async function getCurrentMasonicYear(
+  lodgeId: string
+): Promise<LodgeMasonicYear | null> {
+  const { data, error } = await db()
+    .from("lodge_masonic_years")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .eq("is_current", true)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as LodgeMasonicYear | null) ?? null;
+}
+
+export async function upsertLodgeMasonicYear(
+  lodgeId: string,
+  input: Omit<LodgeMasonicYear, "id" | "lodge_id" | "created_at" | "updated_at"> & {
+    id?: string;
+  }
+): Promise<LodgeMasonicYear> {
+  if (input.is_current) {
+    await db()
+      .from("lodge_masonic_years")
+      .update({ is_current: false, updated_at: new Date().toISOString() })
+      .eq("lodge_id", lodgeId)
+      .eq("is_current", true);
+  }
+
+  const payload = {
+    lodge_id: lodgeId,
+    label: input.label,
+    start_date: input.start_date,
+    end_date: input.end_date,
+    annual_dues_amount: input.annual_dues_amount,
+    is_current: input.is_current,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (input.id) {
+    const { data, error } = await db()
+      .from("lodge_masonic_years")
+      .update(payload)
+      .eq("id", input.id)
+      .eq("lodge_id", lodgeId)
+      .select("*")
+      .single();
+    if (error) throw error;
+    return data as LodgeMasonicYear;
+  }
+
+  const { data, error } = await db()
+    .from("lodge_masonic_years")
+    .insert(payload)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as LodgeMasonicYear;
+}
+
+export async function listHonoraryGuests(lodgeId: string): Promise<Guest[]> {
+  return listGuests(lodgeId, { guestCategory: "honorary_guest" });
 }

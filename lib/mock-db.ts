@@ -837,6 +837,9 @@ export type MockGuest = LodgeScoped & {
   constitution: string | null;
   rank: string | null;
   dietary_requirements: string | null;
+  guest_category: "guest" | "honorary_guest";
+  guest_dining_amount: number | null;
+  dining_waived: boolean;
   is_mason: boolean;
   first_seen_event_id: string | null;
   last_seen_event_id: string | null;
@@ -900,6 +903,9 @@ export function createGuestRecord(
     constitution: data.constitution ?? null,
     rank: data.rank ?? null,
     dietary_requirements: data.dietary_requirements ?? null,
+    guest_category: data.guest_category ?? "guest",
+    guest_dining_amount: data.guest_dining_amount ?? null,
+    dining_waived: data.dining_waived ?? false,
     is_mason: data.is_mason ?? true,
     first_seen_event_id: data.first_seen_event_id ?? null,
     last_seen_event_id: data.last_seen_event_id ?? null,
@@ -1236,6 +1242,8 @@ export type MockMember = LodgeScoped & {
   directory_sort_order: number | null;
   rank: string | null;
   dietary_requirements: string | null;
+  annual_dues_waived?: boolean;
+  annual_dues_waiver_reason?: string | null;
   date_of_initiation: string | null;
   initiation_email_sent: boolean;
   membership_status: 'active' | 'suspended' | 'resigned' | 'excluded';

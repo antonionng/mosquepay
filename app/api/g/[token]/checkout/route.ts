@@ -174,8 +174,16 @@ async function handleDb(args: DbArgs) {
   const lodge = await db.getLodgeById(invitation.lodge_id);
 
   const payerIsGuest = invitation.payer === "guest";
+  // Server-side safety: when the event is flagged "dining waived for all"
+  // (lodge is covering dining), force the dining total to zero even if the
+  // client posted a non-zero amount. Per-guest event overrides are applied
+  // for honorary guests in the recipients panel; the one-off guest at this
+  // checkout point does not yet have a stable guest_id so we honour only
+  // the event-wide flag here.
+  const effectiveDining =
+    event.dining_waived_for_all === true ? 0 : args.diningTotal;
   const total = payerIsGuest
-    ? args.meetingFee + args.diningTotal + args.charityAmount
+    ? args.meetingFee + effectiveDining + args.charityAmount
     : args.charityAmount;
 
   const guestRecord = await db.upsertGuest(invitation.lodge_id, {
@@ -329,7 +337,7 @@ async function handleDb(args: DbArgs) {
   // breakdown the legacy Stripe webhook used to (dining_amount /
   // meeting_fee_amount / charity_amount on public.payments).
   const totalMinor = Math.round(
-    (args.meetingFee + args.diningTotal + args.charityAmount) * 100
+    (args.meetingFee + effectiveDining + args.charityAmount) * 100
   );
   const currency = "GBP";
   const paymentId = `evt_${invitation.lodge_id}_${rsvp.id}_${Date.now().toString(36)}`;
@@ -356,7 +364,7 @@ async function handleDb(args: DbArgs) {
     lodge_slug: lodgeSlug,
     donor_email: args.email,
     donor_name: args.fullName,
-    dining_total: args.diningTotal,
+    dining_total: effectiveDining,
     meeting_fee: args.meetingFee,
     charity_amount: args.charityAmount,
     guest_total: 0,

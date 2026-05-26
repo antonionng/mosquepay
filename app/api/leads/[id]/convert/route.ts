@@ -6,6 +6,7 @@ import * as mockDb from "@/lib/mock-db";
 import { getLodgeSlugFromRequest } from "@/lib/tenant";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
+import { calculateProRataDues } from "@/lib/dues/pro-rata";
 
 /**
  * Convert an approved/initiated lead into a member record.
@@ -90,32 +91,84 @@ export async function POST(
         archived_reason: null,
       });
 
-      // Create initial dues record if active dues exist
-      const activeDues = await db.getLodgeDues(lodgeId);
-      if (activeDues.length > 0) {
-        const dues = activeDues[0];
-        const periodStart =
-          body.date_of_initiation ?? new Date().toISOString().split("T")[0];
-        const periodEnd = new Date(
-          new Date(periodStart).getTime() + 365 * 86400000
-        )
-          .toISOString()
-          .split("T")[0];
-        await db.createMemberDues(lodgeId, {
-          member_email: member.email,
-          member_name: member.full_name,
-          member_id: member.id,
-          dues_id: dues.id,
-          amount: dues.amount,
-          currency: dues.currency,
-          period_start: periodStart,
-          period_end: periodEnd,
-          status: "outstanding",
-          payment_id: null,
-          stripe_payment_intent_id: null,
-          stripe_subscription_id: null,
-          paid_at: null,
+      // Create initial dues record (pro rata when masonic year is configured)
+      const billFullYear = body.bill_full_year === true;
+      const waiveDues = body.waive_dues === true;
+      const annualDuesWaived = body.annual_dues_waived === true;
+      const annualDuesWaiverReason =
+        typeof body.annual_dues_waiver_reason === "string"
+          ? body.annual_dues_waiver_reason.trim().slice(0, 500) || null
+          : null;
+      if (annualDuesWaived) {
+        await db.updateMember(member.id, lodgeId, {
+          annual_dues_waived: true,
+          annual_dues_waiver_reason: annualDuesWaiverReason,
         });
+      }
+
+      if (!waiveDues && !annualDuesWaived) {
+        const [activeDues, masonicYear] = await Promise.all([
+          db.getLodgeDues(lodgeId),
+          db.getCurrentMasonicYear(lodgeId),
+        ]);
+
+        const duesTemplate = activeDues[0] ?? null;
+        const fullAmount =
+          masonicYear?.annual_dues_amount ?? duesTemplate?.amount ?? null;
+
+        if (fullAmount != null && fullAmount > 0) {
+          const initiationDate =
+            body.date_of_initiation ?? new Date().toISOString().split("T")[0];
+
+          let amount = fullAmount;
+          let periodStart = initiationDate;
+          let periodEnd: string;
+          let isProRata = false;
+
+          if (masonicYear && !billFullYear) {
+            const proRata = calculateProRataDues({
+              fullYearAmount: fullAmount,
+              yearStartDate: masonicYear.start_date,
+              yearEndDate: masonicYear.end_date,
+              joinDate: initiationDate,
+            });
+            amount = proRata.amount;
+            periodStart = proRata.periodStart;
+            periodEnd = proRata.periodEnd;
+            isProRata = amount < fullAmount;
+          } else if (masonicYear) {
+            periodStart = masonicYear.start_date;
+            periodEnd = masonicYear.end_date;
+          } else {
+            periodEnd = new Date(
+              new Date(periodStart).getTime() + 365 * 86400000
+            )
+              .toISOString()
+              .split("T")[0];
+          }
+
+          await db.createMemberDues(lodgeId, {
+            member_email: member.email,
+            member_name: member.full_name,
+            member_id: member.id,
+            dues_id: duesTemplate?.id ?? null,
+            amount,
+            currency: duesTemplate?.currency ?? "gbp",
+            period_start: periodStart,
+            period_end: periodEnd,
+            status: "outstanding",
+            payment_id: null,
+            stripe_payment_intent_id: null,
+            stripe_subscription_id: null,
+            paid_at: null,
+            is_pro_rata: isProRata,
+            full_year_amount: isProRata ? fullAmount : null,
+            charitable_amount: 0,
+            gift_aid_declaration_id: null,
+            gift_aid_status: "unknown" as const,
+            gift_aid_eligible_amount: 0,
+          });
+        }
       }
 
       const updatedLead = await db.updateLead(id, lodgeId, {

@@ -1,11 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Trash2 } from "lucide-react";
+import { FeeBreakdown } from "@/components/fees/fee-breakdown";
+import {
+  buildMemberFeeBreakdown,
+  type MemberFeeProfile,
+  type LodgeFeeDefaults,
+} from "@/lib/fees/resolve";
 
 type GuestEntry = {
   guest_name: string;
@@ -28,6 +34,8 @@ type Props = {
   enableGuestTickets: boolean;
   guestTicketPrice: number | null;
   guestTicketDescription: string | null;
+  memberProfile?: MemberFeeProfile | null;
+  feeDefaults?: LodgeFeeDefaults | null;
   initial: {
     attending_ceremony: boolean;
     attending_dining: boolean;
@@ -52,6 +60,8 @@ export function SummonsRsvpForm({
   enableGuestTickets,
   guestTicketPrice,
   guestTicketDescription,
+  memberProfile,
+  feeDefaults,
   initial,
 }: Props) {
   const [attending, setAttending] = useState(initial.attending_ceremony);
@@ -63,19 +73,51 @@ export function SummonsRsvpForm({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const meetingFee =
-    attending && enableMeetingFee && meetingFeeAmount != null
-      ? meetingFeeAmount
-      : 0;
-  const diningTotal =
-    attending && enableDining && dining && diningPrice != null
-      ? diningPrice * (1 + (enableGuestTickets ? 0 : guests.length))
-      : 0;
-  const guestTotal =
-    attending && enableGuestTickets && guestTicketPrice != null
-      ? guests.length * guestTicketPrice
-      : 0;
-  const total = meetingFee + diningTotal + guestTotal;
+  const eventCtx = {
+    enable_meeting_fee: enableMeetingFee,
+    meeting_fee_amount: meetingFeeAmount,
+    enable_dining_rsvp: enableDining,
+    dining_price: diningPrice,
+    enable_guest_tickets: enableGuestTickets,
+    guest_ticket_price: guestTicketPrice,
+  };
+
+  const feeBreakdown = useMemo(
+    () =>
+      buildMemberFeeBreakdown({
+        member: memberProfile,
+        event: eventCtx,
+        defaults: feeDefaults ?? null,
+        attendingCeremony: attending,
+        attendingDining: attending && dining,
+        guests: guests
+          .filter((g) => g.guest_name.trim())
+          .map((g) => ({
+            name: g.guest_name.trim(),
+            profile: null,
+          })),
+      }),
+    [
+      attending,
+      dining,
+      diningPrice,
+      enableDining,
+      enableGuestTickets,
+      enableMeetingFee,
+      feeDefaults,
+      guestTicketPrice,
+      guests,
+      meetingFeeAmount,
+      memberProfile,
+    ]
+  );
+
+  const meetingFee = feeBreakdown.items.find((i) => i.key === "levy")?.amount ?? 0;
+  const diningTotal = feeBreakdown.items.find((i) => i.key === "dining")?.amount ?? 0;
+  const guestTotal = feeBreakdown.items
+    .filter((i) => i.key.startsWith("guest:"))
+    .reduce((s, i) => s + i.amount, 0);
+  const total = feeBreakdown.total;
   const requiresPayment = enablePayments && total > 0;
 
   function addGuest() {
@@ -320,32 +362,7 @@ export function SummonsRsvpForm({
       ) : null}
 
       {attending && requiresPayment ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-            Total due
-          </p>
-          <div className="mt-2 space-y-1 text-sm text-slate-600">
-            {meetingFee > 0 ? (
-              <p>
-                {meetingFeeDescription ?? "Meeting fee"}: £
-                {meetingFee.toFixed(2)}
-              </p>
-            ) : null}
-            {diningTotal > 0 ? (
-              <p>Dining: £{diningTotal.toFixed(2)}</p>
-            ) : null}
-            {guestTotal > 0 ? (
-              <p>Guests: £{guestTotal.toFixed(2)}</p>
-            ) : null}
-          </div>
-          <p className="mt-2 text-lg font-semibold text-slate-950">
-            £{total.toFixed(2)}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            You will be taken to secure checkout. Your place is confirmed once
-            payment is complete.
-          </p>
-        </div>
+        <FeeBreakdown items={feeBreakdown.items} total={total} />
       ) : null}
 
       <Button type="button" variant="primary" onClick={submit} disabled={pending}>

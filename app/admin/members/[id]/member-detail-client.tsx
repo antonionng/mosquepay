@@ -4,28 +4,39 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  User,
-  Mail,
-  Phone,
-  Calendar,
-  UtensilsCrossed,
-  CreditCard,
-  CheckCircle2,
   AlertCircle,
-  Clock,
+  AlertTriangle,
   ArrowLeft,
-  Pencil,
-  Save,
-  X,
-  Send,
-  Wallet,
   Award,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  CreditCard,
+  Loader2,
+  Mail,
+  Pencil,
+  Phone,
+  Save,
+  Send,
   Trash2,
+  User,
+  UtensilsCrossed,
+  Wallet,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 interface Member {
@@ -48,6 +59,13 @@ interface Member {
   directory_sort_order: number | null;
   rank: string | null;
   dietary_requirements: string | null;
+  member_levy_amount: number | null;
+  member_dining_amount: number | null;
+  levy_waived: boolean;
+  dining_waived: boolean;
+  fee_use_custom: boolean;
+  annual_dues_waived: boolean;
+  annual_dues_waiver_reason: string | null;
   date_of_initiation: string | null;
   initiation_email_sent: boolean;
   membership_status: string;
@@ -85,6 +103,7 @@ interface DuesEntry {
   period_end: string;
   status: string;
   paid_at: string | null;
+  waiver_reason: string | null;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -115,12 +134,27 @@ interface OfficeRung {
   current_member_id: string | null;
 }
 
+interface NextDuesSummary {
+  status:
+    | "owed_current_year"
+    | "billed_current_year"
+    | "no_masonic_year"
+    | "no_dues_template"
+    | "waived_at_profile";
+  nextDueDate: string | null;
+  nextYearLabel: string | null;
+  expectedAmount: number | null;
+  currentYearOutstanding: boolean;
+  waiverReason?: string | null;
+}
+
 interface Props {
   member: Member;
   dietaryHistory: DietaryEntry[];
   paymentHistory: PaymentEntry[];
   duesRecords: DuesEntry[];
   offices?: OfficeRung[];
+  nextDues: NextDuesSummary | null;
 }
 
 function buildEditForm(member: Member) {
@@ -140,6 +174,13 @@ function buildEditForm(member: Member) {
     directory_sort_order: member.directory_sort_order?.toString() ?? "",
     rank: member.rank ?? "",
     dietary_requirements: member.dietary_requirements ?? "",
+    fee_use_custom: member.fee_use_custom ?? false,
+    member_levy_amount: member.member_levy_amount?.toString() ?? "",
+    member_dining_amount: member.member_dining_amount?.toString() ?? "",
+    levy_waived: member.levy_waived ?? false,
+    dining_waived: member.dining_waived ?? false,
+    annual_dues_waived: member.annual_dues_waived ?? false,
+    annual_dues_waiver_reason: member.annual_dues_waiver_reason ?? "",
     date_of_initiation: member.date_of_initiation ?? "",
     membership_status: member.membership_status,
   };
@@ -173,6 +214,7 @@ export function MemberDetailClient({
   paymentHistory,
   duesRecords: initialDues,
   offices: initialOffices = [],
+  nextDues,
 }: Props) {
   const router = useRouter();
   const [member, setMember] = useState(initialMember);
@@ -189,6 +231,7 @@ export function MemberDetailClient({
     action: "waive" | "mark_paid" | "mark_outstanding";
   } | null>(null);
   const [duesActionLoading, setDuesActionLoading] = useState(false);
+  const [duesWaiverNote, setDuesWaiverNote] = useState("");
   const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
   const [removing, setRemoving] = useState(false);
 
@@ -230,6 +273,20 @@ export function MemberDetailClient({
           directory_sort_order: numberOrNull(editForm.directory_sort_order),
           rank: emptyToNull(editForm.rank),
           dietary_requirements: emptyToNull(editForm.dietary_requirements),
+          fee_use_custom: editForm.fee_use_custom,
+          member_levy_amount: editForm.fee_use_custom
+            ? numberOrNull(editForm.member_levy_amount)
+            : null,
+          member_dining_amount: editForm.fee_use_custom
+            ? numberOrNull(editForm.member_dining_amount)
+            : null,
+          levy_waived: editForm.levy_waived,
+          dining_waived: editForm.dining_waived,
+          annual_dues_waived: editForm.annual_dues_waived,
+          annual_dues_waiver_reason:
+            editForm.annual_dues_waived
+              ? emptyToNull(editForm.annual_dues_waiver_reason)
+              : null,
           date_of_initiation: editForm.date_of_initiation || null,
           membership_status: editForm.membership_status,
         }),
@@ -361,10 +418,17 @@ export function MemberDetailClient({
     setDuesActionLoading(true);
     setFeedback(null);
     try {
+      const trimmedNote = duesWaiverNote.trim();
       const res = await fetch("/api/dues", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, dues_id: duesId }),
+        body: JSON.stringify({
+          action,
+          dues_id: duesId,
+          ...(action === "waive" && trimmedNote
+            ? { waiver_reason: trimmedNote }
+            : {}),
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.dues) {
@@ -375,6 +439,7 @@ export function MemberDetailClient({
       );
       setFeedback({ type: "success", message: "Dues record updated." });
       setPendingDuesAction(null);
+      setDuesWaiverNote("");
     } catch (duesError) {
       setFeedback({
         type: "error",
@@ -688,11 +753,115 @@ export function MemberDetailClient({
                 </label>
               </div>
               <div className="space-y-2">
-                <Label>Dietary requirements</Label>
+                <Label>Dietary requirements & allergies</Label>
                 <Input
                   value={editForm.dietary_requirements}
                   onChange={(e) => setEditForm({ ...editForm, dietary_requirements: e.target.value })}
                 />
+              </div>
+              <div className="sm:col-span-2 space-y-3 rounded-xl border border-dash-border p-4">
+                <p className="text-sm font-medium text-dash-text">Fees & dining</p>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    checked={!editForm.fee_use_custom}
+                    onChange={() => setEditForm({ ...editForm, fee_use_custom: false })}
+                  />
+                  Use lodge defaults
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    checked={editForm.fee_use_custom}
+                    onChange={() => setEditForm({ ...editForm, fee_use_custom: true })}
+                  />
+                  Custom for this member
+                </label>
+                {editForm.fee_use_custom && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Meeting levy (£)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editForm.member_levy_amount}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, member_levy_amount: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Dining (£)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editForm.member_dining_amount}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, member_dining_amount: e.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
+                )}
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={editForm.levy_waived}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, levy_waived: e.target.checked })
+                    }
+                  />
+                  Levy waived
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={editForm.dining_waived}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, dining_waived: e.target.checked })
+                    }
+                  />
+                  Dines complimentary
+                </label>
+                <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+                  <label className="flex items-center gap-2 text-sm font-medium text-amber-900">
+                    <input
+                      type="checkbox"
+                      checked={editForm.annual_dues_waived}
+                      onChange={(e) =>
+                        setEditForm({
+                          ...editForm,
+                          annual_dues_waived: e.target.checked,
+                          annual_dues_waiver_reason: e.target.checked
+                            ? editForm.annual_dues_waiver_reason
+                            : "",
+                        })
+                      }
+                    />
+                    Annual dues waived
+                  </label>
+                  <p className="text-xs text-amber-800">
+                    Treats this member as exempt from the lodge&apos;s annual
+                    dues bill. The next dues panel and bulk dues run will
+                    skip them until this is turned off.
+                  </p>
+                  {editForm.annual_dues_waived && (
+                    <Textarea
+                      rows={2}
+                      placeholder="Reason for the waiver (e.g. long service, ill health, lodge resolution)"
+                      value={editForm.annual_dues_waiver_reason}
+                      onChange={(e) =>
+                        setEditForm({
+                          ...editForm,
+                          annual_dues_waiver_reason: e.target.value,
+                        })
+                      }
+                      maxLength={500}
+                    />
+                  )}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Date of initiation</Label>
@@ -792,10 +961,34 @@ export function MemberDetailClient({
               <div className="flex items-start gap-3">
                 <UtensilsCrossed className="h-4 w-4 mt-0.5 text-dash-muted shrink-0" />
                 <div>
-                  <p className="text-xs text-dash-muted">Dietary requirements</p>
+                  <p className="text-xs text-dash-muted">Dietary requirements & allergies</p>
                   <p className="text-sm font-medium text-dash-text">
                     {member.dietary_requirements ?? "None specified"}
                   </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <Wallet className="h-4 w-4 mt-0.5 text-dash-muted shrink-0" />
+                <div>
+                  <p className="text-xs text-dash-muted">Fees & dining</p>
+                  <p className="text-sm font-medium text-dash-text">
+                    {member.dining_waived
+                      ? "Dines complimentary"
+                      : member.fee_use_custom
+                        ? `Custom levy${member.member_levy_amount != null ? ` £${member.member_levy_amount}` : ""}, dining${member.member_dining_amount != null ? ` £${member.member_dining_amount}` : " per lodge default"}`
+                        : "Lodge defaults"}
+                    {member.levy_waived ? " · Levy waived" : ""}
+                  </p>
+                  {member.annual_dues_waived && (
+                    <div className="mt-1 inline-flex max-w-full flex-col rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800">
+                      <span className="font-semibold">Annual dues waived</span>
+                      {member.annual_dues_waiver_reason && (
+                        <span className="italic text-amber-700">
+                          {member.annual_dues_waiver_reason}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -878,6 +1071,85 @@ export function MemberDetailClient({
               Membership Dues
             </h3>
           </div>
+          {nextDues && (
+            <div
+              className={cn(
+                "border-b border-dash-border px-6 py-4",
+                nextDues.status === "owed_current_year"
+                  ? "bg-amber-50/60"
+                  : "bg-slate-50/60"
+              )}
+            >
+              <p className="text-xs font-semibold uppercase tracking-wider text-dash-muted">
+                Next dues
+              </p>
+              {nextDues.status === "waived_at_profile" ? (
+                <p className="mt-1 text-sm text-dash-text">
+                  <span className="font-semibold">Annual dues waived.</span>{" "}
+                  Bulk dues runs and next-due reminders will skip this member
+                  until the waiver is removed from their profile.
+                  {nextDues.waiverReason && (
+                    <span className="ml-1 italic text-slate-500">
+                      Reason: {nextDues.waiverReason}
+                    </span>
+                  )}
+                </p>
+              ) : nextDues.status === "no_masonic_year" ? (
+                <p className="mt-1 text-sm text-dash-text">
+                  No masonic year configured.{" "}
+                  <Link
+                    href="/admin/treasurer"
+                    className="underline hover:text-dash-ring"
+                  >
+                    Set one in Treasurer
+                  </Link>{" "}
+                  to drive next due dates.
+                </p>
+              ) : nextDues.status === "owed_current_year" ? (
+                <p className="mt-1 text-sm text-dash-text">
+                  <span className="font-semibold">
+                    Owed for {nextDues.nextYearLabel ?? "the current year"}
+                  </span>
+                  {nextDues.nextDueDate && (
+                    <>
+                      {" "}— due from{" "}
+                      <span className="font-medium">
+                        {new Date(nextDues.nextDueDate).toLocaleDateString(
+                          "en-GB",
+                          { day: "numeric", month: "long", year: "numeric" }
+                        )}
+                      </span>
+                    </>
+                  )}
+                  {nextDues.expectedAmount != null && (
+                    <> at £{nextDues.expectedAmount.toFixed(2)}</>
+                  )}
+                  . Not yet billed.
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-dash-text">
+                  Next bill ({nextDues.nextYearLabel ?? "next year"}) falls due{" "}
+                  <span className="font-medium">
+                    {nextDues.nextDueDate
+                      ? new Date(nextDues.nextDueDate).toLocaleDateString(
+                          "en-GB",
+                          { day: "numeric", month: "long", year: "numeric" }
+                        )
+                      : "next year"}
+                  </span>
+                  {nextDues.expectedAmount != null && (
+                    <> at £{nextDues.expectedAmount.toFixed(2)}</>
+                  )}
+                  .
+                  {nextDues.currentYearOutstanding && (
+                    <span className="ml-1 text-amber-700">
+                      Current year still outstanding.
+                    </span>
+                  )}
+                </p>
+              )}
+            </div>
+          )}
           <div className="divide-y divide-dash-border">
             {duesRecords.length === 0 ? (
               <div className="flex flex-col items-center py-10 text-center">
@@ -914,6 +1186,11 @@ export function MemberDetailClient({
                         year: "numeric",
                       })}
                     </p>
+                    {d.status === "waived" && d.waiver_reason && (
+                      <p className="mt-1 text-xs italic text-slate-500">
+                        Reason: {d.waiver_reason}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <span
@@ -1027,7 +1304,7 @@ export function MemberDetailClient({
         </div>
       </div>
 
-      {pendingDuesAction && duesActionCopy && (
+      {pendingDuesAction && duesActionCopy && pendingDuesAction.action !== "waive" && (
         <ConfirmActionDialog
           open={Boolean(pendingDuesAction)}
           onOpenChange={(open) => {
@@ -1042,6 +1319,82 @@ export function MemberDetailClient({
             handleDuesAction(pendingDuesAction.duesId, pendingDuesAction.action)
           }
         />
+      )}
+
+      {pendingDuesAction?.action === "waive" && (
+        <Dialog
+          open
+          onOpenChange={(open) => {
+            if (duesActionLoading) return;
+            if (!open) {
+              setPendingDuesAction(null);
+              setDuesWaiverNote("");
+            }
+          }}
+        >
+          <DialogContent
+            showClose={!duesActionLoading}
+            className="border-dash-border bg-dash-surface p-0 text-dash-text shadow-2xl"
+          >
+            <DialogHeader className="space-y-3 border-b border-dash-border px-6 py-5 text-left">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-semibold text-dash-text">
+                  Waive dues?
+                </DialogTitle>
+                <DialogDescription className="mt-2 text-sm leading-6 text-dash-muted">
+                  Marks the £
+                  {(pendingDuesRecord?.amount ?? 0).toFixed(2)} dues record as
+                  waived. The note is optional but recommended for the audit
+                  trail and is shown in the treasurer ledger.
+                </DialogDescription>
+              </div>
+            </DialogHeader>
+            <div className="space-y-2 px-6 py-4">
+              <Label htmlFor="dues-waiver-note">Waiver reason (optional)</Label>
+              <Textarea
+                id="dues-waiver-note"
+                rows={3}
+                placeholder="e.g. Long service, ill health, board approval 12 May."
+                value={duesWaiverNote}
+                onChange={(event) => setDuesWaiverNote(event.target.value)}
+                maxLength={500}
+                disabled={duesActionLoading}
+              />
+              <p className="text-xs text-dash-muted">
+                {duesWaiverNote.length}/500
+              </p>
+            </div>
+            <DialogFooter className="gap-2 border-t border-dash-border px-6 py-4 sm:justify-end [&_button]:w-full sm:[&_button]:w-auto">
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={duesActionLoading}
+                onClick={() => {
+                  setPendingDuesAction(null);
+                  setDuesWaiverNote("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={duesActionLoading}
+                onClick={() =>
+                  handleDuesAction(pendingDuesAction.duesId, "waive")
+                }
+              >
+                {duesActionLoading && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Waive dues
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
 
       <ConfirmActionDialog

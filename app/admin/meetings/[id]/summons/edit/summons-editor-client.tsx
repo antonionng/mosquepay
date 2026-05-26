@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { SummonsRecipientsPanel } from "@/components/admin/summons-recipients-panel";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 
 type SummonsForm = {
@@ -465,6 +466,8 @@ export function SummonsEditorClient({
             : " No failures recorded."}
         </div>
       )}
+
+      <SummonsRecipientsPanel eventId={eventId} />
 
       <ConfirmActionDialog
         open={approveConfirmOpen}
