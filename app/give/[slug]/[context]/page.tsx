@@ -152,11 +152,12 @@ function firstParam(v: string | string[] | undefined): string | null {
 }
 
 async function loadLodge(slug: string) {
+  const normalized = slug.trim().toLowerCase();
   try {
-    const { data } = await createServiceClient()
+    const { data, error } = await createServiceClient()
       .from("lodges")
       .select("id, slug, name, current_charity_campaign_id")
-      .eq("slug", slug.trim().toLowerCase())
+      .eq("slug", normalized)
       .eq("is_active", true)
       .maybeSingle<{
         id: string;
@@ -164,8 +165,26 @@ async function loadLodge(slug: string) {
         name: string;
         current_charity_campaign_id: string | null;
       }>();
+    if (error) {
+      // Log loudly: a schema-drift or RLS misconfiguration here turns a
+      // perfectly valid sticker URL into a generic "lodge not found" page,
+      // which is the least debuggable failure mode for the donor (the
+      // sticker LOOKS broken even though the column is just missing).
+      console.error("give resolver: lodge lookup failed", {
+        slug: normalized,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+      return null;
+    }
     return data ?? null;
-  } catch {
+  } catch (err) {
+    console.error("give resolver: lodge lookup threw", {
+      slug: normalized,
+      message: err instanceof Error ? err.message : String(err),
+    });
     // Defensive: the resolver page is public-facing so a missing service
     // role should fail-closed (NotFoundPage), not leak a stack trace.
     return null;
@@ -174,16 +193,28 @@ async function loadLodge(slug: string) {
 
 async function loadMerchantId(lodgeId: string): Promise<string | null> {
   try {
-    const { data } = await createServiceClient()
+    const { data, error } = await createServiceClient()
       .schema("mooov")
       .from("lodges")
       .select("merchant_id, status")
       .eq("id", lodgeId)
       .maybeSingle<{ merchant_id: string; status: string }>();
+    if (error) {
+      console.error("give resolver: mooov merchant lookup failed", {
+        lodge_id: lodgeId,
+        code: error.code,
+        message: error.message,
+      });
+      return null;
+    }
     if (!data) return null;
     if (data.status && data.status !== "active") return null;
     return data.merchant_id ?? null;
-  } catch {
+  } catch (err) {
+    console.error("give resolver: mooov merchant lookup threw", {
+      lodge_id: lodgeId,
+      message: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
 }
