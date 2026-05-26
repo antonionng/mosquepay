@@ -25,6 +25,7 @@ import {
   GraduationCap,
   MapPin,
   Plug,
+  ScanLine,
   Shield,
   Rocket,
   Building2,
@@ -45,6 +46,7 @@ const nav = [
   { href: "/admin/communications", label: "Communications", icon: Megaphone, permission: "members:write" },
   { href: "/admin/website", label: "Website", icon: Globe, permission: "website:write" },
   { href: "/admin/payments", label: "Payments", icon: CreditCard, permission: "payments:write" },
+  { href: "/admin/take-payment", label: "Take payment", icon: ScanLine, permission: "payments:write" },
   { href: "/admin/treasurer", label: "Treasurer", icon: Wallet, permission: "payments:write" },
   { href: "/admin/charity", label: "Charity", icon: Heart, permission: "charity:write", flag: "charity_campaigns" },
   { href: "/admin/donations", label: "Donations", icon: Gift, permission: "charity:write", flag: "gift_aid" },
@@ -130,6 +132,7 @@ export function AdminSidebar() {
   const financeNav = visibleNav.filter((item) =>
     [
       "/admin/payments",
+      "/admin/take-payment",
       "/admin/treasurer",
       "/admin/charity",
       "/admin/donations",
