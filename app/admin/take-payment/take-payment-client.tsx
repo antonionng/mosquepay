@@ -308,8 +308,30 @@ export function TakePaymentClient({
   );
 
   return (
-    <div className="space-y-6">
-      <div className="admin-page-head">
+    <div className="space-y-4 sm:space-y-6">
+      {/* Mobile-only slim header. Mirrors the admin header chrome that the
+          kiosk-mode CSS hides on phones — keeps "Take payment" visible
+          but eats only one line of vertical space instead of the full
+          admin shell. */}
+      <div className="flex items-center justify-between gap-3 pl-12 lg:hidden">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-dash-faint">
+            Lodge admin
+          </p>
+          <h1 className="truncate text-base font-semibold text-dash-text">
+            Take payment
+          </h1>
+        </div>
+        {session ? (
+          <Button variant="outline" size="sm" onClick={reset}>
+            <RotateCcw className="mr-1.5 h-4 w-4" />
+            New
+          </Button>
+        ) : null}
+      </div>
+
+      {/* Desktop header (unchanged) */}
+      <div className="admin-page-head hidden lg:flex">
         <div>
           <h1 className="admin-page-title">Take payment</h1>
           <p className="admin-page-copy">
@@ -495,7 +517,7 @@ function AmountForm({
             <button
               type="button"
               onClick={() => adjust(-5)}
-              className="inline-flex h-9 items-center gap-1 rounded-full bg-slate-800/80 px-3 text-xs font-medium text-slate-200 hover:bg-slate-700"
+              className="touch-pad inline-flex h-9 items-center gap-1 rounded-full bg-slate-800/80 px-3 text-xs font-medium text-slate-200 hover:bg-slate-700"
               aria-label="Decrease by £5"
             >
               <Minus className="h-3.5 w-3.5" /> £5
@@ -503,7 +525,7 @@ function AmountForm({
             <button
               type="button"
               onClick={() => adjust(5)}
-              className="inline-flex h-9 items-center gap-1 rounded-full bg-slate-800/80 px-3 text-xs font-medium text-slate-200 hover:bg-slate-700"
+              className="touch-pad inline-flex h-9 items-center gap-1 rounded-full bg-slate-800/80 px-3 text-xs font-medium text-slate-200 hover:bg-slate-700"
               aria-label="Increase by £5"
             >
               <Plus className="h-3.5 w-3.5" /> £5
@@ -511,7 +533,7 @@ function AmountForm({
             <button
               type="button"
               onClick={() => adjust(10)}
-              className="inline-flex h-9 items-center gap-1 rounded-full bg-slate-800/80 px-3 text-xs font-medium text-slate-200 hover:bg-slate-700"
+              className="touch-pad inline-flex h-9 items-center gap-1 rounded-full bg-slate-800/80 px-3 text-xs font-medium text-slate-200 hover:bg-slate-700"
               aria-label="Increase by £10"
             >
               <Plus className="h-3.5 w-3.5" /> £10
@@ -520,7 +542,7 @@ function AmountForm({
               <button
                 type="button"
                 onClick={clearAmount}
-                className="inline-flex h-9 items-center gap-1 rounded-full bg-red-500/15 px-3 text-xs font-medium text-red-300 hover:bg-red-500/25"
+                className="touch-pad inline-flex h-9 items-center gap-1 rounded-full bg-red-500/15 px-3 text-xs font-medium text-red-300 hover:bg-red-500/25"
               >
                 Clear
               </button>
@@ -534,7 +556,7 @@ function AmountForm({
             <button
               key={preset}
               type="button"
-              className="min-h-11 min-w-[3.5rem] rounded-full border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 shadow-sm transition-colors hover:bg-slate-50 active:bg-slate-100"
+              className="touch-pad min-h-11 min-w-[3.5rem] rounded-full border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 shadow-sm transition-colors hover:bg-slate-50 active:bg-slate-100"
               onClick={() => setAmount(String(preset))}
             >
               £{preset}
@@ -616,6 +638,10 @@ function AmountForm({
                   value={reference}
                   onChange={(e) => setReference(e.target.value)}
                   maxLength={120}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className="ios-input"
                 />
               </div>
               <div className="space-y-2">
@@ -629,6 +655,10 @@ function AmountForm({
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   maxLength={140}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className="ios-input"
                 />
               </div>
             </div>
@@ -686,10 +716,22 @@ function MemberPicker({
     [members, memberId],
   );
 
+  // Lock body scroll while the sheet is open so iOS Safari doesn't
+  // double-scroll (the underlying page + the sheet). Standard mobile
+  // app behaviour.
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   // Lodge member counts are typically small (<100), so a client-side
   // filter beats a debounced search round-trip on flaky meeting Wi-Fi.
   const filtered = useMemo(() => {
-    if (!query.trim()) return members.slice(0, 50);
+    if (!query.trim()) return members.slice(0, 100);
     const q = query.trim().toLowerCase();
     return members
       .filter((m) => {
@@ -697,7 +739,7 @@ function MemberPicker({
         const email = (m.email ?? "").toLowerCase();
         return name.includes(q) || email.includes(q);
       })
-      .slice(0, 50);
+      .slice(0, 100);
   }, [members, query]);
 
   if (selected) {
@@ -725,7 +767,7 @@ function MemberPicker({
             setQuery("");
           }}
           aria-label="Clear member"
-          className="shrink-0 rounded-md p-1 text-emerald-800/80 hover:bg-emerald-100"
+          className="touch-pad shrink-0 rounded-md p-1.5 text-emerald-800/80 hover:bg-emerald-100"
         >
           <X className="h-4 w-4" />
         </button>
@@ -737,73 +779,161 @@ function MemberPicker({
     <div className="space-y-2">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-left text-sm shadow-sm hover:bg-slate-50"
+        onClick={() => setOpen(true)}
+        className="touch-pad flex w-full items-center justify-between gap-3 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-left text-sm shadow-sm hover:bg-slate-50"
         aria-expanded={open}
       >
-        <span className="flex items-center gap-2">
-          <UserX className="h-4 w-4 text-slate-400" />
-          <span className="text-slate-700">
+        <span className="flex min-w-0 items-center gap-2">
+          <UserX className="h-4 w-4 shrink-0 text-slate-400" />
+          <span className="truncate text-slate-700">
             Guest payment{" "}
             <span className="text-slate-400">· no member attached</span>
           </span>
         </span>
-        <span className="text-xs font-medium text-blue-600">
-          {open ? "Cancel" : "Attach member"}
+        <span className="shrink-0 text-xs font-medium text-blue-600">
+          Attach member
         </span>
       </button>
-
-      {open ? (
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-2">
-            <Search className="h-4 w-4 shrink-0 text-slate-400" />
-            <input
-              type="text"
-              autoFocus
-              placeholder="Search by name or email…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
-            />
-          </div>
-          <ul className="max-h-64 overflow-y-auto">
-            {filtered.length === 0 ? (
-              <li className="px-3 py-6 text-center text-sm text-slate-500">
-                No members match &ldquo;{query}&rdquo;.
-              </li>
-            ) : (
-              filtered.map((m) => (
-                <li key={m.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMemberId(m.id);
-                      setQuery("");
-                      setOpen(false);
-                    }}
-                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-slate-50"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-slate-800">
-                        {m.full_name}
-                      </p>
-                      {m.email ? (
-                        <p className="truncate text-xs text-slate-500">
-                          {m.email}
-                        </p>
-                      ) : null}
-                    </div>
-                  </button>
-                </li>
-              ))
-            )}
-          </ul>
-        </div>
-      ) : null}
       <p className="px-1 text-xs text-slate-500">
         Optional. Leave blank for a guest payment, or attach a member so the
         ledger and any Gift Aid declaration are logged automatically.
       </p>
+
+      {/* Full-screen native-style sheet. Positioned fixed so the iOS
+          keyboard pushes it up naturally without breaking the page layout
+          underneath, and the search input is set to 16px so iOS Safari
+          does NOT auto-zoom on focus (the cause of the "page zooms and
+          disfigures" feedback). */}
+      {open ? (
+        <MemberPickerSheet
+          query={query}
+          setQuery={setQuery}
+          filtered={filtered}
+          onPick={(m) => {
+            setMemberId(m.id);
+            setQuery("");
+            setOpen(false);
+          }}
+          onClose={() => {
+            setQuery("");
+            setOpen(false);
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function MemberPickerSheet({
+  query,
+  setQuery,
+  filtered,
+  onPick,
+  onClose,
+}: {
+  query: string;
+  setQuery: (v: string) => void;
+  filtered: MemberOption[];
+  onPick: (m: MemberOption) => void;
+  onClose: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Defer focus a tick so the sheet animates in before the iOS keyboard
+    // jumps up; otherwise the layout can flash.
+    const id = setTimeout(() => inputRef.current?.focus(), 60);
+    return () => clearTimeout(id);
+  }, []);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Attach member"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 sm:items-center"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className={cn(
+          "flex w-full flex-col bg-white shadow-2xl",
+          // Phone: bottom sheet with rounded top + safe-area aware.
+          "max-h-[85dvh] rounded-t-2xl pb-[env(safe-area-inset-bottom)]",
+          // Tablet+: a centred card.
+          "sm:max-h-[70vh] sm:max-w-md sm:rounded-2xl sm:pb-0",
+        )}
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+          <h2 className="text-sm font-semibold text-slate-800">Attach member</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="touch-pad rounded-md p-1.5 text-slate-500 hover:bg-slate-100"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-3">
+          <Search className="h-4 w-4 shrink-0 text-slate-400" />
+          <input
+            ref={inputRef}
+            type="text"
+            inputMode="search"
+            enterKeyHint="search"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            placeholder="Search by name or email…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="ios-input w-full bg-transparent outline-none placeholder:text-slate-400"
+          />
+          {query ? (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              aria-label="Clear search"
+              className="touch-pad rounded-md p-1 text-slate-400 hover:text-slate-600"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+        </div>
+        <ul className="flex-1 overflow-y-auto overscroll-contain">
+          {filtered.length === 0 ? (
+            <li className="px-4 py-10 text-center text-sm text-slate-500">
+              {query.trim()
+                ? `No members match "${query}".`
+                : "No active members in this lodge yet."}
+            </li>
+          ) : (
+            filtered.map((m) => (
+              <li key={m.id}>
+                <button
+                  type="button"
+                  onClick={() => onPick(m)}
+                  className="touch-pad flex w-full items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 text-left hover:bg-slate-50 active:bg-slate-100"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-slate-800">
+                      {m.full_name}
+                    </p>
+                    {m.email ? (
+                      <p className="truncate text-xs text-slate-500">
+                        {m.email}
+                      </p>
+                    ) : null}
+                  </div>
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+      </div>
     </div>
   );
 }
@@ -844,7 +974,7 @@ function Keypad({
           aria-label={k.aria ?? `Digit ${k.value}`}
           onClick={k.onClick ?? (() => onDigit(k.value))}
           className={cn(
-            "flex h-14 items-center justify-center rounded-xl border border-slate-200 bg-white text-2xl font-semibold text-slate-800 shadow-sm transition-all active:scale-[0.97] active:bg-slate-100 sm:h-16 sm:text-3xl",
+            "touch-pad flex h-14 items-center justify-center rounded-xl border border-slate-200 bg-white text-2xl font-semibold text-slate-800 shadow-sm transition-transform active:scale-[0.97] active:bg-slate-100 sm:h-16 sm:text-3xl",
             k.value === "back" && "text-slate-500",
           )}
         >
@@ -1099,8 +1229,11 @@ function ActiveSession({
       className={cn(
         "space-y-5 p-4 sm:p-6",
         // In fullscreen, paint the whole viewport white so the QR has max
-        // contrast on every device.
-        isFullscreen && "fixed inset-0 z-50 m-0 max-h-none max-w-none rounded-none border-0 bg-white",
+        // contrast on every device. Use 100dvh + safe-area insets so iOS
+        // Safari's collapsing URL bar and the home indicator don't crop
+        // the QR.
+        isFullscreen &&
+          "fixed inset-0 z-50 m-0 h-[100dvh] max-h-none max-w-none rounded-none border-0 bg-white pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",
       )}
     >
       <div className="flex items-start justify-between gap-3">

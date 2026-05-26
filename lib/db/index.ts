@@ -1791,6 +1791,9 @@ export async function createMember(
     | "fee_use_custom"
     | "annual_dues_waived"
     | "annual_dues_waiver_reason"
+    | "show_on_website"
+    | "public_bio"
+    | "public_photo_url"
   > &
     Partial<
       Pick<
@@ -1811,6 +1814,9 @@ export async function createMember(
         | "fee_use_custom"
         | "annual_dues_waived"
         | "annual_dues_waiver_reason"
+        | "show_on_website"
+        | "public_bio"
+        | "public_photo_url"
       >
     >
 ): Promise<Member> {
@@ -2942,6 +2948,85 @@ export async function deleteOfficerLadderRung(
     .eq("id", id)
     .eq("lodge_id", lodgeId);
   if (error) throw error;
+}
+
+/**
+ * Public-facing officer entry, joining the officer_ladder rung to the
+ * member assigned to it. Only members who have explicitly opted in via
+ * `members.show_on_website = true` are returned, regardless of whether
+ * they currently hold a rung. This is the single read path used by the
+ * public website Officers section.
+ *
+ * Successors are intentionally excluded; the public site only ever
+ * shows the current officer, never the line of progression.
+ */
+export type PublicOfficer = {
+  rung_id: string;
+  rung_label: string;
+  sort_order: number;
+  member_id: string;
+  full_name: string;
+  rank: string | null;
+  public_bio: string | null;
+  public_photo_url: string | null;
+};
+
+export async function listPublicOfficers(
+  lodgeId: string
+): Promise<PublicOfficer[]> {
+  const { data, error } = await db()
+    .from("officer_ladder")
+    .select(
+      `id, rung_label, sort_order, current_member_id,
+       members:current_member_id(id, full_name, rank, public_bio, public_photo_url, show_on_website, membership_status)`
+    )
+    .eq("lodge_id", lodgeId)
+    .not("current_member_id", "is", null)
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  type JoinedMember = {
+    id: string;
+    full_name: string;
+    rank: string | null;
+    public_bio: string | null;
+    public_photo_url: string | null;
+    show_on_website: boolean;
+    membership_status: string;
+  };
+  type Row = {
+    id: string;
+    rung_label: string;
+    sort_order: number;
+    current_member_id: string | null;
+    // PostgREST returns the embedded resource as either a single object
+    // or an array depending on whether the FK relationship is uniquely
+    // inferred. Handle both shapes defensively.
+    members: JoinedMember | JoinedMember[] | null;
+  };
+  return ((data ?? []) as unknown as Row[])
+    .map((row) => {
+      const member = Array.isArray(row.members)
+        ? row.members[0] ?? null
+        : row.members;
+      if (
+        !member ||
+        member.show_on_website !== true ||
+        member.membership_status !== "active"
+      ) {
+        return null;
+      }
+      return {
+        rung_id: row.id,
+        rung_label: row.rung_label,
+        sort_order: row.sort_order,
+        member_id: member.id,
+        full_name: member.full_name,
+        rank: member.rank,
+        public_bio: member.public_bio,
+        public_photo_url: member.public_photo_url,
+      } satisfies PublicOfficer;
+    })
+    .filter((entry): entry is PublicOfficer => entry != null);
 }
 
 // ---------------------------------------------------------------------------

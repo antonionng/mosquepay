@@ -94,8 +94,18 @@ export function AdminLayoutWrapper({ children }: { children: React.ReactNode }) 
 
   const { title, parent } = adminHeaderMeta(pathname);
 
+  // Routes that should run as a kiosk on phones: full-bleed, no admin
+  // header/breadcrumb chrome eating vertical space. We keep the sidebar
+  // hamburger reachable so the user can still navigate, but on a phone
+  // every other LP admin pixel is hidden so the QR / keypad owns the
+  // viewport. Desktop view is unaffected (CSS re-shows the header at lg).
+  const isKioskRoute = pathname === "/admin/take-payment";
+
   return (
-    <div className="admin-dashboard-light flex min-h-screen bg-dash-surface text-dash-text">
+    <div
+      className="admin-dashboard-light flex min-h-screen bg-dash-surface text-dash-text"
+      data-admin-route={isKioskRoute ? "kiosk" : "default"}
+    >
       <a
         href="#admin-main"
         className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-md focus:border focus:border-dash-border focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-dash-text focus:shadow-md"
@@ -106,6 +116,7 @@ export function AdminLayoutWrapper({ children }: { children: React.ReactNode }) 
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <ImpersonationBanner />
         <header
+          data-admin-chrome="true"
           className={cn(
             "sticky top-0 z-20 border-b border-dash-border bg-dash-surface/95 backdrop-blur-md",
             "supports-[backdrop-filter]:bg-dash-surface/80"
@@ -151,6 +162,7 @@ export function AdminLayoutWrapper({ children }: { children: React.ReactNode }) 
 
         <main
           id="admin-main"
+          data-admin-main="true"
           tabIndex={-1}
           className="flex-1 overflow-auto bg-dash-surface p-4 outline-none sm:p-6 lg:p-8"
         >

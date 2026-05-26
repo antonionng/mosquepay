@@ -67,6 +67,13 @@ export const metadata: Metadata = {
 
 export const viewport = {
   themeColor: "#1d4ed8",
+  // viewportFit:"cover" lets the app draw under iOS Safari's notch + home
+  // indicator so we can use env(safe-area-inset-*) to honour the cutouts
+  // ourselves. width/initialScale stay at Next.js's sane defaults; we do
+  // NOT set maximumScale:1 because that breaks pinch-to-zoom accessibility.
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover" as const,
 };
 
 export default function RootLayout({

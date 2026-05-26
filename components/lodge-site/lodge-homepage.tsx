@@ -52,6 +52,10 @@ type LodgeData = {
   secretary_address: string | null;
   loi_contact: string | null;
   current_charity_campaign_id: string | null;
+  meeting_location: string | null;
+  meeting_location_url: string | null;
+  accessibility_notes: string | null;
+  default_dress_code: string | null;
 };
 
 type PublicUpcomingEvent = {
@@ -64,6 +68,27 @@ type PublicUpcomingEvent = {
   event_type: string;
 };
 
+type PublicOfficerSummary = {
+  rung_id: string;
+  rung_label: string;
+  sort_order: number;
+  member_id: string;
+  full_name: string;
+  rank: string | null;
+  public_bio: string | null;
+  public_photo_url: string | null;
+};
+
+type PublicCharityCampaign = {
+  id: string;
+  name: string;
+  description: string | null;
+  target_amount: number;
+  raised_amount: number;
+  start_date: string;
+  end_date: string | null;
+};
+
 type SitePayload = {
   lodge: LodgeData | null;
   site: {
@@ -73,6 +98,8 @@ type SitePayload = {
     header_settings?: LodgeSiteHeaderSettings | null;
     footer_settings?: LodgeSiteFooterSettings | null;
     upcoming_public_events?: PublicUpcomingEvent[] | null;
+    public_officers?: PublicOfficerSummary[] | null;
+    charity_campaign?: PublicCharityCampaign | null;
     custom_pages?: Array<{
       id: string;
       slug: string;
@@ -730,7 +757,14 @@ function MeetingDetailsSection({
   lodge: LodgeData | null;
   lodgeSlug: string;
 }) {
-  const cards: { icon: ReactNode; label: string; value: string }[] = [];
+  const venue = lodge?.meeting_location ?? lodge?.secretary_address ?? null;
+  const cards: {
+    icon: ReactNode;
+    label: string;
+    value: string;
+    href?: string;
+    helper?: string | null;
+  }[] = [];
   if (lodge?.meeting_schedule) {
     cards.push({
       icon: <Calendar className="h-6 w-6" />,
@@ -738,11 +772,20 @@ function MeetingDetailsSection({
       value: lodge.meeting_schedule,
     });
   }
-  if (lodge?.secretary_address) {
+  if (venue) {
     cards.push({
       icon: <MapPin className="h-6 w-6" />,
-      label: "Location",
-      value: lodge.secretary_address,
+      label: "Where we meet",
+      value: venue,
+      href: lodge?.meeting_location_url ?? undefined,
+      helper: lodge?.accessibility_notes ?? null,
+    });
+  }
+  if (lodge?.default_dress_code) {
+    cards.push({
+      icon: <Users className="h-6 w-6" />,
+      label: "Dress code",
+      value: lodge.default_dress_code,
     });
   }
   if (lodge?.loi_contact) {
@@ -780,9 +823,26 @@ function MeetingDetailsSection({
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                     {item.label}
                   </p>
-                  <p className="mt-2 text-base font-medium text-slate-950 whitespace-pre-line">
-                    {item.value}
-                  </p>
+                  {item.href ? (
+                    <a
+                      href={item.href}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="mt-2 inline-flex items-start gap-2 text-base font-medium text-slate-950 hover:text-blue-700 whitespace-pre-line"
+                    >
+                      <span>{item.value}</span>
+                      <ArrowRight className="mt-1 h-4 w-4 shrink-0 -rotate-45" aria-hidden />
+                    </a>
+                  ) : (
+                    <p className="mt-2 text-base font-medium text-slate-950 whitespace-pre-line">
+                      {item.value}
+                    </p>
+                  )}
+                  {item.helper ? (
+                    <p className="mt-3 text-sm leading-relaxed text-slate-600 whitespace-pre-line">
+                      {item.helper}
+                    </p>
+                  ) : null}
                 </div>
               </StaggerItem>
             ))}
@@ -809,14 +869,30 @@ function MeetingDetailsSection({
 /* ────────────────────────────────────────────────────────────
  *  OFFICERS: Grid of cards
  * ──────────────────────────────────────────────────────────── */
-function OfficersSection({ section }: { section: SiteSection }) {
-  // Officer names + photos are intentionally NOT rendered here. Member
-  // privacy requires explicit per-member opt-in (added in Phase 1). Until
-  // then this section renders only the user-edited heading, body and image.
-  // If a lodge has nothing to say it is hidden entirely.
-  const hasContent =
+function memberInitials(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length === 0) return "?";
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? "" : "";
+  return `${first}${last}`.toUpperCase() || "?";
+}
+
+function OfficersSection({
+  section,
+  officers,
+}: {
+  section: SiteSection;
+  officers: PublicOfficerSummary[];
+}) {
+  // Officer names, photos, and bios are rendered only when each member
+  // has explicitly opted in via `members.show_on_website` and is still
+  // an active member. When no member has opted in we keep the heading /
+  // body / image so the lodge can still describe its officers in their
+  // own words, but the grid collapses so we never invent a roster.
+  const hasOfficers = officers.length > 0;
+  const hasIntro =
     Boolean(section.body?.trim()) || Boolean(section.style?.image_url);
-  if (!hasContent) return null;
+  if (!hasOfficers && !hasIntro) return null;
   return (
     <section
       className={sectionShellClass(section, "relative overflow-hidden bg-white py-20 lg:py-28")}
@@ -832,7 +908,57 @@ function OfficersSection({ section }: { section: SiteSection }) {
             {section.body && <p className="section-description">{section.body}</p>}
           </div>
         </FadeIn>
-        <InlineSectionImage section={section} className="max-h-[28rem]" />
+        <InlineSectionImage section={section} className="mb-12 max-h-[28rem]" />
+
+        {hasOfficers ? (
+          <StaggerChildren
+            className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+            staggerDelay={0.06}
+          >
+            {officers.map((officer) => (
+              <StaggerItem key={officer.rung_id}>
+                <article className="public-grid-card flex h-full flex-col">
+                  <div className="flex items-center gap-4">
+                    {officer.public_photo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={officer.public_photo_url}
+                        alt={`Headshot of ${officer.full_name}`}
+                        className="h-16 w-16 shrink-0 rounded-full object-cover ring-2 ring-slate-100"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div
+                        className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-slate-950 text-base font-semibold text-white"
+                        aria-hidden
+                      >
+                        {memberInitials(officer.full_name)}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        {officer.rung_label}
+                      </p>
+                      <p className="mt-1 text-lg font-semibold text-slate-950">
+                        {officer.full_name}
+                      </p>
+                      {officer.rank ? (
+                        <p className="mt-0.5 text-sm text-slate-500">
+                          {officer.rank}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                  {officer.public_bio ? (
+                    <p className="mt-5 text-sm leading-relaxed text-slate-600 whitespace-pre-line">
+                      {officer.public_bio}
+                    </p>
+                  ) : null}
+                </article>
+              </StaggerItem>
+            ))}
+          </StaggerChildren>
+        ) : null}
       </div>
     </section>
   );
@@ -841,13 +967,38 @@ function OfficersSection({ section }: { section: SiteSection }) {
 /* ────────────────────────────────────────────────────────────
  *  CHARITY: Warm impact section with progress
  * ──────────────────────────────────────────────────────────── */
+function formatGBP(value: number): string {
+  try {
+    return new Intl.NumberFormat("en-GB", {
+      style: "currency",
+      currency: "GBP",
+      maximumFractionDigits: 0,
+    }).format(value);
+  } catch {
+    return `£${Math.round(value).toLocaleString("en-GB")}`;
+  }
+}
+
 function CharitySection({
   section,
   lodgeSlug,
+  campaign,
 }: {
   section: SiteSection;
   lodgeSlug: string;
+  campaign: PublicCharityCampaign | null;
 }) {
+  // Real fundraising progress is shown only when an admin has pinned a
+  // charity campaign via lodges.current_charity_campaign_id. Otherwise
+  // we render the user-editable heading/body/image only, with no fake
+  // progress bar. The hero "Our Charity" CTA is governed by the same
+  // flag.
+  const hasProgress = Boolean(campaign && campaign.target_amount > 0);
+  const ratio =
+    campaign && campaign.target_amount > 0
+      ? Math.max(0, Math.min(1, campaign.raised_amount / campaign.target_amount))
+      : 0;
+  const percent = Math.round(ratio * 100);
   return (
     <section
       className={sectionShellClass(section, "relative overflow-hidden border-y border-slate-200 bg-slate-50 py-20 lg:py-28")}
@@ -880,30 +1031,76 @@ function CharitySection({
           </FadeIn>
 
           <FadeIn delay={0.15}>
-            {section.style?.image_url ? (
+            {campaign ? (
+              <div className="public-grid-card">
+                <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                  <Heart className="h-7 w-7" />
+                </div>
+                <h3 className="text-xl font-semibold text-slate-950">
+                  {campaign.name}
+                </h3>
+                {campaign.description ? (
+                  <p className="mt-3 text-sm leading-relaxed text-slate-600 whitespace-pre-line">
+                    {campaign.description}
+                  </p>
+                ) : null}
+                {hasProgress ? (
+                  <div className="mt-6">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-slate-700">Target</span>
+                      <span className="font-semibold text-slate-950">
+                        {formatGBP(campaign.target_amount)}
+                      </span>
+                    </div>
+                    <div
+                      className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-100"
+                      role="progressbar"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={percent}
+                      aria-label={`${campaign.name} progress`}
+                    >
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-400 transition-all duration-1000"
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500">
+                      {formatGBP(campaign.raised_amount)} raised so far ({percent}%)
+                    </p>
+                  </div>
+                ) : (
+                  <p className="mt-6 text-sm text-slate-500">
+                    Every donation, large or small, makes a difference.
+                  </p>
+                )}
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="mt-6 w-full justify-center sm:w-auto"
+                >
+                  <Link href={withQuery("/donate", lodgeSlug)}>
+                    Donate to this campaign
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+            ) : section.style?.image_url ? (
               <InlineSectionImage section={section} />
             ) : (
               <div className="public-grid-card">
                 <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
                   <Heart className="h-7 w-7" />
                 </div>
-                <h3 className="text-xl font-semibold text-slate-950">Annual Fundraising</h3>
+                <h3 className="text-xl font-semibold text-slate-950">
+                  Annual Fundraising
+                </h3>
                 <p className="mt-3 text-sm text-slate-600">
-                  Supporting local and national causes through events, dining donations, and direct giving.
+                  Supporting local and national causes through events, dining
+                  donations, and direct giving. Pin a current campaign in the
+                  admin to show live progress here.
                 </p>
-                <div className="mt-6">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-slate-700">2024 Target</span>
-                    <span className="font-semibold text-slate-950">£5,000</span>
-                  </div>
-                  <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-400 transition-all duration-1000"
-                      style={{ width: "68%" }}
-                    />
-                  </div>
-                  <p className="mt-2 text-xs text-slate-500">£3,400 raised so far</p>
-                </div>
               </div>
             )}
           </FadeIn>
@@ -1270,12 +1467,16 @@ function SectionRenderer({
   lodge,
   lodgeSlug,
   upcomingPublicEvents,
+  publicOfficers,
+  charityCampaign,
   footerSettings,
 }: {
   section: SiteSection;
   lodge: LodgeData | null;
   lodgeSlug: string;
   upcomingPublicEvents: PublicUpcomingEvent[];
+  publicOfficers: PublicOfficerSummary[];
+  charityCampaign: PublicCharityCampaign | null;
   footerSettings: LodgeSiteFooterSettings | null;
 }) {
   let rendered: ReactNode;
@@ -1303,10 +1504,16 @@ function SectionRenderer({
       );
       break;
     case "officers":
-      rendered = <OfficersSection section={section} />;
+      rendered = <OfficersSection section={section} officers={publicOfficers} />;
       break;
     case "charity":
-      rendered = <CharitySection section={section} lodgeSlug={lodgeSlug} />;
+      rendered = (
+        <CharitySection
+          section={section}
+          lodgeSlug={lodgeSlug}
+          campaign={charityCampaign}
+        />
+      );
       break;
     case "events":
       rendered = (
@@ -1439,6 +1646,8 @@ export function LodgeHomepage({
 
   const hasJoinSection = sections.some((s) => s.type === "join");
   const upcomingPublicEvents = payload.site.upcoming_public_events ?? [];
+  const publicOfficers = payload.site.public_officers ?? [];
+  const charityCampaign = payload.site.charity_campaign ?? null;
   const footerSettings = payload.site.footer_settings ?? null;
 
   return (
@@ -1449,6 +1658,8 @@ export function LodgeHomepage({
           lodge={payload.lodge}
           lodgeSlug={lodgeSlug}
           upcomingPublicEvents={upcomingPublicEvents}
+          publicOfficers={publicOfficers}
+          charityCampaign={charityCampaign}
           footerSettings={footerSettings}
         />
       )}
@@ -1460,6 +1671,8 @@ export function LodgeHomepage({
           lodge={payload.lodge}
           lodgeSlug={lodgeSlug}
           upcomingPublicEvents={upcomingPublicEvents}
+          publicOfficers={publicOfficers}
+          charityCampaign={charityCampaign}
           footerSettings={footerSettings}
         />
       ))}

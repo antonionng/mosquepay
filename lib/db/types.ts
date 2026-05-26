@@ -23,6 +23,32 @@ export type Lodge = {
   visiting_notice: string | null;
   loi_contact: string | null;
   wifi_details: string | null;
+  /**
+   * Public-facing meeting venue (e.g. "Mark Masons Hall, 86 St James's
+   * Street, London"). Distinct from `secretary_address` (used on
+   * summons). Falls back to `secretary_address` on the public site if
+   * not set, but admins are nudged to fill this in cleanly so visitors
+   * see a venue rather than a correspondence address.
+   */
+  meeting_location: string | null;
+  /**
+   * Optional URL for the meeting venue, typically a Google Maps /
+   * What3Words / venue page link. When set the public Meeting Details
+   * card renders the venue as a tappable link.
+   */
+  meeting_location_url: string | null;
+  /**
+   * Short note about wheelchair access, hearing loops, parking, or
+   * other accessibility considerations for visitors. Rendered on the
+   * public Meeting Details card when set.
+   */
+  accessibility_notes: string | null;
+  /**
+   * Default lodge dress code shown on the public site Meeting Details
+   * card and used as a fallback when an individual event has no
+   * `dress_code` set.
+   */
+  default_dress_code: string | null;
   is_active: boolean;
   province_id: string | null;
   custom_domain: string | null;
@@ -1172,6 +1198,24 @@ export type Member = {
   membership_status: 'active' | 'suspended' | 'resigned' | 'excluded';
   stripe_customer_id: string | null;
   portal_token: string;
+  /**
+   * Per-member opt-in for the public lodge website. Defaults to false.
+   * Even when this member holds an officer rung in `officer_ladder`,
+   * their name, photo, and bio stay private until they explicitly opt
+   * in via the admin member detail page. Revocable at any time.
+   */
+  show_on_website: boolean;
+  /**
+   * Short public-facing biography (one or two paragraphs) shown
+   * alongside the member on the public Officers section when
+   * `show_on_website` is true.
+   */
+  public_bio: string | null;
+  /**
+   * Optional headshot URL shown alongside the member on the public
+   * Officers section. Falls back to initials when null.
+   */
+  public_photo_url: string | null;
   archived_at: string | null;
   archived_reason: string | null;
   created_at: string;

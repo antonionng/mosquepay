@@ -42,6 +42,10 @@ type Lodge = {
   data_protection_notice: string | null;
   visiting_notice: string | null;
   loi_contact: string | null;
+  meeting_location: string | null;
+  meeting_location_url: string | null;
+  accessibility_notes: string | null;
+  default_dress_code: string | null;
   primary_color: string | null;
   secondary_color: string | null;
   is_active: boolean;
@@ -152,6 +156,10 @@ export function LodgeProfileSettings() {
         data_protection_notice: lodgeForm.data_protection_notice?.trim() || null,
         visiting_notice: lodgeForm.visiting_notice?.trim() || null,
         loi_contact: lodgeForm.loi_contact?.trim() || null,
+        meeting_location: lodgeForm.meeting_location?.trim() || null,
+        meeting_location_url: lodgeForm.meeting_location_url?.trim() || null,
+        accessibility_notes: lodgeForm.accessibility_notes?.trim() || null,
+        default_dress_code: lodgeForm.default_dress_code?.trim() || null,
         primary_color: lodgeForm.primary_color?.trim() || null,
         secondary_color: lodgeForm.secondary_color?.trim() || null,
         is_active: lodgeForm.is_active !== false,
@@ -376,6 +384,51 @@ export function LodgeProfileSettings() {
                   value={lodgeForm.data_protection_notice ?? ""}
                   onChange={(e) =>
                     setLodgeForm((prev) => ({ ...prev, data_protection_notice: e.target.value }))
+                  }
+                  className="min-h-24 border-dash-border bg-dash-surface text-dash-text placeholder:text-dash-faint"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-dash-border bg-dash-surface-subtle p-4">
+              <h3 className="text-sm font-semibold text-dash-text">
+                Public website details
+              </h3>
+              <p className="mt-1 text-xs leading-5 text-dash-muted">
+                Used on the public Meeting Details section. Distinct from the
+                secretary&apos;s correspondence address above so visitors see
+                the venue, not the postal address.
+              </p>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <Textarea
+                  placeholder="Meeting venue (e.g. Mark Masons Hall, 86 St James's Street, London)"
+                  value={lodgeForm.meeting_location ?? ""}
+                  onChange={(e) =>
+                    setLodgeForm((prev) => ({ ...prev, meeting_location: e.target.value }))
+                  }
+                  className="min-h-24 border-dash-border bg-dash-surface text-dash-text placeholder:text-dash-faint"
+                />
+                <Input
+                  placeholder="Meeting venue map link (e.g. https://maps.app.goo.gl/…)"
+                  value={lodgeForm.meeting_location_url ?? ""}
+                  onChange={(e) =>
+                    setLodgeForm((prev) => ({ ...prev, meeting_location_url: e.target.value }))
+                  }
+                  className="border-dash-border bg-dash-surface text-dash-text placeholder:text-dash-faint"
+                />
+                <Input
+                  placeholder="Default dress code (e.g. Lounge suit, black tie)"
+                  value={lodgeForm.default_dress_code ?? ""}
+                  onChange={(e) =>
+                    setLodgeForm((prev) => ({ ...prev, default_dress_code: e.target.value }))
+                  }
+                  className="border-dash-border bg-dash-surface text-dash-text placeholder:text-dash-faint"
+                />
+                <Textarea
+                  placeholder="Accessibility notes (step-free access, hearing loop, parking…)"
+                  value={lodgeForm.accessibility_notes ?? ""}
+                  onChange={(e) =>
+                    setLodgeForm((prev) => ({ ...prev, accessibility_notes: e.target.value }))
                   }
                   className="min-h-24 border-dash-border bg-dash-surface text-dash-text placeholder:text-dash-faint"
                 />

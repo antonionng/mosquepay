@@ -70,6 +70,9 @@ interface Member {
   initiation_email_sent: boolean;
   membership_status: string;
   stripe_customer_id: string | null;
+  show_on_website: boolean;
+  public_bio: string | null;
+  public_photo_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -183,6 +186,9 @@ function buildEditForm(member: Member) {
     annual_dues_waiver_reason: member.annual_dues_waiver_reason ?? "",
     date_of_initiation: member.date_of_initiation ?? "",
     membership_status: member.membership_status,
+    show_on_website: member.show_on_website ?? false,
+    public_bio: member.public_bio ?? "",
+    public_photo_url: member.public_photo_url ?? "",
   };
 }
 
@@ -289,6 +295,13 @@ export function MemberDetailClient({
               : null,
           date_of_initiation: editForm.date_of_initiation || null,
           membership_status: editForm.membership_status,
+          show_on_website: editForm.show_on_website,
+          public_bio: editForm.show_on_website
+            ? emptyToNull(editForm.public_bio)
+            : null,
+          public_photo_url: editForm.show_on_website
+            ? emptyToNull(editForm.public_photo_url)
+            : null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -758,6 +771,74 @@ export function MemberDetailClient({
                   value={editForm.dietary_requirements}
                   onChange={(e) => setEditForm({ ...editForm, dietary_requirements: e.target.value })}
                 />
+              </div>
+              <div className="sm:col-span-2 space-y-3 rounded-xl border border-blue-200 bg-blue-50/40 p-4">
+                <div>
+                  <p className="text-sm font-medium text-dash-text">
+                    Public website
+                  </p>
+                  <p className="mt-1 text-xs text-dash-muted">
+                    Per-member opt-in. When on, this member can be rendered on
+                    the public Officers section of the lodge website if they
+                    hold an office. Off by default; revocable at any time.
+                  </p>
+                </div>
+                <label className="flex items-start gap-2 text-sm font-medium text-dash-text">
+                  <input
+                    type="checkbox"
+                    checked={editForm.show_on_website}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        show_on_website: e.target.checked,
+                      })
+                    }
+                    className="mt-1 h-4 w-4 rounded border-dash-border"
+                  />
+                  <span>
+                    Show this member on the public lodge website
+                    <span className="block text-xs font-normal text-dash-muted">
+                      Requires the member&apos;s explicit consent. Name, rank,
+                      photo, and bio below are only shown when ticked.
+                    </span>
+                  </span>
+                </label>
+                {editForm.show_on_website ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Public photo URL</Label>
+                      <Input
+                        type="url"
+                        placeholder="https://…/photo.jpg"
+                        value={editForm.public_photo_url}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            public_photo_url: e.target.value,
+                          })
+                        }
+                      />
+                      <p className="text-xs text-dash-muted">
+                        Optional. Falls back to initials on a coloured circle.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Public bio</Label>
+                      <Textarea
+                        rows={4}
+                        maxLength={800}
+                        placeholder="A short paragraph for the public Officers section."
+                        value={editForm.public_bio}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            public_bio: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                  </>
+                ) : null}
               </div>
               <div className="sm:col-span-2 space-y-3 rounded-xl border border-dash-border p-4">
                 <p className="text-sm font-medium text-dash-text">Fees & dining</p>

@@ -11,7 +11,7 @@ import {
   sanitizeCustomPages,
   sanitizeSiteSections,
 } from "@/lib/site-section-style";
-import { isPubliclyVisible } from "@/lib/events/public-visibility";
+import { loadPublicSiteExtras } from "@/lib/lodge-site/public-payload";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
 import type { LodgeSiteCustomPage, LodgeSiteSection } from "@/lib/db/types";
@@ -25,32 +25,6 @@ function normalizeSiteForResponse<T extends { sections: LodgeSiteSection[]; cust
     sections: sanitizeSiteSections(site.sections) ?? site.sections,
     custom_pages: sanitizeCustomPages(site.custom_pages) ?? site.custom_pages,
   };
-}
-
-async function loadUpcomingPublicEvents(opts: {
-  lodgeId: string | null;
-  lodgeSlug: string;
-}) {
-  const raw = isSupabaseConfigured() && opts.lodgeId
-    ? await db
-        .getEvents(opts.lodgeId, { published: true, upcoming: true })
-        .catch(() => [])
-    : !isSupabaseConfigured()
-      ? mockDb.getEvents({
-          lodge_slug: opts.lodgeSlug,
-          published: true,
-          upcoming: true,
-        })
-      : [];
-  return raw.filter(isPubliclyVisible).slice(0, 6).map((event) => ({
-    id: event.id,
-    slug: event.slug,
-    title: event.title,
-    event_date: event.event_date,
-    event_time: event.event_time,
-    location: event.location,
-    event_type: event.event_type,
-  }));
 }
 
 export async function GET(
@@ -78,16 +52,15 @@ export async function GET(
         );
       }
     }
-    const upcomingPublicEvents = await loadUpcomingPublicEvents({
+    const extras = await loadPublicSiteExtras({
       lodgeId: lodge.id,
       lodgeSlug,
+      currentCharityCampaignId: lodge.current_charity_campaign_id ?? null,
     });
     const normalized = normalizeSiteForResponse(site);
     return NextResponse.json({
       lodge,
-      site: normalized
-        ? { ...normalized, upcoming_public_events: upcomingPublicEvents }
-        : normalized,
+      site: normalized ? { ...normalized, ...extras } : normalized,
     });
   }
 
@@ -105,16 +78,15 @@ export async function GET(
       );
     }
   }
-  const upcomingPublicEvents = await loadUpcomingPublicEvents({
+  const extras = await loadPublicSiteExtras({
     lodgeId: null,
     lodgeSlug,
+    currentCharityCampaignId: lodge.current_charity_campaign_id ?? null,
   });
   const normalized = normalizeSiteForResponse(site);
   return NextResponse.json({
     lodge,
-    site: normalized
-      ? { ...normalized, upcoming_public_events: upcomingPublicEvents }
-      : normalized,
+    site: normalized ? { ...normalized, ...extras } : normalized,
   });
 }
 

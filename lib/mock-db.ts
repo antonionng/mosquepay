@@ -63,6 +63,10 @@ export type MockLodge = {
   visiting_notice: string | null;
   loi_contact: string | null;
   wifi_details: string | null;
+  meeting_location: string | null;
+  meeting_location_url: string | null;
+  accessibility_notes: string | null;
+  default_dress_code: string | null;
   is_active: boolean;
   province_id: string | null;
   custom_domain: string | null;
@@ -115,6 +119,10 @@ const lodges: MockLodge[] = [
       "Brethren travelling abroad should confirm regularity before visiting lodges under other jurisdictions.",
     loi_contact: "Contact the Secretary for Lodge of Instruction dates.",
     wifi_details: "MMH Guest WiFi details available at the venue.",
+    meeting_location: "Mark Masons Hall, 86 St James's Street, London, SW1A 1PL",
+    meeting_location_url: "https://maps.app.goo.gl/HsCmZTMVbHkM26ck6",
+    accessibility_notes: "Step-free access via the side entrance. Hearing loop available in the temple. Please contact the secretary in advance if you need additional arrangements.",
+    default_dress_code: "Lounge suit, black tie. White gloves provided.",
     is_active: true,
     province_id: null,
     custom_domain: null,
@@ -230,6 +238,10 @@ export function upsertLodge(
     visiting_notice: input.visiting_notice ?? null,
     loi_contact: input.loi_contact ?? null,
     wifi_details: input.wifi_details ?? null,
+    meeting_location: input.meeting_location ?? null,
+    meeting_location_url: input.meeting_location_url ?? null,
+    accessibility_notes: input.accessibility_notes ?? null,
+    default_dress_code: input.default_dress_code ?? null,
     is_active: input.is_active ?? true,
     province_id: input.province_id ?? null,
     custom_domain: input.custom_domain ?? null,
@@ -1255,6 +1267,9 @@ export type MockMember = LodgeScoped & {
   initiation_email_sent: boolean;
   membership_status: 'active' | 'suspended' | 'resigned' | 'excluded';
   stripe_customer_id: string | null;
+  show_on_website?: boolean;
+  public_bio?: string | null;
+  public_photo_url?: string | null;
   created_at: string;
   updated_at: string;
 };

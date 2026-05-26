@@ -81,6 +81,55 @@
     font-family: var(--font-inter), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     line-height: 1.6;
   }
+
+  /* iOS native-feel helpers.
+     - Auto-zoom on input focus only fires when font-size < 16px, so any
+       single-line text input that's likely to be focused on mobile must
+       declare at least 16px. Components using shadcn's text-sm input get
+       opted into this via the .ios-input utility class.
+     - Disable the 300ms tap delay + grey flash on buttons / tappables
+       so taps feel like a native app, not a website. */
+  .ios-input {
+    font-size: 16px;
+  }
+
+  button,
+  [role="button"],
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .touch-pad {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* Kiosk-style routes (e.g. /admin/take-payment on a phone at a meeting)
+     suppress the admin sidebar header so every pixel of the viewport is
+     dedicated to the QR / keypad. The wrapper toggles data-route="kiosk"
+     so this scope is page-specific, not global. */
+  [data-admin-route="kiosk"] header[data-admin-chrome="true"] {
+    display: none;
+  }
+  [data-admin-route="kiosk"] main[data-admin-main="true"] {
+    padding: 0.75rem env(safe-area-inset-right) env(safe-area-inset-bottom)
+      env(safe-area-inset-left);
+  }
+  @media (min-width: 640px) {
+    [data-admin-route="kiosk"] main[data-admin-main="true"] {
+      padding: 1rem;
+    }
+  }
+  @media (min-width: 1024px) {
+    [data-admin-route="kiosk"] header[data-admin-chrome="true"] {
+      display: flex;
+    }
+    [data-admin-route="kiosk"] main[data-admin-main="true"] {
+      padding: 2rem;
+    }
+  }
   
   h1, h2, h3, h4, h5, h6 {
     @apply font-semibold tracking-tight text-slate-900;

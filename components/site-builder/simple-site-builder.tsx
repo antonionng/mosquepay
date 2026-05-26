@@ -283,6 +283,33 @@ export function SimpleSiteBuilder({
     updateSectionStyle(id, { [key]: next.length > 0 ? next : null });
   }
 
+  function updateFaqEntries(
+    id: string,
+    mutate: (
+      entries: { question: string; answer: string }[]
+    ) => { question: string; answer: string }[]
+  ) {
+    setSections((prev) =>
+      prev.map((s) => {
+        if (s.id !== id) return s;
+        const current = Array.isArray(s.style?.faq_entries)
+          ? s.style?.faq_entries ?? []
+          : [];
+        const next = mutate(current.map((e) => ({ ...e })));
+        const nextStyle = { ...(s.style ?? {}) };
+        if (next.length === 0) {
+          delete nextStyle.faq_entries;
+        } else {
+          nextStyle.faq_entries = next;
+        }
+        return {
+          ...s,
+          style: Object.keys(nextStyle).length > 0 ? nextStyle : null,
+        };
+      })
+    );
+  }
+
   function moveSection(id: string, direction: -1 | 1) {
     setSections((prev) => {
       const sorted = prev.slice().sort((a, b) => a.order - b.order);
@@ -1538,6 +1565,101 @@ export function SimpleSiteBuilder({
                                     Contact submissions email the lodge secretary. Lead intake also creates a CRM lead.
                                   </p>
                                 </div>
+                                {s.type === "faq" ? (
+                                  <div className="rounded-2xl border border-dash-border bg-dash-surface/60 p-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div>
+                                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-dash-muted">
+                                          FAQ entries
+                                        </p>
+                                        <p className="mt-1 text-xs text-dash-muted">
+                                          Each entry becomes a row in the
+                                          accordion on the public site. Leave
+                                          empty to hide the accordion (the
+                                          heading and image above still show).
+                                        </p>
+                                      </div>
+                                      <Button
+                                        type="button"
+                                        variant="dashboard"
+                                        size="sm"
+                                        onClick={() =>
+                                          updateFaqEntries(s.id, (entries) => [
+                                            ...entries,
+                                            { question: "", answer: "" },
+                                          ])
+                                        }
+                                      >
+                                        Add FAQ
+                                      </Button>
+                                    </div>
+                                    {(s.style?.faq_entries ?? []).length === 0 ? (
+                                      <p className="mt-4 rounded-lg border border-dashed border-dash-border bg-dash-surface px-3 py-3 text-xs text-dash-muted">
+                                        No FAQs yet. Add the questions visitors
+                                        ask most: dress code, parking, whether
+                                        partners are welcome at the dining
+                                        table, and how to enquire about
+                                        membership.
+                                      </p>
+                                    ) : (
+                                      <ul className="mt-4 space-y-3">
+                                        {(s.style?.faq_entries ?? []).map(
+                                          (entry, idx) => (
+                                            <li
+                                              key={idx}
+                                              className="rounded-xl border border-dash-border bg-dash-surface p-3"
+                                            >
+                                              <div className="flex items-start justify-between gap-2">
+                                                <label className="text-xs font-medium text-dash-muted">
+                                                  Question {idx + 1}
+                                                </label>
+                                                <button
+                                                  type="button"
+                                                  className="text-xs text-red-600 hover:underline"
+                                                  onClick={() =>
+                                                    updateFaqEntries(s.id, (entries) =>
+                                                      entries.filter((_, i) => i !== idx)
+                                                    )
+                                                  }
+                                                >
+                                                  Remove
+                                                </button>
+                                              </div>
+                                              <Input
+                                                value={entry.question}
+                                                placeholder="What should visitors wear?"
+                                                onChange={(e) =>
+                                                  updateFaqEntries(s.id, (entries) =>
+                                                    entries.map((item, i) =>
+                                                      i === idx
+                                                        ? { ...item, question: e.target.value }
+                                                        : item
+                                                    )
+                                                  )
+                                                }
+                                                className="mt-1"
+                                              />
+                                              <Textarea
+                                                value={entry.answer}
+                                                placeholder="Lounge suit and a sober tie. White gloves are provided."
+                                                onChange={(e) =>
+                                                  updateFaqEntries(s.id, (entries) =>
+                                                    entries.map((item, i) =>
+                                                      i === idx
+                                                        ? { ...item, answer: e.target.value }
+                                                        : item
+                                                    )
+                                                  )
+                                                }
+                                                className="mt-3 min-h-[88px]"
+                                              />
+                                            </li>
+                                          )
+                                        )}
+                                      </ul>
+                                    )}
+                                  </div>
+                                ) : null}
                                 {s.style?.form_mode && s.style.form_mode !== "none" ? (
                                   <div className="rounded-2xl border border-dash-border bg-dash-surface/60 p-4">
                                     <div className="grid gap-4 lg:grid-cols-2">
