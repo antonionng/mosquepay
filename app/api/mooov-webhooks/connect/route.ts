@@ -277,6 +277,18 @@ async function projectConnectEvent(
       await projectEventCaptured(lodgeId, attempt);
     } else if (attempt.intent === "dues") {
       await projectDuesCaptured(lodgeId, attempt);
+    } else if (
+      attempt.intent === "take_payment" ||
+      attempt.intent === "lodge_generic_standing_qr" ||
+      attempt.intent === "charity_donation_standing_qr" ||
+      attempt.intent === "event_dining_standing_qr" ||
+      attempt.intent === "event_raffle_standing_qr"
+    ) {
+      // In-person take-payment + all standing-QR flows. We project to
+      // public.payments with the right dining/charity/raffle split based on
+      // intent so the Treasurer's existing rollups (admin/payments,
+      // admin/treasurer, admin/reports) include these without any new code.
+      await projectStandingOrTakePaymentCaptured(lodgeId, attempt);
     }
     return;
   }
@@ -766,4 +778,104 @@ async function projectDuesCaptured(
       gift_aid_eligible_amount: declaration ? charitableAmount : 0,
     });
   }
+}
+
+// Project an in-person take-payment or standing-QR capture into
+// public.payments. We split the amount into dining/charity/raffle columns
+// based on the intent so the existing Treasurer rollups categorise the row
+// correctly without any new aggregation code.
+//
+// Donor email is intentionally optional here: for standing-QR scans the
+// cardholder typically enters their email on Mooov's hosted page (which
+// doesn't yet pass through to our webhook), and for in-person take-payment
+// there's no email to collect at all. We record `payments.user_email = ""`
+// in those cases; the Treasurer reconciles by reference / time-of-day.
+//
+// Idempotent on payments.mooov_payment_id, like the other projections.
+async function projectStandingOrTakePaymentCaptured(
+  lodgeId: string,
+  attempt: {
+    payment_id: string;
+    intent: string;
+    amount: number;
+    currency: string;
+    guest_descriptor: Record<string, unknown> | null;
+    metadata: Record<string, unknown> | null;
+  },
+) {
+  const existing = await db.getPaymentByMooovId(attempt.payment_id);
+  if (existing) {
+    console.log(
+      "mooov webhook: standing-qr / take-payment already projected (idempotent)",
+      {
+        payment_id: attempt.payment_id,
+        intent: attempt.intent,
+      },
+    );
+    return;
+  }
+
+  const amountMajor = (attempt.amount ?? 0) / 100;
+  const currencyMajor = (attempt.currency ?? "GBP").toUpperCase();
+  const completedAt = new Date().toISOString();
+  const metadata = (attempt.metadata ?? {}) as Record<string, unknown>;
+  const eventIdRaw = metadata.event_id;
+  const eventId = typeof eventIdRaw === "string" ? eventIdRaw : null;
+  const reference =
+    typeof (attempt.guest_descriptor ?? {}).reference === "string"
+      ? ((attempt.guest_descriptor as Record<string, unknown>).reference as string)
+      : null;
+
+  // Default: everything in dining_amount = 0, charity_amount = 0, etc., and
+  // total_amount carries the full sum. We promote one of the sub-totals to
+  // match the intent so existing dashboards classify the row correctly.
+  let diningAmount = 0;
+  let charityAmount = 0;
+  let raffleAmount = 0;
+  let charityName: string | null = null;
+
+  switch (attempt.intent) {
+    case "charity_donation_standing_qr":
+      charityAmount = amountMajor;
+      charityName =
+        typeof metadata.charity_name === "string"
+          ? metadata.charity_name
+          : null;
+      break;
+    case "event_raffle_standing_qr":
+      raffleAmount = amountMajor;
+      break;
+    case "event_dining_standing_qr":
+      diningAmount = amountMajor;
+      break;
+    case "take_payment":
+    case "lodge_generic_standing_qr":
+    default:
+      // Stays on total_amount only — admin/payments will show the row with
+      // the description / reference from the attempt metadata.
+      break;
+  }
+
+  await db.addPayment(lodgeId, {
+    rsvp_id: null,
+    event_id: eventId,
+    user_email: "",
+    user_name: reference,
+    stripe_payment_intent_id: null,
+    stripe_charge_id: null,
+    stripe_customer_id: null,
+    mooov_payment_id: attempt.payment_id,
+    dining_amount: diningAmount,
+    charity_amount: charityAmount,
+    raffle_amount: raffleAmount,
+    meeting_fee_amount: 0,
+    guest_ticket_amount: 0,
+    total_amount: amountMajor,
+    currency: currencyMajor,
+    charity_name: charityName,
+    status: "succeeded",
+    refund_amount: 0,
+    refund_reason: null,
+    completed_at: completedAt,
+  });
 }
