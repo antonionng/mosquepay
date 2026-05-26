@@ -21,11 +21,10 @@
 //   - general: generic lodge payment (no campaign/event linkage).
 
 import { Suspense } from "react";
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Heart, Sparkles, Utensils, Banknote, ShieldCheck } from "lucide-react";
 import { createServiceClient } from "@/lib/supabase/server";
 import { callMooovConnect, MooovApiError } from "@/lib/mooov";
+import { GiveFormClient } from "./give-form-client";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -134,12 +133,20 @@ export default async function GivePage({
 
   return (
     <Suspense>
-      <SelectionPage
+      <GiveFormClient
         slug={slug}
         context={ctx}
         lodgeName={lodge.name}
         eventId={eventId}
-        resolved={resolved}
+        heading={resolved.heading}
+        subheading={resolved.subheading}
+        presetAmounts={resolved.presetAmounts}
+        customAllowed={resolved.customAllowed}
+        charityHeader={lodge.name}
+        // The charity context goes through /api/donations (rich form +
+        // gift aid + receipt by email). Dining / raffle / general all
+        // skip donor capture and let the server resolver mint + 302.
+        collectDonor={ctx === "charity"}
       />
     </Suspense>
   );
@@ -501,116 +508,6 @@ async function mintAndGetHostedUrl({
   }
 }
 
-function SelectionPage({
-  slug,
-  context,
-  lodgeName,
-  eventId,
-  resolved,
-}: {
-  slug: string;
-  context: Context;
-  lodgeName: string;
-  eventId: string | null;
-  resolved: ResolvedContext;
-}) {
-  const base = `/give/${encodeURIComponent(slug)}/${context}`;
-  const eventQuery = eventId ? `&event=${encodeURIComponent(eventId)}` : "";
-  return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 py-10 px-4 sm:py-16">
-      <div className="mx-auto max-w-xl">
-        <div className="rounded-2xl bg-white p-6 shadow-xl sm:p-8">
-          <div className="flex items-center gap-3 text-slate-700">
-            <span className="grid h-10 w-10 place-items-center rounded-full bg-amber-100 text-amber-700">
-              <ContextIcon context={context} />
-            </span>
-            <div className="text-sm font-medium uppercase tracking-wide text-slate-500">
-              {lodgeName}
-            </div>
-          </div>
-          <h1 className="mt-4 text-3xl font-semibold text-slate-900">
-            {resolved.heading}
-          </h1>
-          <p className="mt-2 text-sm text-slate-600">{resolved.subheading}</p>
-
-          <div className="mt-6 space-y-3">
-            <p className="text-xs uppercase tracking-wide text-slate-500">
-              Choose an amount
-            </p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {resolved.presetAmounts.length > 0 ? (
-                resolved.presetAmounts.map((preset) => (
-                  <Link
-                    key={preset}
-                    href={`${base}?amount=${preset}${eventQuery}`}
-                    prefetch={false}
-                    className="block rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-center text-lg font-semibold text-slate-900 transition-colors hover:border-amber-400 hover:bg-amber-50"
-                  >
-                    £{preset}
-                  </Link>
-                ))
-              ) : (
-                <p className="col-span-full text-sm text-slate-600">
-                  No preset amounts configured for this link.
-                </p>
-              )}
-            </div>
-          </div>
-
-          {resolved.customAllowed ? (
-            <form
-              action={base}
-              method="get"
-              className="mt-6 flex items-stretch gap-2"
-            >
-              {eventId ? (
-                <input type="hidden" name="event" value={eventId} />
-              ) : null}
-              <label className="sr-only" htmlFor="amount">
-                Custom amount
-              </label>
-              <div className="relative flex-1">
-                <span className="pointer-events-none absolute inset-y-0 left-3 grid place-items-center text-slate-500">
-                  £
-                </span>
-                <input
-                  id="amount"
-                  name="amount"
-                  type="number"
-                  inputMode="decimal"
-                  step="0.01"
-                  min="1"
-                  max="5000"
-                  placeholder="Custom"
-                  className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-7 pr-4 text-base text-slate-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
-                  required
-                />
-              </div>
-              <button
-                type="submit"
-                className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800"
-              >
-                Pay
-              </button>
-            </form>
-          ) : null}
-
-          <div className="mt-6 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-            <ShieldCheck className="h-4 w-4 text-emerald-600" />
-            <span>
-              You&apos;ll pay via Mooov on a secure page. Cards are not stored
-              on the lodge&apos;s server.
-            </span>
-          </div>
-        </div>
-        <p className="mt-4 text-center text-xs text-slate-500">
-          Powered by LodgePay &amp; Mooov
-        </p>
-      </div>
-    </main>
-  );
-}
-
 function NotFoundPage({ reason }: { reason: string }) {
   return (
     <main className="min-h-screen bg-slate-50 py-16 px-4">
@@ -622,18 +519,4 @@ function NotFoundPage({ reason }: { reason: string }) {
       </div>
     </main>
   );
-}
-
-function ContextIcon({ context }: { context: Context }) {
-  switch (context) {
-    case "charity":
-      return <Heart className="h-5 w-5" />;
-    case "raffle":
-      return <Sparkles className="h-5 w-5" />;
-    case "dining":
-      return <Utensils className="h-5 w-5" />;
-    case "general":
-    default:
-      return <Banknote className="h-5 w-5" />;
-  }
 }
