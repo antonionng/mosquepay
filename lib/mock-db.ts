@@ -69,6 +69,7 @@ export type MockLodge = {
   custom_domain_verified_at: string | null;
   custom_domain_verification_token: string | null;
   accepts_self_registration: boolean;
+  current_charity_campaign_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -120,6 +121,7 @@ const lodges: MockLodge[] = [
     custom_domain_verified_at: null,
     custom_domain_verification_token: null,
     accepts_self_registration: true,
+    current_charity_campaign_id: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   },
@@ -234,6 +236,7 @@ export function upsertLodge(
     custom_domain_verified_at: input.custom_domain_verified_at ?? null,
     custom_domain_verification_token: input.custom_domain_verification_token ?? null,
     accepts_self_registration: input.accepts_self_registration ?? false,
+    current_charity_campaign_id: null,
     created_at: now,
     updated_at: now,
   };

@@ -116,12 +116,16 @@ export function AdminCharityClient({
   giftAidDeclarations,
   meetingCollections,
   gasdsClaims,
+  currentCharityCampaignId,
+  lodgeSlug,
 }: {
   campaigns: Campaign[];
   donations: Donation[];
   giftAidDeclarations: GiftAidDeclaration[];
   meetingCollections: MeetingCollection[];
   gasdsClaims: GasdsClaim[];
+  currentCharityCampaignId?: string | null;
+  lodgeSlug?: string;
 }) {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
@@ -727,6 +731,13 @@ export function AdminCharityClient({
         </Card>
       )}
 
+      <CurrentCampaignPanel
+        campaigns={campaigns}
+        currentCharityCampaignId={currentCharityCampaignId ?? null}
+        lodgeSlug={lodgeSlug ?? "default"}
+        onSaved={() => router.refresh()}
+      />
+
       <Card variant="panel" className="overflow-hidden p-0">
         <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
           <div>
@@ -903,5 +914,156 @@ export function AdminCharityClient({
         </Card>
       </div>
     </div>
+  );
+}
+
+function CurrentCampaignPanel({
+  campaigns,
+  currentCharityCampaignId,
+  lodgeSlug,
+  onSaved,
+}: {
+  campaigns: Campaign[];
+  currentCharityCampaignId: string | null;
+  lodgeSlug: string;
+  onSaved: () => void;
+}) {
+  const [selected, setSelected] = useState<string>(
+    currentCharityCampaignId ?? "",
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  const activeCampaigns = campaigns.filter((c) => c.status === "active");
+  const current = campaigns.find((c) => c.id === currentCharityCampaignId);
+  const dirty = (selected || null) !== (currentCharityCampaignId ?? null);
+  const giveUrl = `/give/${lodgeSlug}/charity`;
+
+  const save = async (campaignId: string | null) => {
+    setSaving(true);
+    setError(null);
+    setFeedback(null);
+    try {
+      const res = await fetch("/api/lodges/current-charity-campaign", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ campaign_id: campaignId }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? "Could not save designation.");
+        return;
+      }
+      setFeedback(
+        campaignId
+          ? "Designated as the lodge's current charity campaign."
+          : "Cleared the designated campaign.",
+      );
+      onSaved();
+    } catch (err) {
+      console.error("save current campaign failed", err);
+      setError("Network error. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card variant="panel" className="overflow-hidden p-0">
+      <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
+        <div>
+          <h2 className="dash-panel-header-title">
+            Standing donation link &amp; QR
+          </h2>
+          <p className="dash-panel-header-description">
+            Pick the campaign that the standing-QR sticker and
+            <code className="mx-1 rounded bg-dash-surface px-1 text-xs">/give/{lodgeSlug}/charity</code>
+            link route to. Change it once a year when the lodge picks a new
+            featured cause.
+          </p>
+        </div>
+      </div>
+      <div className="space-y-4 border-t border-dash-border bg-dash-surface p-4 md:p-5">
+        <div className="grid gap-4 md:grid-cols-[2fr,1fr]">
+          <div className="space-y-3">
+            <label className="text-sm font-medium text-dash-text">
+              Current featured campaign
+            </label>
+            <select
+              value={selected}
+              onChange={(e) => setSelected(e.target.value)}
+              disabled={saving}
+              className="w-full rounded-xl border border-dash-border bg-dash-surface px-4 py-2.5 text-sm text-dash-text focus:border-dash-ring focus:outline-none focus:ring-2 focus:ring-dash-ring/20"
+            >
+              <option value="">— No designated campaign —</option>
+              {activeCampaigns.map((campaign) => (
+                <option key={campaign.id} value={campaign.id}>
+                  {campaign.name}
+                  {currentCharityCampaignId === campaign.id ? " (current)" : ""}
+                </option>
+              ))}
+              {/* If the current one is paused/completed, keep it selectable so
+                  the steward sees what's still set + can clear it. */}
+              {currentCharityCampaignId &&
+              current &&
+              current.status !== "active" ? (
+                <option value={current.id}>
+                  {current.name} ({current.status} — please update)
+                </option>
+              ) : null}
+            </select>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                disabled={!dirty || saving}
+                onClick={() => save(selected || null)}
+              >
+                {saving ? "Saving…" : dirty ? "Save designation" : "Saved"}
+              </Button>
+              {currentCharityCampaignId ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="dashboard"
+                  disabled={saving}
+                  onClick={() => {
+                    setSelected("");
+                    void save(null);
+                  }}
+                >
+                  Clear designation
+                </Button>
+              ) : null}
+            </div>
+            {error ? (
+              <p className="text-sm text-red-600">{error}</p>
+            ) : feedback ? (
+              <p className="text-sm text-emerald-700">{feedback}</p>
+            ) : null}
+          </div>
+          <div className="rounded-xl border border-dash-border bg-dash-surface-subtle/40 p-4 text-sm">
+            <p className="font-medium text-dash-text">Sticker link</p>
+            <p className="mt-1 break-all font-mono text-xs text-dash-text-muted">
+              {giveUrl}
+            </p>
+            <p className="mt-2 text-dash-text-muted">
+              Any device that scans this link is sent to a Mooov-branded page
+              to pay. {current
+                ? `Currently goes to "${current.name}".`
+                : "Set a campaign above to start collecting via the standing QR."}
+            </p>
+            <div className="mt-3">
+              <Button asChild variant="dashboard" size="sm">
+                <Link href={giveUrl} target="_blank" rel="noopener noreferrer">
+                  Preview link
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Card>
   );
 }

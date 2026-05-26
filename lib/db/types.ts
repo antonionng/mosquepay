@@ -29,6 +29,7 @@ export type Lodge = {
   custom_domain_verified_at: string | null;
   custom_domain_verification_token: string | null;
   accepts_self_registration: boolean;
+  current_charity_campaign_id: string | null;
   created_at: string;
   updated_at: string;
 };

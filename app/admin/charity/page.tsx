@@ -9,6 +9,7 @@ export default async function AdminCharityPage() {
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
   const lodgeId = ctx.mode === "database" ? ctx.lodgeId : null;
+  const lodgeSlug = ctx.mode === "database" ? ctx.lodgeSlug : "default";
 
   const campaigns = useMock
     ? mockDb.getCharityCampaigns()
@@ -31,6 +32,12 @@ export default async function AdminCharityPage() {
   const gasdsClaims = useMock || !lodgeId
     ? []
     : await db.getGasdsClaims(lodgeId).catch(() => []);
+  const lodge = useMock
+    ? null
+    : lodgeId
+      ? await db.getLodgeBySlug(lodgeSlug).catch(() => null)
+      : null;
+  const currentCampaignId = lodge?.current_charity_campaign_id ?? null;
 
   return (
     <AdminCharityClient
@@ -39,6 +46,8 @@ export default async function AdminCharityPage() {
       giftAidDeclarations={JSON.parse(JSON.stringify(giftAidDeclarations))}
       meetingCollections={JSON.parse(JSON.stringify(meetingCollections))}
       gasdsClaims={JSON.parse(JSON.stringify(gasdsClaims))}
+      currentCharityCampaignId={currentCampaignId}
+      lodgeSlug={lodgeSlug}
     />
   );
 }
