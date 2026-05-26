@@ -262,12 +262,14 @@ export function PublicFooter({
             </p>
             <div className={isTenantMode ? "flex flex-wrap gap-5 text-xs text-slate-500" : "flex flex-wrap gap-5 text-xs text-dash-faint"}>
               {isTenantMode ? (
-                <Link
-                  href="https://lodgepayments.co.uk"
-                  className="transition-colors hover:text-slate-300"
-                >
-                  Powered by LodgePay
-                </Link>
+                settings.show_powered_by !== false ? (
+                  <Link
+                    href="https://lodgepayments.co.uk"
+                    className="transition-colors hover:text-slate-300"
+                  >
+                    Powered by LodgePay
+                  </Link>
+                ) : null
               ) : (
                 <>
                   <Link href="/privacy" className="transition-colors hover:text-dash-muted">

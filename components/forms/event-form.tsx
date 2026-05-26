@@ -45,6 +45,7 @@ const schema = z.object({
   guest_ticket_price: z.coerce.number().min(0).optional(),
   guest_ticket_description: z.string().optional(),
   published: z.boolean().default(true),
+  feature_on_website: z.boolean().default(false),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -78,6 +79,7 @@ export function EventForm({ eventId, defaultValues }: { eventId?: string; defaul
       enable_meeting_fee: false,
       enable_guest_tickets: false,
       published: true,
+      feature_on_website: false,
       ...defaultValues,
     },
   });
@@ -180,7 +182,25 @@ export function EventForm({ eventId, defaultValues }: { eventId?: string; defaul
           </div>
           <div className="flex items-center gap-2">
             <input type="checkbox" id="published" {...register("published")} className="h-4 w-4 rounded border-input text-blue-600 focus:ring-blue-500" />
-            <Label htmlFor="published">Published (visible on site)</Label>
+            <Label htmlFor="published">Published (visible to members)</Label>
+          </div>
+          <div className="rounded-xl border border-input bg-slate-50 p-3">
+            <label htmlFor="feature_on_website" className="flex items-start gap-2 text-sm text-slate-900">
+              <input
+                type="checkbox"
+                id="feature_on_website"
+                {...register("feature_on_website")}
+                className="mt-1 h-4 w-4 rounded border-input text-blue-600 focus:ring-blue-500"
+              />
+              <span>
+                <span className="font-medium">Show on the public lodge website</span>
+                <span className="mt-1 block text-xs text-slate-500">
+                  Socials and charity events are public by default. Tick this only for meetings
+                  that genuinely welcome visitors (e.g. an open installation). Regular lodge
+                  meetings and lodges of instruction stay private even when published.
+                </span>
+              </span>
+            </label>
           </div>
         </CardContent>
       </Card>

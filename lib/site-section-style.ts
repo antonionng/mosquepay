@@ -309,6 +309,29 @@ export function sanitizeSectionStyle(
   );
   if (responderBody) out.form_autoresponder_body = responderBody;
 
+  if (Array.isArray(o.faq_entries)) {
+    const entries = o.faq_entries
+      .slice(0, 30)
+      .map((raw) => {
+        if (!raw || typeof raw !== "object") return null;
+        const row = raw as Record<string, unknown>;
+        const question = sanitizeLongText(
+          typeof row.question === "string" ? row.question : null,
+          240
+        );
+        const answer = sanitizeLongText(
+          typeof row.answer === "string" ? row.answer : null,
+          1200
+        );
+        if (!question || !answer) return null;
+        return { question, answer };
+      })
+      .filter(
+        (entry): entry is { question: string; answer: string } => entry != null
+      );
+    if (entries.length > 0) out.faq_entries = entries;
+  }
+
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
@@ -597,6 +620,7 @@ export function defaultFooterSettings(): LodgeSiteFooterSettings {
     tagline: null,
     badge_text: "Member website",
     powered_by_text: null,
+    show_powered_by: true,
     link_groups: [
       {
         id: "explore",
@@ -665,6 +689,7 @@ export function sanitizeFooterSettings(input: unknown): LodgeSiteFooterSettings 
       sanitizeShortText(
         typeof o.powered_by_text === "string" ? o.powered_by_text : null
       ) ?? null,
+    show_powered_by: o.show_powered_by !== false,
     link_groups: linkGroups.length ? linkGroups : defaults.link_groups,
   };
 }

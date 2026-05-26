@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import { eventsToIcs } from "@/lib/calendar/ics";
+import { filterPubliclyVisible } from "@/lib/events/public-visibility";
 
 /**
  * Public lodge ICS feed for published events. Subscribe in
@@ -22,10 +23,11 @@ export async function GET(
   if (!lodge) {
     return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
   }
-  const events = await db.getEvents(lodge.id, {
+  const allUpcoming = await db.getEvents(lodge.id, {
     published: true,
     upcoming: true,
   });
+  const events = filterPubliclyVisible(allUpcoming);
   const origin = request.nextUrl.origin;
   const ics = eventsToIcs({
     calendarName: `${lodge.name} - Public events`,

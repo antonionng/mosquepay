@@ -66,6 +66,8 @@ export async function PATCH(
     }
     if (body.guest_ticket_description != null) updates.guest_ticket_description = body.guest_ticket_description.trim() || null;
     if (typeof body.published === "boolean") updates.published = body.published;
+    if (typeof body.feature_on_website === "boolean")
+      updates.feature_on_website = body.feature_on_website;
 
     if (isSupabaseConfigured()) {
       const lodgeId = await db.resolveLodgeId(lodgeSlug);

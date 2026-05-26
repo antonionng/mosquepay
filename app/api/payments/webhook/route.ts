@@ -182,20 +182,29 @@ async function handleRsvpPaymentCompleted(
     }
 
     if (session.metadata?.gift_aid === "true") {
-      await db.addGiftAidDeclaration(lodgeId, {
-        donor_name: session.metadata.gift_aid_donor_name ?? "",
-        donor_email: session.metadata.gift_aid_donor_email ?? "",
-        donor_address_line_1: session.metadata.gift_aid_address_line_1 || null,
-        donor_address_line_2: session.metadata.gift_aid_address_line_2 || null,
-        donor_city: session.metadata.gift_aid_city || null,
-        donor_postcode: session.metadata.gift_aid_postcode || null,
-        donor_country: "United Kingdom",
-        declaration_text:
-          "I am a UK taxpayer and understand that if I pay less Income Tax and/or Capital Gains Tax than the amount of Gift Aid claimed on all my donations in that tax year it is my responsibility to pay any difference.",
-        declaration_confirmed: true,
-        confirmation_method: "online_checkout",
-        hmrc_eligible: true,
-      });
+      // Enduring declaration: only insert if we don't already have an
+      // active declaration on file for this donor email, otherwise we'd
+      // create duplicate Gift Aid rows for every donation.
+      const giftAidEmail = session.metadata.gift_aid_donor_email ?? "";
+      const existing = giftAidEmail
+        ? await db.getActiveGiftAidDeclarationByEmail(lodgeId, giftAidEmail)
+        : null;
+      if (!existing) {
+        await db.addGiftAidDeclaration(lodgeId, {
+          donor_name: session.metadata.gift_aid_donor_name ?? "",
+          donor_email: giftAidEmail,
+          donor_address_line_1: session.metadata.gift_aid_address_line_1 || null,
+          donor_address_line_2: session.metadata.gift_aid_address_line_2 || null,
+          donor_city: session.metadata.gift_aid_city || null,
+          donor_postcode: session.metadata.gift_aid_postcode || null,
+          donor_country: "United Kingdom",
+          declaration_text:
+            "I am a UK taxpayer and understand that if I pay less Income Tax and/or Capital Gains Tax than the amount of Gift Aid claimed on all my donations in that tax year it is my responsibility to pay any difference.",
+          declaration_confirmed: true,
+          confirmation_method: "online_checkout",
+          hmrc_eligible: true,
+        });
+      }
     }
   } else {
     const payment = mockDb.addPayment({
@@ -259,21 +268,32 @@ async function handleDonationCompleted(session: Stripe.Checkout.Session) {
 
   let giftAidDeclarationId: string | null = null;
   if (session.metadata?.gift_aid === "true") {
-    const declaration = await db.addGiftAidDeclaration(lodgeId, {
-      donor_name: session.metadata.gift_aid_donor_name ?? "",
-      donor_email: session.metadata.gift_aid_donor_email ?? "",
-      donor_address_line_1: session.metadata.gift_aid_address_line_1 || null,
-      donor_address_line_2: session.metadata.gift_aid_address_line_2 || null,
-      donor_city: session.metadata.gift_aid_city || null,
-      donor_postcode: session.metadata.gift_aid_postcode || null,
-      donor_country: "United Kingdom",
-      declaration_text:
-        "I am a UK taxpayer and understand that if I pay less Income Tax and/or Capital Gains Tax than the amount of Gift Aid claimed on all my donations in that tax year it is my responsibility to pay any difference.",
-      declaration_confirmed: true,
-      confirmation_method: "online_checkout",
-      hmrc_eligible: true,
-    });
-    giftAidDeclarationId = declaration.id;
+    // Enduring declaration: prefer the donor's existing active declaration
+    // (matched on email) over inserting another one. This keeps the
+    // gift_aid_declarations table 1-per-donor instead of 1-per-donation.
+    const giftAidEmail = session.metadata.gift_aid_donor_email ?? donorEmail;
+    const existing = giftAidEmail
+      ? await db.getActiveGiftAidDeclarationByEmail(lodgeId, giftAidEmail)
+      : null;
+    if (existing) {
+      giftAidDeclarationId = existing.id;
+    } else {
+      const declaration = await db.addGiftAidDeclaration(lodgeId, {
+        donor_name: session.metadata.gift_aid_donor_name ?? "",
+        donor_email: giftAidEmail,
+        donor_address_line_1: session.metadata.gift_aid_address_line_1 || null,
+        donor_address_line_2: session.metadata.gift_aid_address_line_2 || null,
+        donor_city: session.metadata.gift_aid_city || null,
+        donor_postcode: session.metadata.gift_aid_postcode || null,
+        donor_country: "United Kingdom",
+        declaration_text:
+          "I am a UK taxpayer and understand that if I pay less Income Tax and/or Capital Gains Tax than the amount of Gift Aid claimed on all my donations in that tax year it is my responsibility to pay any difference.",
+        declaration_confirmed: true,
+        confirmation_method: "online_checkout",
+        hmrc_eligible: true,
+      });
+      giftAidDeclarationId = declaration.id;
+    }
   }
 
   await db.addDonation(lodgeId, {

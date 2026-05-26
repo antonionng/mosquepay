@@ -127,17 +127,42 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
-  if (giftAid && (!giftAidConfirmed || !giftAidAddressLine1 || !giftAidCity || !giftAidPostcode)) {
-    return NextResponse.json(
-      { error: "Gift Aid requires confirmed eligibility and a full address." },
-      { status: 400 }
-    );
-  }
 
   const lodgeSlug = getLodgeSlugFromRequest(request);
   const lodgeId = await db.resolveLodgeId(lodgeSlug);
   if (!lodgeId) {
     return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  }
+
+  // If the donor's email already has an active Gift Aid declaration on
+  // file for this lodge, the enduring declaration covers this donation
+  // (HMRC model). In that case we don't need the address again -- the
+  // saved declaration has it. Only require the full Gift Aid form when
+  // we have nothing on file for this email yet.
+  let existingGiftAidDeclarationId: string | null = null;
+  if (giftAid) {
+    try {
+      const existing = await db.getActiveGiftAidDeclarationByEmail(
+        lodgeId,
+        donorEmail
+      );
+      existingGiftAidDeclarationId = existing?.id ?? null;
+    } catch (err) {
+      console.error("Donations POST: existing gift aid lookup failed", {
+        lodge_id: lodgeId,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  if (
+    giftAid &&
+    !existingGiftAidDeclarationId &&
+    (!giftAidConfirmed || !giftAidAddressLine1 || !giftAidCity || !giftAidPostcode)
+  ) {
+    return NextResponse.json(
+      { error: "Gift Aid requires confirmed eligibility and a full address." },
+      { status: 400 }
+    );
   }
 
   let supa: ReturnType<typeof createServiceClient>;
@@ -210,7 +235,13 @@ export async function POST(request: NextRequest) {
     donor_name: donorName || null,
     lodge_slug: lodgeSlug,
     gift_aid: giftAid,
-    ...(giftAid
+    // When the donor already has an enduring Gift Aid declaration on file we
+    // forward its id so the webhook reuses it instead of creating a duplicate
+    // declaration row (HMRC enduring-declaration model).
+    ...(existingGiftAidDeclarationId
+      ? { existing_gift_aid_declaration_id: existingGiftAidDeclarationId }
+      : {}),
+    ...(giftAid && !existingGiftAidDeclarationId
       ? {
           gift_aid_address_line_1: giftAidAddressLine1,
           gift_aid_address_line_2: giftAidAddressLine2 || null,

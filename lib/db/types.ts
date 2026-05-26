@@ -56,6 +56,13 @@ export type LodgeSiteSectionStyle = {
   form_notification_recipients?: string | null;
   form_autoresponder_subject?: string | null;
   form_autoresponder_body?: string | null;
+  /**
+   * Optional list of FAQ entries shown on a `faq` section. When absent the
+   * FAQ accordion is hidden; the section keeps any user-edited heading,
+   * body, and image. Populated from the admin FAQ editor (Phase 1) or
+   * imported by an AI draft.
+   */
+  faq_entries?: { question: string; answer: string }[] | null;
 };
 
 export type LodgeSiteSection = {
@@ -133,6 +140,13 @@ export type LodgeSiteFooterSettings = {
   tagline: string | null;
   badge_text: string | null;
   powered_by_text: string | null;
+  /**
+   * Whether to render the "Powered by LodgePay" chip in the public site
+   * hero meta strip and the footer powered-by text. Defaults to true. Set
+   * to false from the admin footer settings panel on paid plans that want
+   * an unbranded public surface.
+   */
+  show_powered_by: boolean;
   link_groups: LodgeSiteFooterLinkGroup[];
 };
 
@@ -267,6 +281,12 @@ export type Event = {
   featured_image_url: string | null;
   created_by: string | null;
   published: boolean;
+  /**
+   * Opt-in flag that promotes this event onto the public lodge website even
+   * when its `event_type` is not naturally public. See
+   * `lib/events/public-visibility.ts` for the full visibility rule.
+   */
+  feature_on_website: boolean;
   sequence_id: string | null;
   sequence_position: number | null;
   summons_status: SummonsStatus;

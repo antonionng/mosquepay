@@ -49,6 +49,7 @@ export type MeetingForm = {
   guest_ticket_price: string;
   guest_ticket_description: string;
   published: boolean;
+  feature_on_website: boolean;
 };
 
 export type MeetingFormMeeting = {
@@ -77,6 +78,7 @@ export type MeetingFormMeeting = {
   meeting_fee_amount: number | null;
   meeting_fee_description: string | null;
   enable_guest_tickets: boolean;
+  feature_on_website: boolean;
   guest_ticket_price: number | null;
   guest_ticket_description: string | null;
   published: boolean;
@@ -166,6 +168,7 @@ export function emptyMeetingForm(): MeetingForm {
     guest_ticket_price: "",
     guest_ticket_description: "",
     published: false,
+    feature_on_website: false,
   };
 }
 
@@ -198,6 +201,7 @@ export function formFromMeeting(meeting: MeetingFormMeeting): MeetingForm {
     guest_ticket_price: formatMoneyInput(meeting.guest_ticket_price),
     guest_ticket_description: meeting.guest_ticket_description ?? "",
     published: meeting.published,
+    feature_on_website: meeting.feature_on_website === true,
   };
 }
 
@@ -765,8 +769,30 @@ export function MeetingFormDrawer({
                   updateForm({ published: event.target.checked })
                 }
               />
-              Publish on the public lodge site when saved
+              Publish (visible to members in the member portal)
             </label>
+            <div className="mt-3 rounded-xl border border-dash-border bg-dash-surface-subtle p-3">
+              <label className="flex items-start gap-2 text-sm text-dash-text">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={form.feature_on_website}
+                  onChange={(event) =>
+                    updateForm({ feature_on_website: event.target.checked })
+                  }
+                  disabled={!form.published}
+                />
+                <span>
+                  <span className="font-medium">Also show on the public lodge website</span>
+                  <span className="mt-1 block text-xs text-dash-muted">
+                    Regular meetings and lodges of instruction stay private by default. Tick this
+                    only for meetings that genuinely welcome visitors or the wider public (e.g. an
+                    installation open to visiting brethren, or a public charity event). Socials and
+                    charity events are shown on the public site automatically.
+                  </span>
+                </span>
+              </label>
+            </div>
           </section>
 
           <div className="sticky bottom-0 -mx-6 flex items-center justify-between gap-3 border-t border-dash-border bg-dash-surface px-6 py-4">

@@ -1,21 +1,44 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
 import {
   Banknote,
   CheckCircle2,
+  Copy,
   Loader2,
+  Maximize2,
+  Minimize2,
   RotateCcw,
   ScanLine,
+  Share2,
   ShieldAlert,
   TriangleAlert,
+  XCircle,
+  Clock,
+  History,
+  Plus,
+  Minus,
+  Delete,
+  RefreshCw,
+  User,
+  UserX,
+  HeartHandshake,
+  Search,
+  X,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -23,11 +46,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+
+type MemberOption = {
+  id: string;
+  full_name: string;
+  email: string | null;
+};
 
 type Props = {
   lodgeSlug: string;
   connected: boolean;
   mooovStatus: string | null;
+  members: MemberOption[];
 };
 
 type StatusPhase = "pending" | "awaiting_payment" | "succeeded" | "failed";
@@ -56,6 +87,38 @@ type MintResponse =
     }
   | { error: string; code?: string };
 
+type HistoryDerived =
+  | "paid"
+  | "open"
+  | "expired"
+  | "cancelled"
+  | "failed";
+
+type HistoryItem = {
+  payment_id: string;
+  amount_minor: number;
+  currency: string;
+  raw_status: string;
+  derived_status: HistoryDerived;
+  failure_reason: string | null;
+  created_at: string;
+  captured_at: string | null;
+  category: string | null;
+  reference: string | null;
+  description: string | null;
+  hosted_url: string | null;
+  created_by_email: string | null;
+  member_id: string | null;
+  member_name: string | null;
+  member_email: string | null;
+  gift_aid_eligible: boolean;
+  gift_aid_declaration_id: string | null;
+  paid_by_name: string | null;
+  paid_by_email: string | null;
+  paid_total: number | null;
+  paid_at: string | null;
+};
+
 const CATEGORIES = [
   { id: "general", label: "General lodge payment" },
   { id: "charity", label: "Charity collection" },
@@ -65,15 +128,21 @@ const CATEGORIES = [
   { id: "other", label: "Other" },
 ] as const;
 
-const PRESET_AMOUNTS = [5, 10, 20, 50] as const;
+const PRESET_AMOUNTS = [1, 2, 5, 10, 20, 50, 100] as const;
 
-export function TakePaymentClient({ lodgeSlug, connected, mooovStatus }: Props) {
+export function TakePaymentClient({
+  lodgeSlug,
+  connected,
+  mooovStatus,
+  members,
+}: Props) {
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]["id"]>(
     "general",
   );
   const [reference, setReference] = useState("");
   const [description, setDescription] = useState("");
+  const [memberId, setMemberId] = useState<string | null>(null);
   const [minting, setMinting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<{
@@ -82,22 +151,97 @@ export function TakePaymentClient({ lodgeSlug, connected, mooovStatus }: Props) 
     qrDataUrl: string;
     amountMinor: number;
     currency: string;
+    reference: string;
+    description: string;
+    memberName: string | null;
+    giftAidEligible: boolean;
   } | null>(null);
   const [status, setStatus] = useState<StatusResponse | null>(null);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const selectedMember = useMemo(
+    () => members.find((m) => m.id === memberId) ?? null,
+    [members, memberId],
+  );
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await fetch("/api/admin/take-payment/history?limit=30", {
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const body = (await res.json()) as { items: HistoryItem[] };
+        setHistory(body.items ?? []);
+      }
+    } catch {
+      // Non-fatal; leave the panel as-is.
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (connected) {
+      void loadHistory();
+    }
+  }, [connected, loadHistory]);
+
+  // Refresh history whenever an active session reaches a terminal phase, so
+  // the panel below shows the just-completed payment without a manual reload.
+  useEffect(() => {
+    if (status?.phase === "succeeded" || status?.phase === "failed") {
+      void loadHistory();
+    }
+  }, [status?.phase, loadHistory]);
 
   const reset = useCallback(() => {
     setAmount("");
     setReference("");
     setDescription("");
     setCategory("general");
+    setMemberId(null);
     setSession(null);
     setStatus(null);
     setError(null);
   }, []);
 
+  const generateQrForUrl = useCallback(async (url: string) => {
+    return QRCode.toDataURL(url, {
+      width: 720,
+      margin: 1,
+      color: { dark: "#0f172a", light: "#ffffff" },
+    });
+  }, []);
+
+  const reopenFromHistory = useCallback(
+    async (item: HistoryItem) => {
+      if (!item.hosted_url) return;
+      try {
+        const qrDataUrl = await generateQrForUrl(item.hosted_url);
+        setSession({
+          paymentId: item.payment_id,
+          url: item.hosted_url,
+          qrDataUrl,
+          amountMinor: item.amount_minor,
+          currency: item.currency,
+          reference: item.reference ?? "",
+          description: item.description ?? "",
+          memberName: item.member_name,
+          giftAidEligible: item.gift_aid_eligible,
+        });
+        setStatus(null);
+      } catch (err) {
+        console.error("re-open qr failed", err);
+      }
+    },
+    [generateQrForUrl],
+  );
+
   const handleSubmit = useCallback(
-    async (e: React.FormEvent<HTMLFormElement>) => {
-      e.preventDefault();
+    async (e?: React.FormEvent<HTMLFormElement>) => {
+      e?.preventDefault();
       setError(null);
       const numericAmount = Number(amount);
       if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
@@ -118,6 +262,7 @@ export function TakePaymentClient({ lodgeSlug, connected, mooovStatus }: Props) 
             category,
             reference,
             description,
+            member_id: memberId,
           }),
         });
         const body = (await res.json()) as MintResponse;
@@ -127,18 +272,22 @@ export function TakePaymentClient({ lodgeSlug, connected, mooovStatus }: Props) 
           setMinting(false);
           return;
         }
-        const qrDataUrl = await QRCode.toDataURL(body.url, {
-          width: 720,
-          margin: 1,
-          color: { dark: "#0f172a", light: "#ffffff" },
-        });
+        const qrDataUrl = await generateQrForUrl(body.url);
         setSession({
           paymentId: body.payment_id,
           url: body.url,
           qrDataUrl,
           amountMinor: body.amount,
           currency: body.currency,
+          reference,
+          description,
+          memberName: selectedMember?.full_name ?? null,
+          // We don't echo the server-side GA detection back yet — the
+          // history panel below will reflect it once the QR shows up there
+          // (a single fast refresh kicks off right after mint).
+          giftAidEligible: false,
         });
+        void loadHistory();
       } catch (err) {
         console.error("take-payment mint failed", err);
         setError("Network error. Try again.");
@@ -146,7 +295,16 @@ export function TakePaymentClient({ lodgeSlug, connected, mooovStatus }: Props) 
         setMinting(false);
       }
     },
-    [amount, category, reference, description],
+    [
+      amount,
+      category,
+      reference,
+      description,
+      memberId,
+      selectedMember,
+      generateQrForUrl,
+      loadHistory,
+    ],
   );
 
   return (
@@ -155,9 +313,9 @@ export function TakePaymentClient({ lodgeSlug, connected, mooovStatus }: Props) 
         <div>
           <h1 className="admin-page-title">Take payment</h1>
           <p className="admin-page-copy">
-            Type the amount, show the QR code on the iPad. The payer scans
-            with their phone camera and pays via card, Apple Pay, or Google
-            Pay on Mooov&apos;s branded page. No reader, no app install.
+            Type the amount, show the QR code. The payer scans with their
+            phone camera and pays via card, Apple Pay, or Google Pay on
+            Mooov&apos;s branded page. Works great on phone, iPad, or laptop.
           </p>
         </div>
         {session ? (
@@ -196,39 +354,239 @@ export function TakePaymentClient({ lodgeSlug, connected, mooovStatus }: Props) 
           onReset={reset}
         />
       ) : (
-        <Card className="p-6">
-          <form className="space-y-5" onSubmit={handleSubmit}>
-            <div className="space-y-2">
-              <Label htmlFor="amount">Amount (£)</Label>
-              <Input
-                id="amount"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0.01"
-                max="5000"
-                placeholder="45.00"
-                value={amount}
-                autoFocus
-                onChange={(e) => setAmount(e.target.value)}
-                required
-                className="text-3xl font-semibold h-16 px-4"
-              />
-              <div className="flex flex-wrap gap-2 pt-2">
-                {PRESET_AMOUNTS.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    className="rounded-full border px-3 py-1 text-sm hover:bg-muted"
-                    onClick={() => setAmount(String(preset))}
-                  >
-                    £{preset}
-                  </button>
-                ))}
-              </div>
-            </div>
+        <>
+          <AmountForm
+            amount={amount}
+            setAmount={setAmount}
+            category={category}
+            setCategory={setCategory}
+            reference={reference}
+            setReference={setReference}
+            description={description}
+            setDescription={setDescription}
+            memberId={memberId}
+            setMemberId={setMemberId}
+            members={members}
+            error={error}
+            minting={minting}
+            onSubmit={handleSubmit}
+          />
+          <HistoryPanel
+            items={history}
+            loading={historyLoading}
+            onRefresh={loadHistory}
+            onReopen={reopenFromHistory}
+          />
+        </>
+      )}
+    </div>
+  );
+}
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+// ─────────────────────────────────────────────────────────────────────────────
+// Amount entry form (mobile-first POS-style keypad + presets + extras)
+// ─────────────────────────────────────────────────────────────────────────────
+
+type AmountFormProps = {
+  amount: string;
+  setAmount: React.Dispatch<React.SetStateAction<string>>;
+  category: (typeof CATEGORIES)[number]["id"];
+  setCategory: (v: (typeof CATEGORIES)[number]["id"]) => void;
+  reference: string;
+  setReference: (v: string) => void;
+  description: string;
+  setDescription: (v: string) => void;
+  memberId: string | null;
+  setMemberId: (v: string | null) => void;
+  members: MemberOption[];
+  error: string | null;
+  minting: boolean;
+  onSubmit: (e?: React.FormEvent<HTMLFormElement>) => void;
+};
+
+function AmountForm({
+  amount,
+  setAmount,
+  category,
+  setCategory,
+  reference,
+  setReference,
+  description,
+  setDescription,
+  memberId,
+  setMemberId,
+  members,
+  error,
+  minting,
+  onSubmit,
+}: AmountFormProps) {
+  const [showExtras, setShowExtras] = useState(false);
+
+  const displayAmount = useMemo(() => {
+    if (!amount) return "0.00";
+    const n = Number(amount);
+    if (!Number.isFinite(n)) return amount;
+    return n.toFixed(amount.includes(".") ? Math.min(2, amount.split(".")[1]?.length ?? 0) : 2);
+  }, [amount]);
+
+  const appendDigit = useCallback(
+    (digit: string) => {
+      setAmount((prev) => {
+        if (digit === ".") {
+          if (prev.includes(".")) return prev;
+          return prev === "" ? "0." : `${prev}.`;
+        }
+        if (prev === "0" && digit !== ".") return digit;
+        const next = prev + digit;
+        const [, decimals] = next.split(".");
+        if (decimals && decimals.length > 2) return prev;
+        if (Number(next) > 5000) return prev;
+        return next;
+      });
+    },
+    [setAmount],
+  );
+
+  const backspace = useCallback(() => {
+    setAmount((prev) => prev.slice(0, -1));
+  }, [setAmount]);
+
+  const clearAmount = useCallback(() => {
+    setAmount("");
+  }, [setAmount]);
+
+  const adjust = useCallback(
+    (delta: number) => {
+      setAmount((prev) => {
+        const current = Number(prev || "0");
+        const next = Math.max(0, Math.min(5000, current + delta));
+        return next === 0 ? "" : String(Number(next.toFixed(2)));
+      });
+    },
+    [setAmount],
+  );
+
+  return (
+    <Card className="overflow-hidden p-0">
+      <form
+        onSubmit={onSubmit}
+        className="flex flex-col gap-5 p-4 sm:p-6"
+      >
+        {/* Big amount display */}
+        <div className="rounded-2xl bg-slate-950 px-4 py-6 text-white shadow-inner sm:py-8">
+          <p className="text-center text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+            Amount to take
+          </p>
+          <div className="mt-2 flex items-center justify-center gap-2">
+            <span className="text-3xl font-semibold text-slate-300 sm:text-4xl">
+              £
+            </span>
+            <span
+              className={cn(
+                "tabular-nums font-semibold tracking-tight",
+                amount ? "text-white" : "text-slate-500",
+                "text-5xl sm:text-6xl",
+              )}
+            >
+              {displayAmount}
+            </span>
+          </div>
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => adjust(-5)}
+              className="inline-flex h-9 items-center gap-1 rounded-full bg-slate-800/80 px-3 text-xs font-medium text-slate-200 hover:bg-slate-700"
+              aria-label="Decrease by £5"
+            >
+              <Minus className="h-3.5 w-3.5" /> £5
+            </button>
+            <button
+              type="button"
+              onClick={() => adjust(5)}
+              className="inline-flex h-9 items-center gap-1 rounded-full bg-slate-800/80 px-3 text-xs font-medium text-slate-200 hover:bg-slate-700"
+              aria-label="Increase by £5"
+            >
+              <Plus className="h-3.5 w-3.5" /> £5
+            </button>
+            <button
+              type="button"
+              onClick={() => adjust(10)}
+              className="inline-flex h-9 items-center gap-1 rounded-full bg-slate-800/80 px-3 text-xs font-medium text-slate-200 hover:bg-slate-700"
+              aria-label="Increase by £10"
+            >
+              <Plus className="h-3.5 w-3.5" /> £10
+            </button>
+            {amount ? (
+              <button
+                type="button"
+                onClick={clearAmount}
+                className="inline-flex h-9 items-center gap-1 rounded-full bg-red-500/15 px-3 text-xs font-medium text-red-300 hover:bg-red-500/25"
+              >
+                Clear
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Preset chips (wrap on phone, single row on tablet+) */}
+        <div className="flex flex-wrap justify-center gap-2">
+          {PRESET_AMOUNTS.map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              className="min-h-11 min-w-[3.5rem] rounded-full border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 shadow-sm transition-colors hover:bg-slate-50 active:bg-slate-100"
+              onClick={() => setAmount(String(preset))}
+            >
+              £{preset}
+            </button>
+          ))}
+        </div>
+
+        {/* Built-in keypad — touch-friendly and works on every device,
+            no native keyboard pushing the rest of the page around. */}
+        <Keypad onDigit={appendDigit} onBackspace={backspace} />
+
+        {/* Member attribution. Optional — leaving it blank treats the
+            payer as a guest, which is exactly what we want for raffles
+            and one-off festive-board top-ups at the bar. Picking a
+            member fills in user_name/email on the payments row and
+            auto-attaches their Gift Aid declaration if one exists. */}
+        <MemberPicker
+          members={members}
+          memberId={memberId}
+          setMemberId={setMemberId}
+        />
+
+        {/* Hidden input keeps form semantics + accessibility */}
+        <Input
+          aria-label="Amount"
+          type="hidden"
+          value={amount}
+          readOnly
+        />
+
+        {/* Collapsible extras: category / reference / description.
+            Treasurer just wants to take a tenner — keep the chrome minimal
+            by default and let them open extras only when needed. */}
+        <div className="rounded-xl border border-slate-200 bg-slate-50/60">
+          <button
+            type="button"
+            onClick={() => setShowExtras((v) => !v)}
+            className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-slate-700"
+            aria-expanded={showExtras}
+          >
+            <span>
+              {showExtras ? "Hide" : "Add"} category, reference, or receipt
+              note
+            </span>
+            <span className="text-xs text-slate-500">
+              {category !== "general" || reference || description
+                ? "Filled in"
+                : "Optional"}
+            </span>
+          </button>
+          {showExtras ? (
+            <div className="space-y-4 border-t border-slate-200 p-4">
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
                 <Select
@@ -260,58 +618,246 @@ export function TakePaymentClient({ lodgeSlug, connected, mooovStatus }: Props) 
                   maxLength={120}
                 />
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">
-                Description on receipt (optional)
-              </Label>
-              <Input
-                id="description"
-                type="text"
-                placeholder="Festive Board top-up — 5 June"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                maxLength={140}
-              />
-            </div>
-
-            {error ? (
-              <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                <TriangleAlert className="h-4 w-4 flex-none" />
-                <span>{error}</span>
+              <div className="space-y-2">
+                <Label htmlFor="description">
+                  Description on receipt (optional)
+                </Label>
+                <Input
+                  id="description"
+                  type="text"
+                  placeholder="Festive Board top-up — 5 June"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  maxLength={140}
+                />
               </div>
-            ) : null}
+            </div>
+          ) : null}
+        </div>
 
-            <Button
-              type="submit"
-              size="lg"
-              disabled={minting}
-              className="w-full text-base"
-            >
-              {minting ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Generating QR…
-                </>
-              ) : (
-                <>
-                  <Banknote className="mr-2 h-5 w-5" />
-                  Generate QR code
-                </>
-              )}
-            </Button>
-            <p className="text-xs text-muted-foreground">
-              The QR is single-use and tied to the amount you typed above. If
-              the payer doesn&apos;t scan within 24 hours it expires
-              automatically.
+        {error ? (
+          <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <TriangleAlert className="h-4 w-4 flex-none" />
+            <span>{error}</span>
+          </div>
+        ) : null}
+
+        <Button
+          type="submit"
+          size="xl"
+          disabled={minting || !amount || Number(amount) <= 0}
+          className="w-full text-base"
+        >
+          {minting ? (
+            <>
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Generating QR…
+            </>
+          ) : (
+            <>
+              <Banknote className="mr-2 h-5 w-5" />
+              Generate QR code
+            </>
+          )}
+        </Button>
+        <p className="text-center text-xs text-muted-foreground">
+          The QR is single-use and tied to the amount you typed above. If the
+          payer doesn&apos;t scan within 24 hours it expires automatically.
+        </p>
+      </form>
+    </Card>
+  );
+}
+
+function MemberPicker({
+  members,
+  memberId,
+  setMemberId,
+}: {
+  members: MemberOption[];
+  memberId: string | null;
+  setMemberId: (v: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+
+  const selected = useMemo(
+    () => members.find((m) => m.id === memberId) ?? null,
+    [members, memberId],
+  );
+
+  // Lodge member counts are typically small (<100), so a client-side
+  // filter beats a debounced search round-trip on flaky meeting Wi-Fi.
+  const filtered = useMemo(() => {
+    if (!query.trim()) return members.slice(0, 50);
+    const q = query.trim().toLowerCase();
+    return members
+      .filter((m) => {
+        const name = m.full_name.toLowerCase();
+        const email = (m.email ?? "").toLowerCase();
+        return name.includes(q) || email.includes(q);
+      })
+      .slice(0, 50);
+  }, [members, query]);
+
+  if (selected) {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2.5 text-sm">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100">
+            <User className="h-4 w-4 text-emerald-700" />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate font-medium text-emerald-900">
+              {selected.full_name}
             </p>
-          </form>
-        </Card>
-      )}
+            {selected.email ? (
+              <p className="truncate text-xs text-emerald-800/80">
+                {selected.email}
+              </p>
+            ) : null}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setMemberId(null);
+            setQuery("");
+          }}
+          aria-label="Clear member"
+          className="shrink-0 rounded-md p-1 text-emerald-800/80 hover:bg-emerald-100"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-left text-sm shadow-sm hover:bg-slate-50"
+        aria-expanded={open}
+      >
+        <span className="flex items-center gap-2">
+          <UserX className="h-4 w-4 text-slate-400" />
+          <span className="text-slate-700">
+            Guest payment{" "}
+            <span className="text-slate-400">· no member attached</span>
+          </span>
+        </span>
+        <span className="text-xs font-medium text-blue-600">
+          {open ? "Cancel" : "Attach member"}
+        </span>
+      </button>
+
+      {open ? (
+        <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-2">
+            <Search className="h-4 w-4 shrink-0 text-slate-400" />
+            <input
+              type="text"
+              autoFocus
+              placeholder="Search by name or email…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
+            />
+          </div>
+          <ul className="max-h-64 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <li className="px-3 py-6 text-center text-sm text-slate-500">
+                No members match &ldquo;{query}&rdquo;.
+              </li>
+            ) : (
+              filtered.map((m) => (
+                <li key={m.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMemberId(m.id);
+                      setQuery("");
+                      setOpen(false);
+                    }}
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-slate-800">
+                        {m.full_name}
+                      </p>
+                      {m.email ? (
+                        <p className="truncate text-xs text-slate-500">
+                          {m.email}
+                        </p>
+                      ) : null}
+                    </div>
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      ) : null}
+      <p className="px-1 text-xs text-slate-500">
+        Optional. Leave blank for a guest payment, or attach a member so the
+        ledger and any Gift Aid declaration are logged automatically.
+      </p>
     </div>
   );
 }
+
+function Keypad({
+  onDigit,
+  onBackspace,
+}: {
+  onDigit: (d: string) => void;
+  onBackspace: () => void;
+}) {
+  const keys: Array<{ label: React.ReactNode; value: string; onClick?: () => void; aria?: string }> = [
+    { label: "1", value: "1" },
+    { label: "2", value: "2" },
+    { label: "3", value: "3" },
+    { label: "4", value: "4" },
+    { label: "5", value: "5" },
+    { label: "6", value: "6" },
+    { label: "7", value: "7" },
+    { label: "8", value: "8" },
+    { label: "9", value: "9" },
+    { label: ".", value: "." },
+    { label: "0", value: "0" },
+    {
+      label: <Delete className="h-5 w-5" />,
+      value: "back",
+      onClick: onBackspace,
+      aria: "Backspace",
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-3 gap-2 sm:max-w-md sm:mx-auto sm:w-full">
+      {keys.map((k) => (
+        <button
+          key={k.value}
+          type="button"
+          aria-label={k.aria ?? `Digit ${k.value}`}
+          onClick={k.onClick ?? (() => onDigit(k.value))}
+          className={cn(
+            "flex h-14 items-center justify-center rounded-xl border border-slate-200 bg-white text-2xl font-semibold text-slate-800 shadow-sm transition-all active:scale-[0.97] active:bg-slate-100 sm:h-16 sm:text-3xl",
+            k.value === "back" && "text-slate-500",
+          )}
+        >
+          {k.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Active session — QR display, status, share, fullscreen
+// ─────────────────────────────────────────────────────────────────────────────
 
 type ActiveSessionProps = {
   session: {
@@ -320,6 +866,10 @@ type ActiveSessionProps = {
     qrDataUrl: string;
     amountMinor: number;
     currency: string;
+    reference: string;
+    description: string;
+    memberName: string | null;
+    giftAidEligible: boolean;
   };
   lodgeSlug: string;
   status: StatusResponse | null;
@@ -334,8 +884,17 @@ function ActiveSession({
   onReset,
 }: ActiveSessionProps) {
   const stopRef = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   const phase: StatusPhase = status?.phase ?? "pending";
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [shareError, setShareError] = useState<string | null>(null);
 
+  // Poll status every 2s until terminal. Honest: we don't claim "card entered"
+  // unless we actually have a webhook-driven succeeded/failed phase to back
+  // it up. Mooov doesn't emit a card-submitted event so the only thing we
+  // can truthfully show before terminal is "waiting".
   useEffect(() => {
     stopRef.current = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -367,6 +926,113 @@ function ActiveSession({
     };
   }, [session.paymentId, onStatusChange]);
 
+  // Elapsed timer ticks once a second so the admin can see "we've been
+  // waiting 32s" without guessing.
+  useEffect(() => {
+    if (phase === "succeeded" || phase === "failed") return;
+    const id = setInterval(() => setElapsed((e) => e + 1), 1000);
+    return () => clearInterval(id);
+  }, [phase]);
+
+  // Wake Lock — keep the screen on while a QR is being shown. Re-acquire on
+  // visibility change because mobile browsers (iOS especially) release the
+  // lock the moment the page is hidden. Guarded everywhere; missing API or
+  // failed acquire is non-fatal.
+  useEffect(() => {
+    if (phase === "succeeded" || phase === "failed") return;
+    let sentinel: WakeLockSentinel | null = null;
+    let cancelled = false;
+
+    const acquire = async () => {
+      try {
+        const nav = navigator as Navigator & {
+          wakeLock?: {
+            request: (type: "screen") => Promise<WakeLockSentinel>;
+          };
+        };
+        if (!nav.wakeLock) return;
+        const lock = await nav.wakeLock.request("screen");
+        if (cancelled) {
+          await lock.release().catch(() => {});
+          return;
+        }
+        sentinel = lock;
+      } catch {
+        // Permission denied or unsupported; ignore.
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible" && !sentinel) {
+        void acquire();
+      }
+    };
+
+    void acquire();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibility);
+      sentinel?.release().catch(() => {});
+      sentinel = null;
+    };
+  }, [phase]);
+
+  // Track fullscreen state in case the user exits via Esc / system gesture.
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    const el = containerRef.current;
+    if (!el) return;
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await el.requestFullscreen();
+      }
+    } catch {
+      // iOS Safari sometimes refuses; fall back gracefully.
+    }
+  }, []);
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(session.url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setShareError("Could not copy the link.");
+    }
+  }, [session.url]);
+
+  const handleShare = useCallback(async () => {
+    setShareError(null);
+    const text =
+      `Pay ${formatMoney(session.amountMinor, session.currency)} via secure ` +
+      `card link${session.description ? ` (${session.description})` : ""}`;
+    try {
+      if (typeof navigator !== "undefined" && "share" in navigator) {
+        await (navigator as Navigator & {
+          share: (data: { title: string; text: string; url: string }) => Promise<void>;
+        }).share({
+          title: "Payment link",
+          text,
+          url: session.url,
+        });
+        return;
+      }
+      // Fallback: SMS via tel/sms scheme works on mobile browsers.
+      const sms = `sms:?&body=${encodeURIComponent(`${text}\n${session.url}`)}`;
+      window.location.href = sms;
+    } catch {
+      // User likely cancelled the share sheet; not an error worth surfacing.
+    }
+  }, [session.amountMinor, session.currency, session.description, session.url]);
+
   const amountLabel = useMemo(
     () => formatMoney(session.amountMinor, session.currency),
     [session.amountMinor, session.currency],
@@ -375,22 +1041,22 @@ function ActiveSession({
   if (phase === "succeeded") {
     const completedAt = status?.projected?.completed_at;
     return (
-      <Card className="p-8 text-center space-y-4 border-emerald-200 bg-emerald-50/40">
-        <CheckCircle2 className="mx-auto h-16 w-16 text-emerald-600" />
+      <Card className="space-y-4 border-emerald-200 bg-emerald-50/40 p-6 text-center sm:p-10">
+        <CheckCircle2 className="mx-auto h-16 w-16 text-emerald-600 sm:h-20 sm:w-20" />
         <div>
-          <h2 className="text-2xl font-semibold text-emerald-900">
+          <h2 className="text-3xl font-semibold text-emerald-900 sm:text-4xl">
             Paid {amountLabel}
           </h2>
           {completedAt ? (
-            <p className="text-sm text-emerald-800">
+            <p className="mt-1 text-sm text-emerald-800">
               {new Date(completedAt).toLocaleString("en-GB")}
             </p>
           ) : (
-            <p className="text-sm text-emerald-800">
+            <p className="mt-1 text-sm text-emerald-800">
               Payment captured. Receipt sent by Mooov.
             </p>
           )}
-          <p className="mt-1 text-xs text-emerald-700">
+          <p className="mt-2 text-xs text-emerald-700/80">
             Ref: {session.paymentId}
           </p>
         </div>
@@ -406,16 +1072,16 @@ function ActiveSession({
 
   if (phase === "failed") {
     return (
-      <Card className="p-8 text-center space-y-4 border-red-200 bg-red-50/40">
-        <TriangleAlert className="mx-auto h-16 w-16 text-red-600" />
+      <Card className="space-y-4 border-red-200 bg-red-50/40 p-6 text-center sm:p-10">
+        <TriangleAlert className="mx-auto h-16 w-16 text-red-600 sm:h-20 sm:w-20" />
         <div>
-          <h2 className="text-2xl font-semibold text-red-900">
+          <h2 className="text-2xl font-semibold text-red-900 sm:text-3xl">
             Payment did not complete
           </h2>
-          <p className="text-sm text-red-800">
-            {status?.failure_reason ?? "The payer cancelled or the card was declined."}
+          <p className="mt-1 text-sm text-red-800">
+            {humanizeFailureReason(status?.failure_reason)}
           </p>
-          <p className="mt-1 text-xs text-red-700">
+          <p className="mt-2 text-xs text-red-700/80">
             Ref: {session.paymentId}
           </p>
         </div>
@@ -428,31 +1094,109 @@ function ActiveSession({
   }
 
   return (
-    <Card className="p-6 space-y-6">
-      <div className="text-center space-y-1">
-        <p className="text-sm uppercase tracking-wide text-muted-foreground">
-          Show this QR to the payer
-        </p>
-        <h2 className="text-3xl font-semibold">{amountLabel}</h2>
+    <Card
+      ref={containerRef}
+      className={cn(
+        "space-y-5 p-4 sm:p-6",
+        // In fullscreen, paint the whole viewport white so the QR has max
+        // contrast on every device.
+        isFullscreen && "fixed inset-0 z-50 m-0 max-h-none max-w-none rounded-none border-0 bg-white",
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-center sm:text-left">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            Show this QR to the payer
+          </p>
+          <h2 className="text-3xl font-semibold leading-tight sm:text-4xl">
+            {amountLabel}
+          </h2>
+          {(session.reference || session.description) && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {session.description || session.reference}
+            </p>
+          )}
+          {(session.memberName || session.giftAidEligible) && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {session.memberName ? (
+                <Badge variant="outline" className="gap-1 border-slate-300">
+                  <User className="h-3 w-3" />
+                  {session.memberName}
+                </Badge>
+              ) : null}
+              {session.giftAidEligible ? (
+                <Badge variant="success" className="gap-1">
+                  <HeartHandshake className="h-3 w-3" />
+                  Gift Aid auto-logged
+                </Badge>
+              ) : null}
+            </div>
+          )}
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={toggleFullscreen}
+          aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+          className="shrink-0"
+        >
+          {isFullscreen ? (
+            <Minimize2 className="h-5 w-5" />
+          ) : (
+            <Maximize2 className="h-5 w-5" />
+          )}
+        </Button>
       </div>
 
-      <div className="mx-auto max-w-md">
-        {/* Plain img avoids next/image sizing overhead; QR is a data URL. */}
+      <div
+        className={cn(
+          "mx-auto w-full",
+          isFullscreen ? "max-w-2xl" : "max-w-sm sm:max-w-md",
+        )}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={session.qrDataUrl}
           alt={`Payment QR code for ${amountLabel}`}
-          className="block w-full h-auto rounded-md border bg-white p-2"
+          className="block aspect-square w-full h-auto rounded-2xl border-4 border-white bg-white shadow-md"
         />
       </div>
 
-      <div className="rounded-md border bg-muted/40 p-4 text-sm">
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          size="lg"
+          onClick={handleShare}
+          className="flex-1 sm:flex-initial"
+        >
+          <Share2 className="mr-2 h-4 w-4" />
+          Share link
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          onClick={handleCopy}
+          className="flex-1 sm:flex-initial"
+        >
+          <Copy className="mr-2 h-4 w-4" />
+          {copied ? "Copied!" : "Copy link"}
+        </Button>
+      </div>
+
+      {shareError ? (
+        <p className="text-center text-xs text-red-700">{shareError}</p>
+      ) : null}
+
+      <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 text-sm">
         <div className="flex items-start gap-2">
-          <ScanLine className="h-5 w-5 flex-none text-muted-foreground" />
+          <ScanLine className="h-5 w-5 flex-none text-slate-500" />
           <div className="space-y-1">
-            <p className="font-medium">How to pay</p>
-            <ol className="list-decimal space-y-0.5 pl-5 text-muted-foreground">
-              <li>Open the camera app on your phone.</li>
+            <p className="font-medium text-slate-800">How to pay</p>
+            <ol className="list-decimal space-y-0.5 pl-5 text-slate-600">
+              <li>Open the camera on a phone.</li>
               <li>Point it at this QR code.</li>
               <li>Tap the link to pay with card, Apple Pay, or Google Pay.</li>
             </ol>
@@ -460,18 +1204,16 @@ function ActiveSession({
         </div>
       </div>
 
-      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-        {phase === "awaiting_payment" ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Card entered — waiting for confirmation…
-          </>
-        ) : (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Waiting for scan…
-          </>
-        )}
+      <div className="flex flex-col items-center gap-1.5 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Waiting for payment…
+        </div>
+        <p className="text-xs text-muted-foreground/80">
+          Elapsed {formatElapsed(elapsed)}
+          {" · "}
+          Auto-checks every 2&nbsp;seconds
+        </p>
       </div>
 
       <details className="text-xs text-muted-foreground">
@@ -490,6 +1232,276 @@ function ActiveSession({
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Recent QR codes panel
+// ─────────────────────────────────────────────────────────────────────────────
+
+function HistoryPanel({
+  items,
+  loading,
+  onRefresh,
+  onReopen,
+}: {
+  items: HistoryItem[];
+  loading: boolean;
+  onRefresh: () => void;
+  onReopen: (item: HistoryItem) => void;
+}) {
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+
+  const handleCancel = useCallback(
+    async (paymentId: string) => {
+      setCancellingId(paymentId);
+      try {
+        const res = await fetch("/api/admin/take-payment/cancel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ payment_id: paymentId }),
+        });
+        if (res.ok) {
+          onRefresh();
+        }
+      } catch {
+        // Best-effort; user can retry.
+      } finally {
+        setCancellingId(null);
+      }
+    },
+    [onRefresh],
+  );
+
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/60 px-4 py-3 sm:px-5">
+        <div className="flex items-center gap-2">
+          <History className="h-4 w-4 text-slate-500" />
+          <h3 className="text-sm font-semibold text-slate-800">
+            Recent QR codes
+          </h3>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onRefresh}
+          disabled={loading}
+          aria-label="Refresh"
+          className="h-8 px-2"
+        >
+          <RefreshCw
+            className={cn(
+              "h-4 w-4 text-slate-500",
+              loading && "animate-spin",
+            )}
+          />
+        </Button>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="px-4 py-10 text-center text-sm text-slate-500 sm:px-6">
+          {loading
+            ? "Loading recent QRs…"
+            : "No QR codes have been generated yet. Take your first payment above."}
+        </div>
+      ) : (
+        <ul className="divide-y divide-slate-200">
+          {items.map((item) => (
+            <HistoryRow
+              key={item.payment_id}
+              item={item}
+              onReopen={() => onReopen(item)}
+              onCancel={() => handleCancel(item.payment_id)}
+              cancelling={cancellingId === item.payment_id}
+            />
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+function HistoryRow({
+  item,
+  onReopen,
+  onCancel,
+  cancelling,
+}: {
+  item: HistoryItem;
+  onReopen: () => void;
+  onCancel: () => void;
+  cancelling: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    if (!item.hosted_url) return;
+    try {
+      await navigator.clipboard.writeText(item.hosted_url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* ignore */
+    }
+  }, [item.hosted_url]);
+
+  const amountLabel = formatMoney(item.amount_minor, item.currency);
+  const created = new Date(item.created_at);
+
+  return (
+    <li className="grid gap-3 px-4 py-4 sm:grid-cols-[1fr_auto] sm:items-center sm:gap-4 sm:px-5">
+      <div className="min-w-0 space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-lg font-semibold tabular-nums text-slate-900">
+            {amountLabel}
+          </span>
+          <DerivedStatusPill status={item.derived_status} />
+          {item.category && item.category !== "general" ? (
+            <Badge variant="outline" className="border-slate-300 capitalize">
+              {item.category.replace(/_/g, " ")}
+            </Badge>
+          ) : null}
+          {item.gift_aid_eligible ? (
+            <Badge variant="success" className="gap-1">
+              <HeartHandshake className="h-3 w-3" />
+              Gift Aid
+            </Badge>
+          ) : null}
+        </div>
+        {(item.description || item.reference) && (
+          <p className="truncate text-sm text-slate-600">
+            {item.description || item.reference}
+          </p>
+        )}
+        <p className="text-xs text-slate-500">
+          {created.toLocaleString("en-GB")}
+          {item.created_by_email ? ` · by ${item.created_by_email}` : ""}
+        </p>
+        {item.member_name ? (
+          <p className="flex items-center gap-1 text-xs text-slate-700">
+            <User className="h-3 w-3" />
+            For {item.member_name}
+            {item.member_email ? ` (${item.member_email})` : ""}
+          </p>
+        ) : (
+          <p className="flex items-center gap-1 text-xs text-slate-500">
+            <UserX className="h-3 w-3" />
+            Guest payment
+          </p>
+        )}
+        {item.derived_status === "paid" &&
+        (item.paid_by_name || item.paid_by_email) &&
+        // Avoid showing the same line twice when the member matches the
+        // captured-payment attribution. Only surface "Paid by" when it
+        // adds new info (e.g. guest payment with payer-entered name).
+        !item.member_name ? (
+          <p className="text-xs text-emerald-700">
+            Paid by {item.paid_by_name ?? item.paid_by_email}
+            {item.paid_at
+              ? ` · ${new Date(item.paid_at).toLocaleString("en-GB")}`
+              : ""}
+          </p>
+        ) : null}
+        {item.derived_status === "paid" && item.paid_at ? (
+          <p className="text-xs text-emerald-700">
+            Captured {new Date(item.paid_at).toLocaleString("en-GB")}
+          </p>
+        ) : null}
+        {item.derived_status === "failed" && item.failure_reason ? (
+          <p className="text-xs text-red-700">
+            {humanizeFailureReason(item.failure_reason)}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
+        {item.derived_status === "open" && item.hosted_url ? (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={onReopen}
+          >
+            Show QR
+          </Button>
+        ) : null}
+        {item.hosted_url ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleCopy}
+            aria-label="Copy link"
+          >
+            <Copy className="mr-1 h-3.5 w-3.5" />
+            {copied ? "Copied" : "Link"}
+          </Button>
+        ) : null}
+        {item.derived_status === "open" ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onCancel}
+            disabled={cancelling}
+            aria-label="Cancel this QR"
+            className="text-red-600 hover:bg-red-50 hover:text-red-700"
+          >
+            {cancelling ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <XCircle className="h-3.5 w-3.5" />
+            )}
+          </Button>
+        ) : null}
+      </div>
+    </li>
+  );
+}
+
+function DerivedStatusPill({ status }: { status: HistoryDerived }) {
+  switch (status) {
+    case "paid":
+      return (
+        <Badge variant="success" className="gap-1">
+          <CheckCircle2 className="h-3 w-3" />
+          Paid
+        </Badge>
+      );
+    case "open":
+      return (
+        <Badge variant="warning" className="gap-1">
+          <Clock className="h-3 w-3" />
+          Open
+        </Badge>
+      );
+    case "expired":
+      return (
+        <Badge variant="muted" className="gap-1">
+          <Clock className="h-3 w-3" />
+          Expired
+        </Badge>
+      );
+    case "cancelled":
+      return (
+        <Badge variant="muted" className="gap-1">
+          <XCircle className="h-3 w-3" />
+          Cancelled
+        </Badge>
+      );
+    case "failed":
+      return (
+        <Badge variant="destructive" className="gap-1">
+          <TriangleAlert className="h-3 w-3" />
+          Failed
+        </Badge>
+      );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
 function formatMoney(minor: number, currency: string): string {
   try {
     return new Intl.NumberFormat("en-GB", {
@@ -499,5 +1511,26 @@ function formatMoney(minor: number, currency: string): string {
     }).format(minor / 100);
   } catch {
     return `£${(minor / 100).toFixed(2)}`;
+  }
+}
+
+function formatElapsed(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}m ${secs.toString().padStart(2, "0")}s`;
+}
+
+function humanizeFailureReason(reason: string | null | undefined): string {
+  if (!reason) return "The payer cancelled or the card was declined.";
+  switch (reason) {
+    case "cancelled_by_admin":
+      return "Cancelled by admin.";
+    case "unexpected_error":
+      return "Something went wrong when creating the payment session.";
+    case "merchant_setup_required":
+      return "Lodge payment processor needs setup.";
+    default:
+      return reason.replace(/_/g, " ");
   }
 }

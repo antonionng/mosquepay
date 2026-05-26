@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import { lodgeScopedEventPath } from "@/lib/public-links";
+import { isPubliclyVisible } from "@/lib/events/public-visibility";
 
 function siteUrl(): string {
   const url =
@@ -49,6 +50,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const events = await db.getEvents(lodge.id, { published: true });
       for (const event of events) {
         if (new Date(event.event_date) < now) continue;
+        if (!isPubliclyVisible(event)) continue;
         dynamicEntries.push({
           url: `${base}${lodgeScopedEventPath(lodge.slug, event.slug)}`,
           lastModified: new Date(event.updated_at ?? event.created_at ?? now),

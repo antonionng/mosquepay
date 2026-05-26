@@ -1,10 +1,15 @@
+import { redirect } from "next/navigation";
 import { getAdminReadContext } from "@/lib/admin/read-context";
+import { getCurrentAdminScope } from "@/lib/auth/permissions";
 import { createServiceClient } from "@/lib/supabase/server";
+import * as db from "@/lib/db";
 import { TakePaymentClient } from "./take-payment-client";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Banknote } from "lucide-react";
 
 export const dynamic = "force-dynamic";
+
+const RETURN_PATH = "/admin/take-payment";
 
 async function getMooovConnection(lodgeId: string) {
   try {
@@ -20,7 +25,34 @@ async function getMooovConnection(lodgeId: string) {
   }
 }
 
+async function getLodgeMembers(lodgeId: string) {
+  // Light-weight list for the in-form picker. We deliberately fetch all
+  // active members in one go (lodges are small — typically <100 members) so
+  // the client can run the filter locally without a debounced API round-trip
+  // mid-meeting on flaky venue Wi-Fi.
+  try {
+    const members = await db.getMembers(lodgeId, { status: "active" });
+    return members.map((m) => ({
+      id: m.id,
+      full_name: m.full_name,
+      email: m.email ?? null,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export default async function TakePaymentPage() {
+  // Custom auth gate so an unauthenticated visitor lands BACK here after
+  // logging in. The shared getAdminReadContext redirects to /admin/login
+  // without a return URL, which is fine for nav-tab landings but defeats
+  // the "bookmark this page on your phone home screen" use case the take-
+  // payment route is built around.
+  const scope = await getCurrentAdminScope();
+  if (scope.kind === "none") {
+    redirect(`/admin/login?from=${encodeURIComponent(RETURN_PATH)}`);
+  }
+
   const ctx = await getAdminReadContext();
   if (ctx.mode !== "database" || !ctx.lodgeId) {
     return (
@@ -43,7 +75,10 @@ export default async function TakePaymentPage() {
     );
   }
 
-  const connection = await getMooovConnection(ctx.lodgeId);
+  const [connection, members] = await Promise.all([
+    getMooovConnection(ctx.lodgeId),
+    getLodgeMembers(ctx.lodgeId),
+  ]);
   const connected = !!connection && connection.status === "active";
 
   return (
@@ -51,6 +86,7 @@ export default async function TakePaymentPage() {
       lodgeSlug={ctx.lodgeSlug}
       connected={connected}
       mooovStatus={connection?.status ?? null}
+      members={members}
     />
   );
 }

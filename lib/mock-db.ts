@@ -547,6 +547,7 @@ export type MockEvent = LodgeScoped & {
   guest_policy: "blue_table" | "white_table" | "closed";
   featured_image_url: string | null;
   published: boolean;
+  feature_on_website: boolean;
   sequence_id: string | null;
   sequence_position: number | null;
   summons_status: "none" | "draft" | "approved" | "sent";
@@ -595,6 +596,7 @@ type AddEventInput = Omit<
   | "summons_approved_at"
   | "summons_approved_by_email"
   | "summons_last_sent_at"
+  | "feature_on_website"
 > & {
   lodge_slug?: string;
   sequence_id?: string | null;
@@ -604,6 +606,7 @@ type AddEventInput = Omit<
   summons_approved_at?: string | null;
   summons_approved_by_email?: string | null;
   summons_last_sent_at?: string | null;
+  feature_on_website?: boolean;
 };
 
 export function addEvent(data: AddEventInput): MockEvent {
@@ -618,6 +621,7 @@ export function addEvent(data: AddEventInput): MockEvent {
     summons_approved_at: null,
     summons_approved_by_email: null,
     summons_last_sent_at: null,
+    feature_on_website: false,
     ...data,
     lodge_slug: withLodgeSlug(data.lodge_slug),
     created_at: now,

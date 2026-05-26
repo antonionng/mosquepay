@@ -1,11 +1,11 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Heart, CheckCircle2 } from "lucide-react";
+import { Heart, CheckCircle2, ShieldCheck } from "lucide-react";
 
 const PRESET_AMOUNTS = [10, 25, 50, 100];
 
@@ -35,8 +35,62 @@ function DonatePageContent() {
   const [postcode, setPostcode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Whether this email already has an active Gift Aid declaration on file
+  // for this lodge. When true the donor doesn't need to re-enter the
+  // address / re-tick the eligibility confirmation: the existing
+  // enduring declaration covers this and all future donations from this
+  // email until the donor revokes it.
+  const [existingGiftAid, setExistingGiftAid] = useState(false);
+  const [checkingGiftAid, setCheckingGiftAid] = useState(false);
+  // Used to ignore stale lookups when the donor edits the email field
+  // faster than the network can respond.
+  const giftAidLookupId = useRef(0);
 
   const effectiveAmount = amount || Number(customAmount) || 0;
+
+  // Debounced lookup: whenever the donor's email looks valid, ask the API
+  // whether we already have a Gift Aid declaration on file for it. If we do,
+  // auto-tick the Gift Aid box and skip the address form -- HMRC treats the
+  // earlier declaration as covering all future donations.
+  useEffect(() => {
+    const email = donorEmail.trim();
+    if (!email || !email.includes("@") || email.length < 5) {
+      setExistingGiftAid(false);
+      setCheckingGiftAid(false);
+      return;
+    }
+
+    const myId = ++giftAidLookupId.current;
+    setCheckingGiftAid(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/donations/gift-aid-status?email=${encodeURIComponent(email)}${
+            lodge ? `&lodge=${encodeURIComponent(lodge)}` : ""
+          }`,
+          { cache: "no-store" }
+        );
+        if (myId !== giftAidLookupId.current) return;
+        if (!res.ok) {
+          setExistingGiftAid(false);
+          return;
+        }
+        const data = (await res.json()) as { has_active_declaration?: boolean };
+        const found = Boolean(data.has_active_declaration);
+        setExistingGiftAid(found);
+        if (found) {
+          setGiftAid(true);
+          setGiftAidConfirmed(true);
+        }
+      } catch {
+        if (myId === giftAidLookupId.current) setExistingGiftAid(false);
+      } finally {
+        if (myId === giftAidLookupId.current) setCheckingGiftAid(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [donorEmail, lodge]);
 
   function selectPreset(value: number) {
     setAmount(value);
@@ -60,7 +114,11 @@ function DonatePageContent() {
       setError("Email is required.");
       return;
     }
-    if (giftAid && (!giftAidConfirmed || !addressLine1 || !city || !postcode)) {
+    // When the donor's email already has a Gift Aid declaration on file we
+    // don't need the address again -- the saved declaration covers this
+    // donation. Otherwise we need a confirmed declaration + full address so
+    // HMRC will accept the claim.
+    if (giftAid && !existingGiftAid && (!giftAidConfirmed || !addressLine1 || !city || !postcode)) {
       setError(
         "Please confirm Gift Aid eligibility and provide your address."
       );
@@ -100,8 +158,12 @@ function DonatePageContent() {
   }
 
   return (
-    <div className="public-page">
-      <section className="public-hero">
+    // Mobile-first ordering: the donation form jumps above the hero on
+    // small screens so the donor lands directly on the call-to-action.
+    // On lg+ we fall back to natural document order (hero first, then
+    // form section).
+    <div className="public-page flex flex-col">
+      <section className="public-hero order-2 lg:order-none">
         <div className="public-hero-shell">
           <div className="public-hero-copy">
             <p className="public-kicker">Make a donation</p>
@@ -121,6 +183,7 @@ function DonatePageContent() {
             <div className="mt-6 space-y-4">
               {[
                 "Gift Aid adds 25% at no cost to you",
+                "Set up Gift Aid once: future donations from the same email are Gift Aided automatically",
                 "100% of donations go directly to charitable causes",
                 "Transparent reporting on how funds are used",
               ].map((item) => (
@@ -136,7 +199,7 @@ function DonatePageContent() {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28">
+      <section className="order-1 py-12 lg:order-none lg:py-28">
         <div className="container-full">
           <div className="mx-auto max-w-xl">
             <div className="public-grid-card">
@@ -212,7 +275,25 @@ function DonatePageContent() {
                   />
                 </div>
 
-                {effectiveAmount > 0 && (
+                {effectiveAmount > 0 && existingGiftAid && (
+                  <div className="space-y-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                    <div className="flex items-start gap-2">
+                      <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold text-emerald-900">
+                          Gift Aid is already set up for this email
+                        </p>
+                        <p className="text-sm leading-relaxed text-emerald-800">
+                          We have your Gift Aid declaration on file, so this
+                          donation will automatically be boosted by 25%. You
+                          don&apos;t need to fill anything in again.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {effectiveAmount > 0 && !existingGiftAid && (
                   <div className="space-y-3 rounded-xl border border-blue-100 bg-blue-50/50 p-4">
                     <div className="flex items-center gap-2">
                       <input
@@ -228,12 +309,26 @@ function DonatePageContent() {
                       <Label htmlFor="gift_aid_donate" className="font-semibold">
                         I would like to Gift Aid my donation
                       </Label>
+                      {checkingGiftAid && (
+                        <span className="text-xs text-slate-500">
+                          Checking your email...
+                        </span>
+                      )}
                     </div>
                     {giftAid && (
                       <div className="space-y-4 pt-1">
                         <p className="text-sm leading-relaxed text-slate-600">
                           Gift Aid allows us to claim an extra 25p for every £1
                           you donate at no cost to you.
+                        </p>
+                        <p className="rounded-lg bg-blue-100/60 px-3 py-2 text-xs leading-relaxed text-blue-900">
+                          We&apos;ll save this Gift Aid declaration against{" "}
+                          <span className="font-semibold">
+                            {donorEmail.trim() || "your email"}
+                          </span>
+                          . Any future donations you make from the same email
+                          will be Gift Aided automatically. You won&apos;t need
+                          to re-enter your address.
                         </p>
                         <p className="text-xs leading-relaxed text-slate-500">
                           I am a UK taxpayer and understand that if I pay less
@@ -317,6 +412,7 @@ function DonatePageContent() {
                   "Gift Aid lets charities reclaim 25p for every £1 you donate",
                   "You must be a UK taxpayer to qualify",
                   "It costs you nothing extra. The charity claims it from HMRC",
+                  "We save your declaration against your email, so future donations from the same email are Gift Aided automatically",
                 ].map((fact) => (
                   <div key={fact} className="flex items-start gap-3">
                     <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />

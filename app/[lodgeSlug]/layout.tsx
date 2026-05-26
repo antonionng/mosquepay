@@ -6,6 +6,7 @@ import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { resolveLodgeSlug } from "@/lib/tenant";
 import { sanitizeCustomPages, sanitizeSiteSections } from "@/lib/site-section-style";
+import { isPubliclyVisible } from "@/lib/events/public-visibility";
 
 async function getScopedSitePayload(lodgeSlug: string) {
   const lodge = isSupabaseConfigured()
@@ -17,6 +18,28 @@ async function getScopedSitePayload(lodgeSlug: string) {
     ? await db.getLodgeSite(lodge.id)
     : mockDb.getLodgeSite(lodgeSlug);
 
+  const rawEvents = isSupabaseConfigured()
+    ? await db
+        .getEvents(lodge.id, { published: true, upcoming: true })
+        .catch(() => [])
+    : mockDb.getEvents({
+        lodge_slug: lodgeSlug,
+        published: true,
+        upcoming: true,
+      });
+  const upcomingPublicEvents = rawEvents
+    .filter(isPubliclyVisible)
+    .slice(0, 6)
+    .map((event) => ({
+      id: event.id,
+      slug: event.slug,
+      title: event.title,
+      event_date: event.event_date,
+      event_time: event.event_time,
+      location: event.location,
+      event_type: event.event_type,
+    }));
+
   return {
     lodge,
     site: site
@@ -25,6 +48,7 @@ async function getScopedSitePayload(lodgeSlug: string) {
           sections: sanitizeSiteSections(site.sections) ?? site.sections,
           custom_pages:
             sanitizeCustomPages(site.custom_pages) ?? site.custom_pages ?? [],
+          upcoming_public_events: upcomingPublicEvents,
         }
       : null,
   };

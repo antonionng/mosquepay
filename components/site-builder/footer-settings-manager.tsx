@@ -222,14 +222,16 @@ function FooterPreview({
         <div className="mt-8 border-t border-white/10 pt-6 text-xs text-slate-500">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <span>(c) {new Date().getFullYear()} {lodgeName}. All rights reserved.</span>
-            <a
-              href="https://lodgepayments.co.uk"
-              target="_blank"
-              rel="noreferrer"
-              className="transition-colors hover:text-slate-300"
-            >
-              Powered by LodgePay
-            </a>
+            {settings.show_powered_by !== false ? (
+              <a
+                href="https://lodgepayments.co.uk"
+                target="_blank"
+                rel="noreferrer"
+                className="transition-colors hover:text-slate-300"
+              >
+                Powered by LodgePay
+              </a>
+            ) : null}
           </div>
         </div>
       </footer>
@@ -407,12 +409,13 @@ export function FooterSettingsManager({
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(24rem,0.9fr)]">
         <div className="space-y-6">
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
             {[
               ["show_logo", "Show logo"],
               ["show_lodge_name", "Show lodge name"],
               ["show_lodge_number", "Show lodge number"],
               ["show_contact_details", "Show contact details"],
+              ["show_powered_by", "Show \"Powered by LodgePay\""],
             ].map(([key, label]) => (
               <label
                 key={key}

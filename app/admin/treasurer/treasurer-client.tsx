@@ -8,6 +8,7 @@ import {
   ArrowDownToLine,
   Banknote,
   CheckCircle2,
+  ChevronRight,
   FileSpreadsheet,
   Loader2,
   Mail,
@@ -30,6 +31,14 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { MembershipFeesSettings } from "@/components/admin/membership-fees-settings";
 import { LodgeFeeDefaultsSettings } from "@/components/admin/lodge-fee-defaults-settings";
 import { MasonicYearSettings } from "@/components/admin/masonic-year-settings";
@@ -125,6 +134,8 @@ export function TreasurerClient({
   const router = useRouter();
   const [busyAction, setBusyAction] = useState<"run" | "remind" | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("ledger");
+  const [outstandingOpen, setOutstandingOpen] = useState(false);
   const [bulkForm, setBulkForm] = useState(() => {
     const now = new Date();
     const yearStart = new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10);
@@ -243,6 +254,58 @@ export function TreasurerClient({
     (i) => new Date(i.due_date) < new Date()
   );
 
+  const outstandingByContact = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        key: string;
+        name: string | null;
+        email: string | null;
+        total: number;
+        count: number;
+        oldest: string | null;
+        items: Array<{
+          source_id: string;
+          amount: number;
+          status: string;
+          occurred_at: string;
+        }>;
+      }
+    >();
+    for (const row of ledger) {
+      if (row.source_type !== "dues") continue;
+      if (row.status === "paid" || row.status === "waived") continue;
+      const key = (row.contact_email ?? row.contact_name ?? row.source_id).toLowerCase();
+      const entry = map.get(key) ?? {
+        key,
+        name: row.contact_name,
+        email: row.contact_email,
+        total: 0,
+        count: 0,
+        oldest: null as string | null,
+        items: [] as Array<{
+          source_id: string;
+          amount: number;
+          status: string;
+          occurred_at: string;
+        }>,
+      };
+      entry.total += Number(row.amount);
+      entry.count += 1;
+      entry.items.push({
+        source_id: row.source_id,
+        amount: Number(row.amount),
+        status: row.status,
+        occurred_at: row.occurred_at,
+      });
+      if (!entry.oldest || row.occurred_at < entry.oldest) {
+        entry.oldest = row.occurred_at;
+      }
+      map.set(key, entry);
+    }
+    return Array.from(map.values()).sort((a, b) => b.total - a.total);
+  }, [ledger]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -272,6 +335,18 @@ export function TreasurerClient({
           label="Outstanding dues"
           value={`£${totals.outstandingDues.toFixed(2)}`}
           color="amber"
+          onClick={
+            outstandingByContact.length > 0
+              ? () => setOutstandingOpen(true)
+              : undefined
+          }
+          hint={
+            outstandingByContact.length > 0
+              ? `${outstandingByContact.length} ${
+                  outstandingByContact.length === 1 ? "member" : "members"
+                }`
+              : undefined
+          }
         />
         <Kpi
           icon={CheckCircle2}
@@ -284,6 +359,12 @@ export function TreasurerClient({
           label="Overdue instalments"
           value={String(overdueInstalments.length)}
           color={overdueInstalments.length > 0 ? "red" : "slate"}
+          onClick={
+            overdueInstalments.length > 0
+              ? () => setActiveTab("instalments")
+              : undefined
+          }
+          hint={overdueInstalments.length > 0 ? "View list" : undefined}
         />
       </div>
 
@@ -293,7 +374,7 @@ export function TreasurerClient({
         </div>
       )}
 
-      <Tabs defaultValue="ledger">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="ledger">Ledger</TabsTrigger>
           <TabsTrigger value="next-dues">Next dues</TabsTrigger>
@@ -609,6 +690,103 @@ export function TreasurerClient({
           </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={outstandingOpen} onOpenChange={setOutstandingOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Outstanding dues</DialogTitle>
+            <DialogDescription>
+              £{totals.outstandingDues.toFixed(2)} across{" "}
+              {outstandingByContact.length}{" "}
+              {outstandingByContact.length === 1 ? "member" : "members"}. Click a
+              row to view their dues.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="-mx-1 max-h-[60vh] overflow-y-auto rounded-xl border border-slate-200">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Member</TableHead>
+                  <TableHead className="text-right">Records</TableHead>
+                  <TableHead className="text-right">Total owed</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {outstandingByContact.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={4}
+                      className="py-8 text-center text-sm text-slate-500"
+                    >
+                      No outstanding dues. All caught up.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  outstandingByContact.map((entry) => {
+                    const firstSource = entry.items[0]?.source_id;
+                    const href = firstSource
+                      ? `/admin/payments?dues=${firstSource}`
+                      : null;
+                    return (
+                      <TableRow
+                        key={entry.key}
+                        className={cn(
+                          href && "cursor-pointer hover:bg-slate-50"
+                        )}
+                        onClick={
+                          href
+                            ? () => {
+                                setOutstandingOpen(false);
+                                router.push(href);
+                              }
+                            : undefined
+                        }
+                      >
+                        <TableCell className="text-sm">
+                          <p className="font-medium text-slate-900">
+                            {entry.name ?? "—"}
+                          </p>
+                          {entry.email && (
+                            <p className="text-xs text-slate-500">
+                              {entry.email}
+                            </p>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right text-sm text-slate-600 tabular-nums">
+                          {entry.count}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold tabular-nums text-amber-700">
+                          £{entry.total.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="w-8 text-slate-400">
+                          {href && <ChevronRight className="h-4 w-4" />}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={sendReminders}
+              disabled={busyAction !== null || outstandingByContact.length === 0}
+            >
+              {busyAction === "remind" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Mail className="mr-2 h-4 w-4" />
+              )}
+              Send dues reminders
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -633,11 +811,15 @@ function Kpi({
   label,
   value,
   color,
+  onClick,
+  hint,
 }: {
   icon: React.ElementType;
   label: string;
   value: string;
   color: "emerald" | "amber" | "blue" | "red" | "slate";
+  onClick?: () => void;
+  hint?: string;
 }) {
   const colorMap = {
     emerald: "bg-emerald-50 text-emerald-600",
@@ -646,13 +828,42 @@ function Kpi({
     red: "bg-red-50 text-red-600",
     slate: "bg-slate-100 text-slate-600",
   };
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${colorMap[color]}`}>
-        <Icon className="h-5 w-5" />
+  const interactive = typeof onClick === "function";
+  const content = (
+    <>
+      <div className="flex items-start justify-between">
+        <div
+          className={`flex h-10 w-10 items-center justify-center rounded-xl ${colorMap[color]}`}
+        >
+          <Icon className="h-5 w-5" />
+        </div>
+        {interactive && (
+          <ChevronRight className="h-4 w-4 text-slate-300 transition-colors group-hover:text-slate-500" />
+        )}
       </div>
       <p className="mt-3 text-2xl font-bold text-slate-900">{value}</p>
-      <p className="text-xs text-slate-500">{label}</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-slate-500">{label}</p>
+        {hint && (
+          <p className="text-[11px] font-medium text-slate-400">{hint}</p>
+        )}
+      </div>
+    </>
+  );
+  if (interactive) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+      >
+        {content}
+      </button>
+    );
+  }
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      {content}
     </div>
   );
 }

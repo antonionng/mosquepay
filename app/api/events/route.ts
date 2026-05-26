@@ -6,6 +6,7 @@ import * as mockDb from "@/lib/mock-db";
 import { getLodgeSlugFromRequest } from "@/lib/tenant";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
+import { filterPubliclyVisible } from "@/lib/events/public-visibility";
 
 export const dynamic = "force-dynamic";
 
@@ -18,16 +19,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([]);
     }
     const events = await db.getEvents(lodgeId, { published: true });
-    return NextResponse.json(events);
+    return NextResponse.json(filterPubliclyVisible(events));
   }
 
   const _rejectMock = rejectIfMockDisabled();
   if (_rejectMock) return _rejectMock;
 
-  const events = mockDb
-    .getEvents({ lodge_slug: lodgeSlug })
-    .filter((event) => event.published);
-  return NextResponse.json(events);
+  const events = mockDb.getEvents({ lodge_slug: lodgeSlug });
+  return NextResponse.json(filterPubliclyVisible(events));
 }
 
 export async function POST(request: NextRequest) {
@@ -93,6 +92,7 @@ export async function POST(request: NextRequest) {
       featured_image_url: null,
       created_by: null,
       published: body.published !== false,
+      feature_on_website: body.feature_on_website === true,
     } satisfies Omit<
       db.Event,
       | "id"

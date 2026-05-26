@@ -14,6 +14,7 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import { getLodgeSlugFromRequest } from "@/lib/tenant";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
+import { getCurrentAdminContextAny } from "@/lib/auth/permissions";
 import { createServiceClient } from "@/lib/supabase/server";
 import { callMooovConnect, MooovApiError } from "@/lib/mooov";
 
@@ -72,6 +73,10 @@ export async function POST(request: NextRequest) {
     typeof body.reference === "string" ? body.reference.trim() : "";
   const category =
     typeof body.category === "string" ? body.category.trim() : "general";
+  const memberId =
+    typeof body.member_id === "string" && body.member_id.trim()
+      ? body.member_id.trim()
+      : null;
 
   if (!Number.isFinite(amount) || amount <= 0) {
     return NextResponse.json(
@@ -96,6 +101,23 @@ export async function POST(request: NextRequest) {
 
   const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
   if (forbidden) return forbidden;
+
+  // Capture who is generating this QR so the history view can show
+  // "created by Bro. Smith" and so audit trails attribute correctly.
+  // Failure to resolve identity is non-fatal; the history just shows
+  // "Admin" in that case.
+  let createdByEmail: string | null = null;
+  let createdByRole: string | null = null;
+  try {
+    const admin = await getCurrentAdminContextAny(lodgeId);
+    createdByEmail = admin?.email ?? null;
+    createdByRole = admin?.role ?? null;
+  } catch (err) {
+    console.warn("Take payment POST: could not resolve admin identity", {
+      lodge_id: lodgeId,
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
 
   let supa: ReturnType<typeof createServiceClient>;
   try {
@@ -146,6 +168,52 @@ export async function POST(request: NextRequest) {
   const cancelUrl = `${siteUrl}/admin/take-payment?cancelled=${encodeURIComponent(paymentId)}`;
   const intentDescription = description || `Payment to lodge (${reference || "in-person"})`;
 
+  // If the admin has attributed this QR to a specific member we resolve them
+  // here so the downstream webhook projector can credit user_name /
+  // user_email correctly and we can auto-attach a Gift Aid declaration if
+  // one already exists for that member's email on this lodge.
+  let memberName: string | null = null;
+  let memberEmail: string | null = null;
+  let giftAidDeclarationId: string | null = null;
+  let giftAidEligible = false;
+  if (memberId) {
+    try {
+      const member = await db.getMemberById(memberId, lodgeId);
+      if (member) {
+        memberName = member.full_name ?? null;
+        memberEmail = member.email ?? null;
+        if (memberEmail) {
+          try {
+            const declaration = await db.getActiveGiftAidDeclarationByEmail(
+              lodgeId,
+              memberEmail,
+            );
+            if (declaration) {
+              giftAidDeclarationId = declaration.id;
+              giftAidEligible = true;
+            }
+          } catch (err) {
+            // Non-fatal; the treasurer can attach Gift Aid manually later.
+            console.warn(
+              "Take payment POST: gift aid declaration lookup failed",
+              {
+                lodge_id: lodgeId,
+                member_id: memberId,
+                message: err instanceof Error ? err.message : String(err),
+              },
+            );
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Take payment POST: member lookup failed", {
+        lodge_id: lodgeId,
+        member_id: memberId,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   const initialMetadata: Record<string, unknown> = {
     source: "lodgepay_take_payment",
     lodge_slug: lodgeSlug,
@@ -154,6 +222,14 @@ export async function POST(request: NextRequest) {
     category,
     reference: reference || null,
     description: intentDescription,
+    created_by_email: createdByEmail,
+    created_by_role: createdByRole,
+    created_at_iso: new Date().toISOString(),
+    member_id: memberId,
+    member_name: memberName,
+    member_email: memberEmail,
+    gift_aid_declaration_id: giftAidDeclarationId,
+    gift_aid_eligible: giftAidEligible,
   };
 
   const { error: insertError } = await supa
@@ -174,6 +250,11 @@ export async function POST(request: NextRequest) {
         lodge_slug: lodgeSlug,
         reference: reference || null,
         category,
+        member_id: memberId,
+        member_name: memberName,
+        member_email: memberEmail,
+        gift_aid_declaration_id: giftAidDeclarationId,
+        gift_aid_eligible: giftAidEligible,
       },
     });
   if (insertError) {

@@ -172,6 +172,73 @@ export function StaticMarketingSite({ initialPage }: { initialPage: MarketingSit
     };
   }, [initialPage]);
 
+  // Reflect existing admin/member session in the static nav so returning
+  // signed-in visitors aren't told to "Login" every time they hit the
+  // marketing root. The session cookies (covenant_admin_session,
+  // covenant_staff_admin_session, sb-*-auth-token) already persist for days;
+  // we just weren't surfacing it here.
+  useEffect(() => {
+    let cancelled = false;
+
+    const findLoginAnchors = () =>
+      Array.from(
+        document.querySelectorAll<HTMLAnchorElement>(
+          'a[href="/admin/login"], a[data-marketing-login]'
+        )
+      );
+
+    const applyViewer = (
+      destination: string,
+      label: string,
+      sessionKey: string
+    ) => {
+      if (cancelled) return;
+      for (const anchor of findLoginAnchors()) {
+        if (anchor.dataset.marketingLoginState === sessionKey) continue;
+        anchor.setAttribute("href", destination);
+        anchor.textContent = label;
+        anchor.dataset.marketingLogin = "true";
+        anchor.dataset.marketingLoginState = sessionKey;
+      }
+    };
+
+    async function resolve() {
+      try {
+        const [adminRes, memberRes] = await Promise.all([
+          fetch("/api/auth/session", { cache: "no-store" }).catch(() => null),
+          fetch("/api/auth/member/session", { cache: "no-store" }).catch(
+            () => null
+          ),
+        ]);
+
+        if (cancelled) return;
+
+        if (adminRes && adminRes.ok) {
+          const data = await adminRes.json().catch(() => null);
+          if (data && data.authenticated) {
+            applyViewer("/admin", "Open dashboard", "admin");
+            return;
+          }
+        }
+
+        if (memberRes && memberRes.ok) {
+          const data = await memberRes.json().catch(() => null);
+          if (data && data.user) {
+            applyViewer("/member", "Open portal", "member");
+            return;
+          }
+        }
+      } catch {
+        // Stay on the guest "Login" CTA if the auth API is unreachable.
+      }
+    }
+
+    void resolve();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div className="lodgepay-marketing-site">
       <style dangerouslySetInnerHTML={{ __html: SITE_CSS }} />

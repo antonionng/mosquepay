@@ -10,6 +10,7 @@ import { ArrowLeft, Calendar, MapPin, Clock, Users } from "lucide-react";
 import { getDefaultLodgeSlug, resolveLodgeSlug } from "@/lib/tenant";
 import { SOCIAL_SHARE_IMAGE, SITE_ORIGIN } from "@/lib/seo";
 import { lodgeScopedEventPath, lodgeScopedEventsPath } from "@/lib/public-links";
+import { isPubliclyVisible } from "@/lib/events/public-visibility";
 
 function siteUrl(): string {
   const url =
@@ -41,7 +42,7 @@ export async function generateMetadata({
   const { lodge } = await searchParams;
   const lodgeSlug = resolveLodgeSlug(lodge);
   const event = await loadEvent(slug, lodgeSlug);
-  if (!event) return { title: "Event not found" };
+  if (!event || !isPubliclyVisible(event)) return { title: "Event not found" };
   const description = (event.description ?? "").slice(0, 200) ||
     `${event.title} - ${formatDate(event.event_date)}`;
   const canonical = `${siteUrl()}/events/${slug}${
@@ -95,6 +96,7 @@ export async function EventPageContent({
 
   const event = await loadEvent(slug, lodgeSlug);
   if (!event) notFound();
+  if (!isPubliclyVisible(event)) notFound();
 
   const jsonLd = {
     "@context": "https://schema.org",

@@ -76,6 +76,7 @@ type MeetingEvent = {
   guest_ticket_price: number | null;
   guest_ticket_description: string | null;
   published: boolean;
+  feature_on_website: boolean;
 };
 
 type RsvpEntry = {

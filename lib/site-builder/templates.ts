@@ -199,6 +199,7 @@ function packFooter(
     tagline,
     badge_text: "Official lodge website",
     powered_by_text: null,
+    show_powered_by: true,
     link_groups: [
       {
         id: "explore",

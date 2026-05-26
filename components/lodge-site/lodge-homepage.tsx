@@ -13,7 +13,6 @@ import {
   MapPin,
   Phone,
   Send,
-  Shirt,
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -49,6 +48,20 @@ type LodgeData = {
   support_phone: string | null;
   primary_color: string | null;
   secondary_color: string | null;
+  meeting_schedule: string | null;
+  secretary_address: string | null;
+  loi_contact: string | null;
+  current_charity_campaign_id: string | null;
+};
+
+type PublicUpcomingEvent = {
+  id: string;
+  slug: string;
+  title: string;
+  event_date: string;
+  event_time: string | null;
+  location: string | null;
+  event_type: string;
 };
 
 type SitePayload = {
@@ -59,6 +72,7 @@ type SitePayload = {
     sections: SiteSection[];
     header_settings?: LodgeSiteHeaderSettings | null;
     footer_settings?: LodgeSiteFooterSettings | null;
+    upcoming_public_events?: PublicUpcomingEvent[] | null;
     custom_pages?: Array<{
       id: string;
       slug: string;
@@ -525,14 +539,18 @@ function HeroSection({
   section,
   lodge,
   lodgeSlug,
+  footerSettings,
 }: {
   section: SiteSection;
   lodge: LodgeData | null;
   lodgeSlug: string;
+  footerSettings: LodgeSiteFooterSettings | null;
 }) {
   const layers = heroBackgroundLayers(section);
   const primaryHex = mergeHeroPrimaryColor(section, lodge?.primary_color);
   const hasCustomBg = Boolean(layers.imageUrl);
+  const showPoweredBy = footerSettings?.show_powered_by !== false;
+  const hasCharity = Boolean(lodge?.current_charity_campaign_id);
 
   return (
     <section
@@ -605,28 +623,32 @@ function HeroSection({
                   </Link>
                 </Button>
               )}
-              <Button
-                asChild
-                size="lg"
-                variant="secondary"
-                className="rounded-xl border-white/10 bg-white/10 text-white hover:bg-white/20 hover:text-white"
-              >
-                <Link href={withQuery("/charity", lodgeSlug)}>Our Charity</Link>
-              </Button>
+              {hasCharity ? (
+                <Button
+                  asChild
+                  size="lg"
+                  variant="secondary"
+                  className="rounded-xl border-white/10 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+                >
+                  <Link href={withQuery("/charity", lodgeSlug)}>Our Charity</Link>
+                </Button>
+              ) : null}
             </div>
           </FadeIn>
           <FadeIn delay={0.5}>
             <div className="public-hero-meta mt-12 justify-center">
               {lodge?.city && <span className="public-hero-meta-chip">{lodge.city}</span>}
               <span className="public-hero-meta-chip">Established Tradition</span>
-              <Link
-                href="https://lodgepayments.co.uk"
-                target="_blank"
-                rel="noreferrer"
-                className="public-hero-meta-chip"
-              >
-                Powered by LodgePay
-              </Link>
+              {showPoweredBy ? (
+                <Link
+                  href="https://lodgepayments.co.uk"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="public-hero-meta-chip"
+                >
+                  Powered by LodgePay
+                </Link>
+              ) : null}
             </div>
           </FadeIn>
         </div>
@@ -701,11 +723,35 @@ function AboutSection({ section }: { section: SiteSection }) {
  * ──────────────────────────────────────────────────────────── */
 function MeetingDetailsSection({
   section,
+  lodge,
   lodgeSlug,
 }: {
   section: SiteSection;
+  lodge: LodgeData | null;
   lodgeSlug: string;
 }) {
+  const cards: { icon: ReactNode; label: string; value: string }[] = [];
+  if (lodge?.meeting_schedule) {
+    cards.push({
+      icon: <Calendar className="h-6 w-6" />,
+      label: "Schedule",
+      value: lodge.meeting_schedule,
+    });
+  }
+  if (lodge?.secretary_address) {
+    cards.push({
+      icon: <MapPin className="h-6 w-6" />,
+      label: "Location",
+      value: lodge.secretary_address,
+    });
+  }
+  if (lodge?.loi_contact) {
+    cards.push({
+      icon: <Clock className="h-6 w-6" />,
+      label: "Lodge of Instruction",
+      value: lodge.loi_contact,
+    });
+  }
   return (
     <section
       className={sectionShellClass(section, "relative overflow-hidden border-y border-slate-200 bg-slate-50 py-20 lg:py-28")}
@@ -723,42 +769,25 @@ function MeetingDetailsSection({
         </FadeIn>
         <InlineSectionImage section={section} className="mb-12 max-h-[28rem]" />
 
-        <StaggerChildren className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4" staggerDelay={0.08}>
-          {[
-            {
-              icon: <Calendar className="h-6 w-6" />,
-              label: "Schedule",
-              value: "Regular meetings throughout the season",
-            },
-            {
-              icon: <MapPin className="h-6 w-6" />,
-              label: "Location",
-              value: "Mark Masons' Hall, London",
-            },
-            {
-              icon: <Clock className="h-6 w-6" />,
-              label: "Timing",
-              value: "Evenings, with festive board dining after",
-            },
-            {
-              icon: <Shirt className="h-6 w-6" />,
-              label: "Dress Code",
-              value: "Dark lounge suit",
-            },
-          ].map((item) => (
-            <StaggerItem key={item.label}>
-              <div className="public-grid-card h-full">
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-950 text-white">
-                  {item.icon}
+        {cards.length > 0 ? (
+          <StaggerChildren className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3" staggerDelay={0.08}>
+            {cards.map((item) => (
+              <StaggerItem key={item.label}>
+                <div className="public-grid-card h-full">
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-950 text-white">
+                    {item.icon}
+                  </div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    {item.label}
+                  </p>
+                  <p className="mt-2 text-base font-medium text-slate-950 whitespace-pre-line">
+                    {item.value}
+                  </p>
                 </div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  {item.label}
-                </p>
-                <p className="mt-2 text-base font-medium text-slate-950">{item.value}</p>
-              </div>
-            </StaggerItem>
-          ))}
-        </StaggerChildren>
+              </StaggerItem>
+            ))}
+          </StaggerChildren>
+        ) : null}
 
         {section.cta_href && section.cta_label && (
           <FadeIn delay={0.3}>
@@ -781,6 +810,13 @@ function MeetingDetailsSection({
  *  OFFICERS: Grid of cards
  * ──────────────────────────────────────────────────────────── */
 function OfficersSection({ section }: { section: SiteSection }) {
+  // Officer names + photos are intentionally NOT rendered here. Member
+  // privacy requires explicit per-member opt-in (added in Phase 1). Until
+  // then this section renders only the user-edited heading, body and image.
+  // If a lodge has nothing to say it is hidden entirely.
+  const hasContent =
+    Boolean(section.body?.trim()) || Boolean(section.style?.image_url);
+  if (!hasContent) return null;
   return (
     <section
       className={sectionShellClass(section, "relative overflow-hidden bg-white py-20 lg:py-28")}
@@ -790,34 +826,13 @@ function OfficersSection({ section }: { section: SiteSection }) {
       <SectionBackground section={section} />
       <div className={`container-full ${sectionContentClass(section)}`} style={sectionContainerStyle(section)}>
         <FadeIn>
-          <div className="mb-14 max-w-2xl">
+          <div className="mb-10 max-w-2xl">
             <p className="section-label">Leadership</p>
             <h2 className="section-title">{section.heading}</h2>
             {section.body && <p className="section-description">{section.body}</p>}
           </div>
         </FadeIn>
-        <InlineSectionImage section={section} className="mb-12 max-h-[28rem]" />
-
-        <StaggerChildren className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3" staggerDelay={0.08}>
-          {[
-            { role: "Worshipful Master", name: "Leading the lodge" },
-            { role: "Senior Warden", name: "Assisting in governance" },
-            { role: "Junior Warden", name: "Overseeing the Festive Board" },
-            { role: "Secretary", name: "Managing administration" },
-            { role: "Treasurer", name: "Managing finances" },
-            { role: "Director of Ceremonies", name: "Directing ritual" },
-          ].map((officer) => (
-            <StaggerItem key={officer.role}>
-              <div className="public-grid-card h-full">
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-700">
-                  <Users className="h-5 w-5" />
-                </div>
-                <h3 className="text-lg font-semibold text-slate-950">{officer.role}</h3>
-                <p className="mt-1 text-sm text-slate-500">{officer.name}</p>
-              </div>
-            </StaggerItem>
-          ))}
-        </StaggerChildren>
+        <InlineSectionImage section={section} className="max-h-[28rem]" />
       </div>
     </section>
   );
@@ -904,58 +919,70 @@ function CharitySection({
 function EventsSection({
   section,
   lodgeSlug,
+  events,
 }: {
   section: SiteSection;
   lodgeSlug: string;
+  events: PublicUpcomingEvent[];
 }) {
+  // Regular lodge meetings are private. This grid is populated only with
+  // events that pass `isPubliclyVisible` (socials, charity, and admin-
+  // featured public meetings). When the list is empty we still render the
+  // user-editable heading/body/image, but the grid and CTA collapse so the
+  // lodge never advertises a fake calendar.
+  const hasEvents = events.length > 0;
   return (
     <section
       className={sectionShellClass(section, "relative overflow-hidden bg-white py-20 lg:py-28")}
       style={sectionShellStyle(section)}
-      aria-label="Events"
+      aria-label="Public events"
     >
       <SectionBackground section={section} />
       <div className={`container-full ${sectionContentClass(section)}`} style={sectionContainerStyle(section)}>
         <FadeIn>
-          <div className="mb-14 max-w-2xl">
-            <p className="section-label">Events</p>
+          <div className="mb-10 max-w-2xl">
+            <p className="section-label">Open events and socials</p>
             <h2 className="section-title">{section.heading}</h2>
             {section.body && <p className="section-description">{section.body}</p>}
           </div>
         </FadeIn>
         <InlineSectionImage section={section} className="mb-12 max-h-[28rem]" />
 
-        <StaggerChildren className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3" staggerDelay={0.08}>
-          {[
-            {
-              title: "Regular Meeting",
-              date: "Monthly",
-              desc: "Ceremony, lodge business, and Festive Board",
-            },
-            {
-              title: "Installation Meeting",
-              date: "Annual",
-              desc: "Installation of the new Worshipful Master",
-            },
-            {
-              title: "Ladies' Festival",
-              date: "Annual",
-              desc: "A social celebration with partners and guests",
-            },
-          ].map((event) => (
-            <StaggerItem key={event.title}>
-              <div className="public-grid-card h-full">
-                <div className="mb-3 inline-flex rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
-                  {event.date}
-                </div>
-                <h3 className="text-xl font-semibold text-slate-950">{event.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600">{event.desc}</p>
-              </div>
-            </StaggerItem>
-          ))}
-        </StaggerChildren>
+        {hasEvents ? (
+          <StaggerChildren className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3" staggerDelay={0.08}>
+            {events.map((event) => (
+              <StaggerItem key={event.id}>
+                <Link
+                  href={withQuery(`/events/${event.slug}`, lodgeSlug)}
+                  className="group public-grid-card block h-full"
+                >
+                  <div className="mb-3 inline-flex rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold capitalize text-blue-700">
+                    {event.event_type.replace(/_/g, " ")}
+                  </div>
+                  <div className="mb-3 flex items-center gap-2 text-sm font-medium text-blue-600">
+                    <Calendar className="h-4 w-4" />
+                    {formatEventDateLine(event.event_date, event.event_time)}
+                  </div>
+                  <h3 className="text-xl font-semibold text-slate-950 transition-colors group-hover:text-blue-700">
+                    {event.title}
+                  </h3>
+                  {event.location ? (
+                    <p className="mt-2 inline-flex items-center gap-2 text-sm text-slate-500">
+                      <MapPin className="h-4 w-4" />
+                      {event.location}
+                    </p>
+                  ) : null}
+                  <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-blue-600">
+                    View details
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </span>
+                </Link>
+              </StaggerItem>
+            ))}
+          </StaggerChildren>
+        ) : null}
 
-        {section.cta_href && section.cta_label && (
+        {hasEvents && section.cta_href && section.cta_label && (
           <FadeIn delay={0.3}>
             <div className="mt-10 text-center">
               <Button asChild {...ctaButtonProps(section)}>
@@ -972,33 +999,36 @@ function EventsSection({
   );
 }
 
+function formatEventDateLine(dateIso: string, timeIso: string | null) {
+  const datePart = formatPublicDate(dateIso);
+  if (!timeIso) return datePart;
+  return `${datePart} · ${timeIso.slice(0, 5)}`;
+}
+
+function formatPublicDate(value: string) {
+  try {
+    return new Date(value).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  } catch {
+    return value;
+  }
+}
+
 /* ────────────────────────────────────────────────────────────
  *  FAQ: Radix Accordion
  * ──────────────────────────────────────────────────────────── */
 function FaqSection({ section }: { section: SiteSection }) {
-  const defaultFaqs = [
-    {
-      q: "What is Freemasonry?",
-      a: "Freemasonry is one of the world's oldest social and charitable organisations. It is based on the principles of integrity, kindness, honesty, and fairness.",
-    },
-    {
-      q: "How do I join?",
-      a: "You need to be over 21, believe in a Supreme Being, and be of good character. Contact us to begin a conversation about membership.",
-    },
-    {
-      q: "What happens at meetings?",
-      a: "Meetings include ceremonial work, lodge business, and a Festive Board (formal dinner) afterwards. Dress code is dark lounge suit.",
-    },
-    {
-      q: "Is Freemasonry a religion?",
-      a: "No. Freemasonry is not a religion, nor a substitute for religion. Members are encouraged to continue practising their own faith.",
-    },
-    {
-      q: "What does it cost?",
-      a: "Annual dues vary by lodge. There is an initiation fee and yearly subscription, plus dining costs for events attended.",
-    },
-  ];
-
+  // FAQ entries are configured per-lodge (Phase 1 adds the admin editor).
+  // When no entries exist we keep the heading/body/image but drop the
+  // accordion so we never invent answers on behalf of the lodge.
+  const entries = section.style?.faq_entries ?? [];
+  const hasEntries = entries.length > 0;
+  const hasIntro =
+    Boolean(section.body?.trim()) || Boolean(section.style?.image_url);
+  if (!hasEntries && !hasIntro) return null;
   return (
     <section
       className={sectionShellClass(section, "relative overflow-hidden bg-white py-20 lg:py-28")}
@@ -1017,20 +1047,22 @@ function FaqSection({ section }: { section: SiteSection }) {
             </div>
           </FadeIn>
 
-          <FadeIn delay={0.15}>
-            <Accordion type="single" collapsible className="w-full">
-              {defaultFaqs.map((faq, i) => (
-                <AccordionItem key={i} value={`faq-${i}`}>
-                  <AccordionTrigger className="text-left font-semibold text-slate-950">
-                    {faq.q}
-                  </AccordionTrigger>
-                  <AccordionContent className="text-slate-600 leading-relaxed">
-                    {faq.a}
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          </FadeIn>
+          {hasEntries ? (
+            <FadeIn delay={0.15}>
+              <Accordion type="single" collapsible className="w-full">
+                {entries.map((faq, i) => (
+                  <AccordionItem key={`${faq.question}-${i}`} value={`faq-${i}`}>
+                    <AccordionTrigger className="text-left font-semibold text-slate-950">
+                      {faq.question}
+                    </AccordionTrigger>
+                    <AccordionContent className="text-slate-600 leading-relaxed whitespace-pre-line">
+                      {faq.answer}
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </FadeIn>
+          ) : null}
         </div>
       </div>
     </section>
@@ -1141,50 +1173,60 @@ function ContactSection({
             </div>
           </FadeIn>
 
-          <FadeIn delay={0.15}>
-            <div className="public-grid-card-muted h-fit lg:mt-20">
-              <h3 className="text-lg font-semibold text-slate-950">Lodge Details</h3>
-              <div className="mt-6 space-y-5">
-                <div className="flex items-start gap-3">
-                  <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-slate-400" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-950">Meeting Location</p>
-                    <p className="text-sm text-slate-600">
-                      Mark Masons&apos; Hall, 86 St James&apos;s Street, London SW1A 1PL
-                    </p>
+          {(() => {
+            const hasAddress = Boolean(lodge?.secretary_address);
+            const hasEmail = Boolean(lodge?.support_email);
+            const hasPhone = Boolean(lodge?.support_phone);
+            if (!hasAddress && !hasEmail && !hasPhone) return null;
+            return (
+              <FadeIn delay={0.15}>
+                <div className="public-grid-card-muted h-fit lg:mt-20">
+                  <h3 className="text-lg font-semibold text-slate-950">Lodge details</h3>
+                  <div className="mt-6 space-y-5">
+                    {hasAddress && lodge?.secretary_address ? (
+                      <div className="flex items-start gap-3">
+                        <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-slate-400" />
+                        <div>
+                          <p className="text-sm font-medium text-slate-950">Meeting location</p>
+                          <p className="text-sm text-slate-600 whitespace-pre-line">
+                            {lodge.secretary_address}
+                          </p>
+                        </div>
+                      </div>
+                    ) : null}
+                    {hasEmail && lodge?.support_email ? (
+                      <div className="flex items-start gap-3">
+                        <Mail className="mt-0.5 h-5 w-5 shrink-0 text-slate-400" />
+                        <div>
+                          <p className="text-sm font-medium text-slate-950">Email</p>
+                          <a
+                            href={`mailto:${lodge.support_email}`}
+                            className="text-sm text-blue-600 hover:text-blue-700"
+                          >
+                            {lodge.support_email}
+                          </a>
+                        </div>
+                      </div>
+                    ) : null}
+                    {hasPhone && lodge?.support_phone ? (
+                      <div className="flex items-start gap-3">
+                        <Phone className="mt-0.5 h-5 w-5 shrink-0 text-slate-400" />
+                        <div>
+                          <p className="text-sm font-medium text-slate-950">Phone</p>
+                          <a
+                            href={`tel:${lodge.support_phone}`}
+                            className="text-sm text-blue-600 hover:text-blue-700"
+                          >
+                            {lodge.support_phone}
+                          </a>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
-                {lodge?.support_email && (
-                  <div className="flex items-start gap-3">
-                    <Mail className="mt-0.5 h-5 w-5 shrink-0 text-slate-400" />
-                    <div>
-                      <p className="text-sm font-medium text-slate-950">Email</p>
-                      <a
-                        href={`mailto:${lodge.support_email}`}
-                        className="text-sm text-blue-600 hover:text-blue-700"
-                      >
-                        {lodge.support_email}
-                      </a>
-                    </div>
-                  </div>
-                )}
-                {lodge?.support_phone && (
-                  <div className="flex items-start gap-3">
-                    <Phone className="mt-0.5 h-5 w-5 shrink-0 text-slate-400" />
-                    <div>
-                      <p className="text-sm font-medium text-slate-950">Phone</p>
-                      <a
-                        href={`tel:${lodge.support_phone}`}
-                        className="text-sm text-blue-600 hover:text-blue-700"
-                      >
-                        {lodge.support_phone}
-                      </a>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </FadeIn>
+              </FadeIn>
+            );
+          })()}
         </div>
       </div>
     </section>
@@ -1227,21 +1269,38 @@ function SectionRenderer({
   section,
   lodge,
   lodgeSlug,
+  upcomingPublicEvents,
+  footerSettings,
 }: {
   section: SiteSection;
   lodge: LodgeData | null;
   lodgeSlug: string;
+  upcomingPublicEvents: PublicUpcomingEvent[];
+  footerSettings: LodgeSiteFooterSettings | null;
 }) {
   let rendered: ReactNode;
   switch (section.type) {
     case "hero":
-      rendered = <HeroSection section={section} lodge={lodge} lodgeSlug={lodgeSlug} />;
+      rendered = (
+        <HeroSection
+          section={section}
+          lodge={lodge}
+          lodgeSlug={lodgeSlug}
+          footerSettings={footerSettings}
+        />
+      );
       break;
     case "about":
       rendered = <AboutSection section={section} />;
       break;
     case "meeting_details":
-      rendered = <MeetingDetailsSection section={section} lodgeSlug={lodgeSlug} />;
+      rendered = (
+        <MeetingDetailsSection
+          section={section}
+          lodge={lodge}
+          lodgeSlug={lodgeSlug}
+        />
+      );
       break;
     case "officers":
       rendered = <OfficersSection section={section} />;
@@ -1250,7 +1309,13 @@ function SectionRenderer({
       rendered = <CharitySection section={section} lodgeSlug={lodgeSlug} />;
       break;
     case "events":
-      rendered = <EventsSection section={section} lodgeSlug={lodgeSlug} />;
+      rendered = (
+        <EventsSection
+          section={section}
+          lodgeSlug={lodgeSlug}
+          events={upcomingPublicEvents}
+        />
+      );
       break;
     case "faq":
       rendered = <FaqSection section={section} />;
@@ -1373,6 +1438,8 @@ export function LodgeHomepage({
   const otherSections = sections.filter((s) => s.type !== "hero");
 
   const hasJoinSection = sections.some((s) => s.type === "join");
+  const upcomingPublicEvents = payload.site.upcoming_public_events ?? [];
+  const footerSettings = payload.site.footer_settings ?? null;
 
   return (
     <div className="bg-white text-slate-950">
@@ -1381,6 +1448,8 @@ export function LodgeHomepage({
           section={heroSection}
           lodge={payload.lodge}
           lodgeSlug={lodgeSlug}
+          upcomingPublicEvents={upcomingPublicEvents}
+          footerSettings={footerSettings}
         />
       )}
 
@@ -1390,6 +1459,8 @@ export function LodgeHomepage({
           section={section}
           lodge={payload.lodge}
           lodgeSlug={lodgeSlug}
+          upcomingPublicEvents={upcomingPublicEvents}
+          footerSettings={footerSettings}
         />
       ))}
 

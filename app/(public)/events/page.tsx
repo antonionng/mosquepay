@@ -7,6 +7,7 @@ import { Calendar, MapPin, ArrowRight } from "lucide-react";
 import { getDefaultLodgeSlug, resolveLodgeSlug } from "@/lib/tenant";
 import { marketingMetadata } from "@/lib/seo";
 import { lodgeScopedEventPath } from "@/lib/public-links";
+import { filterPubliclyVisible } from "@/lib/events/public-visibility";
 import { formatDate } from "@/lib/utils";
 
 export const metadata = marketingMetadata({
@@ -60,7 +61,7 @@ export async function EventsPageContent({
     const raw = lodgeId
       ? await db.getEvents(lodgeId, { published: true, upcoming: true })
       : [];
-    events = raw.map((e) => ({
+    events = filterPubliclyVisible(raw).map((e) => ({
       id: e.id,
       title: e.title,
       slug: e.slug,
@@ -69,7 +70,12 @@ export async function EventsPageContent({
       location: e.location ?? "",
     }));
   } else if (shouldUseInMemoryMock()) {
-    events = mockDb.getEvents({ published: true, upcoming: true, lodge_slug: lodgeSlug }).map((e) => ({
+    const raw = mockDb.getEvents({
+      published: true,
+      upcoming: true,
+      lodge_slug: lodgeSlug,
+    });
+    events = filterPubliclyVisible(raw).map((e) => ({
       id: e.id,
       title: e.title,
       slug: e.slug,

@@ -10,6 +10,7 @@ import {
   hashVisitorToken,
 } from "@/lib/guest-tokens";
 import { sendGuestSelfRegisterEmail } from "@/lib/email/guest";
+import { filterPubliclyVisible } from "@/lib/events/public-visibility";
 import {
   rejectHoneypot,
   rejectRateLimited,
@@ -112,9 +113,7 @@ export async function POST(
       published: true,
       upcoming: true,
     });
-    const openCount = upcoming.filter(
-      (e) => e.guest_policy !== "closed"
-    ).length;
+    const openCount = filterPubliclyVisible(upcoming).length;
 
     sendGuestSelfRegisterEmail({
       toEmail: email,

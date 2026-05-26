@@ -9,6 +9,7 @@ import {
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { formatDate } from "@/lib/utils";
+import { filterPubliclyVisible } from "@/lib/events/public-visibility";
 import { VisitorRegisterForm } from "./register-form";
 
 export const dynamic = "force-dynamic";
@@ -62,18 +63,16 @@ export default async function PublicVisitPage({
           published: true,
           upcoming: true,
         });
-        upcomingEvents = events
-          .filter((e) => e.guest_policy !== "closed")
-          .map((e) => ({
-            id: e.id,
-            title: e.title,
-            event_date: e.event_date,
-            event_time: e.event_time,
-            location: e.location,
-            dress_code: e.dress_code,
-            description: e.description,
-            guest_policy: e.guest_policy,
-          }));
+        upcomingEvents = filterPubliclyVisible(events).map((e) => ({
+          id: e.id,
+          title: e.title,
+          event_date: e.event_date,
+          event_time: e.event_time,
+          location: e.location,
+          dress_code: e.dress_code,
+          description: e.description,
+          guest_policy: e.guest_policy,
+        }));
       }
     }
   } else if (shouldUseInMemoryMock()) {
@@ -92,18 +91,16 @@ export default async function PublicVisitPage({
           published: true,
           upcoming: true,
         });
-        upcomingEvents = events
-          .filter((e) => e.guest_policy !== "closed")
-          .map((e) => ({
-            id: e.id,
-            title: e.title,
-            event_date: e.event_date,
-            event_time: e.event_time,
-            location: e.location,
-            dress_code: e.dress_code,
-            description: e.description,
-            guest_policy: e.guest_policy,
-          }));
+        upcomingEvents = filterPubliclyVisible(events).map((e) => ({
+          id: e.id,
+          title: e.title,
+          event_date: e.event_date,
+          event_time: e.event_time,
+          location: e.location,
+          dress_code: e.dress_code,
+          description: e.description,
+          guest_policy: e.guest_policy,
+        }));
       }
     }
   }

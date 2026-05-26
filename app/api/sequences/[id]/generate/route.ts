@@ -161,6 +161,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         featured_image_url: null,
         created_by: null,
         published: false,
+        feature_on_website: false,
         sequence_id: sequence.id,
         sequence_position: candidate.position,
         summons_status: "none",
