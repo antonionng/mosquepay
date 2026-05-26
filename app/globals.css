@@ -109,17 +109,30 @@
   /* Kiosk-style routes (e.g. /admin/take-payment on a phone at a meeting)
      suppress the admin sidebar header so every pixel of the viewport is
      dedicated to the QR / keypad. The wrapper toggles data-route="kiosk"
-     so this scope is page-specific, not global. */
+     so this scope is page-specific, not global.
+
+     We add the iOS safe-area-top inset to the top padding so the page
+     title and tab bar never sit under the system status bar (the cause of
+     the "09:01" overlap on the first iteration). Bottom + horizontal
+     insets keep the page off the home-indicator + curved edges. */
   [data-admin-route="kiosk"] header[data-admin-chrome="true"] {
     display: none;
   }
   [data-admin-route="kiosk"] main[data-admin-main="true"] {
-    padding: 0.75rem env(safe-area-inset-right) env(safe-area-inset-bottom)
-      env(safe-area-inset-left);
+    /* Phone kiosk uses tighter side padding so the keypad cards stretch
+       edge-to-edge for that "native app" feel. The horizontal env() insets
+       are kept so notched phones (notch on the right in landscape) don't
+       clip content. */
+    padding: calc(0.5rem + env(safe-area-inset-top))
+      max(env(safe-area-inset-right), 0.5rem)
+      env(safe-area-inset-bottom)
+      max(env(safe-area-inset-left), 0.5rem);
   }
   @media (min-width: 640px) {
     [data-admin-route="kiosk"] main[data-admin-main="true"] {
-      padding: 1rem;
+      padding: calc(1rem + env(safe-area-inset-top))
+        env(safe-area-inset-right) env(safe-area-inset-bottom)
+        env(safe-area-inset-left);
     }
   }
   @media (min-width: 1024px) {

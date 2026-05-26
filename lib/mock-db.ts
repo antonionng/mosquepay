@@ -1269,7 +1269,6 @@ export type MockMember = LodgeScoped & {
   stripe_customer_id: string | null;
   show_on_website?: boolean;
   public_bio?: string | null;
-  public_photo_url?: string | null;
   created_at: string;
   updated_at: string;
 };

@@ -1793,7 +1793,6 @@ export async function createMember(
     | "annual_dues_waiver_reason"
     | "show_on_website"
     | "public_bio"
-    | "public_photo_url"
   > &
     Partial<
       Pick<
@@ -1816,7 +1815,6 @@ export async function createMember(
         | "annual_dues_waiver_reason"
         | "show_on_website"
         | "public_bio"
-        | "public_photo_url"
       >
     >
 ): Promise<Member> {
@@ -2968,7 +2966,6 @@ export type PublicOfficer = {
   full_name: string;
   rank: string | null;
   public_bio: string | null;
-  public_photo_url: string | null;
 };
 
 export async function listPublicOfficers(
@@ -2978,7 +2975,7 @@ export async function listPublicOfficers(
     .from("officer_ladder")
     .select(
       `id, rung_label, sort_order, current_member_id,
-       members:current_member_id(id, full_name, rank, public_bio, public_photo_url, show_on_website, membership_status)`
+       members:current_member_id(id, full_name, rank, public_bio, show_on_website, membership_status)`
     )
     .eq("lodge_id", lodgeId)
     .not("current_member_id", "is", null)
@@ -2989,7 +2986,6 @@ export async function listPublicOfficers(
     full_name: string;
     rank: string | null;
     public_bio: string | null;
-    public_photo_url: string | null;
     show_on_website: boolean;
     membership_status: string;
   };
@@ -3023,7 +3019,6 @@ export async function listPublicOfficers(
         full_name: member.full_name,
         rank: member.rank,
         public_bio: member.public_bio,
-        public_photo_url: member.public_photo_url,
       } satisfies PublicOfficer;
     })
     .filter((entry): entry is PublicOfficer => entry != null);

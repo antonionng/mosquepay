@@ -47,7 +47,14 @@ export function proxy(request: NextRequest) {
     const staffOk = !!verifyStaffAdminCookie(staffToken);
     if (!dummyOk && !staffOk) {
       const login = new URL("/admin/login", request.url);
-      login.searchParams.set("from", path);
+      // Preserve safe query params on the return path so a bookmarked deep
+      // link like /admin/take-payment?tab=cash actually lands back on the
+      // Cash tab after login, not on the default Charge tab. We pass the
+      // original search string through verbatim — `from` is consumed by
+      // the admin login redirect logic so a malicious value can only land
+      // the user on another admin route they could already navigate to.
+      const search = request.nextUrl.search;
+      login.searchParams.set("from", search ? `${path}${search}` : path);
       return NextResponse.redirect(login);
     }
   }
@@ -56,7 +63,8 @@ export function proxy(request: NextRequest) {
     const token = request.cookies.get(SESSION_COOKIE)?.value;
     if (!token || !verifyDummyCookie(token)) {
       const login = new URL("/operator/login", request.url);
-      login.searchParams.set("from", path);
+      const search = request.nextUrl.search;
+      login.searchParams.set("from", search ? `${path}${search}` : path);
       return NextResponse.redirect(login);
     }
   }

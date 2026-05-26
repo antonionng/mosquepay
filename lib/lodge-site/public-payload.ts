@@ -38,7 +38,6 @@ export type PublicOfficerSummary = {
   full_name: string;
   rank: string | null;
   public_bio: string | null;
-  public_photo_url: string | null;
 };
 
 export type PublicCharityCampaign = {

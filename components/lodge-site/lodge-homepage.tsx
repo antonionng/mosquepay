@@ -76,7 +76,6 @@ type PublicOfficerSummary = {
   full_name: string;
   rank: string | null;
   public_bio: string | null;
-  public_photo_url: string | null;
 };
 
 type PublicCharityCampaign = {
@@ -867,16 +866,8 @@ function MeetingDetailsSection({
 }
 
 /* ────────────────────────────────────────────────────────────
- *  OFFICERS: Grid of cards
+ *  OFFICERS: Grid of text-only cards (no headshots by design)
  * ──────────────────────────────────────────────────────────── */
-function memberInitials(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/);
-  if (parts.length === 0) return "?";
-  const first = parts[0]?.[0] ?? "";
-  const last = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? "" : "";
-  return `${first}${last}`.toUpperCase() || "?";
-}
-
 function OfficersSection({
   section,
   officers,
@@ -884,11 +875,12 @@ function OfficersSection({
   section: SiteSection;
   officers: PublicOfficerSummary[];
 }) {
-  // Officer names, photos, and bios are rendered only when each member
+  // Officer names and optional bios are rendered only when each member
   // has explicitly opted in via `members.show_on_website` and is still
-  // an active member. When no member has opted in we keep the heading /
-  // body / image so the lodge can still describe its officers in their
-  // own words, but the grid collapses so we never invent a roster.
+  // an active member. Cards are text-only by design: no headshots, no
+  // avatars. When no member has opted in we keep the heading / body /
+  // image above so the lodge can still describe its officers in their
+  // own words, and the grid collapses.
   const hasOfficers = officers.length > 0;
   const hasIntro =
     Boolean(section.body?.trim()) || Boolean(section.style?.image_url);
@@ -918,39 +910,19 @@ function OfficersSection({
             {officers.map((officer) => (
               <StaggerItem key={officer.rung_id}>
                 <article className="public-grid-card flex h-full flex-col">
-                  <div className="flex items-center gap-4">
-                    {officer.public_photo_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={officer.public_photo_url}
-                        alt={`Headshot of ${officer.full_name}`}
-                        className="h-16 w-16 shrink-0 rounded-full object-cover ring-2 ring-slate-100"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div
-                        className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-slate-950 text-base font-semibold text-white"
-                        aria-hidden
-                      >
-                        {memberInitials(officer.full_name)}
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                        {officer.rung_label}
-                      </p>
-                      <p className="mt-1 text-lg font-semibold text-slate-950">
-                        {officer.full_name}
-                      </p>
-                      {officer.rank ? (
-                        <p className="mt-0.5 text-sm text-slate-500">
-                          {officer.rank}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    {officer.rung_label}
+                  </p>
+                  <p className="mt-2 text-lg font-semibold text-slate-950">
+                    {officer.full_name}
+                  </p>
+                  {officer.rank ? (
+                    <p className="mt-1 text-sm text-slate-500">
+                      {officer.rank}
+                    </p>
+                  ) : null}
                   {officer.public_bio ? (
-                    <p className="mt-5 text-sm leading-relaxed text-slate-600 whitespace-pre-line">
+                    <p className="mt-4 text-sm leading-relaxed text-slate-600 whitespace-pre-line">
                       {officer.public_bio}
                     </p>
                   ) : null}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
@@ -88,12 +89,6 @@ export function AdminLayoutWrapper({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const isAuthPage = pathname === "/admin/login" || pathname === "/admin/accept-invite";
 
-  if (isAuthPage) {
-    return <>{children}</>;
-  }
-
-  const { title, parent } = adminHeaderMeta(pathname);
-
   // Routes that should run as a kiosk on phones: full-bleed, no admin
   // header/breadcrumb chrome eating vertical space. We keep the sidebar
   // hamburger reachable so the user can still navigate, but on a phone
@@ -101,9 +96,42 @@ export function AdminLayoutWrapper({ children }: { children: React.ReactNode }) 
   // viewport. Desktop view is unaffected (CSS re-shows the header at lg).
   const isKioskRoute = pathname === "/admin/take-payment";
 
+  // Lock <html>/<body> scroll on kiosk routes so the page feels like a
+  // native app: only the inner <main> scrolls, no rubber-band bounce on
+  // iOS, no accidental zoom-and-pan. Desktop is unaffected because the
+  // tablet/laptop kiosk view doesn't need it.
+  //
+  // NB: the effect must live ABOVE the auth-page early return so the hook
+  // order stays stable across all paths (React's rules-of-hooks).
+  useEffect(() => {
+    if (!isKioskRoute) return;
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtml = html.style.overflow;
+    const prevBody = body.style.overflow;
+    const prevTouch = (body.style as CSSStyleDeclaration).overscrollBehavior;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    body.style.overscrollBehavior = "none";
+    return () => {
+      html.style.overflow = prevHtml;
+      body.style.overflow = prevBody;
+      body.style.overscrollBehavior = prevTouch;
+    };
+  }, [isKioskRoute]);
+
+  if (isAuthPage) {
+    return <>{children}</>;
+  }
+
+  const { title, parent } = adminHeaderMeta(pathname);
+
   return (
     <div
-      className="admin-dashboard-light flex min-h-screen bg-dash-surface text-dash-text"
+      className={cn(
+        "admin-dashboard-light flex bg-dash-surface text-dash-text",
+        isKioskRoute ? "h-dvh min-h-0 overflow-hidden" : "min-h-screen",
+      )}
       data-admin-route={isKioskRoute ? "kiosk" : "default"}
     >
       <a
@@ -113,7 +141,12 @@ export function AdminLayoutWrapper({ children }: { children: React.ReactNode }) 
         Skip to main content
       </a>
       <AdminSidebar />
-      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+      <div
+        className={cn(
+          "flex min-w-0 flex-1 flex-col",
+          isKioskRoute ? "h-dvh min-h-0" : "min-h-screen",
+        )}
+      >
         <ImpersonationBanner />
         <header
           data-admin-chrome="true"
@@ -164,7 +197,13 @@ export function AdminLayoutWrapper({ children }: { children: React.ReactNode }) 
           id="admin-main"
           data-admin-main="true"
           tabIndex={-1}
-          className="flex-1 overflow-auto bg-dash-surface p-4 outline-none sm:p-6 lg:p-8"
+          className={cn(
+            "flex-1 overflow-auto bg-dash-surface p-4 outline-none sm:p-6 lg:p-8",
+            // On kiosk routes the inner main is the only scrollable region.
+            // overscroll-behavior:contain stops iOS rubber-banding past the
+            // edges from dragging the lodge header chrome on or off-screen.
+            isKioskRoute && "overscroll-contain",
+          )}
         >
           {children}
         </main>

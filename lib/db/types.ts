@@ -439,6 +439,18 @@ export type Payment = {
   status: string;
   refund_amount: number;
   refund_reason: string | null;
+  // How the money arrived. card_qr is the default for online/QR rows; cash,
+  // cheque, bacs are treasurer-recorded manual entries (see migration 054).
+  payment_method?:
+    | "card_qr"
+    | "card_online"
+    | "cash"
+    | "cheque"
+    | "bacs"
+    | "other"
+    | null;
+  payment_method_note?: string | null;
+  recorded_by_email?: string | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
@@ -1211,11 +1223,6 @@ export type Member = {
    * `show_on_website` is true.
    */
   public_bio: string | null;
-  /**
-   * Optional headshot URL shown alongside the member on the public
-   * Officers section. Falls back to initials when null.
-   */
-  public_photo_url: string | null;
   archived_at: string | null;
   archived_reason: string | null;
   created_at: string;

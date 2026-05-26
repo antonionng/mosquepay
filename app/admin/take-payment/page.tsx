@@ -11,6 +11,28 @@ export const dynamic = "force-dynamic";
 
 const RETURN_PATH = "/admin/take-payment";
 
+type SearchParams = Record<string, string | string[] | undefined>;
+
+function buildReturnPath(params: SearchParams): string {
+  // Preserve the tab + focus query string through the login redirect so
+  // a bookmarked link like /admin/take-payment?tab=cash actually lands
+  // on the Cash tab post-login, not on the default Charge tab.
+  const pick = (key: string) => {
+    const value = params[key];
+    if (typeof value === "string" && value) return value;
+    if (Array.isArray(value) && value[0]) return value[0];
+    return null;
+  };
+  const allowed: Array<[string, string]> = [];
+  const tab = pick("tab");
+  if (tab) allowed.push(["tab", tab]);
+  const focus = pick("focus");
+  if (focus) allowed.push(["focus", focus]);
+  if (allowed.length === 0) return RETURN_PATH;
+  const search = new URLSearchParams(allowed).toString();
+  return `${RETURN_PATH}?${search}`;
+}
+
 async function getMooovConnection(lodgeId: string) {
   try {
     const { data } = await createServiceClient()
@@ -42,15 +64,21 @@ async function getLodgeMembers(lodgeId: string) {
   }
 }
 
-export default async function TakePaymentPage() {
+export default async function TakePaymentPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
   // Custom auth gate so an unauthenticated visitor lands BACK here after
   // logging in. The shared getAdminReadContext redirects to /admin/login
   // without a return URL, which is fine for nav-tab landings but defeats
   // the "bookmark this page on your phone home screen" use case the take-
   // payment route is built around.
+  const params = await searchParams;
   const scope = await getCurrentAdminScope();
   if (scope.kind === "none") {
-    redirect(`/admin/login?from=${encodeURIComponent(RETURN_PATH)}`);
+    const returnTo = buildReturnPath(params);
+    redirect(`/admin/login?from=${encodeURIComponent(returnTo)}`);
   }
 
   const ctx = await getAdminReadContext();
@@ -83,7 +111,6 @@ export default async function TakePaymentPage() {
 
   return (
     <TakePaymentClient
-      lodgeSlug={ctx.lodgeSlug}
       connected={connected}
       mooovStatus={connection?.status ?? null}
       members={members}

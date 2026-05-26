@@ -17,9 +17,33 @@ import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { getCurrentAdminContextAny } from "@/lib/auth/permissions";
 import { createServiceClient } from "@/lib/supabase/server";
 import { callMooovConnect, MooovApiError } from "@/lib/mooov";
+import {
+  resolveTakePaymentAttribution,
+  type GuestInlineInput,
+} from "@/lib/take-payment/resolve-attribution";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+function trimOrNull(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function parseGuestInline(value: unknown): GuestInlineInput | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  const full_name = trimOrNull(v.full_name);
+  if (!full_name) return null;
+  return {
+    full_name,
+    email: trimOrNull(v.email),
+    phone: trimOrNull(v.phone),
+    mother_lodge_name: trimOrNull(v.mother_lodge_name),
+    mother_lodge_number: trimOrNull(v.mother_lodge_number),
+  };
+}
 
 interface PaymentIntentResponse {
   payment_id: string;
@@ -77,6 +101,11 @@ export async function POST(request: NextRequest) {
     typeof body.member_id === "string" && body.member_id.trim()
       ? body.member_id.trim()
       : null;
+  const guestId =
+    typeof body.guest_id === "string" && body.guest_id.trim()
+      ? body.guest_id.trim()
+      : null;
+  const guestInline = parseGuestInline(body.guest_inline);
 
   if (!Number.isFinite(amount) || amount <= 0) {
     return NextResponse.json(
@@ -168,51 +197,24 @@ export async function POST(request: NextRequest) {
   const cancelUrl = `${siteUrl}/admin/take-payment?cancelled=${encodeURIComponent(paymentId)}`;
   const intentDescription = description || `Payment to lodge (${reference || "in-person"})`;
 
-  // If the admin has attributed this QR to a specific member we resolve them
-  // here so the downstream webhook projector can credit user_name /
-  // user_email correctly and we can auto-attach a Gift Aid declaration if
-  // one already exists for that member's email on this lodge.
-  let memberName: string | null = null;
-  let memberEmail: string | null = null;
-  let giftAidDeclarationId: string | null = null;
-  let giftAidEligible = false;
-  if (memberId) {
-    try {
-      const member = await db.getMemberById(memberId, lodgeId);
-      if (member) {
-        memberName = member.full_name ?? null;
-        memberEmail = member.email ?? null;
-        if (memberEmail) {
-          try {
-            const declaration = await db.getActiveGiftAidDeclarationByEmail(
-              lodgeId,
-              memberEmail,
-            );
-            if (declaration) {
-              giftAidDeclarationId = declaration.id;
-              giftAidEligible = true;
-            }
-          } catch (err) {
-            // Non-fatal; the treasurer can attach Gift Aid manually later.
-            console.warn(
-              "Take payment POST: gift aid declaration lookup failed",
-              {
-                lodge_id: lodgeId,
-                member_id: memberId,
-                message: err instanceof Error ? err.message : String(err),
-              },
-            );
-          }
-        }
-      }
-    } catch (err) {
-      console.warn("Take payment POST: member lookup failed", {
-        lodge_id: lodgeId,
-        member_id: memberId,
-        message: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }
+  // Payer attribution. Resolved up front so the downstream webhook projector
+  // credits user_name / user_email correctly and we can auto-attach a Gift
+  // Aid declaration when the payer has an active one on this lodge. Shared
+  // with the cash endpoint; supports member, existing guest, and inline-new
+  // guest (created via find-or-create on the guests directory).
+  const attribution = await resolveTakePaymentAttribution(lodgeId, {
+    memberId,
+    guestId,
+    guestInline,
+  });
+  const {
+    memberId: resolvedMemberId,
+    guestId: resolvedGuestId,
+    payerName,
+    payerEmail,
+    giftAidDeclarationId,
+    giftAidEligible,
+  } = attribution;
 
   const initialMetadata: Record<string, unknown> = {
     source: "lodgepay_take_payment",
@@ -225,9 +227,14 @@ export async function POST(request: NextRequest) {
     created_by_email: createdByEmail,
     created_by_role: createdByRole,
     created_at_iso: new Date().toISOString(),
-    member_id: memberId,
-    member_name: memberName,
-    member_email: memberEmail,
+    member_id: resolvedMemberId,
+    guest_id: resolvedGuestId,
+    payer_name: payerName,
+    payer_email: payerEmail,
+    // Legacy aliases retained so the webhook projector + history endpoint
+    // keep working unchanged for in-flight QR codes minted on the old shape.
+    member_name: payerName,
+    member_email: payerEmail,
     gift_aid_declaration_id: giftAidDeclarationId,
     gift_aid_eligible: giftAidEligible,
   };
@@ -250,9 +257,10 @@ export async function POST(request: NextRequest) {
         lodge_slug: lodgeSlug,
         reference: reference || null,
         category,
-        member_id: memberId,
-        member_name: memberName,
-        member_email: memberEmail,
+        member_id: resolvedMemberId,
+        guest_id: resolvedGuestId,
+        payer_name: payerName,
+        payer_email: payerEmail,
         gift_aid_declaration_id: giftAidDeclarationId,
         gift_aid_eligible: giftAidEligible,
       },

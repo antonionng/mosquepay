@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { verifyMooovWebhook } from "@/lib/mooov";
 import * as db from "@/lib/db";
 import { sendGuestWelcomeEmail } from "@/lib/email/guest";
+import { projectTakePaymentCaptured } from "@/lib/take-payment/project-captured";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -803,8 +804,91 @@ async function projectStandingOrTakePaymentCaptured(
     metadata: Record<string, unknown> | null;
   },
 ) {
-  const existing = await db.getPaymentByMooovId(attempt.payment_id);
-  if (existing) {
+  const amountMajor = (attempt.amount ?? 0) / 100;
+  const metadata = (attempt.metadata ?? {}) as Record<string, unknown>;
+  const guest = (attempt.guest_descriptor ?? {}) as Record<string, unknown>;
+  const eventIdRaw = metadata.event_id;
+  const eventId = typeof eventIdRaw === "string" ? eventIdRaw : null;
+  const reference =
+    typeof guest.reference === "string" ? (guest.reference as string) : null;
+
+  // Pull through any payer attribution the mint route stashed. When the
+  // treasurer picked a member or guest in the take-payment form we want the
+  // projected payments row to be credited to that payer (user_name +
+  // user_email) so the admin/payments ledger doesn't show a blank row.
+  // Reads the new payer_name/payer_email keys with a fallback to the legacy
+  // member_name/member_email keys for QR codes minted on the old shape.
+  const payerName =
+    typeof guest.payer_name === "string"
+      ? (guest.payer_name as string)
+      : typeof guest.member_name === "string"
+        ? (guest.member_name as string)
+        : null;
+  const payerEmail =
+    typeof guest.payer_email === "string"
+      ? (guest.payer_email as string)
+      : typeof guest.member_email === "string"
+        ? (guest.member_email as string)
+        : null;
+  const memberId =
+    typeof guest.member_id === "string" ? (guest.member_id as string) : null;
+  const guestId =
+    typeof guest.guest_id === "string" ? (guest.guest_id as string) : null;
+  const giftAidDeclarationId =
+    typeof guest.gift_aid_declaration_id === "string"
+      ? (guest.gift_aid_declaration_id as string)
+      : null;
+  const giftAidEligible = guest.gift_aid_eligible === true;
+
+  // Translate the various standing-QR + take_payment intents into the unified
+  // (category, charityName) shape the shared projector expects. Generic /
+  // unknown intents pass through with no category so total_amount carries
+  // the full sum and dining/charity/raffle sub-totals stay zero.
+  let category: string | null =
+    typeof metadata.category === "string" ? (metadata.category as string) : null;
+  let charityName: string | null = null;
+  switch (attempt.intent) {
+    case "charity_donation_standing_qr":
+      category = "charity";
+      charityName =
+        typeof metadata.charity_name === "string"
+          ? (metadata.charity_name as string)
+          : null;
+      break;
+    case "event_raffle_standing_qr":
+      category = "raffle";
+      break;
+    case "event_dining_standing_qr":
+      category = "dining";
+      break;
+    case "take_payment":
+      // category already set from metadata above.
+      break;
+    case "lodge_generic_standing_qr":
+    default:
+      category = null;
+      break;
+  }
+
+  const result = await projectTakePaymentCaptured({
+    lodgeId,
+    mooovPaymentId: attempt.payment_id,
+    amountMajor,
+    currency: attempt.currency ?? "GBP",
+    category,
+    reference,
+    eventId,
+    charityName,
+    payerName,
+    payerEmail,
+    memberId,
+    guestId,
+    giftAidDeclarationId,
+    giftAidEligible,
+    paymentMethod: "card_qr",
+  });
+
+  if (result.alreadyExisted) {
     console.log(
       "mooov webhook: standing-qr / take-payment already projected (idempotent)",
       {
@@ -812,143 +896,5 @@ async function projectStandingOrTakePaymentCaptured(
         intent: attempt.intent,
       },
     );
-    return;
-  }
-
-  const amountMajor = (attempt.amount ?? 0) / 100;
-  const currencyMajor = (attempt.currency ?? "GBP").toUpperCase();
-  const completedAt = new Date().toISOString();
-  const metadata = (attempt.metadata ?? {}) as Record<string, unknown>;
-  const guest = (attempt.guest_descriptor ?? {}) as Record<string, unknown>;
-  const eventIdRaw = metadata.event_id;
-  const eventId = typeof eventIdRaw === "string" ? eventIdRaw : null;
-  const reference =
-    typeof guest.reference === "string" ? (guest.reference as string) : null;
-  const category =
-    typeof metadata.category === "string"
-      ? (metadata.category as string)
-      : null;
-
-  // Pull through any member attribution the mint route stashed. When the
-  // treasurer picked a member in the take-payment form we want the
-  // projected payments row to be credited to that member (user_name +
-  // user_email) so the admin/payments ledger doesn't show a blank row.
-  const memberName =
-    typeof guest.member_name === "string" ? (guest.member_name as string) : null;
-  const memberEmail =
-    typeof guest.member_email === "string" ? (guest.member_email as string) : null;
-  const giftAidDeclarationId =
-    typeof guest.gift_aid_declaration_id === "string"
-      ? (guest.gift_aid_declaration_id as string)
-      : null;
-  const giftAidEligible = guest.gift_aid_eligible === true;
-
-  // Default: everything in dining_amount = 0, charity_amount = 0, etc., and
-  // total_amount carries the full sum. We promote one of the sub-totals to
-  // match the intent so existing dashboards classify the row correctly.
-  let diningAmount = 0;
-  let charityAmount = 0;
-  let raffleAmount = 0;
-  let charityName: string | null = null;
-
-  switch (attempt.intent) {
-    case "charity_donation_standing_qr":
-      charityAmount = amountMajor;
-      charityName =
-        typeof metadata.charity_name === "string"
-          ? metadata.charity_name
-          : null;
-      break;
-    case "event_raffle_standing_qr":
-      raffleAmount = amountMajor;
-      break;
-    case "event_dining_standing_qr":
-      diningAmount = amountMajor;
-      break;
-    case "take_payment":
-      // The take-payment form lets the admin tag a category for the QR. We
-      // honour it here so a category=charity QR also lands in charity
-      // rollups, dining in dining rollups, etc. — matching the experience
-      // for the dedicated standing-QR intents above.
-      if (category === "charity") {
-        charityAmount = amountMajor;
-      } else if (category === "dining") {
-        diningAmount = amountMajor;
-      } else if (category === "raffle") {
-        raffleAmount = amountMajor;
-      }
-      break;
-    case "lodge_generic_standing_qr":
-    default:
-      // Stays on total_amount only — admin/payments will show the row with
-      // the description / reference from the attempt metadata.
-      break;
-  }
-
-  const payment = await db.addPayment(lodgeId, {
-    rsvp_id: null,
-    event_id: eventId,
-    user_email: memberEmail ?? "",
-    user_name: memberName ?? reference,
-    stripe_payment_intent_id: null,
-    stripe_charge_id: null,
-    stripe_customer_id: null,
-    mooov_payment_id: attempt.payment_id,
-    dining_amount: diningAmount,
-    charity_amount: charityAmount,
-    raffle_amount: raffleAmount,
-    meeting_fee_amount: 0,
-    guest_ticket_amount: 0,
-    total_amount: amountMajor,
-    currency: currencyMajor,
-    charity_name: charityName,
-    status: "succeeded",
-    refund_amount: 0,
-    refund_reason: null,
-    completed_at: completedAt,
-  });
-
-  // Gift Aid auto-logging.
-  //
-  // When the QR was attributed to a member who already has an active Gift
-  // Aid declaration on this lodge AND the take_payment is being treated as
-  // a charity collection (category=charity OR the charity_donation_standing
-  // intent), we record a matching public.donations row linked back to the
-  // declaration. This is what makes the donation show up in the GA reclaim
-  // batch flow — exactly as it would have if the donor had used the
-  // standard online donation page. Best-effort: a failure here doesn't fail
-  // the projection because the payments row is already written.
-  const isCharity =
-    attempt.intent === "charity_donation_standing_qr" ||
-    (attempt.intent === "take_payment" && category === "charity");
-  if (
-    isCharity &&
-    giftAidEligible &&
-    giftAidDeclarationId &&
-    memberEmail &&
-    amountMajor > 0
-  ) {
-    try {
-      await db.addDonation(lodgeId, {
-        event_id: null,
-        payment_id: payment.id,
-        donor_name: memberName,
-        donor_email: memberEmail,
-        amount: amountMajor,
-        currency: (attempt.currency ?? "gbp").toLowerCase(),
-        source: "in_person_take_payment",
-        status: "completed",
-        gift_aid_declaration_id: giftAidDeclarationId,
-      });
-    } catch (err) {
-      console.error(
-        "mooov webhook: take-payment gift aid donation insert failed",
-        {
-          payment_id: attempt.payment_id,
-          declaration_id: giftAidDeclarationId,
-          message: err instanceof Error ? err.message : String(err),
-        },
-      );
-    }
   }
 }
