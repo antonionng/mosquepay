@@ -194,6 +194,7 @@ export async function POST(request: NextRequest) {
         payment_id: string;
         state: "authorized" | "captured" | "processing" | "failed";
         provider?: { provider: string; provider_ref?: string; hosted_url?: string };
+        checkout_session_id?: string;
       }>("POST", "/v1/payment_intents", {
         merchant: merchantId,
         idempotencyKey,
@@ -201,7 +202,7 @@ export async function POST(request: NextRequest) {
           payment_id: paymentId,
           amount: totalMinor,
           currency,
-          flow: "redirect",
+          flow: "embedded",
           success_url: successUrl,
           cancel_url: cancelUrl,
           description,
@@ -236,7 +237,12 @@ export async function POST(request: NextRequest) {
         .update({
           status: result.state,
           provider_ref: result.provider?.provider_ref ?? null,
-          metadata: { ...initialMetadata, hosted_url: hostedUrl },
+          metadata: {
+            ...initialMetadata,
+            hosted_url: hostedUrl,
+            flow: "embedded",
+            checkout_session_id: result.checkout_session_id ?? null,
+          },
         })
         .eq("payment_id", paymentId);
 

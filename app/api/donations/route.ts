@@ -65,6 +65,7 @@ interface PaymentIntentResponse {
     provider_ref?: string;
     hosted_url?: string;
   };
+  checkout_session_id?: string;
 }
 
 async function loadMooovMerchant(
@@ -269,7 +270,7 @@ export async function POST(request: NextRequest) {
           payment_id: paymentId,
           amount: amountMinor,
           currency,
-          flow: "redirect",
+          flow: "embedded",
           success_url: successUrl,
           cancel_url: cancelUrl,
           description,
@@ -301,6 +302,8 @@ export async function POST(request: NextRequest) {
     const persistedMetadata: Record<string, unknown> = {
       ...initialMetadata,
       hosted_url: hostedUrl,
+      flow: "embedded",
+      checkout_session_id: result.checkout_session_id ?? null,
     };
     const { error: updateError } = await supa
       .schema("mooov")
