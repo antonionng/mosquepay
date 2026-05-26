@@ -383,10 +383,21 @@ export async function POST(request: NextRequest) {
     }
 
     try {
+      // CANARY: this is the first LP surface on flow:"embedded". The other
+      // three surfaces (dues/pay, donations, g/[token]/checkout) stay on
+      // flow:"redirect" until this one smoke-passes in prod. With embedded,
+      // hosted_url is https://pay.mooov.money/c/<payment_id> (Mooov-branded
+      // page wrapping the Stripe Payment Element) instead of
+      // https://checkout.stripe.com/... -- same response shape, same
+      // webhook envelope, so the rest of this handler is unchanged.
+      // checkout_session_id (cs_*) is new on the response and we persist it
+      // for audit / future Stripe-dashboard lookups; missing on the older
+      // redirect path which is fine.
       const result = await callMooovConnect<{
         payment_id: string;
         state: "authorized" | "captured" | "processing" | "failed";
         provider?: { provider: string; provider_ref?: string; hosted_url?: string };
+        checkout_session_id?: string;
       }>("POST", "/v1/payment_intents", {
         merchant: merchantId,
         idempotencyKey,
@@ -394,7 +405,7 @@ export async function POST(request: NextRequest) {
           payment_id: paymentId,
           amount: totalMinor,
           currency,
-          flow: "redirect",
+          flow: "embedded",
           success_url: successUrl,
           cancel_url: cancelUrl,
           description,
@@ -431,7 +442,12 @@ export async function POST(request: NextRequest) {
         .update({
           status: result.state,
           provider_ref: result.provider?.provider_ref ?? null,
-          metadata: { ...initialMetadata, hosted_url: hostedUrl },
+          metadata: {
+            ...initialMetadata,
+            hosted_url: hostedUrl,
+            flow: "embedded",
+            checkout_session_id: result.checkout_session_id ?? null,
+          },
         })
         .eq("payment_id", paymentId);
 
