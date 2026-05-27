@@ -1,16 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
+import Link from "next/link";
 import {
   ArrowLeft,
   ArrowRight as ArrowRightIcon,
+  ExternalLink,
   XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import type { LodgeFeeDefaults } from "@/lib/fees/resolve";
+import { resolveEffectiveAmount } from "@/lib/fees/resolve";
 
 export const MEETING_TYPES = [
   "regular_meeting",
@@ -207,12 +211,65 @@ export function formFromMeeting(meeting: MeetingFormMeeting): MeetingForm {
 
 const WIZARD_STEPS = [
   { id: "basics", label: "Basics" },
-  { id: "rsvp", label: "RSVP & dining" },
-  { id: "payments", label: "Payments & charity" },
+  { id: "rsvp", label: "Attendance" },
+  { id: "fees", label: "Fees" },
   { id: "publish", label: "Review" },
 ] as const;
 
 type WizardStepId = (typeof WIZARD_STEPS)[number]["id"];
+
+function formatGbp(value: number | null | undefined): string {
+  if (value == null) return "";
+  return `£${Number(value).toFixed(2)}`;
+}
+
+/**
+ * Helper used by the Fees step. Given the current event-level form value and
+ * a lodge default, returns a single string describing what will actually be
+ * charged (e.g. "Using lodge default of £10.00", or "Custom: £15.00").
+ */
+function describeFeeOrigin(
+  formValue: string,
+  defaultValue: number | null | undefined,
+  options: { required?: boolean } = {}
+): { resolved: number | null; hint: string; tone: "muted" | "warn" } {
+  const trimmed = formValue.trim();
+  const hasCustom = trimmed !== "";
+  const resolved = resolveEffectiveAmount(
+    hasCustom ? Number(trimmed) : null,
+    defaultValue ?? null
+  );
+
+  if (hasCustom) {
+    return {
+      resolved,
+      hint: `Custom for this meeting: ${formatGbp(Number(trimmed))}`,
+      tone: "muted",
+    };
+  }
+
+  if (defaultValue != null) {
+    return {
+      resolved,
+      hint: `Using lodge default of ${formatGbp(defaultValue)}`,
+      tone: "muted",
+    };
+  }
+
+  if (options.required) {
+    return {
+      resolved: null,
+      hint: "No lodge default — set a price for this meeting.",
+      tone: "warn",
+    };
+  }
+
+  return {
+    resolved: null,
+    hint: "No price set and no lodge default. Treated as £0.00.",
+    tone: "muted",
+  };
+}
 
 function MoneyInput({
   id,
@@ -259,6 +316,7 @@ export function MeetingFormDrawer({
   updateForm,
   onClose,
   onSubmit,
+  lodgeDefaults,
 }: {
   open: boolean;
   editing: boolean;
@@ -269,8 +327,36 @@ export function MeetingFormDrawer({
   updateForm: (updates: Partial<MeetingForm>) => void;
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  lodgeDefaults: LodgeFeeDefaults | null;
 }) {
   const [step, setStep] = useState<WizardStepId>("basics");
+
+  const levyOrigin = useMemo(
+    () =>
+      describeFeeOrigin(
+        form.meeting_fee_amount,
+        lodgeDefaults?.default_member_levy_amount
+      ),
+    [form.meeting_fee_amount, lodgeDefaults]
+  );
+  const memberDiningOrigin = useMemo(
+    () =>
+      describeFeeOrigin(
+        form.dining_price,
+        lodgeDefaults?.default_member_dining_amount,
+        { required: true }
+      ),
+    [form.dining_price, lodgeDefaults]
+  );
+  const guestDiningOrigin = useMemo(
+    () =>
+      describeFeeOrigin(
+        form.guest_ticket_price,
+        lodgeDefaults?.default_guest_dining_amount
+      ),
+    [form.guest_ticket_price, lodgeDefaults]
+  );
+
   if (!open) return null;
   const currentIndex = WIZARD_STEPS.findIndex((s) => s.id === step);
   const isLast = currentIndex === WIZARD_STEPS.length - 1;
@@ -473,18 +559,60 @@ export function MeetingFormDrawer({
             )}
           >
             <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-dash-muted">
-              RSVP and Dining
+              Attendance
             </h3>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="flex items-center gap-2 text-sm text-dash-text">
+            <p className="text-xs text-dash-muted">
+              Who can RSVP, whether dinner is served, and whether members may
+              bring guests. Fees are set in the next step.
+            </p>
+
+            <fieldset className="space-y-3 rounded-lg border border-dash-border bg-dash-surface p-4">
+              <label className="flex items-center gap-2 text-sm font-medium text-dash-text">
                 <input
                   type="checkbox"
                   checked={form.enable_rsvp}
-                  onChange={(event) => updateForm({ enable_rsvp: event.target.checked })}
+                  onChange={(event) =>
+                    updateForm({ enable_rsvp: event.target.checked })
+                  }
                 />
-                Enable RSVP
+                Members can RSVP
               </label>
-              <label className="flex items-center gap-2 text-sm text-dash-text">
+              {form.enable_rsvp && (
+                <div className="grid gap-4 pl-6 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm text-dash-text" htmlFor="rsvp-deadline">
+                      RSVP deadline
+                    </label>
+                    <Input
+                      id="rsvp-deadline"
+                      type="date"
+                      value={form.rsvp_deadline}
+                      onChange={(event) =>
+                        updateForm({ rsvp_deadline: event.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm text-dash-text" htmlFor="max-attendees">
+                      Max attendees
+                    </label>
+                    <Input
+                      id="max-attendees"
+                      type="number"
+                      min="0"
+                      placeholder="Leave blank for no limit"
+                      value={form.max_attendees}
+                      onChange={(event) =>
+                        updateForm({ max_attendees: event.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+            </fieldset>
+
+            <fieldset className="space-y-3 rounded-lg border border-dash-border bg-dash-surface p-4">
+              <label className="flex items-center gap-2 text-sm font-medium text-dash-text">
                 <input
                   type="checkbox"
                   checked={form.enable_dining_rsvp}
@@ -492,174 +620,31 @@ export function MeetingFormDrawer({
                     updateForm({ enable_dining_rsvp: event.target.checked })
                   }
                 />
-                Enable dining
+                Festive board is served
               </label>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-dash-text" htmlFor="rsvp-deadline">
-                  RSVP deadline
-                </label>
-                <Input
-                  id="rsvp-deadline"
-                  type="date"
-                  value={form.rsvp_deadline}
-                  onChange={(event) => updateForm({ rsvp_deadline: event.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-dash-text" htmlFor="max-attendees">
-                  Max attendees
-                </label>
-                <Input
-                  id="max-attendees"
-                  type="number"
-                  min="0"
-                  placeholder="Leave blank for no limit"
-                  value={form.max_attendees}
-                  onChange={(event) => updateForm({ max_attendees: event.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-dash-text" htmlFor="dining-price">
-                  Dining price
-                </label>
-                <MoneyInput
-                  id="dining-price"
-                  value={form.dining_price}
-                  onChange={(value) => updateForm({ dining_price: value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-dash-text" htmlFor="dining-description">
-                  Dining description
-                </label>
-                <Input
-                  id="dining-description"
-                  placeholder="Three-course installation dinner at 7.30 pm"
-                  value={form.dining_description}
-                  onChange={(event) =>
-                    updateForm({ dining_description: event.target.value })
-                  }
-                />
-              </div>
               {form.enable_dining_rsvp && (
-                <label className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm text-amber-900 sm:col-span-2">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5"
-                    checked={form.dining_waived_for_all}
+                <div className="space-y-2 pl-6">
+                  <label className="text-sm text-dash-text" htmlFor="dining-description">
+                    What is being served
+                  </label>
+                  <Input
+                    id="dining-description"
+                    placeholder="e.g. Three-course installation dinner at 7.30 pm"
+                    value={form.dining_description}
                     onChange={(event) =>
-                      updateForm({
-                        dining_waived_for_all: event.target.checked,
-                      })
+                      updateForm({ dining_description: event.target.value })
                     }
                   />
-                  <div>
-                    <p className="font-semibold">
-                      Waive dining for everyone at this meeting
-                    </p>
-                    <p className="text-xs text-amber-800">
-                      Useful for events where the lodge covers dining (e.g. an
-                      installation). Members and guests are shown as
-                      complimentary on the recipients panel and dining will
-                      not be charged at checkout.
-                    </p>
-                  </div>
-                </label>
+                  <p className="text-xs text-dash-muted">
+                    Shown to members in the summons and on the RSVP form.
+                    Member and guest dining prices live in the next step.
+                  </p>
+                </div>
               )}
-            </div>
-          </section>
+            </fieldset>
 
-          <section
-            className={cn(
-              "space-y-4 rounded-xl border border-dash-border bg-dash-surface-subtle p-4",
-              step !== "payments" && "hidden"
-            )}
-          >
-            <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-dash-muted">
-              Payments and Charity
-            </h3>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="flex items-center gap-2 text-sm text-dash-text">
-                <input
-                  type="checkbox"
-                  checked={form.enable_payments}
-                  onChange={(event) => updateForm({ enable_payments: event.target.checked })}
-                />
-                Enable payments
-              </label>
-              <label className="flex items-center gap-2 text-sm text-dash-text">
-                <input
-                  type="checkbox"
-                  checked={form.enable_meeting_fee}
-                  onChange={(event) => updateForm({ enable_meeting_fee: event.target.checked })}
-                />
-                Meeting fee
-              </label>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-dash-text" htmlFor="meeting-fee-amount">
-                  Meeting fee amount
-                </label>
-                <MoneyInput
-                  id="meeting-fee-amount"
-                  value={form.meeting_fee_amount}
-                  onChange={(value) => updateForm({ meeting_fee_amount: value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <label
-                  className="text-sm font-medium text-dash-text"
-                  htmlFor="meeting-fee-description"
-                >
-                  Meeting fee description
-                </label>
-                <Input
-                  id="meeting-fee-description"
-                  placeholder="e.g. Per-meeting subscription"
-                  value={form.meeting_fee_description}
-                  onChange={(event) =>
-                    updateForm({ meeting_fee_description: event.target.value })
-                  }
-                />
-              </div>
-              <label className="flex items-center gap-2 text-sm text-dash-text">
-                <input
-                  type="checkbox"
-                  checked={form.enable_charity_donation}
-                  onChange={(event) =>
-                    updateForm({ enable_charity_donation: event.target.checked })
-                  }
-                />
-                Charity donation
-              </label>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-dash-text" htmlFor="charity-name">
-                  Charity name
-                </label>
-                <Input
-                  id="charity-name"
-                  placeholder="e.g. RMBI"
-                  value={form.charity_name}
-                  onChange={(event) => updateForm({ charity_name: event.target.value })}
-                />
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <label
-                  className="text-sm font-medium text-dash-text"
-                  htmlFor="charity-description"
-                >
-                  Charity description
-                </label>
-                <Textarea
-                  id="charity-description"
-                  rows={2}
-                  placeholder="Optional note about the charity or the donation purpose."
-                  value={form.charity_description}
-                  onChange={(event) =>
-                    updateForm({ charity_description: event.target.value })
-                  }
-                />
-              </div>
-              <label className="flex items-center gap-2 text-sm text-dash-text">
+            <fieldset className="space-y-3 rounded-lg border border-dash-border bg-dash-surface p-4">
+              <label className="flex items-center gap-2 text-sm font-medium text-dash-text">
                 <input
                   type="checkbox"
                   checked={form.enable_guest_tickets}
@@ -667,35 +652,176 @@ export function MeetingFormDrawer({
                     updateForm({ enable_guest_tickets: event.target.checked })
                   }
                 />
-                Guest tickets
+                Members may bring guests
               </label>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-dash-text" htmlFor="guest-ticket-price">
-                  Guest ticket price
-                </label>
-                <MoneyInput
-                  id="guest-ticket-price"
-                  value={form.guest_ticket_price}
-                  onChange={(value) => updateForm({ guest_ticket_price: value })}
-                />
+              <p className="pl-6 text-xs text-dash-muted">
+                Members will be able to add guest names when they RSVP. Guest
+                dining price is set in the next step.
+              </p>
+            </fieldset>
+          </section>
+
+          <section
+            className={cn(
+              "space-y-4 rounded-xl border border-dash-border bg-dash-surface-subtle p-4",
+              step !== "fees" && "hidden"
+            )}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-dash-muted">
+                  Fees
+                </h3>
+                <p className="mt-1 text-xs text-dash-muted">
+                  Leave a price blank to use the lodge default. Set a number
+                  here only when this meeting needs to differ.
+                </p>
               </div>
-              <div className="space-y-2 sm:col-span-2">
-                <label
-                  className="text-sm font-medium text-dash-text"
-                  htmlFor="guest-ticket-description"
-                >
-                  Guest ticket description
-                </label>
-                <Input
-                  id="guest-ticket-description"
-                  placeholder="e.g. Includes ceremony and dining"
-                  value={form.guest_ticket_description}
+              <Link
+                href="/admin/treasurer?tab=meeting-dining"
+                target="_blank"
+                className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
+              >
+                Lodge defaults <ExternalLink className="h-3 w-3" />
+              </Link>
+            </div>
+
+            <FeeRow
+              title="Member meeting levy"
+              description="Charged to every member who attends the ceremony."
+              enabled={form.enable_meeting_fee}
+              onToggle={(value) => updateForm({ enable_meeting_fee: value })}
+              amountId="meeting-fee-amount"
+              amount={form.meeting_fee_amount}
+              onAmount={(value) => updateForm({ meeting_fee_amount: value })}
+              originHint={levyOrigin.hint}
+              originTone={levyOrigin.tone}
+              descriptionId="meeting-fee-description"
+              descriptionLabel="Description (optional)"
+              descriptionPlaceholder="e.g. Per-meeting subscription"
+              descriptionValue={form.meeting_fee_description}
+              onDescription={(value) =>
+                updateForm({ meeting_fee_description: value })
+              }
+            />
+
+            <FeeRow
+              title="Member dining"
+              description="Charged when a member opts in to the festive board."
+              enabled={form.enable_dining_rsvp}
+              onToggle={(value) => updateForm({ enable_dining_rsvp: value })}
+              gateNote={
+                !form.enable_dining_rsvp
+                  ? "Festive board is currently off. Enable it on the previous step to charge for dining."
+                  : null
+              }
+              amountId="dining-price"
+              amount={form.dining_price}
+              onAmount={(value) => updateForm({ dining_price: value })}
+              originHint={memberDiningOrigin.hint}
+              originTone={memberDiningOrigin.tone}
+            />
+
+            {form.enable_dining_rsvp && (
+              <label className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm text-amber-900">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={form.dining_waived_for_all}
                   onChange={(event) =>
-                    updateForm({ guest_ticket_description: event.target.value })
+                    updateForm({
+                      dining_waived_for_all: event.target.checked,
+                    })
                   }
                 />
-              </div>
-            </div>
+                <div>
+                  <p className="font-semibold">
+                    Waive dining for everyone at this meeting
+                  </p>
+                  <p className="text-xs text-amber-800">
+                    Use for installations or socials where the lodge is
+                    covering dining. Members and guests are shown as
+                    complimentary on the recipients panel and dining will
+                    not be charged at checkout.
+                  </p>
+                </div>
+              </label>
+            )}
+
+            <FeeRow
+              title="Guest dining"
+              description="Charged for each guest a member brings to the festive board."
+              enabled={form.enable_guest_tickets}
+              onToggle={(value) => updateForm({ enable_guest_tickets: value })}
+              gateNote={
+                !form.enable_guest_tickets
+                  ? 'Guests are currently off. Enable "Members may bring guests" on the previous step to charge for guests.'
+                  : null
+              }
+              amountId="guest-ticket-price"
+              amount={form.guest_ticket_price}
+              onAmount={(value) => updateForm({ guest_ticket_price: value })}
+              originHint={guestDiningOrigin.hint}
+              originTone={guestDiningOrigin.tone}
+              descriptionId="guest-ticket-description"
+              descriptionLabel="Description (optional)"
+              descriptionPlaceholder="e.g. Includes ceremony and dining"
+              descriptionValue={form.guest_ticket_description}
+              onDescription={(value) =>
+                updateForm({ guest_ticket_description: value })
+              }
+            />
+
+            <fieldset className="space-y-3 rounded-lg border border-dash-border bg-dash-surface p-4">
+              <label className="flex items-center gap-2 text-sm font-medium text-dash-text">
+                <input
+                  type="checkbox"
+                  checked={form.enable_charity_donation}
+                  onChange={(event) =>
+                    updateForm({
+                      enable_charity_donation: event.target.checked,
+                    })
+                  }
+                />
+                Collect a charity donation at this meeting
+              </label>
+              {form.enable_charity_donation && (
+                <div className="grid gap-4 pl-6 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm text-dash-text" htmlFor="charity-name">
+                      Charity name
+                    </label>
+                    <Input
+                      id="charity-name"
+                      placeholder="e.g. RMBI"
+                      value={form.charity_name}
+                      onChange={(event) =>
+                        updateForm({ charity_name: event.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <label
+                      className="text-sm text-dash-text"
+                      htmlFor="charity-description"
+                    >
+                      Charity description
+                    </label>
+                    <Textarea
+                      id="charity-description"
+                      rows={2}
+                      placeholder="Optional note about the charity or the donation purpose."
+                      value={form.charity_description}
+                      onChange={(event) =>
+                        updateForm({
+                          charity_description: event.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+            </fieldset>
           </section>
 
           <section
@@ -738,18 +864,20 @@ export function MeetingFormDrawer({
                 <dt className="text-xs text-dash-muted">RSVP</dt>
                 <dd className="font-medium text-dash-text">
                   {form.enable_rsvp ? "Enabled" : "Off"}
-                  {form.enable_dining_rsvp
-                    ? ` · Dining ${form.dining_price ? `£${formatMoneyInput(form.dining_price)}` : "(no price)"}`
-                    : ""}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs text-dash-muted">Payments</dt>
+                <dt className="text-xs text-dash-muted">Festive board</dt>
                 <dd className="font-medium text-dash-text">
-                  {form.enable_payments ? "Enabled" : "Off"}
-                  {form.enable_meeting_fee
-                    ? ` · Fee ${form.meeting_fee_amount ? `£${formatMoneyInput(form.meeting_fee_amount)}` : "(no amount)"}`
-                    : ""}
+                  {form.enable_dining_rsvp ? (
+                    form.dining_waived_for_all ? (
+                      "Complimentary for everyone"
+                    ) : (
+                      "Served"
+                    )
+                  ) : (
+                    "Not served"
+                  )}
                 </dd>
               </div>
               <div className="sm:col-span-2">
@@ -761,6 +889,13 @@ export function MeetingFormDrawer({
                 </dd>
               </div>
             </dl>
+
+            <FeeSummary
+              form={form}
+              levyResolved={levyOrigin.resolved}
+              memberDiningResolved={memberDiningOrigin.resolved}
+              guestDiningResolved={guestDiningOrigin.resolved}
+            />
             <label className="flex items-center gap-2 text-sm text-dash-text">
               <input
                 type="checkbox"
@@ -842,5 +977,246 @@ export function MeetingFormDrawer({
         </form>
       </div>
     </div>
+  );
+}
+
+/**
+ * One fee block on the Fees step. Always renders the toggle + amount field
+ * (disabled when not enabled) so the height stays stable as the user opts in
+ * and out. The hint line below the amount tells the user where the resolved
+ * value will come from (lodge default vs custom).
+ */
+function FeeRow({
+  title,
+  description,
+  enabled,
+  onToggle,
+  gateNote,
+  amountId,
+  amount,
+  onAmount,
+  originHint,
+  originTone,
+  descriptionId,
+  descriptionLabel,
+  descriptionPlaceholder,
+  descriptionValue,
+  onDescription,
+}: {
+  title: string;
+  description: string;
+  enabled: boolean;
+  onToggle: (value: boolean) => void;
+  gateNote?: string | null;
+  amountId: string;
+  amount: string;
+  onAmount: (value: string) => void;
+  originHint: string;
+  originTone: "muted" | "warn";
+  descriptionId?: string;
+  descriptionLabel?: string;
+  descriptionPlaceholder?: string;
+  descriptionValue?: string;
+  onDescription?: (value: string) => void;
+}) {
+  const disabled = !enabled;
+  return (
+    <fieldset
+      className={cn(
+        "space-y-3 rounded-lg border border-dash-border bg-dash-surface p-4",
+        disabled && "opacity-80"
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <label className="flex items-start gap-2 text-sm font-medium text-dash-text">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={enabled}
+            onChange={(event) => onToggle(event.target.checked)}
+          />
+          <span>
+            {title}
+            <span className="mt-0.5 block text-xs font-normal text-dash-muted">
+              {description}
+            </span>
+          </span>
+        </label>
+      </div>
+
+      <div className="grid gap-3 pl-6 sm:grid-cols-[minmax(0,180px),1fr]">
+        <div className="space-y-1">
+          <label
+            className={cn(
+              "text-xs font-medium",
+              disabled ? "text-dash-muted" : "text-dash-text"
+            )}
+            htmlFor={amountId}
+          >
+            Amount (£)
+          </label>
+          <MoneyInput
+            id={amountId}
+            value={amount}
+            onChange={(value) => (disabled ? null : onAmount(value))}
+          />
+          <p
+            className={cn(
+              "text-xs",
+              originTone === "warn" ? "text-amber-700" : "text-dash-muted"
+            )}
+          >
+            {disabled
+              ? gateNote ?? "Toggle on to charge this fee."
+              : originHint}
+          </p>
+        </div>
+
+        {descriptionId && onDescription && (
+          <div className="space-y-1">
+            <label
+              className={cn(
+                "text-xs font-medium",
+                disabled ? "text-dash-muted" : "text-dash-text"
+              )}
+              htmlFor={descriptionId}
+            >
+              {descriptionLabel ?? "Description"}
+            </label>
+            <Input
+              id={descriptionId}
+              placeholder={descriptionPlaceholder}
+              value={descriptionValue ?? ""}
+              disabled={disabled}
+              onChange={(event) => onDescription(event.target.value)}
+            />
+          </div>
+        )}
+      </div>
+    </fieldset>
+  );
+}
+
+/**
+ * The "What members will be charged" block on the Review step. Uses the same
+ * resolved amounts the resolver will use, so the user sees the lodge-default
+ * fallback applied before they hit Save.
+ */
+function FeeSummary({
+  form,
+  levyResolved,
+  memberDiningResolved,
+  guestDiningResolved,
+}: {
+  form: MeetingForm;
+  levyResolved: number | null;
+  memberDiningResolved: number | null;
+  guestDiningResolved: number | null;
+}) {
+  const levyOn = form.enable_meeting_fee;
+  const diningOn = form.enable_dining_rsvp;
+  const diningWaivedAll = form.dining_waived_for_all && diningOn;
+  const guestsOn = form.enable_guest_tickets;
+
+  const memberAttendingDiningTotal =
+    (levyOn ? levyResolved ?? 0 : 0) +
+    (diningOn && !diningWaivedAll ? memberDiningResolved ?? 0 : 0);
+
+  const memberCeremonyOnlyTotal = levyOn ? levyResolved ?? 0 : 0;
+  const guestTotal = guestsOn && !diningWaivedAll ? guestDiningResolved ?? 0 : 0;
+
+  const hasAnyCharge =
+    memberAttendingDiningTotal > 0 ||
+    memberCeremonyOnlyTotal > 0 ||
+    guestTotal > 0 ||
+    form.enable_charity_donation;
+
+  if (!hasAnyCharge && !diningWaivedAll) {
+    return (
+      <p className="rounded-lg border border-dash-border bg-dash-surface-subtle px-3 py-2 text-xs text-dash-muted">
+        No fees configured. Members and guests attend free.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2 rounded-lg border border-dash-border bg-dash-surface-subtle p-3 text-sm">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-dash-muted">
+        What attendees will be charged
+      </p>
+      <ul className="space-y-1">
+        {levyOn && (
+          <SummaryRow
+            label="Member attending ceremony only"
+            value={memberCeremonyOnlyTotal}
+            zeroFallback={
+              levyResolved == null
+                ? "No price set"
+                : undefined
+            }
+          />
+        )}
+        {diningOn && (
+          <SummaryRow
+            label="Member attending dining"
+            value={memberAttendingDiningTotal}
+            waived={diningWaivedAll && memberAttendingDiningTotal === 0 && !levyOn}
+            zeroFallback={
+              diningWaivedAll
+                ? "Dining complimentary"
+                : memberDiningResolved == null
+                ? "No price set"
+                : undefined
+            }
+          />
+        )}
+        {guestsOn && (
+          <SummaryRow
+            label="Each guest"
+            value={guestTotal}
+            waived={diningWaivedAll}
+            zeroFallback={
+              diningWaivedAll
+                ? "Dining complimentary"
+                : guestDiningResolved == null
+                ? "No price set"
+                : undefined
+            }
+          />
+        )}
+        {form.enable_charity_donation && (
+          <li className="flex items-center justify-between gap-3 text-dash-text">
+            <span>Charity collection</span>
+            <span className="text-dash-muted">{form.charity_name || "(no name)"}</span>
+          </li>
+        )}
+      </ul>
+    </div>
+  );
+}
+
+function SummaryRow({
+  label,
+  value,
+  waived,
+  zeroFallback,
+}: {
+  label: string;
+  value: number;
+  waived?: boolean;
+  zeroFallback?: string;
+}) {
+  return (
+    <li className="flex items-center justify-between gap-3 text-dash-text">
+      <span>{label}</span>
+      <span
+        className={cn(
+          "font-medium tabular-nums",
+          waived && "text-emerald-700"
+        )}
+      >
+        {value === 0 && zeroFallback ? zeroFallback : `£${value.toFixed(2)}`}
+      </span>
+    </li>
   );
 }

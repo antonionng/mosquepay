@@ -20,6 +20,8 @@ export default async function AdminMeetingsPage() {
   const meetingTypes = ["regular_meeting", "lodge_meeting", "installation", "lodge_of_instruction", "committee", "emergency"];
   const meetings = allEvents.filter((e) => meetingTypes.includes(e.event_type));
 
+  const lodgeDefaults = lodgeId ? await db.getLodgeFeeDefaults(lodgeId) : null;
+
   const rsvpMap: Record<
     string,
     Array<{
@@ -90,6 +92,7 @@ export default async function AdminMeetingsPage() {
         | "approved"
         | "sent"
         | undefined,
+      lodgeDefaults,
     });
   }
 

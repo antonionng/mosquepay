@@ -3,6 +3,9 @@
  * Used in the meetings list, selected meeting panel, and reporting.
  */
 
+import { resolveEffectiveAmount } from "@/lib/fees/resolve";
+import type { LodgeFeeDefaults } from "@/lib/fees/resolve";
+
 export type MeetingReadinessInput = {
   event_date: string;
   enable_rsvp: boolean;
@@ -19,6 +22,12 @@ export type MeetingReadinessInput = {
   hasSummons: boolean;
   summonsSentCount: number;
   summonsStatus?: "none" | "draft" | "approved" | "sent";
+  /**
+   * Optional lodge-level fee defaults. When supplied, readiness treats a
+   * `null` event amount as "inherits from default" rather than missing,
+   * matching the behaviour of `lib/fees/resolve.ts`.
+   */
+  lodgeDefaults?: LodgeFeeDefaults | null;
 };
 
 export type ReadinessIssue = {
@@ -80,14 +89,19 @@ export function getMeetingReadiness(
     });
   }
 
+  const effectiveDining = resolveEffectiveAmount(
+    input.dining_price,
+    input.lodgeDefaults?.default_member_dining_amount
+  );
   if (
     isFuture &&
     input.enable_dining_rsvp &&
-    (input.dining_price === null || input.dining_price <= 0)
+    (effectiveDining == null || effectiveDining <= 0)
   ) {
     issues.push({
       key: "dining_no_price",
-      message: "Dining enabled but no price set",
+      message:
+        "Dining enabled but no price set (and no lodge default to fall back on)",
       severity: "warn",
     });
   }
@@ -104,26 +118,36 @@ export function getMeetingReadiness(
     });
   }
 
+  const effectiveLevy = resolveEffectiveAmount(
+    input.meeting_fee_amount,
+    input.lodgeDefaults?.default_member_levy_amount
+  );
   if (
     isFuture &&
     input.enable_meeting_fee &&
-    (input.meeting_fee_amount === null || input.meeting_fee_amount <= 0)
+    (effectiveLevy == null || effectiveLevy <= 0)
   ) {
     issues.push({
       key: "meeting_fee_no_amount",
-      message: "Meeting fee enabled but no amount set",
+      message:
+        "Member levy enabled but no amount set (and no lodge default to fall back on)",
       severity: "warn",
     });
   }
 
+  const effectiveGuestDining = resolveEffectiveAmount(
+    input.guest_ticket_price,
+    input.lodgeDefaults?.default_guest_dining_amount
+  );
   if (
     isFuture &&
     input.enable_guest_tickets &&
-    (input.guest_ticket_price === null || input.guest_ticket_price <= 0)
+    (effectiveGuestDining == null || effectiveGuestDining <= 0)
   ) {
     issues.push({
       key: "guest_no_price",
-      message: "Guest tickets enabled but no price",
+      message:
+        "Guests enabled but no dining price (and no lodge default to fall back on)",
       severity: "warn",
     });
   }

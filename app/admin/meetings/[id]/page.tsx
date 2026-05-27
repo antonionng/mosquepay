@@ -50,6 +50,8 @@ export default async function AdminMeetingDetailPage({
   }
   const summonsSentCount = sends.reduce((a, s) => a + s.sent_count, 0);
 
+  const lodgeDefaults = lodgeId ? await db.getLodgeFeeDefaults(lodgeId) : null;
+
   const readiness = getMeetingReadiness({
     event_date: event.event_date,
     enable_rsvp: event.enable_rsvp,
@@ -65,6 +67,7 @@ export default async function AdminMeetingDetailPage({
     published: event.published,
     hasSummons: Boolean(summons),
     summonsSentCount,
+    lodgeDefaults,
   });
 
   const reqHeaders = await headers();
@@ -97,6 +100,7 @@ export default async function AdminMeetingDetailPage({
       sends={JSON.parse(JSON.stringify(sends))}
       publicUrl={publicUrl}
       publicPath={publicPath}
+      lodgeDefaults={lodgeDefaults}
     />
   );
 }

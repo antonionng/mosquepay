@@ -147,7 +147,7 @@ export function buildMemberFeeBreakdown(args: {
   if (levy > 0 || memberLevyWaived) {
     items.push({
       key: "levy",
-      label: "Meeting levy",
+      label: "Member meeting levy",
       amount: levy,
       waived: memberLevyWaived,
     });
@@ -167,7 +167,7 @@ export function buildMemberFeeBreakdown(args: {
   if (dining > 0 || memberDiningWaived) {
     items.push({
       key: "dining",
-      label: "Festive board",
+      label: "Member dining",
       amount: dining,
       waived: memberDiningWaived,
     });
@@ -186,7 +186,7 @@ export function buildMemberFeeBreakdown(args: {
       guest.profile?.dining_waived === true;
     items.push({
       key: `guest:${guest.name}`,
-      label: `Guest: ${guest.name}`,
+      label: `Guest dining – ${guest.name}`,
       amount,
       waived: guestWaived,
     });
@@ -201,4 +201,23 @@ export function formatFeeLabel(item: FeeLineItem): string {
     return `${item.label} (complimentary)`;
   }
   return item.label;
+}
+
+/**
+ * Resolve the amount that will actually be charged for a fee, given a
+ * possible per-event override and the lodge-level default. Returns null when
+ * no value is available anywhere (caller decides whether that is an error).
+ *
+ * Mirrors the resolver precedence: explicit event amount → lodge default.
+ * Treats `0` on the event as an intentional override (zero is still a price),
+ * and only falls through to the default when the event value is null/undefined.
+ */
+export function resolveEffectiveAmount(
+  eventAmount: number | null | undefined,
+  defaultAmount: number | null | undefined
+): number | null {
+  const ev = toAmount(eventAmount ?? null);
+  if (ev != null) return ev;
+  const def = toAmount(defaultAmount ?? null);
+  return def;
 }

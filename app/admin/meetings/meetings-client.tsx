@@ -46,6 +46,7 @@ import {
   slugify,
   type MeetingForm,
 } from "./meeting-form";
+import type { LodgeFeeDefaults } from "@/lib/fees/resolve";
 
 type MeetingEvent = {
   id: string;
@@ -124,6 +125,9 @@ export function AdminMeetingsClient({
   const [meetingForm, setMeetingForm] = useState<MeetingForm>(() => emptyMeetingForm());
   const [formError, setFormError] = useState<string | null>(null);
   const [formSaving, setFormSaving] = useState(false);
+  const [lodgeDefaults, setLodgeDefaults] = useState<LodgeFeeDefaults | null>(
+    null
+  );
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -179,37 +183,46 @@ export function AdminMeetingsClient({
     setView(tab === "calendar" ? "calendar" : "list");
   }
 
+  // Cache the lodge defaults across opens of the drawer. They are tiny and
+  // don't change while the user is sitting on this page; revalidate each time
+  // the drawer opens so a treasurer who just edited the defaults in another
+  // tab sees the latest values.
+  async function fetchLodgeDefaults(): Promise<LodgeFeeDefaults | null> {
+    try {
+      const res = await fetch("/api/settings/lodge-fees");
+      if (!res.ok) return null;
+      const data = await res.json();
+      const fees = data.fees ?? null;
+      if (!fees) return null;
+      const defaults: LodgeFeeDefaults = {
+        default_member_levy_amount:
+          fees.default_member_levy_amount ?? null,
+        default_member_dining_amount:
+          fees.default_member_dining_amount ?? null,
+        default_guest_dining_amount:
+          fees.default_guest_dining_amount ?? null,
+        currency: fees.currency ?? "gbp",
+      };
+      setLodgeDefaults(defaults);
+      return defaults;
+    } catch {
+      return null;
+    }
+  }
+
   function openNewMeetingForm() {
     setEditingMeetingId(null);
     setFormError(null);
     setFormOpen(true);
-    void (async () => {
-      const base = emptyMeetingForm();
-      try {
-        const res = await fetch("/api/settings/lodge-fees");
-        if (res.ok) {
-          const data = await res.json();
-          const fees = data.fees ?? {};
-          setMeetingForm({
-            ...base,
-            enable_meeting_fee: fees.default_member_levy_amount != null,
-            meeting_fee_amount: formatMoneyInput(fees.default_member_levy_amount),
-            enable_guest_tickets: fees.default_guest_dining_amount != null,
-            guest_ticket_price: formatMoneyInput(fees.default_guest_dining_amount),
-            enable_dining_rsvp: fees.default_member_dining_amount != null,
-            dining_price: formatMoneyInput(fees.default_member_dining_amount),
-            enable_payments:
-              fees.default_member_levy_amount != null ||
-              fees.default_guest_dining_amount != null ||
-              fees.default_member_dining_amount != null,
-          });
-          return;
-        }
-      } catch {
-        /* use empty defaults */
-      }
-      setMeetingForm(base);
-    })();
+    // Start with a sensible default: meeting levy ON (since most meetings
+    // charge one and a lodge default will be filled in), dining and guests
+    // opt-in by the user. Prices are left blank so the resolver falls through
+    // to the lodge defaults at runtime.
+    setMeetingForm({
+      ...emptyMeetingForm(),
+      enable_meeting_fee: true,
+    });
+    void fetchLodgeDefaults();
   }
 
   function openEditMeetingForm(meeting: MeetingEvent) {
@@ -217,6 +230,7 @@ export function AdminMeetingsClient({
     setMeetingForm(formFromMeeting(meeting));
     setFormError(null);
     setFormOpen(true);
+    void fetchLodgeDefaults();
   }
 
   function updateMeetingForm(updates: Partial<MeetingForm>) {
@@ -228,6 +242,16 @@ export function AdminMeetingsClient({
     setFormSaving(true);
     setFormError(null);
 
+    // `enable_payments` is no longer a user-controllable switch — it is
+    // derived from whether any fee or charity collection is enabled. Public
+    // checkout pages still use this flag as a gate, so we must keep writing
+    // it but it should always reflect the actual fee state.
+    const derivedEnablePayments =
+      meetingForm.enable_meeting_fee ||
+      meetingForm.enable_dining_rsvp ||
+      meetingForm.enable_guest_tickets ||
+      meetingForm.enable_charity_donation;
+
     const payload = {
       ...meetingForm,
       slug: meetingForm.slug || slugify(meetingForm.title),
@@ -237,6 +261,7 @@ export function AdminMeetingsClient({
       guest_ticket_price: meetingForm.guest_ticket_price || null,
       max_attendees: meetingForm.max_attendees || null,
       rsvp_deadline: meetingForm.rsvp_deadline || null,
+      enable_payments: derivedEnablePayments,
     };
 
     try {
@@ -664,6 +689,7 @@ export function AdminMeetingsClient({
         updateForm={updateMeetingForm}
         onClose={() => setFormOpen(false)}
         onSubmit={handleMeetingSubmit}
+        lodgeDefaults={lodgeDefaults}
       />
     </div>
   );

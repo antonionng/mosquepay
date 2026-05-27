@@ -35,12 +35,12 @@ import {
 } from "@/lib/meetings/readiness";
 import {
   MeetingFormDrawer,
-  emptyMeetingForm,
   formFromMeeting,
   slugify,
   type MeetingForm,
   type MeetingFormMeeting,
 } from "../meeting-form";
+import type { LodgeFeeDefaults } from "@/lib/fees/resolve";
 
 type MeetingEvent = MeetingFormMeeting;
 
@@ -104,6 +104,7 @@ export function MeetingDetailClient({
   sends,
   publicUrl,
   publicPath,
+  lodgeDefaults,
 }: {
   meeting: MeetingEvent;
   rsvps: RsvpEntry[];
@@ -112,6 +113,7 @@ export function MeetingDetailClient({
   sends: SummonsSend[];
   publicUrl: string;
   publicPath: string;
+  lodgeDefaults: LodgeFeeDefaults | null;
 }) {
   const router = useRouter();
   const [formOpen, setFormOpen] = useState(false);
@@ -146,6 +148,14 @@ export function MeetingDetailClient({
     setFormSaving(true);
     setFormError(null);
 
+    // Derive enable_payments from whether any fee/charity is enabled. See
+    // meetings-client.tsx for the same logic — keep these two in sync.
+    const derivedEnablePayments =
+      meetingForm.enable_meeting_fee ||
+      meetingForm.enable_dining_rsvp ||
+      meetingForm.enable_guest_tickets ||
+      meetingForm.enable_charity_donation;
+
     const payload = {
       ...meetingForm,
       slug: meetingForm.slug || slugify(meetingForm.title),
@@ -155,6 +165,7 @@ export function MeetingDetailClient({
       guest_ticket_price: meetingForm.guest_ticket_price || null,
       max_attendees: meetingForm.max_attendees || null,
       rsvp_deadline: meetingForm.rsvp_deadline || null,
+      enable_payments: derivedEnablePayments,
     };
 
     try {
@@ -930,6 +941,7 @@ export function MeetingDetailClient({
         updateForm={updateMeetingForm}
         onClose={() => setFormOpen(false)}
         onSubmit={handleMeetingSubmit}
+        lodgeDefaults={lodgeDefaults}
       />
     </div>
   );
