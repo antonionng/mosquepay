@@ -1,34 +1,24 @@
 import { NextResponse } from "next/server";
-import { hasDummySession } from "@/lib/auth/dummy";
 import {
   getCurrentAdminScope,
-  getCurrentStaffAdminContext,
   requireAdminPermission,
   type AdminPermission,
 } from "@/lib/auth/permissions";
 
+/**
+ * Gate an admin-only API route on "is this caller an admin?".
+ *
+ * Uses the same scope resolver the page side uses (getCurrentAdminScope),
+ * so the API can never reject an actor the proxy + admin layout already
+ * accepted. If you also need to check a specific permission or a tenant
+ * boundary, use requireAdminApiPermission instead -- this helper only
+ * answers the identity question.
+ */
 export async function requireAdminApiAuth() {
-  if (await hasDummySession()) {
-    return null;
-  }
-
-  const staff = await getCurrentStaffAdminContext();
-  if (staff) {
-    return null;
-  }
-
-  // Last-resort fallback. If the staff-cookie lookup couldn't resolve an
-  // admin row but the broader scope resolver can (dummy / platform / lodge
-  // membership found via listAdminUsersByEmail), the user clearly has admin
-  // access at the page level -- e.g. /admin/take-payment rendered for them.
-  // Letting the API agree with the page closes the class of 401s where the
-  // /admin/* proxy + page-side getCurrentAdminScope let the user through
-  // but the API's single-row staff-context lookup dropped them.
   const scope = await getCurrentAdminScope();
   if (scope.kind !== "none") {
     return null;
   }
-
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 

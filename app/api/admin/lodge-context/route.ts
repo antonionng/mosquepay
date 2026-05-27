@@ -80,12 +80,39 @@ export async function GET(request: NextRequest) {
     access.lodges[0] ??
     null;
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     selectedSlug: selectedLodge?.slug ?? selectedSlug,
     selectedLodge,
     lodges: access.lodges,
     isPlatform: access.isPlatform,
   });
+
+  // Self-heal a stale or missing ADMIN_LODGE_COOKIE for lodge-scoped admins.
+  // The admin shell polls this endpoint on every navigation, so by the time
+  // the user clicks anything that hits an API write route (which resolves
+  // the lodge via getLodgeSlugFromRequest -> cookie) the cookie is anchored
+  // to a lodge the actor actually administers. This is the backstop for
+  // sessions established before login started writing the cookie itself,
+  // and for cases where a previous user left a stale value behind.
+  //
+  // Platform admins are intentionally left alone: the lodge switcher /
+  // POST handler is the only thing that should set their cookie, since
+  // their "no cookie" state means "show me the global view".
+  if (!access.isPlatform && selectedLodge && cookieSlug !== selectedLodge.slug) {
+    response.cookies.set(ADMIN_LODGE_COOKIE, selectedLodge.slug, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 30,
+      path: "/",
+    });
+  } else if (access.isPlatform && cookieSlug && !allowedSlugs.has(cookieSlug)) {
+    // Platform admin with a cookie that points at a non-existent lodge --
+    // clear it so the switcher reflects the global view again.
+    response.cookies.delete(ADMIN_LODGE_COOKIE);
+  }
+
+  return response;
 }
 
 export async function POST(request: NextRequest) {

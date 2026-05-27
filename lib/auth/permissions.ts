@@ -281,18 +281,79 @@ export async function getCurrentAdminContextAny(lodgeId?: string | null) {
   );
 }
 
+/**
+ * Authorize an admin API action against (optionally) a specific lodge.
+ *
+ * Authority model:
+ *   1. Identity comes from getCurrentAdminScope() -- the same resolver the
+ *      page side uses. As long as a user can render /admin/* the API agrees
+ *      they are an admin. This closes the class of bugs where the page
+ *      rendered but the API returned 401 because a single-row admin lookup
+ *      (getAdminUserByEmail) couldn't reconcile the requested lodgeId.
+ *   2. Tenant isolation is enforced against scope.lodgeIds. A lodge-scoped
+ *      admin can never act on a lodge they don't administer, no matter what
+ *      lodgeId the request resolved to.
+ *   3. Permission is checked against the role first, then against per-row
+ *      admin_users.permissions overrides loaded best-effort.
+ *
+ * Failures distinguish 401 (not signed in as an admin) from 403 (signed in
+ * but lacking permission or out of tenant) so the client can route them to
+ * the right UX.
+ */
 export async function requireAdminPermission(
   permission: AdminPermission,
   lodgeId?: string | null
 ) {
-  const admin = await getCurrentAdminContextAny(lodgeId);
-  if (!admin) {
+  const scope = await getCurrentAdminScope();
+
+  if (scope.kind === "none") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!roleHasPermission(admin.role, permission)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  if (scope.kind === "lodge" && lodgeId != null && !scope.lodgeIds.includes(lodgeId)) {
+    // Cross-tenant attempt. Usually means the route resolved the lodge via
+    // getLodgeSlugFromRequest's default-slug fallback while the admin's
+    // ADMIN_LODGE_COOKIE was missing or stale. We log it to make the next
+    // recurrence trivially diagnosable.
+    console.warn(
+      "[permissions] admin attempted action on out-of-scope lodge",
+      {
+        email: scope.email,
+        role: scope.role,
+        permission,
+        requestedLodgeId: lodgeId,
+        scopeLodgeIds: scope.lodgeIds,
+      }
+    );
+    return NextResponse.json(
+      { error: "This action is not available for the selected lodge." },
+      { status: 403 }
+    );
   }
-  return null;
+
+  if (roleHasPermission(scope.role, permission)) {
+    return null;
+  }
+
+  // The role doesn't grant the permission, but admin_users rows can carry
+  // per-row overrides in the permissions[] column. Honor those before
+  // returning 403.
+  try {
+    const overrides = await db.getAdminUserByEmail(scope.email, lodgeId);
+    if (overrides?.permissions?.includes(permission)) {
+      return null;
+    }
+  } catch (error) {
+    // Fall through to 403 -- we already know the actor is a real admin,
+    // just one whose role doesn't include this permission and whose
+    // per-row overrides couldn't be loaded.
+    console.error(
+      "[permissions] per-row permission override lookup failed",
+      { email: scope.email, lodgeId, permission, error }
+    );
+  }
+
+  return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 }
 
 export type AdminScope =
