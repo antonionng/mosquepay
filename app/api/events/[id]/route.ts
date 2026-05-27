@@ -47,8 +47,31 @@ export async function PATCH(
     if (typeof body.enable_charity_donation === "boolean") updates.enable_charity_donation = body.enable_charity_donation;
     if (body.charity_name != null) updates.charity_name = body.charity_name.trim() || null;
     if (body.charity_description != null) updates.charity_description = body.charity_description.trim() || null;
+    if (Array.isArray(body.charity_suggested_amounts)) {
+      updates.charity_suggested_amounts = body.charity_suggested_amounts
+        .map((n: unknown) => Number(n))
+        .filter((n: number) => Number.isFinite(n) && n > 0);
+    }
+    if (typeof body.charity_allow_custom === "boolean") {
+      updates.charity_allow_custom = body.charity_allow_custom;
+    }
     if (typeof body.enable_raffle_donation === "boolean") updates.enable_raffle_donation = body.enable_raffle_donation;
     if (body.raffle_description != null) updates.raffle_description = body.raffle_description.trim() || null;
+    if (Array.isArray(body.raffle_suggested_amounts)) {
+      updates.raffle_suggested_amounts = body.raffle_suggested_amounts
+        .map((n: unknown) => Number(n))
+        .filter((n: number) => Number.isFinite(n) && n > 0);
+    }
+    if (typeof body.raffle_allow_custom === "boolean") {
+      updates.raffle_allow_custom = body.raffle_allow_custom;
+    }
+    if (typeof body.enable_raffle_wine_pledge === "boolean") {
+      updates.enable_raffle_wine_pledge = body.enable_raffle_wine_pledge;
+    }
+    if (body.raffle_wine_description != null) {
+      updates.raffle_wine_description =
+        body.raffle_wine_description.trim() || null;
+    }
     if (typeof body.enable_meeting_fee === "boolean") updates.enable_meeting_fee = body.enable_meeting_fee;
     if ("meeting_fee_amount" in body) {
       updates.meeting_fee_amount =

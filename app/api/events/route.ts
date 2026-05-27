@@ -73,12 +73,24 @@ export async function POST(request: NextRequest) {
       enable_charity_donation: body.enable_charity_donation === true,
       charity_name: body.charity_name?.trim() ?? null,
       charity_description: body.charity_description?.trim() ?? null,
-      charity_suggested_amounts: [10, 20, 50, 100],
-      charity_allow_custom: true,
+      charity_suggested_amounts: Array.isArray(body.charity_suggested_amounts)
+        ? body.charity_suggested_amounts
+            .map((n: unknown) => Number(n))
+            .filter((n: number) => Number.isFinite(n) && n > 0)
+        : [10, 20, 50, 100],
+      charity_allow_custom: body.charity_allow_custom !== false,
       enable_raffle_donation: body.enable_raffle_donation === true,
       raffle_description: body.raffle_description?.trim() ?? "Help fund evening raffle prizes",
-      raffle_suggested_amounts: [5, 10, 20, 50],
-      raffle_allow_custom: true,
+      raffle_suggested_amounts: Array.isArray(body.raffle_suggested_amounts)
+        ? body.raffle_suggested_amounts
+            .map((n: unknown) => Number(n))
+            .filter((n: number) => Number.isFinite(n) && n > 0)
+        : [5, 10, 20, 50],
+      raffle_allow_custom: body.raffle_allow_custom !== false,
+      enable_raffle_wine_pledge: body.enable_raffle_wine_pledge === true,
+      raffle_wine_description:
+        body.raffle_wine_description?.trim() ??
+        "Bring a bottle of wine for the evening raffle",
       enable_meeting_fee: body.enable_meeting_fee === true,
       meeting_fee_amount: body.meeting_fee_amount != null ? Number(body.meeting_fee_amount) : null,
       meeting_fee_description: body.meeting_fee_description?.trim() ?? null,

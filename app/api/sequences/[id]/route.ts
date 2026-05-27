@@ -206,6 +206,15 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       updates.default_enable_charity_donation = body.default_enable_charity_donation;
     const charityName = nullableTrim(body.default_charity_name);
     if (charityName !== undefined) updates.default_charity_name = charityName;
+    if (typeof body.default_enable_raffle_donation === "boolean")
+      updates.default_enable_raffle_donation = body.default_enable_raffle_donation;
+    const raffleDesc = nullableTrim(body.default_raffle_description);
+    if (raffleDesc !== undefined) updates.default_raffle_description = raffleDesc;
+    if (typeof body.default_enable_raffle_wine_pledge === "boolean")
+      updates.default_enable_raffle_wine_pledge =
+        body.default_enable_raffle_wine_pledge;
+    const wineDesc = nullableTrim(body.default_raffle_wine_description);
+    if (wineDesc !== undefined) updates.default_raffle_wine_description = wineDesc;
     const lead = parseInt0(body.summons_lead_weeks, 1, 26);
     if (lead !== undefined) updates.summons_lead_weeks = lead;
     const minLead = parseInt0(body.summons_min_lead_weeks, 1, 26);

@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
+import { sendWinePledgeConfirmationEmail } from "@/lib/email/wine-pledge";
 
 function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
@@ -75,11 +76,61 @@ export async function POST(
   const dietary = trimOrNull(body.dietary_requirements);
   const notes = trimOrNull(body.special_requests);
   const guests = attendingCeremony ? parseGuests(body.guests) : [];
+
+  // Wine pledge is only honoured when the event has it switched on and the
+  // brother is actually planning to attend. Bottles is clamped to a sane
+  // range so a stray paste of a giant number can't poison the bring-list.
+  const winePledgeRequested =
+    event.enable_raffle_wine_pledge === true &&
+    attendingCeremony &&
+    body.raffle_wine_pledged === true;
+  const wineBottles = winePledgeRequested
+    ? Math.max(
+        1,
+        Math.min(20, Math.floor(Number(body.raffle_wine_bottles) || 1))
+      )
+    : 0;
+  const wineNote = winePledgeRequested ? trimOrNull(body.raffle_wine_note) : null;
+
   const existing = await db.getRsvpByEventAndEmail(
     event.id,
     accessLink.recipient_email,
     accessLink.lodge_id
   );
+
+  const wasPledgedBefore = existing?.raffle_wine_pledged === true;
+  const shouldEmailWinePledge =
+    winePledgeRequested && wineBottles > 0 && !wasPledgedBefore;
+  // Capture the values the helper depends on so the closure does not need
+  // to rely on control-flow narrowing of outer `const` references (TS does
+  // not narrow `event`/`accessLink` inside a nested function declaration).
+  const recipientEmail = accessLink.recipient_email;
+  const recipientName = accessLink.recipient_name;
+  const lodgeIdForEmail = accessLink.lodge_id;
+  const eventTitleForEmail = event.title;
+  const eventDateForEmail = event.event_date;
+  const eventTimeForEmail = event.event_time;
+  const eventLocationForEmail = event.location;
+
+  async function maybeSendWinePledgeEmail() {
+    if (!shouldEmailWinePledge) return;
+    try {
+      const lodge = await db.getLodgeById(lodgeIdForEmail);
+      await sendWinePledgeConfirmationEmail({
+        toEmail: recipientEmail,
+        toName: recipientName ?? recipientEmail,
+        lodgeName: lodge?.name ?? "your lodge",
+        eventTitle: eventTitleForEmail,
+        eventDate: eventDateForEmail,
+        eventTime: eventTimeForEmail,
+        location: eventLocationForEmail,
+        bottles: wineBottles,
+        note: wineNote,
+      });
+    } catch (error) {
+      console.error("Wine pledge email failed:", error);
+    }
+  }
 
   if (existing) {
     const rsvp = await db.updateRsvp(existing.id, accessLink.lodge_id, {
@@ -89,6 +140,9 @@ export async function POST(
       dietary_requirements: dietary,
       special_requests: notes,
       status: attendingCeremony ? "confirmed" : "apologies",
+      raffle_wine_pledged: winePledgeRequested,
+      raffle_wine_bottles: wineBottles,
+      raffle_wine_note: wineNote,
     });
     if (rsvp && guests.length > 0) {
       await db.addEventGuests(
@@ -107,6 +161,7 @@ export async function POST(
         }))
       );
     }
+    await maybeSendWinePledgeEmail();
     return NextResponse.json({ success: true, rsvp });
   }
 
@@ -128,6 +183,9 @@ export async function POST(
     payment_completed: false,
     payment_id: null,
     status: attendingCeremony ? "confirmed" : "apologies",
+    raffle_wine_pledged: winePledgeRequested,
+    raffle_wine_bottles: wineBottles,
+    raffle_wine_note: wineNote,
   });
 
   if (guests.length > 0) {
@@ -147,6 +205,8 @@ export async function POST(
       }))
     );
   }
+
+  await maybeSendWinePledgeEmail();
 
   return NextResponse.json({ success: true, rsvp });
 }

@@ -24,6 +24,7 @@ import { getDefaultLodgeSlug, getLodgeSlugFromRequest } from "@/lib/tenant";
 import { resolveCheckoutFeesForMember } from "@/lib/fees/server-resolve";
 import { createServiceClient } from "@/lib/supabase/server";
 import { callMooovConnect, MooovApiError } from "@/lib/mooov";
+import { sendWinePledgeConfirmationEmail } from "@/lib/email/wine-pledge";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,9 +71,26 @@ export async function POST(request: NextRequest) {
     gift_aid_address_line_2,
     gift_aid_city,
     gift_aid_postcode,
+    raffle_wine_pledged,
+    raffle_wine_bottles,
+    raffle_wine_note,
     standalone,
     mock_payment,
   } = body;
+
+  // Wine pledge is a non-cash side-effect of attending: only honoured when
+  // the brother is actually saying "yes" and is not part of the cash total.
+  // We clamp bottles for the same defence-in-depth reason as the
+  // summons-access route.
+  const winePledged =
+    raffle_wine_pledged === true && attending_ceremony !== false;
+  const wineBottles = winePledged
+    ? Math.max(1, Math.min(20, Math.floor(Number(raffle_wine_bottles) || 1)))
+    : 0;
+  const wineNote =
+    winePledged && typeof raffle_wine_note === "string"
+      ? raffle_wine_note.trim().slice(0, 500) || null
+      : null;
 
   const shouldMockPayment =
     process.env.NODE_ENV !== "production" &&
@@ -144,6 +162,9 @@ export async function POST(request: NextRequest) {
         payment_completed: false,
         payment_id: null,
         status: "payment_pending",
+        raffle_wine_pledged: winePledged,
+        raffle_wine_bottles: wineBottles,
+        raffle_wine_note: wineNote,
       };
 
       if (isSupabaseConfigured()) {
@@ -170,6 +191,31 @@ export async function POST(request: NextRequest) {
               welcome_email_sent_at: null,
             }))
           );
+        }
+
+        // Fire-and-forget wine pledge confirmation. Don't block checkout.
+        if (winePledged && wineBottles > 0) {
+          try {
+            const [eventRow, lodge] = await Promise.all([
+              db.getEventById(event_id, lodgeId),
+              db.getLodgeById(lodgeId),
+            ]);
+            if (eventRow) {
+              await sendWinePledgeConfirmationEmail({
+                toEmail: user_email,
+                toName: user_name ?? user_email,
+                lodgeName: lodge?.name ?? "your lodge",
+                eventTitle: eventRow.title,
+                eventDate: eventRow.event_date,
+                eventTime: eventRow.event_time,
+                location: eventRow.location,
+                bottles: wineBottles,
+                note: wineNote,
+              });
+            }
+          } catch (error) {
+            console.error("Wine pledge email failed:", error);
+          }
         }
       } else {
         const rsvp = mockDb.addRsvp({ ...rsvpData, lodge_slug: lodgeSlug });

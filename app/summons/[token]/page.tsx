@@ -233,6 +233,21 @@ export default async function PublicSummonsPage({
                   enableGuestTickets={event.enable_guest_tickets}
                   guestTicketPrice={event.guest_ticket_price}
                   guestTicketDescription={event.guest_ticket_description}
+                  enableCharityDonation={event.enable_charity_donation}
+                  charityName={event.charity_name}
+                  charityDescription={event.charity_description}
+                  charitySuggestedAmounts={
+                    event.charity_suggested_amounts ?? null
+                  }
+                  charityAllowCustom={event.charity_allow_custom}
+                  enableRaffleDonation={event.enable_raffle_donation}
+                  raffleDescription={event.raffle_description}
+                  raffleSuggestedAmounts={
+                    event.raffle_suggested_amounts ?? null
+                  }
+                  raffleAllowCustom={event.raffle_allow_custom}
+                  enableRaffleWinePledge={event.enable_raffle_wine_pledge}
+                  raffleWineDescription={event.raffle_wine_description}
                   memberProfile={memberProfile ?? null}
                   feeDefaults={feeDefaults}
                   initial={{
@@ -246,6 +261,12 @@ export default async function PublicSummonsPage({
                     dietary_requirements:
                       existingRsvp?.dietary_requirements ?? "",
                     special_requests: existingRsvp?.special_requests ?? "",
+                    raffle_wine_pledged:
+                      existingRsvp?.raffle_wine_pledged ?? false,
+                    raffle_wine_bottles:
+                      existingRsvp?.raffle_wine_bottles ?? 0,
+                    raffle_wine_note:
+                      existingRsvp?.raffle_wine_note ?? "",
                   }}
                 />
               </div>

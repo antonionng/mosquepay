@@ -60,6 +60,12 @@ export default async function AdminMeetingsPage() {
       special_requests: r.special_requests,
       payment_required: r.payment_required,
       payment_completed: r.payment_completed,
+      raffle_wine_pledged:
+        (r as { raffle_wine_pledged?: boolean }).raffle_wine_pledged ?? false,
+      raffle_wine_bottles:
+        (r as { raffle_wine_bottles?: number }).raffle_wine_bottles ?? 0,
+      raffle_wine_note:
+        (r as { raffle_wine_note?: string | null }).raffle_wine_note ?? null,
     }));
 
     let hasSummons = false;

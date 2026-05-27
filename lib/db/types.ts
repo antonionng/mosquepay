@@ -296,6 +296,13 @@ export type Event = {
   raffle_description: string | null;
   raffle_suggested_amounts: number[] | null;
   raffle_allow_custom: boolean;
+  /**
+   * Non-cash "bring a bottle for the raffle" pledge. Independent of
+   * enable_raffle_donation: a lodge can run a cash raffle, a wine raffle,
+   * both, or neither. See migration 057.
+   */
+  enable_raffle_wine_pledge: boolean;
+  raffle_wine_description: string | null;
   enable_meeting_fee: boolean;
   meeting_fee_amount: number | null;
   meeting_fee_description: string | null;
@@ -393,6 +400,10 @@ export type MeetingSequence = {
   default_enable_meeting_fee: boolean;
   default_enable_charity_donation: boolean;
   default_charity_name: string | null;
+  default_enable_raffle_donation: boolean;
+  default_raffle_description: string | null;
+  default_enable_raffle_wine_pledge: boolean;
+  default_raffle_wine_description: string | null;
   /** Max lead time in weeks for auto-creating a draft summons. */
   summons_lead_weeks: number;
   /** UI warning threshold: anything inside this is overdue. */
@@ -420,6 +431,15 @@ export type Rsvp = {
   payment_completed: boolean;
   payment_id: string | null;
   status: string;
+  /**
+   * Non-cash raffle wine pledge. `raffle_wine_pledged` is the boolean
+   * gate; when true `raffle_wine_bottles` is >= 1 and `raffle_wine_note`
+   * is optional free text (e.g. "Chianti Riserva"). When false bottles
+   * is 0 and the note is null. See migration 057.
+   */
+  raffle_wine_pledged: boolean;
+  raffle_wine_bottles: number;
+  raffle_wine_note: string | null;
   created_at: string;
   updated_at: string;
 };

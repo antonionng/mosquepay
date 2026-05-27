@@ -138,7 +138,8 @@ export async function POST(request: NextRequest, { params }: Params) {
         max_attendees: null,
         enable_payments:
           sequence.default_enable_dining_rsvp ||
-          sequence.default_enable_meeting_fee,
+          sequence.default_enable_meeting_fee ||
+          sequence.default_enable_raffle_donation,
         enable_dining_rsvp: sequence.default_enable_dining_rsvp,
         dining_price: sequence.default_dining_price,
         dining_description: null,
@@ -147,10 +148,14 @@ export async function POST(request: NextRequest, { params }: Params) {
         charity_description: null,
         charity_suggested_amounts: [10, 20, 50, 100],
         charity_allow_custom: true,
-        enable_raffle_donation: false,
-        raffle_description: null,
-        raffle_suggested_amounts: null,
-        raffle_allow_custom: false,
+        enable_raffle_donation: sequence.default_enable_raffle_donation,
+        raffle_description: sequence.default_raffle_description,
+        raffle_suggested_amounts: sequence.default_enable_raffle_donation
+          ? [5, 10, 20, 50]
+          : null,
+        raffle_allow_custom: sequence.default_enable_raffle_donation,
+        enable_raffle_wine_pledge: sequence.default_enable_raffle_wine_pledge,
+        raffle_wine_description: sequence.default_raffle_wine_description,
         enable_meeting_fee: sequence.default_enable_meeting_fee,
         meeting_fee_amount: sequence.default_meeting_fee_amount,
         meeting_fee_description: null,

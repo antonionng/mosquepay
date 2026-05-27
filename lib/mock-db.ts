@@ -550,6 +550,8 @@ export type MockEvent = LodgeScoped & {
   raffle_description: string | null;
   raffle_suggested_amounts: number[] | null;
   raffle_allow_custom: boolean;
+  enable_raffle_wine_pledge: boolean;
+  raffle_wine_description: string | null;
   enable_meeting_fee: boolean;
   meeting_fee_amount: number | null;
   meeting_fee_description: string | null;
@@ -668,6 +670,9 @@ export type MockRsvp = LodgeScoped & {
   payment_completed: boolean;
   payment_id: string | null;
   status: string;
+  raffle_wine_pledged?: boolean;
+  raffle_wine_bottles?: number;
+  raffle_wine_note?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -1649,7 +1654,7 @@ function seedData() {
     }
   });
 
-  const guestMeetingDefaults = { enable_meeting_fee: false, meeting_fee_amount: null, meeting_fee_description: null, enable_guest_tickets: false, guest_ticket_price: null, guest_ticket_description: null, guest_policy: "blue_table" as const };
+  const guestMeetingDefaults = { enable_meeting_fee: false, meeting_fee_amount: null, meeting_fee_description: null, enable_guest_tickets: false, guest_ticket_price: null, guest_ticket_description: null, guest_policy: "blue_table" as const, enable_raffle_wine_pledge: false, raffle_wine_description: "Bring a bottle of wine for the evening raffle" as string | null };
   const seedEvents: Array<AddEventInput> = [
     { title: "Regular Meeting – April", slug: "regular-meeting-april", description: "Monthly regular meeting with ceremony.", event_type: "regular_meeting", event_date: daysFromNow(5), event_time: "18:30", location: "Mark Masons' Hall", temple_room: "Temple 1", dress_code: "Dark lounge suit", enable_rsvp: true, rsvp_deadline: daysFromNow(3), max_attendees: 60, enable_payments: true, enable_dining_rsvp: true, dining_price: 45, dining_description: "Three course festive board", enable_charity_donation: true, charity_name: "Masonic Charitable Foundation", charity_description: "Support MCF", charity_suggested_amounts: [5, 10, 20], charity_allow_custom: true, enable_raffle_donation: true, raffle_description: "Charity raffle", raffle_suggested_amounts: [2, 5, 10], raffle_allow_custom: true, ...guestMeetingDefaults, enable_guest_tickets: true, guest_ticket_price: 45, guest_ticket_description: "Guest dining ticket", featured_image_url: null, published: true },
     { title: "Installation Meeting", slug: "installation-meeting", description: "Annual installation of the new Worshipful Master.", event_type: "installation", event_date: daysFromNow(30), event_time: "16:00", location: "Mark Masons' Hall", temple_room: "Grand Temple", dress_code: "Morning dress", enable_rsvp: true, rsvp_deadline: daysFromNow(25), max_attendees: 120, enable_payments: true, enable_dining_rsvp: true, dining_price: 65, dining_description: "Four course installation banquet", enable_charity_donation: true, charity_name: "London Grand Rank Benevolent Fund", charity_description: null, charity_suggested_amounts: [10, 25, 50], charity_allow_custom: true, enable_raffle_donation: true, raffle_description: "Grand raffle", raffle_suggested_amounts: [5, 10], raffle_allow_custom: false, ...guestMeetingDefaults, enable_guest_tickets: true, guest_ticket_price: 65, guest_ticket_description: "Guest banquet ticket", featured_image_url: null, published: true },

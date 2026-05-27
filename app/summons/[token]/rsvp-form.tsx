@@ -34,6 +34,17 @@ type Props = {
   enableGuestTickets: boolean;
   guestTicketPrice: number | null;
   guestTicketDescription: string | null;
+  enableCharityDonation: boolean;
+  charityName: string | null;
+  charityDescription: string | null;
+  charitySuggestedAmounts: number[] | null;
+  charityAllowCustom: boolean;
+  enableRaffleDonation: boolean;
+  raffleDescription: string | null;
+  raffleSuggestedAmounts: number[] | null;
+  raffleAllowCustom: boolean;
+  enableRaffleWinePledge: boolean;
+  raffleWineDescription: string | null;
   memberProfile?: MemberFeeProfile | null;
   feeDefaults?: LodgeFeeDefaults | null;
   initial: {
@@ -41,8 +52,15 @@ type Props = {
     attending_dining: boolean;
     dietary_requirements: string;
     special_requests: string;
+    raffle_wine_pledged: boolean;
+    raffle_wine_bottles: number;
+    raffle_wine_note: string;
   };
 };
+
+function formatGbp(value: number): string {
+  return Number.isInteger(value) ? `£${value}` : `£${value.toFixed(2)}`;
+}
 
 export function SummonsRsvpForm({
   token,
@@ -56,10 +74,23 @@ export function SummonsRsvpForm({
   enablePayments,
   enableMeetingFee,
   meetingFeeAmount,
-  meetingFeeDescription,
+  // meetingFeeDescription is part of the prop interface but the breakdown
+  // component renders the canonical label from buildMemberFeeBreakdown, so
+  // we don't read it here. Intentionally unused.
   enableGuestTickets,
   guestTicketPrice,
   guestTicketDescription,
+  enableCharityDonation,
+  charityName,
+  charityDescription,
+  charitySuggestedAmounts,
+  charityAllowCustom,
+  enableRaffleDonation,
+  raffleDescription,
+  raffleSuggestedAmounts,
+  raffleAllowCustom,
+  enableRaffleWinePledge,
+  raffleWineDescription,
   memberProfile,
   feeDefaults,
   initial,
@@ -72,6 +103,17 @@ export function SummonsRsvpForm({
   const [pending, setPending] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [charityAmount, setCharityAmount] = useState<number>(0);
+  const [charityCustom, setCharityCustom] = useState<string>("");
+  const [raffleAmount, setRaffleAmount] = useState<number>(0);
+  const [raffleCustom, setRaffleCustom] = useState<string>("");
+
+  const [winePledged, setWinePledged] = useState(initial.raffle_wine_pledged);
+  const [wineBottles, setWineBottles] = useState<number>(
+    Math.max(initial.raffle_wine_bottles, 1)
+  );
+  const [wineNote, setWineNote] = useState(initial.raffle_wine_note);
 
   const eventCtx = {
     enable_meeting_fee: enableMeetingFee,
@@ -117,8 +159,49 @@ export function SummonsRsvpForm({
   const guestTotal = feeBreakdown.items
     .filter((i) => i.key.startsWith("guest:"))
     .reduce((s, i) => s + i.amount, 0);
-  const total = feeBreakdown.total;
+
+  // Contributions live alongside compulsory charges, but only when the
+  // member has actually entered an amount. We use feeBreakdown.items as the
+  // basis for the existing UI and append extra rows for charity / raffle so
+  // the breakdown component shows a unified summary at the bottom.
+  const breakdownItems = useMemo(() => {
+    const items = [...feeBreakdown.items];
+    if (enableCharityDonation && charityAmount > 0) {
+      items.push({
+        key: "charity",
+        label: charityName ? `Charity donation: ${charityName}` : "Charity donation",
+        amount: charityAmount,
+      });
+    }
+    if (enableRaffleDonation && raffleAmount > 0) {
+      items.push({
+        key: "raffle",
+        label: "Raffle contribution",
+        amount: raffleAmount,
+      });
+    }
+    return items;
+  }, [
+    feeBreakdown.items,
+    enableCharityDonation,
+    charityAmount,
+    charityName,
+    enableRaffleDonation,
+    raffleAmount,
+  ]);
+
+  const total = breakdownItems.reduce((s, i) => s + i.amount, 0);
+  const compulsoryTotal = feeBreakdown.total;
   const requiresPayment = enablePayments && total > 0;
+
+  // Wine pledge is a non-cash side effect of attending. We always send it
+  // in the RSVP payload (even on apologies — the brother may want to drop
+  // a bottle off in advance). When attending+paying, we route through
+  // checkout first and save the pledge on the resulting RSVP via the
+  // payment webhook's RSVP confirmation path, BUT the checkout route
+  // doesn't currently carry pledge fields, so we save the RSVP first via
+  // the access endpoint and then continue to checkout. See submit() below.
+  const showWinePledge = enableRaffleWinePledge;
 
   function addGuest() {
     if (guests.length >= 10) return;
@@ -135,6 +218,28 @@ export function SummonsRsvpForm({
     );
   }
 
+  function selectCharity(amount: number) {
+    setCharityAmount(amount);
+    setCharityCustom("");
+  }
+
+  function selectRaffle(amount: number) {
+    setRaffleAmount(amount);
+    setRaffleCustom("");
+  }
+
+  function setCharityCustomAmount(raw: string) {
+    setCharityCustom(raw);
+    const n = Number(raw);
+    setCharityAmount(Number.isFinite(n) && n > 0 ? n : 0);
+  }
+
+  function setRaffleCustomAmount(raw: string) {
+    setRaffleCustom(raw);
+    const n = Number(raw);
+    setRaffleAmount(Number.isFinite(n) && n > 0 ? n : 0);
+  }
+
   async function submit() {
     if (attending && guests.some((guest) => !guest.guest_name.trim())) {
       setError("Please provide a name for each guest.");
@@ -144,6 +249,23 @@ export function SummonsRsvpForm({
     setPending(true);
     setError(null);
     setSaved(false);
+
+    // Wine pledge payload is shared between both branches below. The
+    // checkout-session route will write it onto the freshly-created RSVP
+    // before it hands off to Mooov; the access route writes it directly.
+    const winePayload =
+      showWinePledge && attending
+        ? {
+            raffle_wine_pledged: winePledged,
+            raffle_wine_bottles: winePledged ? Math.max(1, wineBottles) : 0,
+            raffle_wine_note: winePledged ? wineNote.trim() || null : null,
+          }
+        : {
+            raffle_wine_pledged: false,
+            raffle_wine_bottles: 0,
+            raffle_wine_note: null,
+          };
+
     try {
       if (attending && requiresPayment) {
         const lodgeQuery = lodgeSlug
@@ -168,13 +290,14 @@ export function SummonsRsvpForm({
               meeting_fee: meetingFee,
               guest_total: guestTotal,
               guests,
-              charity_amount: 0,
-              raffle_amount: 0,
+              charity_amount: charityAmount,
+              raffle_amount: raffleAmount,
               gift_aid: false,
               gift_aid_address_line_1: "",
               gift_aid_address_line_2: "",
               gift_aid_city: "",
               gift_aid_postcode: "",
+              ...winePayload,
             }),
           }
         );
@@ -201,6 +324,7 @@ export function SummonsRsvpForm({
             guests: attending ? guests : [],
             dietary_requirements: dietary,
             special_requests: notes,
+            ...winePayload,
           }),
         }
       );
@@ -215,6 +339,9 @@ export function SummonsRsvpForm({
       setPending(false);
     }
   }
+
+  const charityChips = charitySuggestedAmounts ?? [];
+  const raffleChips = raffleSuggestedAmounts ?? [];
 
   return (
     <div className="space-y-4">
@@ -354,6 +481,184 @@ export function SummonsRsvpForm({
         />
       </div>
 
+      {attending &&
+      (enableCharityDonation ||
+        enableRaffleDonation ||
+        showWinePledge) ? (
+        <div className="space-y-4 rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">
+            Optional contributions
+          </p>
+
+          {enableCharityDonation ? (
+            <div className="space-y-2">
+              <Label className="font-semibold text-slate-950">
+                Charity donation{charityName ? ` (${charityName})` : ""}
+              </Label>
+              {charityDescription ? (
+                <p className="text-xs text-slate-600">{charityDescription}</p>
+              ) : null}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => selectCharity(0)}
+                  className={
+                    charityAmount === 0 && !charityCustom
+                      ? "rounded-lg border border-blue-600 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm"
+                      : "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700"
+                  }
+                >
+                  None
+                </button>
+                {charityChips.map((amount) => (
+                  <button
+                    key={amount}
+                    type="button"
+                    onClick={() => selectCharity(amount)}
+                    className={
+                      charityAmount === amount && !charityCustom
+                        ? "rounded-lg border border-blue-600 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm"
+                        : "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700"
+                    }
+                  >
+                    {formatGbp(amount)}
+                  </button>
+                ))}
+                {charityAllowCustom ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-slate-600">£</span>
+                    <Input
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step="0.01"
+                      placeholder="Custom"
+                      value={charityCustom}
+                      onChange={(event) =>
+                        setCharityCustomAmount(event.target.value)
+                      }
+                      className="h-8 w-24 text-xs"
+                    />
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {enableRaffleDonation ? (
+            <div className="space-y-2">
+              <Label className="font-semibold text-slate-950">
+                Raffle contribution
+              </Label>
+              {raffleDescription ? (
+                <p className="text-xs text-slate-600">{raffleDescription}</p>
+              ) : null}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => selectRaffle(0)}
+                  className={
+                    raffleAmount === 0 && !raffleCustom
+                      ? "rounded-lg border border-blue-600 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm"
+                      : "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700"
+                  }
+                >
+                  None
+                </button>
+                {raffleChips.map((amount) => (
+                  <button
+                    key={amount}
+                    type="button"
+                    onClick={() => selectRaffle(amount)}
+                    className={
+                      raffleAmount === amount && !raffleCustom
+                        ? "rounded-lg border border-blue-600 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm"
+                        : "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700"
+                    }
+                  >
+                    {formatGbp(amount)}
+                  </button>
+                ))}
+                {raffleAllowCustom ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-slate-600">£</span>
+                    <Input
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step="0.01"
+                      placeholder="Custom"
+                      value={raffleCustom}
+                      onChange={(event) =>
+                        setRaffleCustomAmount(event.target.value)
+                      }
+                      className="h-8 w-24 text-xs"
+                    />
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {showWinePledge ? (
+            <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
+              <label className="flex items-start gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={winePledged}
+                  onChange={(event) => setWinePledged(event.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600"
+                />
+                <span>
+                  <span className="block font-semibold text-slate-950">
+                    Pledge a bottle for the wine raffle
+                  </span>
+                  <span className="mt-1 block text-xs text-slate-600">
+                    {raffleWineDescription ??
+                      "Bring a bottle of wine for the evening raffle."}{" "}
+                    No payment is taken — the bottle is the donation. Please
+                    bring it on the night.
+                  </span>
+                </span>
+              </label>
+              {winePledged ? (
+                <div className="grid gap-3 sm:grid-cols-[120px_1fr]">
+                  <div className="space-y-1">
+                    <Label htmlFor="wine_bottles">Bottles</Label>
+                    <Input
+                      id="wine_bottles"
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={wineBottles}
+                      onChange={(event) =>
+                        setWineBottles(
+                          Math.max(
+                            1,
+                            Math.min(20, Number(event.target.value) || 1)
+                          )
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="wine_note">
+                      What you&apos;ll bring (optional)
+                    </Label>
+                    <Input
+                      id="wine_note"
+                      placeholder="e.g. Chianti Riserva 2019"
+                      value={wineNote}
+                      onChange={(event) => setWineNote(event.target.value)}
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
       {saved ? (
         <p className="text-sm font-medium text-emerald-700">
@@ -361,8 +666,8 @@ export function SummonsRsvpForm({
         </p>
       ) : null}
 
-      {attending && requiresPayment ? (
-        <FeeBreakdown items={feeBreakdown.items} total={total} />
+      {attending && (requiresPayment || compulsoryTotal > 0) ? (
+        <FeeBreakdown items={breakdownItems} total={total} />
       ) : null}
 
       <Button type="button" variant="primary" onClick={submit} disabled={pending}>

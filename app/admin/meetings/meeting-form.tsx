@@ -46,6 +46,16 @@ export type MeetingForm = {
   enable_charity_donation: boolean;
   charity_name: string;
   charity_description: string;
+  /** Comma-separated suggested amounts, e.g. "10, 20, 50, 100". */
+  charity_suggested_amounts: string;
+  charity_allow_custom: boolean;
+  enable_raffle_donation: boolean;
+  raffle_description: string;
+  /** Comma-separated suggested amounts, e.g. "5, 10, 20, 50". */
+  raffle_suggested_amounts: string;
+  raffle_allow_custom: boolean;
+  enable_raffle_wine_pledge: boolean;
+  raffle_wine_description: string;
   enable_meeting_fee: boolean;
   meeting_fee_amount: string;
   meeting_fee_description: string;
@@ -78,6 +88,14 @@ export type MeetingFormMeeting = {
   enable_charity_donation: boolean;
   charity_name: string | null;
   charity_description: string | null;
+  charity_suggested_amounts?: number[] | null;
+  charity_allow_custom?: boolean;
+  enable_raffle_donation?: boolean;
+  raffle_description?: string | null;
+  raffle_suggested_amounts?: number[] | null;
+  raffle_allow_custom?: boolean;
+  enable_raffle_wine_pledge?: boolean;
+  raffle_wine_description?: string | null;
   enable_meeting_fee: boolean;
   meeting_fee_amount: number | null;
   meeting_fee_description: string | null;
@@ -143,6 +161,44 @@ export function formatMoneyInput(value: string | number | null | undefined) {
   return Number.isFinite(amount) ? amount.toFixed(2) : "";
 }
 
+/**
+ * Render an array of suggested amounts (e.g. [10, 20, 50, 100]) into the
+ * comma-separated string the form input edits. We strip falsy/non-numeric
+ * entries so the editor never resurrects garbage rows.
+ */
+export function suggestedAmountsToInput(
+  values: number[] | null | undefined
+): string {
+  if (!Array.isArray(values) || values.length === 0) return "";
+  return values
+    .map((n) => Number(n))
+    .filter((n) => Number.isFinite(n) && n > 0)
+    .map((n) => (Number.isInteger(n) ? String(n) : n.toFixed(2)))
+    .join(", ");
+}
+
+/**
+ * Parse the user-facing comma-separated amounts back into a numeric array
+ * suitable for the JSON `*_suggested_amounts` columns. Drops blanks and
+ * non-positive values silently — the wizard intentionally does not error
+ * on bad rows, it just ignores them.
+ */
+export function parseSuggestedAmounts(input: string): number[] {
+  if (!input) return [];
+  return input
+    .split(/[,\s]+/)
+    .map((raw) => raw.trim())
+    .filter(Boolean)
+    .map((raw) => Number(raw))
+    .filter((n) => Number.isFinite(n) && n > 0);
+}
+
+const DEFAULT_CHARITY_SUGGESTED = "10, 20, 50, 100";
+const DEFAULT_RAFFLE_SUGGESTED = "5, 10, 20, 50";
+const DEFAULT_RAFFLE_DESCRIPTION = "Help fund evening raffle prizes";
+const DEFAULT_WINE_DESCRIPTION =
+  "Bring a bottle of wine for the evening raffle";
+
 export function emptyMeetingForm(): MeetingForm {
   return {
     title: "",
@@ -165,6 +221,14 @@ export function emptyMeetingForm(): MeetingForm {
     enable_charity_donation: false,
     charity_name: "",
     charity_description: "",
+    charity_suggested_amounts: DEFAULT_CHARITY_SUGGESTED,
+    charity_allow_custom: true,
+    enable_raffle_donation: false,
+    raffle_description: DEFAULT_RAFFLE_DESCRIPTION,
+    raffle_suggested_amounts: DEFAULT_RAFFLE_SUGGESTED,
+    raffle_allow_custom: true,
+    enable_raffle_wine_pledge: false,
+    raffle_wine_description: DEFAULT_WINE_DESCRIPTION,
     enable_meeting_fee: false,
     meeting_fee_amount: "",
     meeting_fee_description: "",
@@ -198,6 +262,20 @@ export function formFromMeeting(meeting: MeetingFormMeeting): MeetingForm {
     enable_charity_donation: meeting.enable_charity_donation,
     charity_name: meeting.charity_name ?? "",
     charity_description: meeting.charity_description ?? "",
+    charity_suggested_amounts:
+      suggestedAmountsToInput(meeting.charity_suggested_amounts) ||
+      DEFAULT_CHARITY_SUGGESTED,
+    charity_allow_custom: meeting.charity_allow_custom ?? true,
+    enable_raffle_donation: meeting.enable_raffle_donation === true,
+    raffle_description:
+      meeting.raffle_description ?? DEFAULT_RAFFLE_DESCRIPTION,
+    raffle_suggested_amounts:
+      suggestedAmountsToInput(meeting.raffle_suggested_amounts) ||
+      DEFAULT_RAFFLE_SUGGESTED,
+    raffle_allow_custom: meeting.raffle_allow_custom ?? true,
+    enable_raffle_wine_pledge: meeting.enable_raffle_wine_pledge === true,
+    raffle_wine_description:
+      meeting.raffle_wine_description ?? DEFAULT_WINE_DESCRIPTION,
     enable_meeting_fee: meeting.enable_meeting_fee,
     meeting_fee_amount: formatMoneyInput(meeting.meeting_fee_amount),
     meeting_fee_description: meeting.meeting_fee_description ?? "",
@@ -819,6 +897,151 @@ export function MeetingFormDrawer({
                       }
                     />
                   </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <label
+                      className="text-sm text-dash-text"
+                      htmlFor="charity-suggested"
+                    >
+                      Suggested amounts (£)
+                    </label>
+                    <Input
+                      id="charity-suggested"
+                      placeholder="e.g. 10, 20, 50, 100"
+                      value={form.charity_suggested_amounts}
+                      onChange={(event) =>
+                        updateForm({
+                          charity_suggested_amounts: event.target.value,
+                        })
+                      }
+                    />
+                    <p className="text-xs text-dash-muted">
+                      Comma-separated list. Members can tap one of these
+                      buttons on the summons.
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-dash-text sm:col-span-2">
+                    <input
+                      type="checkbox"
+                      checked={form.charity_allow_custom}
+                      onChange={(event) =>
+                        updateForm({
+                          charity_allow_custom: event.target.checked,
+                        })
+                      }
+                    />
+                    Allow members to enter a custom amount
+                  </label>
+                </div>
+              )}
+            </fieldset>
+
+            <fieldset className="space-y-3 rounded-lg border border-dash-border bg-dash-surface p-4">
+              <label className="flex items-center gap-2 text-sm font-medium text-dash-text">
+                <input
+                  type="checkbox"
+                  checked={form.enable_raffle_donation}
+                  onChange={(event) =>
+                    updateForm({
+                      enable_raffle_donation: event.target.checked,
+                    })
+                  }
+                />
+                Sell raffle tickets at this meeting
+              </label>
+              {form.enable_raffle_donation && (
+                <div className="grid gap-4 pl-6 sm:grid-cols-2">
+                  <div className="space-y-2 sm:col-span-2">
+                    <label
+                      className="text-sm text-dash-text"
+                      htmlFor="raffle-description"
+                    >
+                      Raffle description
+                    </label>
+                    <Input
+                      id="raffle-description"
+                      placeholder="e.g. Help fund evening raffle prizes"
+                      value={form.raffle_description}
+                      onChange={(event) =>
+                        updateForm({ raffle_description: event.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <label
+                      className="text-sm text-dash-text"
+                      htmlFor="raffle-suggested"
+                    >
+                      Suggested amounts (£)
+                    </label>
+                    <Input
+                      id="raffle-suggested"
+                      placeholder="e.g. 5, 10, 20, 50"
+                      value={form.raffle_suggested_amounts}
+                      onChange={(event) =>
+                        updateForm({
+                          raffle_suggested_amounts: event.target.value,
+                        })
+                      }
+                    />
+                    <p className="text-xs text-dash-muted">
+                      Comma-separated list. Members can tap one of these
+                      buttons on the summons.
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-dash-text sm:col-span-2">
+                    <input
+                      type="checkbox"
+                      checked={form.raffle_allow_custom}
+                      onChange={(event) =>
+                        updateForm({
+                          raffle_allow_custom: event.target.checked,
+                        })
+                      }
+                    />
+                    Allow members to enter a custom amount
+                  </label>
+                </div>
+              )}
+            </fieldset>
+
+            <fieldset className="space-y-3 rounded-lg border border-dash-border bg-dash-surface p-4">
+              <label className="flex items-center gap-2 text-sm font-medium text-dash-text">
+                <input
+                  type="checkbox"
+                  checked={form.enable_raffle_wine_pledge}
+                  onChange={(event) =>
+                    updateForm({
+                      enable_raffle_wine_pledge: event.target.checked,
+                    })
+                  }
+                />
+                Invite members to pledge a bottle of wine for the raffle
+              </label>
+              {form.enable_raffle_wine_pledge && (
+                <div className="grid gap-4 pl-6 sm:grid-cols-2">
+                  <div className="space-y-2 sm:col-span-2">
+                    <label
+                      className="text-sm text-dash-text"
+                      htmlFor="wine-description"
+                    >
+                      Wine pledge description
+                    </label>
+                    <Input
+                      id="wine-description"
+                      placeholder="e.g. Bring a bottle of wine for the evening raffle"
+                      value={form.raffle_wine_description}
+                      onChange={(event) =>
+                        updateForm({
+                          raffle_wine_description: event.target.value,
+                        })
+                      }
+                    />
+                    <p className="text-xs text-dash-muted">
+                      Non-cash pledge. The bottle is the donation, so nothing
+                      is charged at checkout. The steward gets a bring-list
+                      on the recipients view.
+                    </p>
+                  </div>
                 </div>
               )}
             </fieldset>
@@ -886,6 +1109,18 @@ export function MeetingFormDrawer({
                   {form.enable_charity_donation
                     ? form.charity_name || "(no name)"
                     : "Off"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-dash-muted">Raffle (cash)</dt>
+                <dd className="font-medium text-dash-text">
+                  {form.enable_raffle_donation ? "Enabled" : "Off"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-dash-muted">Wine pledge</dt>
+                <dd className="font-medium text-dash-text">
+                  {form.enable_raffle_wine_pledge ? "Enabled" : "Off"}
                 </dd>
               </div>
             </dl>
@@ -1129,7 +1364,9 @@ function FeeSummary({
     memberAttendingDiningTotal > 0 ||
     memberCeremonyOnlyTotal > 0 ||
     guestTotal > 0 ||
-    form.enable_charity_donation;
+    form.enable_charity_donation ||
+    form.enable_raffle_donation ||
+    form.enable_raffle_wine_pledge;
 
   if (!hasAnyCharge && !diningWaivedAll) {
     return (
@@ -1188,6 +1425,18 @@ function FeeSummary({
           <li className="flex items-center justify-between gap-3 text-dash-text">
             <span>Charity collection</span>
             <span className="text-dash-muted">{form.charity_name || "(no name)"}</span>
+          </li>
+        )}
+        {form.enable_raffle_donation && (
+          <li className="flex items-center justify-between gap-3 text-dash-text">
+            <span>Raffle tickets</span>
+            <span className="text-dash-muted">Optional contribution</span>
+          </li>
+        )}
+        {form.enable_raffle_wine_pledge && (
+          <li className="flex items-center justify-between gap-3 text-dash-text">
+            <span>Wine pledge</span>
+            <span className="text-dash-muted">Bring a bottle (non-cash)</span>
           </li>
         )}
       </ul>

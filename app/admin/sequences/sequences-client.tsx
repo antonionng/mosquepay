@@ -49,6 +49,10 @@ type SequenceRecord = {
   default_enable_meeting_fee: boolean;
   default_enable_charity_donation: boolean;
   default_charity_name: string | null;
+  default_enable_raffle_donation: boolean;
+  default_raffle_description: string | null;
+  default_enable_raffle_wine_pledge: boolean;
+  default_raffle_wine_description: string | null;
   summons_lead_weeks: number;
   summons_min_lead_weeks: number;
   auto_draft_summons: boolean;
@@ -84,6 +88,10 @@ type SequenceForm = {
   default_enable_meeting_fee: boolean;
   default_enable_charity_donation: boolean;
   default_charity_name: string;
+  default_enable_raffle_donation: boolean;
+  default_raffle_description: string;
+  default_enable_raffle_wine_pledge: boolean;
+  default_raffle_wine_description: string;
   summons_lead_weeks: number;
   summons_min_lead_weeks: number;
   auto_draft_summons: boolean;
@@ -141,6 +149,10 @@ function defaultForm(): SequenceForm {
     default_enable_meeting_fee: false,
     default_enable_charity_donation: false,
     default_charity_name: "",
+    default_enable_raffle_donation: false,
+    default_raffle_description: "",
+    default_enable_raffle_wine_pledge: false,
+    default_raffle_wine_description: "Bring a bottle of wine for the evening raffle",
     summons_lead_weeks: 6,
     summons_min_lead_weeks: 4,
     auto_draft_summons: true,
@@ -327,6 +339,12 @@ export function SequencesClient({
       default_enable_meeting_fee: sequence.default_enable_meeting_fee,
       default_enable_charity_donation: sequence.default_enable_charity_donation,
       default_charity_name: sequence.default_charity_name ?? "",
+      default_enable_raffle_donation: sequence.default_enable_raffle_donation,
+      default_raffle_description: sequence.default_raffle_description ?? "",
+      default_enable_raffle_wine_pledge: sequence.default_enable_raffle_wine_pledge,
+      default_raffle_wine_description:
+        sequence.default_raffle_wine_description ??
+        "Bring a bottle of wine for the evening raffle",
       summons_lead_weeks: sequence.summons_lead_weeks,
       summons_min_lead_weeks: sequence.summons_min_lead_weeks,
       auto_draft_summons: sequence.auto_draft_summons,
@@ -1078,6 +1096,119 @@ export function SequencesClient({
                     }
                   />
                 </div>
+              </div>
+
+              <div className="space-y-3 rounded-xl border border-dash-border bg-dash-surface-subtle/60 p-4">
+                <p className="text-sm font-semibold text-dash-text">
+                  Charity, raffle and wine pledge
+                </p>
+                <p className="text-xs text-dash-muted">
+                  Defaults applied when generating meetings. Each meeting can
+                  still override these.
+                </p>
+
+                <label className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-4 w-4 rounded border-input text-blue-600"
+                    checked={createForm.default_enable_charity_donation}
+                    onChange={(event) =>
+                      setCreateForm((current) => ({
+                        ...current,
+                        default_enable_charity_donation: event.target.checked,
+                      }))
+                    }
+                  />
+                  <span className="text-sm text-dash-text">
+                    Offer a charity donation on the summons RSVP.
+                  </span>
+                </label>
+                {createForm.default_enable_charity_donation && (
+                  <div className="space-y-2 pl-7">
+                    <label className="text-xs font-medium text-dash-muted">
+                      Default charity name
+                    </label>
+                    <Input
+                      value={createForm.default_charity_name}
+                      placeholder="e.g. Mark Benevolent Fund"
+                      onChange={(event) =>
+                        setCreateForm((current) => ({
+                          ...current,
+                          default_charity_name: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                )}
+
+                <label className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-4 w-4 rounded border-input text-blue-600"
+                    checked={createForm.default_enable_raffle_donation}
+                    onChange={(event) =>
+                      setCreateForm((current) => ({
+                        ...current,
+                        default_enable_raffle_donation: event.target.checked,
+                      }))
+                    }
+                  />
+                  <span className="text-sm text-dash-text">
+                    Collect cash contributions for the evening raffle.
+                  </span>
+                </label>
+                {createForm.default_enable_raffle_donation && (
+                  <div className="space-y-2 pl-7">
+                    <label className="text-xs font-medium text-dash-muted">
+                      Raffle description shown on RSVP
+                    </label>
+                    <Input
+                      value={createForm.default_raffle_description}
+                      placeholder="Help fund evening raffle prizes"
+                      onChange={(event) =>
+                        setCreateForm((current) => ({
+                          ...current,
+                          default_raffle_description: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                )}
+
+                <label className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-4 w-4 rounded border-input text-blue-600"
+                    checked={createForm.default_enable_raffle_wine_pledge}
+                    onChange={(event) =>
+                      setCreateForm((current) => ({
+                        ...current,
+                        default_enable_raffle_wine_pledge: event.target.checked,
+                      }))
+                    }
+                  />
+                  <span className="text-sm text-dash-text">
+                    Let attendees pledge a bottle of wine for the raffle (no
+                    payment).
+                  </span>
+                </label>
+                {createForm.default_enable_raffle_wine_pledge && (
+                  <div className="space-y-2 pl-7">
+                    <label className="text-xs font-medium text-dash-muted">
+                      Wine pledge description shown on RSVP
+                    </label>
+                    <Input
+                      value={createForm.default_raffle_wine_description}
+                      placeholder="Bring a bottle of wine for the evening raffle"
+                      onChange={(event) =>
+                        setCreateForm((current) => ({
+                          ...current,
+                          default_raffle_wine_description: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3 rounded-xl border border-dash-border bg-dash-surface-subtle/60 p-4">

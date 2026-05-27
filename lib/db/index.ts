@@ -599,6 +599,8 @@ export async function getEventBySlug(
 type AddEventOptional =
   | "sequence_id"
   | "sequence_position"
+  | "enable_raffle_wine_pledge"
+  | "raffle_wine_description"
   | "summons_status"
   | "summons_auto_drafted_at"
   | "summons_approved_at"
@@ -667,9 +669,15 @@ export async function getRsvpById(
   return data as Rsvp | null;
 }
 
+type RsvpWineFields =
+  | "raffle_wine_pledged"
+  | "raffle_wine_bottles"
+  | "raffle_wine_note";
+
 export async function addRsvp(
   lodgeId: string,
-  data: Omit<Rsvp, "id" | "lodge_id" | "created_at" | "updated_at">
+  data: Omit<Rsvp, "id" | "lodge_id" | "created_at" | "updated_at" | RsvpWineFields> &
+    Partial<Pick<Rsvp, RsvpWineFields>>
 ): Promise<Rsvp> {
   const { data: row, error } = await db()
     .from("rsvps")
@@ -694,6 +702,9 @@ export async function updateRsvp(
       | "number_of_guests"
       | "dietary_requirements"
       | "special_requests"
+      | "raffle_wine_pledged"
+      | "raffle_wine_bottles"
+      | "raffle_wine_note"
     >
   >
 ): Promise<Rsvp | null> {

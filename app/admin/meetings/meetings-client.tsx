@@ -43,6 +43,7 @@ import {
   emptyMeetingForm,
   formatMoneyInput,
   formFromMeeting,
+  parseSuggestedAmounts,
   slugify,
   type MeetingForm,
 } from "./meeting-form";
@@ -70,6 +71,14 @@ type MeetingEvent = {
   enable_charity_donation: boolean;
   charity_name: string | null;
   charity_description: string | null;
+  charity_suggested_amounts: number[] | null;
+  charity_allow_custom: boolean;
+  enable_raffle_donation: boolean;
+  raffle_description: string | null;
+  raffle_suggested_amounts: number[] | null;
+  raffle_allow_custom: boolean;
+  enable_raffle_wine_pledge: boolean;
+  raffle_wine_description: string | null;
   enable_meeting_fee: boolean;
   meeting_fee_amount: number | null;
   meeting_fee_description: string | null;
@@ -93,6 +102,9 @@ type RsvpEntry = {
   special_requests: string | null;
   payment_required: boolean;
   payment_completed: boolean;
+  raffle_wine_pledged?: boolean;
+  raffle_wine_bottles?: number;
+  raffle_wine_note?: string | null;
 };
 
 type View = "list" | "calendar";
@@ -250,7 +262,8 @@ export function AdminMeetingsClient({
       meetingForm.enable_meeting_fee ||
       meetingForm.enable_dining_rsvp ||
       meetingForm.enable_guest_tickets ||
-      meetingForm.enable_charity_donation;
+      meetingForm.enable_charity_donation ||
+      meetingForm.enable_raffle_donation;
 
     const payload = {
       ...meetingForm,
@@ -262,6 +275,12 @@ export function AdminMeetingsClient({
       max_attendees: meetingForm.max_attendees || null,
       rsvp_deadline: meetingForm.rsvp_deadline || null,
       enable_payments: derivedEnablePayments,
+      charity_suggested_amounts: parseSuggestedAmounts(
+        meetingForm.charity_suggested_amounts
+      ),
+      raffle_suggested_amounts: parseSuggestedAmounts(
+        meetingForm.raffle_suggested_amounts
+      ),
     };
 
     try {

@@ -284,6 +284,23 @@ export default async function MeetingSummonsPage({
                     : "Not configured"}
                 </dd>
               </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-slate-500">Raffle</dt>
+                <dd className="font-medium">
+                  {event.enable_raffle_donation
+                    ? event.raffle_description ?? "Optional contribution"
+                    : "Not configured"}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-slate-500">Wine pledge</dt>
+                <dd className="font-medium">
+                  {event.enable_raffle_wine_pledge
+                    ? event.raffle_wine_description ??
+                      "Bring a bottle for the raffle"
+                    : "Not configured"}
+                </dd>
+              </div>
             </dl>
             {menuItems.length > 0 && (
               <div className="mt-5">

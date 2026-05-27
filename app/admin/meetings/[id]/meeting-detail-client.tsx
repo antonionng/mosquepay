@@ -36,6 +36,7 @@ import {
 import {
   MeetingFormDrawer,
   formFromMeeting,
+  parseSuggestedAmounts,
   slugify,
   type MeetingForm,
   type MeetingFormMeeting,
@@ -57,6 +58,9 @@ type RsvpEntry = {
   special_requests: string | null;
   payment_required: boolean;
   payment_completed: boolean;
+  raffle_wine_pledged?: boolean;
+  raffle_wine_bottles?: number;
+  raffle_wine_note?: string | null;
 };
 
 type SummonsSummary = {
@@ -131,6 +135,11 @@ export function MeetingDetailClient({
     (r) => r.payment_required && !r.payment_completed
   ).length;
   const dietaryCount = rsvps.filter((r) => r.dietary_requirements).length;
+  const winePledgers = rsvps.filter((r) => r.raffle_wine_pledged === true);
+  const wineBottleCount = winePledgers.reduce(
+    (sum, r) => sum + (r.raffle_wine_bottles ?? 0),
+    0
+  );
   const latestSend = sends[0] ?? null;
 
   function openEdit() {
@@ -154,7 +163,8 @@ export function MeetingDetailClient({
       meetingForm.enable_meeting_fee ||
       meetingForm.enable_dining_rsvp ||
       meetingForm.enable_guest_tickets ||
-      meetingForm.enable_charity_donation;
+      meetingForm.enable_charity_donation ||
+      meetingForm.enable_raffle_donation;
 
     const payload = {
       ...meetingForm,
@@ -166,6 +176,12 @@ export function MeetingDetailClient({
       max_attendees: meetingForm.max_attendees || null,
       rsvp_deadline: meetingForm.rsvp_deadline || null,
       enable_payments: derivedEnablePayments,
+      charity_suggested_amounts: parseSuggestedAmounts(
+        meetingForm.charity_suggested_amounts
+      ),
+      raffle_suggested_amounts: parseSuggestedAmounts(
+        meetingForm.raffle_suggested_amounts
+      ),
     };
 
     try {
@@ -629,6 +645,27 @@ export function MeetingDetailClient({
                 </div>
               </div>
 
+              {meeting.enable_raffle_wine_pledge && winePledgers.length > 0 && (
+                <div className="rounded-lg border border-violet-200 bg-violet-50/60 px-3 py-2 text-xs text-violet-900">
+                  <p className="font-semibold">
+                    Wine raffle: {wineBottleCount} bottle
+                    {wineBottleCount === 1 ? "" : "s"} pledged by{" "}
+                    {winePledgers.length} brother
+                    {winePledgers.length === 1 ? "" : "s"}
+                  </p>
+                  <ul className="mt-1 space-y-0.5">
+                    {winePledgers.map((p) => (
+                      <li key={p.id}>
+                        {p.user_name} —{" "}
+                        {p.raffle_wine_bottles ?? 1} bottle
+                        {(p.raffle_wine_bottles ?? 1) === 1 ? "" : "s"}
+                        {p.raffle_wine_note ? ` (${p.raffle_wine_note})` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
                 <Button
                   type="button"
@@ -707,6 +744,17 @@ export function MeetingDetailClient({
                             Request: {r.special_requests}
                           </p>
                         )}
+                        {r.raffle_wine_pledged && (
+                          <p className="mt-1 text-xs font-medium text-violet-700">
+                            Wine pledge:{" "}
+                            {r.raffle_wine_bottles ?? 1}{" "}
+                            bottle
+                            {(r.raffle_wine_bottles ?? 1) === 1 ? "" : "s"}
+                            {r.raffle_wine_note
+                              ? ` — ${r.raffle_wine_note}`
+                              : ""}
+                          </p>
+                        )}
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1">
                         {r.status === "confirmed" ? (
@@ -776,6 +824,18 @@ export function MeetingDetailClient({
                       : "Off"
                   }
                   hint={meeting.charity_description ?? undefined}
+                />
+                <ConfigRow
+                  label="Raffle (cash)"
+                  value={meeting.enable_raffle_donation ? "Enabled" : "Off"}
+                  hint={meeting.raffle_description ?? undefined}
+                />
+                <ConfigRow
+                  label="Wine pledge"
+                  value={
+                    meeting.enable_raffle_wine_pledge ? "Enabled" : "Off"
+                  }
+                  hint={meeting.raffle_wine_description ?? undefined}
                 />
                 <ConfigRow
                   label="Guest tickets"

@@ -183,6 +183,13 @@ export async function POST(request: NextRequest) {
       default_enable_meeting_fee: body.default_enable_meeting_fee === true,
       default_enable_charity_donation: body.default_enable_charity_donation === true,
       default_charity_name: nullableTrim(body.default_charity_name),
+      default_enable_raffle_donation: body.default_enable_raffle_donation === true,
+      default_raffle_description: nullableTrim(body.default_raffle_description),
+      default_enable_raffle_wine_pledge:
+        body.default_enable_raffle_wine_pledge === true,
+      default_raffle_wine_description: nullableTrim(
+        body.default_raffle_wine_description
+      ),
       summons_lead_weeks: parseInteger(body.summons_lead_weeks, 1, 26, 6),
       summons_min_lead_weeks: parseInteger(body.summons_min_lead_weeks, 1, 26, 4),
       auto_draft_summons: body.auto_draft_summons !== false,
