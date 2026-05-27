@@ -91,7 +91,7 @@ export function ReportsClient({
   const [tab, setTab] = useState<Tab>("secretary");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="admin-page-head">
         <div>
           <h1 className="admin-page-title">Reports</h1>
@@ -151,7 +151,7 @@ function SecretaryView({ r }: { r: SecretaryReport }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi
           label="Meetings"
@@ -270,7 +270,7 @@ function TreasurerView({ r }: { r: TreasurerReport }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi label="Total paid" value={`£${r.totalPaid.toFixed(2)}`} hint={`£${r.totalRefunded.toFixed(2)} refunded`} />
         <Kpi label="Dues outstanding" value={`£${r.unpaidDuesTotal.toFixed(2)}`} hint={`${r.outstandingDues.length} members`} />
@@ -400,7 +400,7 @@ function CharityView({ r }: { r: CharityReport }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi label="Total raised" value={`£${r.totalRaised.toFixed(2)}`} hint={`${r.donationCount} donations`} />
         <Kpi label="Active campaigns" value={`${r.campaignCount}`} />
@@ -559,7 +559,7 @@ function RecruitmentView({ r }: { r: RecruitmentReport }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi label="Total leads" value={`${r.totalLeads}`} />
         <Kpi label="New this month" value={`${r.newThisMonth}`} />
@@ -701,7 +701,7 @@ function OperatorView({ r }: { r: OperatorReport }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="grid gap-4 sm:grid-cols-3">
         <Kpi label="Lodges" value={`${r.totalLodges}`} />
         <Kpi label="Active" value={`${r.activeLodges}`} />

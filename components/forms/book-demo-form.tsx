@@ -75,14 +75,30 @@ export function BookDemoForm() {
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="full_name">Full name *</Label>
-          <Input id="full_name" {...register("full_name")} />
+          <Input
+            id="full_name"
+            autoComplete="name"
+            autoCapitalize="words"
+            enterKeyHint="next"
+            {...register("full_name")}
+          />
           {errors.full_name ? (
             <p className="text-sm text-red-600">{errors.full_name.message}</p>
           ) : null}
         </div>
         <div className="space-y-2">
           <Label htmlFor="work_email">Work email *</Label>
-          <Input id="work_email" type="email" {...register("work_email")} />
+          <Input
+            id="work_email"
+            type="email"
+            autoComplete="email"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            inputMode="email"
+            enterKeyHint="next"
+            {...register("work_email")}
+          />
           {errors.work_email ? (
             <p className="text-sm text-red-600">{errors.work_email.message}</p>
           ) : null}
@@ -104,7 +120,15 @@ export function BookDemoForm() {
       </div>
       <div className="space-y-2">
         <Label htmlFor="lodge_count">How many lodges do you manage?</Label>
-        <Input id="lodge_count" type="number" min={1} max={500} {...register("lodge_count")} />
+        <Input
+          id="lodge_count"
+          type="number"
+          min={1}
+          max={500}
+          inputMode="numeric"
+          enterKeyHint="next"
+          {...register("lodge_count")}
+        />
       </div>
       <div className="space-y-2">
         <Label htmlFor="priorities">Top priorities</Label>

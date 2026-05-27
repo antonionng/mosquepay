@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { AdminSidebar } from "@/components/layout/admin-sidebar";
 import { AdminLodgeSwitcher } from "@/components/layout/admin-lodge-switcher";
 import { ImpersonationBanner } from "@/components/layout/impersonation-banner";
@@ -87,6 +87,7 @@ function adminHeaderMeta(pathname: string): { title: string; parent?: HeaderPare
 
 export function AdminLayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const isAuthPage = pathname === "/admin/login" || pathname === "/admin/accept-invite";
 
   // Routes that should run as a kiosk on phones: full-bleed, no admin
@@ -155,12 +156,30 @@ export function AdminLayoutWrapper({ children }: { children: React.ReactNode }) 
             "supports-[backdrop-filter]:bg-dash-surface/80"
           )}
         >
-          <div className="flex h-16 items-center justify-between gap-4 px-4 pl-[3.25rem] lg:h-[4.5rem] lg:pl-6 lg:pr-8">
+          <div
+            className={cn(
+              "flex h-14 items-center justify-between gap-3 px-4 pl-[3.25rem] sm:h-16 lg:h-[4.5rem] lg:pl-6 lg:pr-8",
+              "pt-[env(safe-area-inset-top)] h-[calc(3.5rem+env(safe-area-inset-top))] sm:h-[calc(4rem+env(safe-area-inset-top))] lg:h-[calc(4.5rem+env(safe-area-inset-top))]"
+            )}
+          >
+            {/* Back button on phone when we have a parent route; replaces
+                the breadcrumb (which is unreadable on phone and steals a
+                row of vertical space). At sm+ we restore the breadcrumb. */}
+            {parent && (
+              <button
+                type="button"
+                onClick={() => router.push(parent.href)}
+                aria-label={`Back to ${parent.label}`}
+                className="-ml-2 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-dash-text transition-colors hover:bg-dash-surface-subtle sm:hidden"
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </button>
+            )}
             <div className="flex min-w-0 flex-1 items-center gap-4">
               <div className="min-w-0 flex-1">
                 {parent ? (
                   <nav
-                    className="mb-0.5 flex flex-wrap items-center gap-1.5 text-xs text-dash-muted"
+                    className="mb-0.5 hidden flex-wrap items-center gap-1.5 text-xs text-dash-muted sm:flex"
                     aria-label="Breadcrumb"
                   >
                     <Link
@@ -178,11 +197,11 @@ export function AdminLayoutWrapper({ children }: { children: React.ReactNode }) 
                     </Link>
                   </nav>
                 ) : (
-                  <p className="mb-0.5 text-xs font-medium uppercase tracking-[0.14em] text-dash-faint">
+                  <p className="mb-0.5 hidden text-xs font-medium uppercase tracking-[0.14em] text-dash-faint sm:block">
                     Lodge admin
                   </p>
                 )}
-                <h1 className="truncate text-lg font-semibold tracking-tight text-dash-text lg:text-xl">
+                <h1 className="truncate text-base font-semibold tracking-tight text-dash-text sm:text-lg lg:text-xl">
                   {title}
                 </h1>
               </div>

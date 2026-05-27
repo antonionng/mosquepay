@@ -206,7 +206,7 @@ export default async function AdminDashboardPage() {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       <div className="admin-page-head">
         <div>
           <h1 className="admin-page-title">Dashboard</h1>
@@ -230,34 +230,35 @@ export default async function AdminDashboardPage() {
         </div>
       )}
 
-      {/* KPI row */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* KPI row: 2x2 on phone (compact, all visible without scroll),
+          4-up on xl. */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {kpis.map((k) => {
           const Icon = k.icon;
           const ac = kpiAccentIcon[k.accent];
           return (
             <Link key={k.label} href={k.href} className="block min-w-0">
-              <Card variant="kpi" className="dash-kpi-card h-full rounded-xl p-5 hover:border-dash-border-strong">
-                <div className="flex items-start justify-between gap-3">
+              <Card variant="kpi" className="dash-kpi-card h-full rounded-xl p-3 hover:border-dash-border-strong sm:p-5">
+                <div className="flex items-start justify-between gap-2 sm:gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium uppercase tracking-[0.12em] text-dash-muted [.dash-kpi-card_&]:text-dash-muted">
+                    <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-dash-muted sm:text-xs [.dash-kpi-card_&]:text-dash-muted">
                       {k.label}
                     </p>
-                    <p className="mt-2 text-3xl font-semibold tracking-tight text-dash-text [.dash-kpi-card_&]:text-dash-text">
+                    <p className="mt-1 text-xl font-semibold tracking-tight text-dash-text sm:mt-2 sm:text-3xl [.dash-kpi-card_&]:text-dash-text">
                       {k.value}
                     </p>
-                    <div className="mt-2 flex items-center gap-1.5 text-xs text-dash-muted">
+                    <div className="mt-1 hidden items-center gap-1.5 text-xs text-dash-muted sm:mt-2 sm:flex">
                       <TrendingUp className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden />
                       <span className="line-clamp-2">{k.hint}</span>
                     </div>
                   </div>
                   <div
                     className={cn(
-                      "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
+                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl sm:h-11 sm:w-11",
                       ac.wrap
                     )}
                   >
-                    <Icon className={cn("h-5 w-5", ac.icon)} aria-hidden />
+                    <Icon className={cn("h-4 w-4 sm:h-5 sm:w-5", ac.icon)} aria-hidden />
                   </div>
                 </div>
               </Card>
@@ -287,7 +288,7 @@ export default async function AdminDashboardPage() {
       </div>
 
       {/* Main chart + leaderboard */}
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid gap-4 sm:gap-6 xl:grid-cols-3">
         <Card variant="panel" className="xl:col-span-2 overflow-hidden p-0">
           <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
             <div>

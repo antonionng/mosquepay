@@ -161,7 +161,7 @@ export default async function AdminLeadsPage() {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       <div className="admin-page-head">
         <div>
           <h1 className="admin-page-title">Candidate Pipeline</h1>

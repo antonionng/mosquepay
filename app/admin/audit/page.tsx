@@ -34,7 +34,7 @@ export default async function AdminAuditPage() {
     ctx.mode === "database" && ctx.lodgeId ? await db.listAuditLogs(ctx.lodgeId, 150) : [];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       <div className="admin-page-head">
         <div>
           <h1 className="admin-page-title">Audit Trail</h1>

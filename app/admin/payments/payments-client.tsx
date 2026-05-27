@@ -366,7 +366,7 @@ export function AdminPaymentsClient({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       <div className="admin-page-head">
         <div>
           <h1 className="admin-page-title">Payments</h1>
@@ -376,7 +376,7 @@ export function AdminPaymentsClient({
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {summaryCards.map((card) => {
           const Icon = card.icon;
           const ac = kpiAccentIcon[card.accent];
@@ -384,25 +384,25 @@ export function AdminPaymentsClient({
             <Card
               key={card.label}
               variant="kpi"
-              className="dash-kpi-card h-full rounded-xl p-5 hover:border-dash-border-strong"
+              className="dash-kpi-card h-full rounded-xl p-3 hover:border-dash-border-strong sm:p-5"
             >
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start justify-between gap-2 sm:gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium uppercase tracking-[0.12em] text-dash-muted [.dash-kpi-card_&]:text-dash-muted">
+                  <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-dash-muted sm:text-xs [.dash-kpi-card_&]:text-dash-muted">
                     {card.label}
                   </p>
-                  <p className="mt-2 text-3xl font-semibold tracking-tight text-dash-text [.dash-kpi-card_&]:text-dash-text">
+                  <p className="mt-1 text-xl font-semibold tracking-tight text-dash-text sm:mt-2 sm:text-3xl [.dash-kpi-card_&]:text-dash-text">
                     {card.value}
                   </p>
-                  <p className="mt-2 text-xs text-dash-muted">{card.count}</p>
+                  <p className="mt-1 hidden text-xs text-dash-muted sm:mt-2 sm:block">{card.count}</p>
                 </div>
                 <div
                   className={cn(
-                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
+                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl sm:h-11 sm:w-11",
                     ac.wrap
                   )}
                 >
-                  <Icon className={cn("h-5 w-5", ac.icon)} aria-hidden />
+                  <Icon className={cn("h-4 w-4 sm:h-5 sm:w-5", ac.icon)} aria-hidden />
                 </div>
               </div>
             </Card>
@@ -611,7 +611,7 @@ export function AdminPaymentsClient({
       )}
 
       {activeTab === "giftaid" && (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <Card variant="panel" className="overflow-hidden border-emerald-500/20 bg-gradient-to-r from-emerald-500/[0.06] to-blue-500/[0.06] p-0">
             <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15">

@@ -142,7 +142,7 @@ export function TemplateMarketplaceClient({
     : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-wider text-slate-500">

@@ -305,7 +305,7 @@ export function MeetingDetailClient({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       <div>
         <Button
           asChild
@@ -724,7 +724,7 @@ export function MeetingDetailClient({
           </Card>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <Card variant="panel" className="overflow-hidden p-0">
             <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
               <h3 className="dash-panel-header-title">Configuration</h3>

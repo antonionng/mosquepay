@@ -170,7 +170,7 @@ export default function MemberGuestsPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">My guests</h1>
         <p className="mt-1 text-sm text-slate-500">

@@ -307,7 +307,7 @@ export function AdminMembersClient({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       <div className="admin-page-head">
         <div>
           <h1 className="admin-page-title">Members</h1>
@@ -358,7 +358,7 @@ export function AdminMembersClient({
         </div>
       </div>
 
-      <Tabs defaultValue={initialTab} className="space-y-6">
+      <Tabs defaultValue={initialTab} className="space-y-4 sm:space-y-6">
         <TabsList>
           <TabsTrigger value="members">Members</TabsTrigger>
           <TabsTrigger value="offices">
@@ -372,50 +372,50 @@ export function AdminMembersClient({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="members" className="space-y-8">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Card variant="kpi" className="dash-kpi-card rounded-xl p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-dash-muted">
-                Total Members
+        <TabsContent value="members" className="space-y-5 sm:space-y-8">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+        <Card variant="kpi" className="dash-kpi-card rounded-xl p-3 sm:p-5">
+          <div className="flex items-start justify-between gap-2 sm:gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-dash-muted sm:text-xs">
+                Total members
               </p>
-              <p className="mt-2 text-3xl font-semibold tracking-tight text-dash-text">
+              <p className="mt-1 text-xl font-semibold tracking-tight text-dash-text sm:mt-2 sm:text-3xl">
                 {totalCount}
               </p>
             </div>
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500/10">
-              <Users className="h-5 w-5 text-blue-600" />
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 sm:h-11 sm:w-11">
+              <Users className="h-4 w-4 text-blue-600 sm:h-5 sm:w-5" />
             </div>
           </div>
         </Card>
-        <Card variant="kpi" className="dash-kpi-card rounded-xl p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-dash-muted">
-                Active Members
+        <Card variant="kpi" className="dash-kpi-card rounded-xl p-3 sm:p-5">
+          <div className="flex items-start justify-between gap-2 sm:gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-dash-muted sm:text-xs">
+                Active members
               </p>
-              <p className="mt-2 text-3xl font-semibold tracking-tight text-dash-text">
+              <p className="mt-1 text-xl font-semibold tracking-tight text-dash-text sm:mt-2 sm:text-3xl">
                 {activeCount}
               </p>
             </div>
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/10">
-              <Shield className="h-5 w-5 text-emerald-600" />
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 sm:h-11 sm:w-11">
+              <Shield className="h-4 w-4 text-emerald-600 sm:h-5 sm:w-5" />
             </div>
           </div>
         </Card>
-        <Card variant="kpi" className="dash-kpi-card rounded-xl p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-dash-muted">
-                With Dietary Reqs
+        <Card variant="kpi" className="dash-kpi-card col-span-2 rounded-xl p-3 sm:col-span-1 sm:p-5">
+          <div className="flex items-start justify-between gap-2 sm:gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-dash-muted sm:text-xs">
+                With dietary reqs
               </p>
-              <p className="mt-2 text-3xl font-semibold tracking-tight text-dash-text">
+              <p className="mt-1 text-xl font-semibold tracking-tight text-dash-text sm:mt-2 sm:text-3xl">
                 {members.filter((m) => m.dietary_requirements).length}
               </p>
             </div>
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500/10">
-              <UtensilsCrossed className="h-5 w-5 text-amber-700" />
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 sm:h-11 sm:w-11">
+              <UtensilsCrossed className="h-4 w-4 text-amber-700 sm:h-5 sm:w-5" />
             </div>
           </div>
         </Card>
@@ -597,7 +597,7 @@ export function AdminMembersClient({
       )}
 
       {showForm && (
-        <div className="fixed inset-0 z-50 flex justify-end">
+        <div className="admin-drawer-shell fixed inset-0 z-50 flex justify-end">
           <div
             className="absolute inset-0 bg-dash-text/20 backdrop-blur-[2px]"
             onClick={() => {
@@ -605,7 +605,7 @@ export function AdminMembersClient({
               setFormError(null);
             }}
           />
-          <div className="relative w-full max-w-md bg-dash-surface shadow-xl border-l border-dash-border overflow-y-auto">
+          <div className="admin-drawer-panel relative w-full max-w-md bg-dash-surface shadow-xl border-l border-dash-border overflow-y-auto">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-dash-border bg-dash-surface px-6 py-4">
               <h2 className="text-lg font-semibold text-dash-text flex items-center gap-2">
                 <UserPlus className="h-5 w-5" />

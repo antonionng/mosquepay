@@ -13,7 +13,9 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "inline-flex h-11 max-w-full items-center justify-start overflow-x-auto rounded-xl border border-slate-200 bg-slate-100/90 p-1 text-slate-600 shadow-sm",
+      // scrollbar-hide so the scroll affordance on phone (when there are
+      // 3+ tabs) doesn't show a chunky scrollbar; users can still swipe.
+      "inline-flex h-11 max-w-full items-center justify-start overflow-x-auto scrollbar-hide rounded-xl border border-dash-border bg-dash-surface-subtle p-1 text-dash-muted shadow-sm",
       className
     )}
     {...props}
@@ -28,7 +30,11 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium text-slate-600 ring-offset-white transition-all hover:bg-slate-200/60 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:hover:text-white",
+      // Flat brand-blue active state (was violet→blue gradient which clashed
+      // with the rest of the new flat-blue brand system). Keeps the high
+      // contrast for accessibility but reads as part of the LodgePay shell.
+      "inline-flex items-center justify-center whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium text-dash-muted ring-offset-white transition-all hover:bg-dash-surface hover:text-dash-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dash-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+      "data-[state=active]:bg-dash-surface data-[state=active]:text-[hsl(var(--dash-ring))] data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-[hsl(var(--dash-ring)/0.25)]",
       className
     )}
     {...props}

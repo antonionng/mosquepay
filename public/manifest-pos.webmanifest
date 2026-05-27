@@ -1,14 +1,14 @@
 {
-  "name": "Lodge Member Portal",
-  "short_name": "Lodge",
-  "description": "Summons, RSVPs, dues, donations, and your digital lodge card.",
-  "start_url": "/member?utm_source=pwa",
-  "scope": "/member",
+  "name": "LodgePay POS",
+  "short_name": "LodgePay POS",
+  "description": "Take card and cash payments at a meeting. QR codes, cash entries, receipts.",
+  "start_url": "/admin/take-payment?utm_source=pwa",
+  "scope": "/admin/take-payment",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#ffffff",
   "theme_color": "#0B43B8",
-  "categories": ["productivity", "lifestyle", "social"],
+  "categories": ["business", "finance", "productivity"],
   "lang": "en-GB",
   "icons": [
     {
@@ -32,21 +32,15 @@
   ],
   "shortcuts": [
     {
-      "name": "Summons",
-      "short_name": "Summons",
-      "url": "/member?focus=summons",
+      "name": "QR charge",
+      "short_name": "QR",
+      "url": "/admin/take-payment?tab=charge",
       "icons": [{ "src": "/brand/lodgepay-logo-mark.png", "sizes": "192x192" }]
     },
     {
-      "name": "Pay dues",
-      "short_name": "Pay",
-      "url": "/member/dues",
-      "icons": [{ "src": "/brand/lodgepay-logo-mark.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "Member card",
-      "short_name": "Card",
-      "url": "/member/card",
+      "name": "Cash entry",
+      "short_name": "Cash",
+      "url": "/admin/take-payment?tab=cash",
       "icons": [{ "src": "/brand/lodgepay-logo-mark.png", "sizes": "192x192" }]
     }
   ]

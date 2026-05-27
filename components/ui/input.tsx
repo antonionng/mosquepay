@@ -3,7 +3,10 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const inputVariants = cva(
-  "flex h-11 w-full rounded-xl px-4 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50",
+  // text-base on phones (>=16px) prevents iOS Safari auto-zoom on focus.
+  // text-sm at md+ keeps desktop tight. Apply to single-line inputs which
+  // is the only place iOS Safari triggers the zoom behaviour.
+  "flex h-11 w-full rounded-xl px-4 py-2 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
   {
     variants: {
       variant: {

@@ -233,6 +233,9 @@ export default function MemberProfilePage() {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     className="pl-10"
+                    autoComplete="name"
+                    autoCapitalize="words"
+                    enterKeyHint="next"
                   />
                 </div>
               </div>
@@ -246,6 +249,7 @@ export default function MemberProfilePage() {
                     type="email"
                     value={email}
                     disabled
+                    autoComplete="email"
                     className="pl-10 bg-slate-50 text-slate-500 cursor-not-allowed"
                   />
                 </div>
@@ -265,6 +269,9 @@ export default function MemberProfilePage() {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     className="pl-10"
+                    autoComplete="tel"
+                    inputMode="tel"
+                    enterKeyHint="next"
                   />
                 </div>
               </div>
@@ -279,6 +286,8 @@ export default function MemberProfilePage() {
                     value={dietaryRequirements}
                     onChange={(e) => setDietaryRequirements(e.target.value)}
                     className="pl-10"
+                    autoComplete="off"
+                    enterKeyHint="done"
                   />
                 </div>
                 <p className="text-xs text-slate-400">
@@ -421,6 +430,8 @@ export default function MemberProfilePage() {
                 <Input
                   id="currentPassword"
                   type="password"
+                  autoComplete="current-password"
+                  enterKeyHint="next"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   className="pl-10"
@@ -436,6 +447,8 @@ export default function MemberProfilePage() {
                 <Input
                   id="newPassword"
                   type="password"
+                  autoComplete="new-password"
+                  enterKeyHint="next"
                   placeholder="Min. 6 characters"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
@@ -452,6 +465,8 @@ export default function MemberProfilePage() {
                 <Input
                   id="confirmNew"
                   type="password"
+                  autoComplete="new-password"
+                  enterKeyHint="go"
                   value={confirmNew}
                   onChange={(e) => setConfirmNew(e.target.value)}
                   className="pl-10"

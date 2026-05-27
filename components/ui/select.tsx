@@ -11,7 +11,9 @@ const SelectGroup = SelectPrimitive.Group;
 const SelectValue = SelectPrimitive.Value;
 
 const selectTriggerVariants = cva(
-  "flex h-11 w-full items-center justify-between rounded-xl px-4 py-2 text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+  // text-base on phones matches the rest of our form controls so labels
+  // sit at a consistent reading size next to inputs.
+  "flex h-11 w-full items-center justify-between rounded-xl px-4 py-2 text-base shadow-sm transition-colors focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1 md:text-sm",
   {
     variants: {
       variant: {

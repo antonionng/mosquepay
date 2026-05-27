@@ -33,11 +33,16 @@ const buttonVariants = cva(
       },
       size: {
         default: "h-11 px-5",
-        sm: "h-9 px-4 text-sm",
+        // Small variants are 40px (10) on phones for a comfortable tap target,
+        // tightening to 36px (9) on tablet+ where pointer precision is higher.
+        // Apple HIG recommends 44pt; 40px + tap-highlight-color:transparent +
+        // touch-action:manipulation feels native without making desktop chrome
+        // feel oversized.
+        sm: "h-10 px-4 text-sm sm:h-9",
         lg: "h-12 px-6 text-base",
         xl: "h-14 px-8 text-base",
         icon: "h-11 w-11",
-        "icon-sm": "h-9 w-9",
+        "icon-sm": "h-10 w-10 sm:h-9 sm:w-9",
         "icon-lg": "h-12 w-12",
       },
     },

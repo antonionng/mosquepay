@@ -88,7 +88,13 @@ export function VisitorRegisterForm({ lodgeSlug }: Props) {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="full_name">Your name *</Label>
-          <Input id="full_name" {...register("full_name")} />
+          <Input
+            id="full_name"
+            autoComplete="name"
+            autoCapitalize="words"
+            enterKeyHint="next"
+            {...register("full_name")}
+          />
           {errors.full_name ? (
             <p className="text-sm text-destructive">
               {errors.full_name.message as string}
@@ -97,7 +103,17 @@ export function VisitorRegisterForm({ lodgeSlug }: Props) {
         </div>
         <div className="space-y-2">
           <Label htmlFor="email">Email *</Label>
-          <Input id="email" type="email" {...register("email")} />
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            inputMode="email"
+            enterKeyHint="next"
+            {...register("email")}
+          />
           {errors.email ? (
             <p className="text-sm text-destructive">
               {errors.email.message as string}
@@ -106,7 +122,14 @@ export function VisitorRegisterForm({ lodgeSlug }: Props) {
         </div>
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor="phone">Phone (optional)</Label>
-          <Input id="phone" type="tel" {...register("phone")} />
+          <Input
+            id="phone"
+            type="tel"
+            autoComplete="tel"
+            inputMode="tel"
+            enterKeyHint="next"
+            {...register("phone")}
+          />
         </div>
       </div>
 

@@ -114,15 +114,15 @@ function StatCard({
   iconColor: string;
 }) {
   return (
-    <div className="dash-kpi-card">
-      <div className="mb-4 flex items-center justify-between">
-        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconBg}`}>
-          <Icon className={`h-5 w-5 ${iconColor}`} />
+    <div className="dash-kpi-card p-4 sm:p-5">
+      <div className="mb-2 flex items-center justify-between sm:mb-4">
+        <div className={`flex h-9 w-9 items-center justify-center rounded-xl sm:h-10 sm:w-10 ${iconBg}`}>
+          <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${iconColor}`} />
         </div>
       </div>
-      <p className="text-2xl font-bold text-dash-text">{value}</p>
-      <p className="mt-1 text-sm text-dash-muted">{label}</p>
-      {subtext && <p className="mt-0.5 text-xs text-dash-faint">{subtext}</p>}
+      <p className="text-xl font-bold text-dash-text sm:text-2xl">{value}</p>
+      <p className="mt-0.5 text-xs text-dash-muted sm:mt-1 sm:text-sm">{label}</p>
+      {subtext && <p className="mt-0.5 text-[10px] text-dash-faint sm:text-xs">{subtext}</p>}
     </div>
   );
 }
@@ -188,8 +188,12 @@ export default function MemberDashboardPage() {
   const userName = data?.user?.full_name || "Member";
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
-      <div>
+    <div className="mx-auto max-w-6xl space-y-5 sm:space-y-8">
+      {/* Welcome block: hidden on phone because the top app bar already
+          shows "Dashboard" and the user's name lives in the sidebar /
+          profile tab. Bringing it back at sm+ where the breathing room
+          is available. */}
+      <div className="hidden sm:block">
         <h1 className="text-2xl font-bold text-dash-text">
           {loading ? (
             <span className="inline-block h-8 w-48 animate-pulse rounded bg-dash-surface-subtle" />
@@ -200,7 +204,9 @@ export default function MemberDashboardPage() {
         <p className="mt-1 text-dash-muted">Here&apos;s an overview of your membership</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* 2x2 grid on phone keeps all four KPIs in a single thumb-zone
+          frame; expands to 4-up on lg. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
         {loading ? (
           <>
             <SkeletonCard />
@@ -246,61 +252,65 @@ export default function MemberDashboardPage() {
 
       {!loading && <NextMeetingCard nextEvent={data?.nextEvent ?? null} />}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+      {/* Quick actions: 2-up tile grid on phone (compact, thumb-friendly),
+          becomes a 4-up row at lg. Tiles are vertical (icon top, label
+          below) on phone so two fit per row without the description text
+          forcing a tall card. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
         <Link
           href="/member/events"
-          className="group flex items-center gap-4 rounded-2xl border border-dash-border bg-dash-surface p-5 shadow-[var(--dash-shadow)] transition-all hover:border-dash-border-strong hover:shadow-[var(--dash-shadow-raised)]"
+          className="group flex flex-col gap-2 rounded-2xl border border-dash-border bg-dash-surface p-4 shadow-[var(--dash-shadow)] transition-all hover:border-dash-border-strong hover:shadow-[var(--dash-shadow-raised)] sm:flex-row sm:items-center sm:gap-4 sm:p-5"
         >
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[hsl(var(--dash-ring)/0.1)] transition-colors group-hover:bg-[hsl(var(--dash-ring)/0.16)]">
-            <Calendar className="h-6 w-6 text-[hsl(var(--dash-ring))]" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(var(--dash-ring)/0.1)] transition-colors group-hover:bg-[hsl(var(--dash-ring)/0.16)] sm:h-12 sm:w-12">
+            <Calendar className="h-5 w-5 text-[hsl(var(--dash-ring))] sm:h-6 sm:w-6" />
           </div>
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-dash-text">RSVP to Event</p>
-            <p className="text-xs text-dash-muted">View upcoming events</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-dash-text">RSVP to event</p>
+            <p className="hidden text-xs text-dash-muted sm:block">View upcoming events</p>
           </div>
-          <ArrowRight className="h-4 w-4 text-dash-faint transition-colors group-hover:text-[hsl(var(--dash-ring))]" />
+          <ArrowRight className="hidden h-4 w-4 text-dash-faint transition-colors group-hover:text-[hsl(var(--dash-ring))] sm:block" />
         </Link>
 
         <Link
           href="/member/dues"
-          className="group flex items-center gap-4 rounded-2xl border border-dash-border bg-dash-surface p-5 shadow-[var(--dash-shadow)] transition-all hover:border-amber-200 hover:shadow-[var(--dash-shadow-raised)]"
+          className="group flex flex-col gap-2 rounded-2xl border border-dash-border bg-dash-surface p-4 shadow-[var(--dash-shadow)] transition-all hover:border-amber-200 hover:shadow-[var(--dash-shadow-raised)] sm:flex-row sm:items-center sm:gap-4 sm:p-5"
         >
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 transition-colors group-hover:bg-amber-100">
-            <Wallet className="h-6 w-6 text-amber-600" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 transition-colors group-hover:bg-amber-100 sm:h-12 sm:w-12">
+            <Wallet className="h-5 w-5 text-amber-600 sm:h-6 sm:w-6" />
           </div>
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-dash-text">Pay Dues</p>
-            <p className="text-xs text-dash-muted">View and pay outstanding dues</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-dash-text">Pay dues</p>
+            <p className="hidden text-xs text-dash-muted sm:block">View and pay outstanding dues</p>
           </div>
-          <ArrowRight className="h-4 w-4 text-dash-faint transition-colors group-hover:text-amber-500" />
+          <ArrowRight className="hidden h-4 w-4 text-dash-faint transition-colors group-hover:text-amber-500 sm:block" />
         </Link>
 
         <Link
           href="/member/donations"
-          className="group flex items-center gap-4 rounded-2xl border border-dash-border bg-dash-surface p-5 shadow-[var(--dash-shadow)] transition-all hover:border-pink-200 hover:shadow-[var(--dash-shadow-raised)]"
+          className="group flex flex-col gap-2 rounded-2xl border border-dash-border bg-dash-surface p-4 shadow-[var(--dash-shadow)] transition-all hover:border-pink-200 hover:shadow-[var(--dash-shadow-raised)] sm:flex-row sm:items-center sm:gap-4 sm:p-5"
         >
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-pink-50 transition-colors group-hover:bg-pink-100">
-            <Heart className="h-6 w-6 text-pink-600" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-50 transition-colors group-hover:bg-pink-100 sm:h-12 sm:w-12">
+            <Heart className="h-5 w-5 text-pink-600 sm:h-6 sm:w-6" />
           </div>
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-dash-text">Make Donation</p>
-            <p className="text-xs text-dash-muted">Support the lodge</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-dash-text">Make donation</p>
+            <p className="hidden text-xs text-dash-muted sm:block">Support the lodge</p>
           </div>
-          <ArrowRight className="h-4 w-4 text-dash-faint transition-colors group-hover:text-pink-500" />
+          <ArrowRight className="hidden h-4 w-4 text-dash-faint transition-colors group-hover:text-pink-500 sm:block" />
         </Link>
 
         <Link
           href="/member/card"
-          className="group flex items-center gap-4 rounded-2xl border border-dash-border bg-dash-surface p-5 shadow-[var(--dash-shadow)] transition-all hover:border-emerald-200 hover:shadow-[var(--dash-shadow-raised)]"
+          className="group flex flex-col gap-2 rounded-2xl border border-dash-border bg-dash-surface p-4 shadow-[var(--dash-shadow)] transition-all hover:border-emerald-200 hover:shadow-[var(--dash-shadow-raised)] sm:flex-row sm:items-center sm:gap-4 sm:p-5"
         >
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 transition-colors group-hover:bg-emerald-100">
-            <IdCard className="h-6 w-6 text-emerald-600" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 transition-colors group-hover:bg-emerald-100 sm:h-12 sm:w-12">
+            <IdCard className="h-5 w-5 text-emerald-600 sm:h-6 sm:w-6" />
           </div>
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-dash-text">My Card</p>
-            <p className="text-xs text-dash-muted">QR + calendar feed</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-dash-text">My card</p>
+            <p className="hidden text-xs text-dash-muted sm:block">QR + calendar feed</p>
           </div>
-          <ArrowRight className="h-4 w-4 text-dash-faint transition-colors group-hover:text-emerald-500" />
+          <ArrowRight className="hidden h-4 w-4 text-dash-faint transition-colors group-hover:text-emerald-500 sm:block" />
         </Link>
       </div>
 

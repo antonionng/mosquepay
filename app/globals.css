@@ -83,20 +83,44 @@
   }
 
   /* iOS native-feel helpers.
-     - Auto-zoom on input focus only fires when font-size < 16px, so any
-       single-line text input that's likely to be focused on mobile must
-       declare at least 16px. Components using shadcn's text-sm input get
-       opted into this via the .ios-input utility class.
+     - Auto-zoom on input focus only fires when computed font-size < 16px.
+       Our Input/Textarea/Select primitives use text-base on phones for that
+       reason, but this rule is a safety net for any raw <input>/<select>/
+       <textarea> rendered outside the design system.
+     - .ios-input is kept for explicit opt-ins (e.g. amount keypad where we
+       want 16px even on desktop because the digit is the whole UI).
      - Disable the 300ms tap delay + grey flash on buttons / tappables
        so taps feel like a native app, not a website. */
+  @media (max-width: 767px) {
+    :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="submit"]):not([type="button"]):not([type="reset"])),
+    :where(select),
+    :where(textarea) {
+      font-size: max(16px, 1rem);
+    }
+  }
   .ios-input {
     font-size: 16px;
   }
 
+  /* Native-app input ergonomics: snap to controls, no double-tap zoom, no
+     iOS rubber-band on the page chrome itself. */
+  input,
+  textarea,
+  select,
   button,
   [role="button"],
-  a {
+  a,
+  label {
     -webkit-tap-highlight-color: transparent;
+  }
+  input,
+  textarea,
+  select,
+  button,
+  [role="button"],
+  [role="tab"],
+  a[href] {
+    touch-action: manipulation;
   }
 
   .touch-pad {
@@ -104,6 +128,42 @@
     -webkit-tap-highlight-color: transparent;
     user-select: none;
     -webkit-user-select: none;
+  }
+
+  /* Native bottom-sheet treatment for any "fixed inset-0 flex justify-end"
+     right-edge admin drawer that hasn't been migrated to the shared Sheet
+     primitive yet. Opt in by adding the .admin-drawer-shell class to the
+     outer fixed container — the panel inside is selected via the
+     descendant rule. On phone (<sm) the panel sticks to the bottom edge,
+     gets rounded top corners, a drag handle, and safe-area bottom padding.
+     Desktop is unchanged. */
+  @media (max-width: 639px) {
+    .admin-drawer-shell {
+      align-items: flex-end !important;
+      justify-content: stretch !important;
+    }
+    .admin-drawer-shell > .admin-drawer-panel {
+      width: 100% !important;
+      max-width: 100% !important;
+      max-height: 92dvh;
+      border-left: 0 !important;
+      border-top-left-radius: 1rem;
+      border-top-right-radius: 1rem;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .admin-drawer-shell > .admin-drawer-panel::before {
+      content: "";
+      position: absolute;
+      top: 0.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 2.5rem;
+      height: 0.25rem;
+      border-radius: 9999px;
+      background-color: hsl(var(--dash-border-strong) / 0.6);
+      z-index: 30;
+      pointer-events: none;
+    }
   }
 
   /* Kiosk-style routes (e.g. /admin/take-payment on a phone at a meeting)
@@ -193,7 +253,10 @@
   }
 
   .public-hero-shell {
-    @apply container-full relative z-10 grid min-h-[72vh] gap-12 px-6 pb-20 pt-32 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)] lg:items-center lg:gap-20 lg:pb-24 lg:pt-40;
+    /* Phone: tighter top padding so the headline sits inside the first
+       fold even on iPhone SE (375x667). pt-32 (128px) used to push
+       headline below the visible area on small phones. */
+    @apply container-full relative z-10 grid min-h-[64dvh] gap-8 px-4 pb-14 pt-20 sm:min-h-[72vh] sm:gap-12 sm:px-6 sm:pb-20 sm:pt-32 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)] lg:items-center lg:gap-20 lg:pb-24 lg:pt-40;
   }
 
   .public-hero-copy {
@@ -225,7 +288,9 @@
   }
 
   .public-section {
-    @apply py-20 lg:py-28;
+    /* Phone: 56px vertical padding (was 80px) so first-page-load shows two
+       sections at once instead of one. Restores at sm+. */
+    @apply py-14 sm:py-20 lg:py-28;
   }
 
   .public-section-muted {
@@ -253,23 +318,36 @@
   }
 
   .admin-page-head {
-    @apply flex flex-col gap-4 border-b border-[hsl(var(--dash-border))] pb-6 md:flex-row md:items-end md:justify-between;
+    /* Tighter top padding on phone — the admin top header already shows
+       the page title, so the page-head's title is duplicated. Hiding it
+       on phone would lose the action row, so instead we collapse spacing
+       hard and let the action row sit just below the header title. */
+    @apply flex flex-col gap-3 pb-4 md:flex-row md:items-end md:justify-between md:gap-4 md:border-b md:border-[hsl(var(--dash-border))] md:pb-6;
   }
 
   .admin-action-row {
-    @apply flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end;
+    /* On phone, actions sit in a horizontal scroll rail so a page can
+       have 4+ actions without forcing them to stack into 4 full-width
+       buttons (which is what the previous flex-col + w-full did and is
+       the most "this is a website" pattern in the app). */
+    @apply -mx-1 flex w-full snap-x snap-mandatory gap-2 overflow-x-auto px-1 pb-1 scrollbar-hide sm:mx-0 sm:w-auto sm:snap-none sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:overflow-visible sm:px-0 sm:pb-0;
   }
 
   .admin-action-row > * {
-    @apply w-full sm:w-auto;
+    /* Each action becomes a tappable chip on phone (auto width, snap-start
+       so it docks left as you scroll). On tablet+ we revert to the usual
+       flow layout. */
+    @apply w-auto shrink-0 snap-start sm:w-auto;
   }
 
   .admin-page-title {
-    @apply text-2xl font-semibold tracking-tight text-[hsl(var(--dash-text))] sm:text-3xl;
+    /* Phone hides the on-page title because the admin top app bar already
+       shows it. Re-shows at sm+ where vertical space is available. */
+    @apply hidden text-2xl font-semibold tracking-tight text-[hsl(var(--dash-text))] sm:block sm:text-3xl;
   }
 
   .admin-page-copy {
-    @apply mt-1 max-w-3xl text-sm text-[hsl(var(--dash-text-muted))];
+    @apply mt-1 hidden max-w-3xl text-sm text-[hsl(var(--dash-text-muted))] sm:block;
   }
 
   .admin-surface {
@@ -395,15 +473,15 @@
 
 @layer utilities {
   .container-narrow {
-    @apply mx-auto max-w-3xl px-6;
+    @apply mx-auto max-w-3xl px-4 sm:px-6;
   }
-  
+
   .container-wide {
-    @apply mx-auto max-w-6xl px-6;
+    @apply mx-auto max-w-6xl px-4 sm:px-6;
   }
-  
+
   .container-full {
-    @apply mx-auto max-w-[88rem] px-6;
+    @apply mx-auto max-w-[88rem] px-4 sm:px-6;
   }
   
   .text-balance {

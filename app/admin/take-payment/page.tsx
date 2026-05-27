@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getAdminReadContext } from "@/lib/admin/read-context";
 import { getCurrentAdminScope } from "@/lib/auth/permissions";
@@ -8,6 +9,19 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Banknote } from "lucide-react";
 
 export const dynamic = "force-dynamic";
+
+// Point this route at its own PWA manifest so admins can install "LodgePay
+// POS" as a standalone app from /admin/take-payment without it being
+// confused with the member portal manifest (which scopes to /member).
+export const metadata: Metadata = {
+  title: "Take payment",
+  manifest: "/manifest-pos.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "LodgePay POS",
+  },
+};
 
 const RETURN_PATH = "/admin/take-payment";
 
@@ -84,7 +98,7 @@ export default async function TakePaymentPage({
   const ctx = await getAdminReadContext();
   if (ctx.mode !== "database" || !ctx.lodgeId) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         <div className="admin-page-head">
           <div>
             <h1 className="admin-page-title">Take payment</h1>

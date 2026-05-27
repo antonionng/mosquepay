@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 export default function AdminSettingsPage() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       <div className="admin-page-head">
         <div>
           <h1 className="admin-page-title">Settings</h1>

@@ -262,7 +262,7 @@ export function GiftAidClient({
         </div>
       ) : null}
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-5 grid grid-cols-2 gap-3 sm:mt-8 sm:gap-4 xl:grid-cols-4">
         <div className="dash-kpi-card p-6">
           <div className="flex items-center justify-between">
             <span className="text-sm text-dash-muted">Total Declarations</span>

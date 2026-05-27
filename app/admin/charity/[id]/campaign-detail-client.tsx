@@ -239,7 +239,7 @@ export function CharityCampaignDetailClient({
   );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       <div>
         <Button asChild variant="ghost" size="sm" className="text-dash-muted">
           <Link href="/admin/charity" className="flex items-center gap-2">

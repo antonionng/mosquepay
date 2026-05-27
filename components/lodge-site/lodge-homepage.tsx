@@ -281,11 +281,30 @@ function ContactEnquiryForm({
       <div className="grid gap-5 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="contact-name">Full name</Label>
-          <Input id="contact-name" name="name" required placeholder="John Smith" />
+          <Input
+            id="contact-name"
+            name="name"
+            required
+            autoComplete="name"
+            enterKeyHint="next"
+            placeholder="John Smith"
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="contact-email">Email</Label>
-          <Input id="contact-email" name="email" required type="email" placeholder="john@example.com" />
+          <Input
+            id="contact-email"
+            name="email"
+            required
+            type="email"
+            autoComplete="email"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            inputMode="email"
+            enterKeyHint="next"
+            placeholder="john@example.com"
+          />
         </div>
       </div>
       {formFieldVisible(section, "phone") || formFieldVisible(section, "subject") ? (
@@ -296,6 +315,10 @@ function ContactEnquiryForm({
               <Input
                 id="contact-phone"
                 name="phone"
+                type="tel"
+                autoComplete="tel"
+                inputMode="tel"
+                enterKeyHint="next"
                 required={formFieldRequired(section, "phone")}
                 placeholder="Optional"
               />
@@ -307,6 +330,8 @@ function ContactEnquiryForm({
               <Input
                 id="contact-subject"
                 name="subject"
+                autoComplete="off"
+                enterKeyHint="next"
                 required={formFieldRequired(section, "subject")}
                 placeholder="Visiting, membership, or general enquiry"
               />
@@ -404,17 +429,43 @@ function LeadIntakeForm({
       <div className="grid gap-5 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="lead-first-name">First name</Label>
-          <Input id="lead-first-name" name="first_name" required placeholder="John" />
+          <Input
+            id="lead-first-name"
+            name="first_name"
+            required
+            autoComplete="given-name"
+            enterKeyHint="next"
+            placeholder="John"
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="lead-last-name">Last name</Label>
-          <Input id="lead-last-name" name="last_name" required placeholder="Smith" />
+          <Input
+            id="lead-last-name"
+            name="last_name"
+            required
+            autoComplete="family-name"
+            enterKeyHint="next"
+            placeholder="Smith"
+          />
         </div>
       </div>
       <div className="grid gap-5 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="lead-email">Email</Label>
-          <Input id="lead-email" name="email" required type="email" placeholder="john@example.com" />
+          <Input
+            id="lead-email"
+            name="email"
+            required
+            type="email"
+            autoComplete="email"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            inputMode="email"
+            enterKeyHint="next"
+            placeholder="john@example.com"
+          />
         </div>
         {formFieldVisible(section, "phone") ? (
           <div className="space-y-2">
@@ -422,6 +473,10 @@ function LeadIntakeForm({
             <Input
               id="lead-phone"
               name="phone"
+              type="tel"
+              autoComplete="tel"
+              inputMode="tel"
+              enterKeyHint="next"
               required={formFieldRequired(section, "phone")}
               placeholder="Optional"
             />
@@ -436,6 +491,8 @@ function LeadIntakeForm({
               <Input
                 id="lead-location"
                 name="location"
+                autoComplete="address-level2"
+                enterKeyHint="next"
                 required={formFieldRequired(section, "location")}
                 placeholder="Town or city"
               />
@@ -447,6 +504,8 @@ function LeadIntakeForm({
               <Input
                 id="lead-how-heard"
                 name="how_heard"
+                autoComplete="off"
+                enterKeyHint="next"
                 required={formFieldRequired(section, "how_heard")}
                 placeholder="Friend, search, event..."
               />

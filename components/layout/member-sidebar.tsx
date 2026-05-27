@@ -63,7 +63,12 @@ export function MemberSidebar() {
         variant="ghost"
         size="icon"
         className={cn(
-          "fixed left-3 top-3 z-50 h-10 w-10 border border-dash-border bg-dash-surface text-dash-text shadow-sm lg:hidden",
+          // Anchored to the safe-area inset on iOS so the trigger sits
+          // inside the new MemberTopBar's leading slot, never overlapping
+          // the notch / status bar. The bottom tabs handle primary nav on
+          // phone; this hamburger gives one-tap access to lodge context,
+          // user info, and logout for secondary actions.
+          "fixed left-3 top-[calc(env(safe-area-inset-top)+0.625rem)] z-50 h-10 w-10 border border-dash-border bg-dash-surface text-dash-text shadow-sm lg:hidden",
           "hover:bg-dash-surface-subtle hover:text-dash-text"
         )}
         onClick={() => setMobileOpen(!mobileOpen)}

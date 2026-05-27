@@ -311,7 +311,7 @@ export function SummonsEditorClient({
     saving || sending || approving || (status !== "approved" && status !== "sent");
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8">
+    <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button asChild variant="secondary" size="sm">
           <Link href="/admin/meetings">

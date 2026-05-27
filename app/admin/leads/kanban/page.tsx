@@ -87,7 +87,7 @@ export default async function LeadsKanbanPage() {
   }));
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       <div className="admin-page-head">
         <div>
           <h1 className="admin-page-title">Pipeline Board</h1>

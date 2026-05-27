@@ -156,7 +156,7 @@ export default async function LeadDetailPage({
   }));
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       <div>
         <Button
           asChild
@@ -394,7 +394,7 @@ export default async function LeadDetailPage({
           </Card>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <LeadDetailActions
             leadId={lead.id}
             currentStage={lead.stage}

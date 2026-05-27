@@ -226,7 +226,7 @@ export function AdminDonationsClient({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       <div className="admin-page-head">
         <div className="flex-1">
           <h1 className="admin-page-title">Donations</h1>

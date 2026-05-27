@@ -347,7 +347,7 @@ export function SequencesClient({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       <div className="admin-page-head">
         <div>
           <h1 className="admin-page-title">Meeting sequences</h1>
@@ -478,7 +478,7 @@ export function SequencesClient({
           </Button>
         </Card>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {sequences.map((sequence) => {
             const events = eventsBySequence[sequence.id] ?? [];
             const upcoming = events.filter(
@@ -692,7 +692,7 @@ export function SequencesClient({
       )}
 
       {createOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end">
+        <div className="admin-drawer-shell fixed inset-0 z-50 flex justify-end">
           <button
             type="button"
             aria-label="Close sequence form"
@@ -701,7 +701,7 @@ export function SequencesClient({
           />
           <form
             onSubmit={handleCreate}
-            className="relative flex h-full w-full max-w-2xl flex-col overflow-y-auto border-l border-dash-border bg-dash-surface shadow-xl"
+            className="admin-drawer-panel relative flex h-full w-full max-w-2xl flex-col overflow-y-auto border-l border-dash-border bg-dash-surface shadow-xl"
           >
             <div className="flex items-center justify-between border-b border-dash-border px-6 py-4">
               <div>

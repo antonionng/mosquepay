@@ -351,7 +351,7 @@ export function AdminMeetingsClient({
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       <div className="admin-page-head">
         <div>
           <h1 className="admin-page-title">Meetings</h1>
@@ -480,7 +480,7 @@ export function AdminMeetingsClient({
       </div>
 
       {view === "list" && (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <Card variant="panel" className="space-y-4 overflow-hidden p-0">
             <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
               <div>

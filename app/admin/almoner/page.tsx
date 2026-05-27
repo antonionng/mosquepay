@@ -10,7 +10,7 @@ export default async function AlmonerPage() {
   const ctx = await getAdminReadContext();
   if (ctx.mode !== "database" || !ctx.lodgeId) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         <div className="admin-page-head">
           <div>
             <h1 className="admin-page-title">Almoner</h1>

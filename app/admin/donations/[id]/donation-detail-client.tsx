@@ -124,7 +124,7 @@ export function DonationDetailClient({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="admin-page-head">
         <div className="min-w-0 flex-1">
           <h1 className="admin-page-title">

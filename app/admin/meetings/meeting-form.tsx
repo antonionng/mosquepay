@@ -278,14 +278,14 @@ export function MeetingFormDrawer({
   const basicsValid = Boolean(form.title.trim()) && Boolean(form.event_date);
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <div className="admin-drawer-shell fixed inset-0 z-50 flex justify-end">
       <button
         type="button"
         aria-label="Close meeting form"
         className="absolute inset-0 bg-dash-text/20 backdrop-blur-[2px]"
         onClick={onClose}
       />
-      <div className="relative flex h-full w-full max-w-2xl flex-col border-l border-dash-border bg-dash-surface shadow-xl">
+      <div className="admin-drawer-panel relative flex h-full w-full max-w-2xl flex-col border-l border-dash-border bg-dash-surface shadow-xl">
         <div className="flex items-center justify-between border-b border-dash-border px-6 py-4">
           <div>
             <h2 className="text-lg font-semibold text-dash-text">

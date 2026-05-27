@@ -43,23 +43,27 @@ function LoginForm() {
 
   return (
     <div className="w-full max-w-sm">
-      <div className="mb-8 flex flex-col items-center text-center">
+      <div className="mb-6 flex flex-col items-center text-center sm:mb-8">
         <Image
           src="/brand/lodgepay-admin-signin.png"
           alt="LodgePay"
           width={1024}
           height={1024}
           priority
-          className="mb-6 h-44 w-44 object-contain"
+          className="mb-4 h-24 w-24 object-contain sm:mb-6 sm:h-44 sm:w-44"
         />
-        <h1 className="text-3xl font-semibold tracking-tight text-dash-text">Admin Login</h1>
-        <p className="mt-2 text-sm text-dash-muted">Sign in to access the admin panel.</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-dash-text sm:text-3xl">Admin login</h1>
+        <p className="mt-1.5 text-sm text-dash-muted sm:mt-2">Sign in to access the admin panel.</p>
       </div>
-      
-      <div className="admin-surface p-8">
+
+      <div className="admin-surface p-5 sm:p-8">
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <div
+              role="alert"
+              aria-live="polite"
+              className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+            >
               {error}
             </div>
           )}
@@ -67,11 +71,18 @@ function LoginForm() {
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
+              name="email"
               variant="dashboard"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="email"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              inputMode="email"
+              enterKeyHint="next"
               placeholder="admin@covenantlodge.org.uk"
             />
           </div>
@@ -79,21 +90,24 @@ function LoginForm() {
             <Label htmlFor="password">Password</Label>
             <Input
               id="password"
+              name="password"
               variant="dashboard"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
+              enterKeyHint="go"
               placeholder="Password"
             />
           </div>
-          <Button type="submit" variant="brand" className="w-full" disabled={loading}>
+          <Button type="submit" variant="brand" className="h-12 w-full text-base sm:h-11 sm:text-sm" disabled={loading}>
             {loading ? "Signing in..." : "Sign in"}
           </Button>
         </form>
       </div>
 
-      <p className="mt-6 text-center">
+      <p className="mt-5 text-center sm:mt-6">
         <Link href="/" className="text-sm text-dash-muted transition-colors hover:text-brand">
           ← Back to site
         </Link>
@@ -104,7 +118,7 @@ function LoginForm() {
 
 export default function AdminLoginPage() {
   return (
-    <div className="admin-dashboard-light flex min-h-screen items-center justify-center bg-dash-bg p-6">
+    <div className="admin-dashboard-light flex min-h-[100dvh] items-center justify-center bg-dash-bg p-4 sm:p-6">
       <Suspense fallback={<div className="text-dash-muted">Loading...</div>}>
         <LoginForm />
       </Suspense>

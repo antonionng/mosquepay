@@ -237,6 +237,7 @@ function DonatePageContent() {
                       type="number"
                       min={1}
                       step={1}
+                      inputMode="decimal"
                       placeholder="Custom"
                       className="w-24"
                       value={customAmount}
@@ -259,6 +260,8 @@ function DonatePageContent() {
                   <Label htmlFor="donor_name">Your name</Label>
                   <Input
                     id="donor_name"
+                    autoComplete="name"
+                    enterKeyHint="next"
                     value={donorName}
                     onChange={(e) => setDonorName(e.target.value)}
                   />
@@ -270,6 +273,12 @@ function DonatePageContent() {
                     id="donor_email"
                     type="email"
                     required
+                    autoComplete="email"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    inputMode="email"
+                    enterKeyHint="next"
                     value={donorEmail}
                     onChange={(e) => setDonorEmail(e.target.value)}
                   />
@@ -357,6 +366,8 @@ function DonatePageContent() {
                           <div className="space-y-1">
                             <Label className="text-sm">Address line 1 *</Label>
                             <Input
+                              autoComplete="address-line1"
+                              enterKeyHint="next"
                               value={addressLine1}
                               onChange={(e) => setAddressLine1(e.target.value)}
                             />
@@ -364,6 +375,8 @@ function DonatePageContent() {
                           <div className="space-y-1">
                             <Label className="text-sm">Address line 2</Label>
                             <Input
+                              autoComplete="address-line2"
+                              enterKeyHint="next"
                               value={addressLine2}
                               onChange={(e) => setAddressLine2(e.target.value)}
                             />
@@ -371,6 +384,8 @@ function DonatePageContent() {
                           <div className="space-y-1">
                             <Label className="text-sm">City *</Label>
                             <Input
+                              autoComplete="address-level2"
+                              enterKeyHint="next"
                               value={city}
                               onChange={(e) => setCity(e.target.value)}
                             />
@@ -378,6 +393,9 @@ function DonatePageContent() {
                           <div className="space-y-1">
                             <Label className="text-sm">Postcode *</Label>
                             <Input
+                              autoComplete="postal-code"
+                              autoCapitalize="characters"
+                              enterKeyHint="done"
                               value={postcode}
                               onChange={(e) => setPostcode(e.target.value)}
                             />

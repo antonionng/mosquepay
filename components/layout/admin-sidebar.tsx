@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { AdminLodgeSwitcher } from "@/components/layout/admin-lodge-switcher";
 import {
   LayoutDashboard,
   Users,
@@ -193,7 +194,9 @@ export function AdminSidebar() {
         variant="ghost"
         size="icon"
         className={cn(
-          "fixed left-3 top-3 z-50 h-10 w-10 border border-dash-border bg-dash-surface text-dash-text shadow-sm lg:hidden",
+          // Anchored below the iOS safe-area inset so the button never sits
+          // under the status bar on standalone PWA installs.
+          "fixed left-3 top-[calc(env(safe-area-inset-top)+0.5rem)] z-50 h-10 w-10 border border-dash-border bg-dash-surface text-dash-text shadow-sm lg:hidden",
           "hover:bg-dash-surface-subtle hover:text-dash-text"
         )}
         onClick={() => setMobileOpen(!mobileOpen)}
@@ -225,6 +228,18 @@ export function AdminSidebar() {
               className="h-11 w-auto max-w-[13.75rem] object-contain lg:h-12"
             />
           </Link>
+        </div>
+
+        {/* Lodge context (working-in selector + view live site).
+            Sits at the top of the sidebar so it's the first thing users
+            see — especially important on phone where this is the only
+            way to switch lodge. Closing the drawer happens after a
+            successful change so the user lands on the refreshed page. */}
+        <div className="shrink-0 border-b border-dash-border bg-dash-surface px-3 py-3">
+          <AdminLodgeSwitcher
+            variant="sidebar"
+            onAfterChange={() => setMobileOpen(false)}
+          />
         </div>
 
         <nav
@@ -267,16 +282,6 @@ export function AdminSidebar() {
             Log out
           </button>
         </nav>
-
-        <div className="shrink-0 border-t border-dash-border bg-dash-surface-subtle/90 p-3 backdrop-blur-sm">
-          <Link
-            href="/"
-            className="block rounded-lg px-3 py-2 text-xs font-medium text-dash-muted transition-colors hover:bg-dash-surface hover:text-dash-ring"
-            onClick={() => setMobileOpen(false)}
-          >
-            View site
-          </Link>
-        </div>
       </aside>
       {mobileOpen && (
         <div

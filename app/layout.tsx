@@ -59,9 +59,21 @@ export const metadata: Metadata = {
     icon: "/icon.png",
     apple: "/icon.png",
   },
+  // format-detection:none stops iOS Safari from auto-linking phone numbers,
+  // addresses, and dates in admin/lodge content (they show up as ugly blue
+  // underlined "tap to call" affordances on numeric IDs and reference codes).
+  formatDetection: {
+    telephone: false,
+    date: false,
+    address: false,
+    email: false,
+    url: false,
+  },
   other: {
     "og:image:secure_url": SOCIAL_SHARE_IMAGE.url,
     "article:publisher": SITE_ORIGIN,
+    // Hint to Chromium PWAs that landscape is also acceptable on tablets.
+    "mobile-web-app-capable": "yes",
   },
 };
 

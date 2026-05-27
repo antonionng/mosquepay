@@ -49,7 +49,7 @@ export default async function ProvinceDetailPage({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
         <Link
           href="/admin/provinces"
