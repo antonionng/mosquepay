@@ -40,7 +40,12 @@ export async function POST(request: NextRequest) {
   if (!lodgeId) {
     return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("admin:all", lodgeId);
+  // Mooov disconnect is a payment-ops action: the treasurer is the natural
+  // owner of the payments rail and is the one who'd flip Mooov off if it
+  // misbehaves. Match the sidebar visibility gate
+  // (components/layout/admin-sidebar.tsx) and the integration credentials
+  // API so treasurer can actually use the Disconnect button shown to them.
+  const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
   if (forbidden) return forbidden;
 
   const supa = createServiceClient();

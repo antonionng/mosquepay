@@ -75,6 +75,15 @@ const ESSENTIALS_ENTITLEMENTS: EntitlementKey[] = [
   "secretary_reports",
   "charity",
   "guest_links",
+  // The /admin/integrations page is the only UI surface that exposes
+  // Mooov Connect (connect, reconnect, disconnect, repair). Mooov is the
+  // payments rail and `payments` is already an Essentials entitlement, so
+  // gating its setup UI to Province made it impossible for any paying
+  // Essentials/Complete/Group lodge to actually administer their own
+  // Mooov merchant. Calendar / email / accounting connectors on this
+  // page are non-destructive (each one is its own toggle), so promoting
+  // the page itself doesn't auto-enable a paid integration.
+  "integrations",
 ];
 
 const COMPLETE_EXTRA_ENTITLEMENTS: EntitlementKey[] = [
@@ -100,7 +109,6 @@ const PROVINCE_EXTRA_ENTITLEMENTS: EntitlementKey[] = [
   "province_dashboards",
   "migration_planning",
   "named_support",
-  "integrations",
 ];
 
 export const PLAN_DEFINITIONS: Record<PlanCode, PlanDefinition> = {

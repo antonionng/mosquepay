@@ -40,7 +40,13 @@ export async function PATCH(
   if (!lodgeId) {
     return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("admin:all", lodgeId);
+  // Integrations (Mooov, accounting, calendar, email) are owned by the
+  // lodge treasurer in addition to the secretary. Gating on payments:write
+  // (which treasurer has, and which admin:all implicitly grants for
+  // secretary/super_admin/operator) keeps the API in lockstep with the
+  // sidebar visibility gate in components/layout/admin-sidebar.tsx so the
+  // treasurer doesn't see the page but get 403s on save.
+  const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
   if (forbidden) return forbidden;
   const body = await request.json();
   const cred = await db.upsertIntegrationCredentials(lodgeId, provider, {
@@ -82,7 +88,7 @@ export async function DELETE(
   if (!lodgeId) {
     return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("admin:all", lodgeId);
+  const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
   if (forbidden) return forbidden;
   await db.deleteIntegrationCredentials(lodgeId, provider);
   return NextResponse.json({ ok: true });
