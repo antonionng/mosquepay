@@ -21,7 +21,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest, getDefaultLodgeSlug } from "@/lib/tenant";
+import { getLodgeSlugFromRequest } from "@/lib/tenant";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { createServiceClient } from "@/lib/supabase/server";
 import { callMooovConnect, MooovApiError } from "@/lib/mooov";
@@ -211,16 +211,16 @@ export async function POST(request: NextRequest) {
   const idempotencyKey = `don_${paymentId}`;
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const lodgeQuery =
-    lodgeSlug === getDefaultLodgeSlug()
-      ? ""
-      : `&lodge=${encodeURIComponent(lodgeSlug)}`;
+  // Always thread ?lodge=<slug> through success/cancel URLs -- even when this
+  // lodge is the platform default. Keeping the slug explicit means (a) the
+  // PublicHeader on /donate renders the correct lodge branding when a donor
+  // hits "back" to retry, and (b) the link cannot silently retarget another
+  // lodge if DEFAULT_LODGE_SLUG ever changes.
+  const lodgeQuery = `&lodge=${encodeURIComponent(lodgeSlug)}`;
   const successUrl = `${siteUrl}/events/rsvp/success?payment_id=${encodeURIComponent(
     paymentId
   )}&type=donation${lodgeQuery}`;
-  const cancelUrl = `${siteUrl}/donate${
-    lodgeSlug === getDefaultLodgeSlug() ? "" : `?lodge=${encodeURIComponent(lodgeSlug)}`
-  }`;
+  const cancelUrl = `${siteUrl}/donate?lodge=${encodeURIComponent(lodgeSlug)}`;
   const description = donorName
     ? `Donation from ${donorName}`
     : "Donation";

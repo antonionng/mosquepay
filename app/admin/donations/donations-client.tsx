@@ -108,11 +108,18 @@ export function AdminDonationsClient({
   const [linkCopied, setLinkCopied] = useState(false);
 
   useEffect(() => {
-    const lodgeQuery =
-      lodgeSlug && lodgeSlug !== DEFAULT_LODGE_SLUG
-        ? `?lodge=${encodeURIComponent(lodgeSlug)}`
-        : "";
-    setDonationUrl(`${window.location.origin}/donate${lodgeQuery}`);
+    // Always include ?lodge=<slug> -- even when the lodge happens to be the
+    // platform default. This makes the donation URL explicit (donors and the
+    // PublicHeader can see exactly which lodge it routes to), survives any
+    // future change to DEFAULT_LODGE_SLUG, and ensures the public /donate
+    // page renders this lodge's branding (PublicHeader auto-switches into
+    // tenant mode whenever ?lodge= is present). Without the param the donor
+    // would see the platform's generic "LodgePay" header instead of the
+    // lodge's name + logo.
+    const slug = lodgeSlug || DEFAULT_LODGE_SLUG;
+    setDonationUrl(
+      `${window.location.origin}/donate?lodge=${encodeURIComponent(slug)}`
+    );
   }, [lodgeSlug]);
 
   async function copyDonationLink() {

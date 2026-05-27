@@ -23,6 +23,13 @@ function DonatePageContent() {
   const initialName = searchParams.get("name") ?? "";
   const initialGiftAid = searchParams.get("gift_aid") === "1";
 
+  // Lodge name for the hero. Fetched client-side using the same public
+  // endpoint the PublicHeader uses so donors see "Donate to Covenant Lodge
+  // No. 4344" (or whichever lodge the link routes to) instead of the
+  // platform-generic copy. We only render the lodge label once it's loaded
+  // so we don't flash the wrong name.
+  const [lodgeName, setLodgeName] = useState<string | null>(null);
+
   const [amount, setAmount] = useState<number>(0);
   const [customAmount, setCustomAmount] = useState("");
   const [donorName, setDonorName] = useState(initialName);
@@ -47,6 +54,36 @@ function DonatePageContent() {
   const giftAidLookupId = useRef(0);
 
   const effectiveAmount = amount || Number(customAmount) || 0;
+
+  // Resolve the lodge label for the hero. We only attempt the lookup when
+  // a slug is on the URL -- on the bare /donate path we keep the generic
+  // copy. The same endpoint powers the lodge-aware PublicHeader, so this
+  // adds no new public surface area.
+  useEffect(() => {
+    if (!lodge) {
+      setLodgeName(null);
+      return;
+    }
+    let active = true;
+    async function loadLodge() {
+      try {
+        const res = await fetch(
+          `/api/lodges/${encodeURIComponent(lodge)}/site`,
+          { cache: "no-store" }
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as { lodge?: { name?: string } };
+        if (!active) return;
+        if (data.lodge?.name) setLodgeName(data.lodge.name);
+      } catch {
+        // Keep generic copy on failure.
+      }
+    }
+    loadLodge();
+    return () => {
+      active = false;
+    };
+  }, [lodge]);
 
   // Debounced lookup: whenever the donor's email looks valid, ask the API
   // whether we already have a Gift Aid declaration on file for it. If we do,
@@ -166,14 +203,16 @@ function DonatePageContent() {
       <section className="public-hero order-2 lg:order-none">
         <div className="public-hero-shell">
           <div className="public-hero-copy">
-            <p className="public-kicker">Make a donation</p>
+            <p className="public-kicker">
+              {lodgeName ? `Donate to ${lodgeName}` : "Make a donation"}
+            </p>
             <h1 className="public-hero-title">
               Every contribution makes a difference.
             </h1>
             <p className="public-hero-body">
-              Support our charitable work with a one-off donation. Your
-              generosity helps fund community causes, education, and welfare
-              programmes.
+              {lodgeName
+                ? `Support ${lodgeName}'s charitable work with a one-off donation. Your generosity helps fund community causes, education, and welfare programmes.`
+                : "Support our charitable work with a one-off donation. Your generosity helps fund community causes, education, and welfare programmes."}
             </p>
           </div>
           <div className="public-hero-panel">
