@@ -15,6 +15,7 @@ import {
   Calendar,
   ExternalLink,
 } from "lucide-react";
+import { AttachToMeetingCard } from "./attach-to-meeting";
 
 export const dynamic = "force-dynamic";
 
@@ -43,14 +44,37 @@ export default async function AdminPaymentDetailPage({
   const payment = await db.getPaymentById(id, lodgeId);
   if (!payment) notFound();
 
-  const [event, rsvp, donations, auditLogs] = await Promise.all([
+  const [event, rsvp, donations, auditLogs, allEvents] = await Promise.all([
     payment.event_id
       ? db.getEventById(payment.event_id, lodgeId)
       : Promise.resolve(null),
     payment.rsvp_id ? db.getRsvpById(payment.rsvp_id, lodgeId) : Promise.resolve(null),
     db.getDonationsByEmail(payment.user_email, lodgeId),
     db.listAuditLogsByEntity(lodgeId, "payment", id),
+    db.getEvents(lodgeId),
   ]);
+
+  // Trim the picker to a reasonable window: ±180 days from the request.
+  // Older history can still be reached by searching from the meetings list;
+  // the typical "attach to meeting" flow targets meetings within the last
+  // few months. Computed on the server during render — the lint disable is
+  // for the react-hooks/purity rule which treats Date.now as impure even in
+  // server components where it's fine.
+  // eslint-disable-next-line react-hooks/purity
+  const nowMs = Date.now();
+  const eventPickerOptions = allEvents
+    .filter((evt) => {
+      const ts = new Date(evt.event_date).getTime();
+      if (!Number.isFinite(ts)) return false;
+      return Math.abs(ts - nowMs) <= 180 * 24 * 60 * 60 * 1000;
+    })
+    .sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime())
+    .slice(0, 30)
+    .map((evt) => ({
+      id: evt.id,
+      title: evt.title,
+      event_date: evt.event_date,
+    }));
 
   const linkedDonation = donations.find((d) => d.payment_id === id) ?? null;
 
@@ -157,22 +181,33 @@ export default async function AdminPaymentDetailPage({
             <p className="text-sm text-dash-text-muted">{payment.user_email}</p>
           </Card>
 
-          {event ? (
-            <Card variant="panel" className="space-y-2 p-5">
-              <h2 className="flex items-center gap-2 text-base font-semibold text-dash-text">
-                <Calendar className="h-4 w-4" /> Event
-              </h2>
-              <Link
-                href={`/admin/events/${event.id}`}
-                className="inline-flex items-center gap-1 text-sm font-medium text-dash-text hover:text-dash-ring"
-              >
-                {event.title} <ExternalLink className="h-3 w-3" />
-              </Link>
+          <Card variant="panel" className="space-y-3 p-5">
+            <h2 className="flex items-center gap-2 text-base font-semibold text-dash-text">
+              <Calendar className="h-4 w-4" /> Meeting
+            </h2>
+            {event ? (
+              <div className="space-y-1">
+                <Link
+                  href={`/admin/meetings/${event.id}`}
+                  className="inline-flex items-center gap-1 text-sm font-medium text-dash-text hover:text-dash-ring"
+                >
+                  {event.title} <ExternalLink className="h-3 w-3" />
+                </Link>
+                <p className="text-xs text-dash-text-muted">
+                  {formatDate(event.event_date)}
+                </p>
+              </div>
+            ) : (
               <p className="text-xs text-dash-text-muted">
-                {formatDate(event.event_date)}
+                Not linked to a meeting.
               </p>
-            </Card>
-          ) : null}
+            )}
+            <AttachToMeetingCard
+              paymentId={payment.id}
+              currentEventId={payment.event_id ?? null}
+              events={eventPickerOptions}
+            />
+          </Card>
 
           {rsvp ? (
             <Card variant="panel" className="space-y-2 p-5">

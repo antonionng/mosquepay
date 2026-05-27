@@ -13,17 +13,21 @@ import { HistoryTab } from "./components/history-tab";
 import type { ActiveSessionState } from "./components/active-session";
 import type {
   CategoryId,
+  EventOption,
   HistoryItem,
   MemberOption,
   PayerSelection,
   StatusResponse,
   TabId,
 } from "./components/types";
+import { CATEGORIES } from "./components/types";
 
 type Props = {
   connected: boolean;
   mooovStatus: string | null;
   members: MemberOption[];
+  /** Recent + upcoming events for the optional "Link to meeting" picker. */
+  events: EventOption[];
 };
 
 // Take-payment shell. Owns:
@@ -37,6 +41,7 @@ export function TakePaymentClient({
   connected,
   mooovStatus,
   members,
+  events,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -51,6 +56,23 @@ export function TakePaymentClient({
   // Optional focus param so the cash tab can deep-link "scroll to my entry"
   // when the undo window expires and the user is sent to History.
   const focusId = searchParams.get("focus");
+
+  // Optional deep-link params:
+  //   ?event_id=<uuid>  preselects the meeting on the picker
+  //   ?category=<id>    preselects the contribution category
+  // Both come from the meeting detail page's "Take a payment for this
+  // meeting" CTAs so the duty officer lands on a pre-filled form.
+  const initialEventId = (() => {
+    const raw = searchParams.get("event_id");
+    if (!raw) return null;
+    return events.find((event) => event.id === raw) ? raw : null;
+  })();
+  const initialCategory: CategoryId = (() => {
+    const raw = searchParams.get("category");
+    if (!raw) return "general";
+    const known = CATEGORIES.find((c) => c.id === raw);
+    return known ? (raw as CategoryId) : "general";
+  })();
 
   const setTab = useCallback(
     (next: TabId, opts?: { focus?: string }) => {
@@ -81,9 +103,12 @@ export function TakePaymentClient({
   // amount you just typed. Memo-isolated so we don't accidentally pull
   // it into every child's re-render cycle.
   const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState<CategoryId>("general");
+  const [category, setCategory] = useState<CategoryId>(initialCategory);
   const [reference, setReference] = useState("");
   const [description, setDescription] = useState("");
+  // Optional event linkage shared across tabs so switching Charge/Cash
+  // doesn't lose the picked meeting. Driven by deep-link params on mount.
+  const [eventId, setEventId] = useState<string | null>(initialEventId);
   // Unified payer state — member, existing guest, inline-new guest, or
   // anonymous. Shared between Charge and Cash so a treasurer who picked a
   // guest in Cash sees the same guest selected if they switch to Charge.
@@ -213,6 +238,7 @@ export function TakePaymentClient({
       {tab === "charge" ? (
         <ChargeTab
           members={members}
+          events={events}
           amount={amount}
           setAmount={setAmount}
           category={category}
@@ -221,6 +247,8 @@ export function TakePaymentClient({
           setReference={setReference}
           description={description}
           setDescription={setDescription}
+          eventId={eventId}
+          setEventId={setEventId}
           payer={payer}
           setPayer={setPayer}
           session={session}
@@ -233,6 +261,7 @@ export function TakePaymentClient({
       {tab === "cash" ? (
         <CashTab
           members={members}
+          events={events}
           amount={amount}
           setAmount={setAmount}
           category={category}
@@ -241,6 +270,8 @@ export function TakePaymentClient({
           setReference={setReference}
           description={description}
           setDescription={setDescription}
+          eventId={eventId}
+          setEventId={setEventId}
           payer={payer}
           setPayer={setPayer}
           onLogged={loadHistory}

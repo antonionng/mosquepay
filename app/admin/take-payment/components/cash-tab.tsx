@@ -21,6 +21,7 @@ import { formatMoney, newClientToken } from "./helpers";
 import type {
   CashResponse,
   CategoryId,
+  EventOption,
   MemberOption,
   PayerSelection,
 } from "./types";
@@ -49,6 +50,7 @@ type ConfirmationState = {
 
 export function CashTab({
   members,
+  events,
   amount,
   setAmount,
   category,
@@ -57,12 +59,15 @@ export function CashTab({
   setReference,
   description,
   setDescription,
+  eventId,
+  setEventId,
   payer,
   setPayer,
   onLogged,
   onJumpToHistory,
 }: {
   members: MemberOption[];
+  events: EventOption[];
   amount: string;
   setAmount: React.Dispatch<React.SetStateAction<string>>;
   category: CategoryId;
@@ -71,6 +76,8 @@ export function CashTab({
   setReference: (v: string) => void;
   description: string;
   setDescription: (v: string) => void;
+  eventId: string | null;
+  setEventId: (v: string | null) => void;
   payer: PayerSelection;
   setPayer: (v: PayerSelection) => void;
   onLogged: () => void;
@@ -149,6 +156,7 @@ export function CashTab({
           reference,
           description,
           note,
+          event_id: eventId,
           client_token: clientTokenRef.current,
           ...buildPayerPayload(payer),
         }),
@@ -190,6 +198,7 @@ export function CashTab({
     category,
     reference,
     description,
+    eventId,
     payer,
     note,
     pendingHighValueConfirm,
@@ -327,9 +336,13 @@ export function CashTab({
           setReference={setReference}
           description={description}
           setDescription={setDescription}
+          events={events}
+          eventId={eventId}
+          setEventId={setEventId}
           note={note}
           setNote={setNote}
           showNote
+          defaultOpen={Boolean(eventId) || category !== "general"}
         />
         {error ? (
           <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">

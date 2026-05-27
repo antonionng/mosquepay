@@ -42,6 +42,10 @@ function buildReturnPath(params: SearchParams): string {
   if (tab) allowed.push(["tab", tab]);
   const focus = pick("focus");
   if (focus) allowed.push(["focus", focus]);
+  const eventId = pick("event_id");
+  if (eventId) allowed.push(["event_id", eventId]);
+  const category = pick("category");
+  if (category) allowed.push(["category", category]);
   if (allowed.length === 0) return RETURN_PATH;
   const search = new URLSearchParams(allowed).toString();
   return `${RETURN_PATH}?${search}`;
@@ -73,6 +77,45 @@ async function getLodgeMembers(lodgeId: string) {
       full_name: m.full_name,
       email: m.email ?? null,
     }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Events for the optional "Link to meeting" picker on the take-payment
+ * form. We pull a small window: today + 90 days forward and 60 days back,
+ * so the duty officer can attribute on the night and the treasurer can
+ * back-fill cash collected the next day. Older meetings can still be
+ * attached retroactively from the payment detail page.
+ */
+async function getLodgeEventsForPicker(lodgeId: string) {
+  try {
+    const events = await db.getEvents(lodgeId);
+    const now = Date.now();
+    const horizonForwardMs = 90 * 24 * 60 * 60 * 1000;
+    const horizonBackMs = 60 * 24 * 60 * 60 * 1000;
+    return events
+      .filter((event) => {
+        const ts = new Date(event.event_date).getTime();
+        if (!Number.isFinite(ts)) return false;
+        if (ts > now + horizonForwardMs) return false;
+        if (ts < now - horizonBackMs) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        // Prefer the closest event to "now" first so the next upcoming
+        // meeting tops the list, and recent past meetings follow.
+        const aDist = Math.abs(new Date(a.event_date).getTime() - now);
+        const bDist = Math.abs(new Date(b.event_date).getTime() - now);
+        return aDist - bDist;
+      })
+      .slice(0, 20)
+      .map((event) => ({
+        id: event.id,
+        title: event.title,
+        event_date: event.event_date,
+      }));
   } catch {
     return [];
   }
@@ -117,9 +160,10 @@ export default async function TakePaymentPage({
     );
   }
 
-  const [connection, members] = await Promise.all([
+  const [connection, members, events] = await Promise.all([
     getMooovConnection(ctx.lodgeId),
     getLodgeMembers(ctx.lodgeId),
+    getLodgeEventsForPicker(ctx.lodgeId),
   ]);
   const connected = !!connection && connection.status === "active";
 
@@ -128,6 +172,7 @@ export default async function TakePaymentPage({
       connected={connected}
       mooovStatus={connection?.status ?? null}
       members={members}
+      events={events}
     />
   );
 }

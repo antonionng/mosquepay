@@ -16,9 +16,11 @@ import {
   Eye,
   ExternalLink,
   Globe,
+  Lock,
   Link as LinkIcon,
   MapPin,
   Pencil,
+  PoundSterling,
   Send,
   Users,
   AlertTriangle,
@@ -82,6 +84,19 @@ type SummonsSend = {
   created_at: string;
 };
 
+/**
+ * Tri-state visibility for the admin detail page. Mirrors
+ * `isPubliclyVisible` from `lib/events/public-visibility.ts` so the UI never
+ * shows a "Visit" affordance that would 404.
+ *
+ *   - draft         → not published yet
+ *   - members_only  → published, but the public route still 404s
+ *                     (regular meeting without feature_on_website, or
+ *                     guest_policy === 'closed')
+ *   - public        → both flags align, the public URL renders
+ */
+export type MeetingVisibility = "draft" | "members_only" | "public";
+
 function typeLabel(t: string) {
   return t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -100,6 +115,23 @@ function formatPrice(value: number | null) {
   return `£${Number(value).toFixed(2)}`;
 }
 
+export type MeetingFinance = {
+  meeting: {
+    succeededTotal: number;
+    pendingTotal: number;
+    succeededCount: number;
+    pendingCount: number;
+    charity: number;
+    dining: number;
+    raffle: number;
+    meetingFee: number;
+    guestTicket: number;
+    refunded: number;
+  };
+  lodgeAllTime: number;
+  currency: string;
+};
+
 export function MeetingDetailClient({
   meeting,
   rsvps,
@@ -108,7 +140,12 @@ export function MeetingDetailClient({
   sends,
   publicUrl,
   publicPath,
+  previewPath,
+  visibility,
+  visibilityReason,
+  canFeatureOnWebsite,
   lodgeDefaults,
+  finance,
 }: {
   meeting: MeetingEvent;
   rsvps: RsvpEntry[];
@@ -117,7 +154,17 @@ export function MeetingDetailClient({
   sends: SummonsSend[];
   publicUrl: string;
   publicPath: string;
+  previewPath: string;
+  visibility: MeetingVisibility;
+  visibilityReason: string | null;
+  /**
+   * True when this meeting's event_type is private by default but could
+   * be promoted to the public site by ticking `feature_on_website`. False
+   * for naturally-public types (social/charity) and closed meetings.
+   */
+  canFeatureOnWebsite: boolean;
   lodgeDefaults: LodgeFeeDefaults | null;
+  finance?: MeetingFinance;
 }) {
   const router = useRouter();
   const [formOpen, setFormOpen] = useState(false);
@@ -215,12 +262,15 @@ export function MeetingDetailClient({
     }
   }
 
-  async function togglePublished(next: boolean) {
+  async function patchMeeting(
+    overrides: Partial<MeetingForm>,
+    failureMessage: string
+  ) {
     try {
       const res = await fetch(`/api/events/${meeting.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...formFromMeeting(meeting), published: next }),
+        body: JSON.stringify({ ...formFromMeeting(meeting), ...overrides }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -229,11 +279,23 @@ export function MeetingDetailClient({
       router.refresh();
     } catch (error) {
       window.alert(
-        error instanceof Error
-          ? error.message
-          : "Could not update publish state."
+        error instanceof Error ? error.message : failureMessage
       );
     }
+  }
+
+  async function togglePublished(next: boolean) {
+    await patchMeeting(
+      { published: next },
+      "Could not update publish state."
+    );
+  }
+
+  async function toggleFeatureOnWebsite(next: boolean) {
+    await patchMeeting(
+      { feature_on_website: next },
+      "Could not update website visibility."
+    );
   }
 
   function downloadCsv(filename: string, headers: string[], rows: string[][]) {
@@ -393,15 +455,25 @@ export function MeetingDetailClient({
                   >
                     {typeLabel(meeting.event_type)}
                   </Badge>
-                  {meeting.published ? (
+                  {visibility === "public" && (
                     <Badge
                       variant="outline"
                       className="border-emerald-200 bg-emerald-50 text-emerald-900"
                     >
                       <Globe className="mr-1 h-3 w-3" />
-                      Published
+                      Public website
                     </Badge>
-                  ) : (
+                  )}
+                  {visibility === "members_only" && (
+                    <Badge
+                      variant="outline"
+                      className="border-blue-200 bg-blue-50 text-blue-900"
+                    >
+                      <Lock className="mr-1 h-3 w-3" />
+                      Members only
+                    </Badge>
+                  )}
+                  {visibility === "draft" && (
                     <Badge
                       variant="outline"
                       className="border-amber-200 bg-amber-50 text-amber-900"
@@ -470,18 +542,21 @@ export function MeetingDetailClient({
           <div
             className={cn(
               "rounded-xl border p-4",
-              meeting.published
-                ? "border-emerald-200 bg-emerald-50/60"
-                : "border-amber-200 bg-amber-50/60"
+              visibility === "public" && "border-emerald-200 bg-emerald-50/60",
+              visibility === "members_only" &&
+                "border-blue-200 bg-blue-50/60",
+              visibility === "draft" && "border-amber-200 bg-amber-50/60"
             )}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-dash-muted">
                   <LinkIcon className="h-3.5 w-3.5" />
-                  Public link
+                  {visibility === "public" && "Public link"}
+                  {visibility === "members_only" && "Private preview"}
+                  {visibility === "draft" && "Draft preview"}
                 </div>
-                {meeting.published ? (
+                {visibility === "public" && (
                   <>
                     <p className="mt-2 break-all font-mono text-xs text-emerald-900">
                       {publicUrl}
@@ -491,21 +566,37 @@ export function MeetingDetailClient({
                       members and guests for RSVPs.
                     </p>
                   </>
-                ) : (
+                )}
+                {visibility === "members_only" && (
                   <>
-                    <p className="mt-2 break-all font-mono text-xs text-amber-900">
-                      {publicUrl}
+                    <p className="mt-2 text-xs text-blue-900">
+                      This meeting is published for members but not on the
+                      public website, so its public URL would 404 for
+                      visitors. Use the admin preview to QA the page, and
+                      share it with members through the summons.
                     </p>
-                    <p className="mt-1 text-xs text-amber-900/80">
-                      This meeting is a draft and won&apos;t appear publicly
-                      until you publish it. The URL above is reserved for when
-                      you do.
+                    {visibilityReason && (
+                      <p className="mt-1 text-xs text-blue-900/80">
+                        {visibilityReason}
+                      </p>
+                    )}
+                  </>
+                )}
+                {visibility === "draft" && (
+                  <>
+                    <p className="mt-2 text-xs text-amber-900">
+                      Draft &mdash; this meeting hasn&apos;t been published
+                      yet, so its public URL would 404. Preview the page as
+                      an admin before publishing.
+                    </p>
+                    <p className="mt-1 break-all font-mono text-xs text-amber-900/70">
+                      {publicUrl}
                     </p>
                   </>
                 )}
               </div>
               <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-start">
-                {meeting.published ? (
+                {visibility === "public" && (
                   <>
                     <Button
                       type="button"
@@ -527,16 +618,54 @@ export function MeetingDetailClient({
                       </Link>
                     </Button>
                   </>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="primary"
-                    size="sm"
-                    onClick={() => togglePublished(true)}
-                  >
-                    <Globe className="mr-2 h-3.5 w-3.5" />
-                    Publish
-                  </Button>
+                )}
+                {visibility === "members_only" && (
+                  <>
+                    <Button asChild variant="primary" size="sm">
+                      <Link
+                        href={previewPath}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Eye className="mr-2 h-3.5 w-3.5" />
+                        Admin preview
+                      </Link>
+                    </Button>
+                    {canFeatureOnWebsite && (
+                      <Button
+                        type="button"
+                        variant="dashboard"
+                        size="sm"
+                        onClick={() => toggleFeatureOnWebsite(true)}
+                      >
+                        <Globe className="mr-2 h-3.5 w-3.5" />
+                        Make public
+                      </Button>
+                    )}
+                  </>
+                )}
+                {visibility === "draft" && (
+                  <>
+                    <Button asChild variant="dashboard" size="sm">
+                      <Link
+                        href={previewPath}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Eye className="mr-2 h-3.5 w-3.5" />
+                        Preview
+                      </Link>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="sm"
+                      onClick={() => togglePublished(true)}
+                    >
+                      <Globe className="mr-2 h-3.5 w-3.5" />
+                      Publish
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
@@ -784,6 +913,20 @@ export function MeetingDetailClient({
         </div>
 
         <div className="space-y-4 sm:space-y-6">
+          {finance ? (
+            <MoneyRaisedCard
+              eventId={meeting.id}
+              finance={finance}
+              meetingHasFees={Boolean(
+                meeting.enable_meeting_fee ||
+                  meeting.enable_dining_rsvp ||
+                  meeting.enable_guest_tickets ||
+                  meeting.enable_charity_donation ||
+                  meeting.enable_raffle_donation,
+              )}
+            />
+          ) : null}
+
           <Card variant="panel" className="overflow-hidden p-0">
             <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
               <h3 className="dash-panel-header-title">Configuration</h3>
@@ -939,42 +1082,85 @@ export function MeetingDetailClient({
               <h3 className="dash-panel-header-title">Visibility</h3>
             </div>
             <CardContent className="space-y-3 border-t border-dash-border bg-dash-surface p-5 text-sm">
-              {meeting.published ? (
-                <>
-                  <div className="flex items-center gap-2 text-emerald-900">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                    <span>Live on the public lodge site</span>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="dashboard"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => togglePublished(false)}
-                  >
-                    <EyeOff className="mr-2 h-3.5 w-3.5" />
-                    Unpublish (return to draft)
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center gap-2 text-amber-900">
-                    <CircleDot className="h-4 w-4 text-amber-600" />
-                    <span>Draft — not visible publicly</span>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="primary"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => togglePublished(true)}
-                  >
-                    <Globe className="mr-2 h-3.5 w-3.5" />
-                    Publish now
-                  </Button>
-                </>
+              {visibility === "public" && (
+                <div className="flex items-center gap-2 text-emerald-900">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <span>Live on the public lodge site</span>
+                </div>
               )}
-              {meeting.published && (
+              {visibility === "members_only" && (
+                <div className="flex items-center gap-2 text-blue-900">
+                  <Lock className="h-4 w-4 text-blue-600" />
+                  <span>Published &mdash; members only, not on public site</span>
+                </div>
+              )}
+              {visibility === "draft" && (
+                <div className="flex items-center gap-2 text-amber-900">
+                  <CircleDot className="h-4 w-4 text-amber-600" />
+                  <span>Draft &mdash; not visible to anyone yet</span>
+                </div>
+              )}
+
+              {visibility === "draft" ? (
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => togglePublished(true)}
+                >
+                  <Globe className="mr-2 h-3.5 w-3.5" />
+                  Publish now
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="dashboard"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => togglePublished(false)}
+                >
+                  <EyeOff className="mr-2 h-3.5 w-3.5" />
+                  Unpublish (return to draft)
+                </Button>
+              )}
+
+              {canFeatureOnWebsite && meeting.published && (
+                <div className="rounded-lg border border-dash-border bg-dash-surface-subtle/60 p-3">
+                  <label className="flex cursor-pointer items-start gap-2 text-xs text-dash-text">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={meeting.feature_on_website}
+                      onChange={(event) =>
+                        toggleFeatureOnWebsite(event.target.checked)
+                      }
+                    />
+                    <span className="min-w-0">
+                      <span className="block font-medium text-dash-text">
+                        Show on the public lodge website
+                      </span>
+                      <span className="mt-0.5 block text-dash-muted">
+                        Off by default for this meeting type. Turn on for
+                        installations or other meetings you want visitors to
+                        see.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              )}
+
+              <Button asChild variant="ghost" size="sm" className="w-full">
+                <Link
+                  href={previewPath}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Eye className="mr-2 h-3.5 w-3.5" />
+                  Admin preview
+                </Link>
+              </Button>
+              {visibility === "public" && (
                 <Button asChild variant="ghost" size="sm" className="w-full">
                   <Link
                     href={publicPath}
@@ -1028,5 +1214,140 @@ function ConfigRow({
         <p className="mt-0.5 text-xs text-dash-text-muted">{hint}</p>
       )}
     </div>
+  );
+}
+
+function formatMoney(amount: number, currency = "GBP") {
+  try {
+    return new Intl.NumberFormat("en-GB", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `£${amount.toFixed(2)}`;
+  }
+}
+
+/**
+ * Money raised summary on the meeting detail page. Surfaces:
+ *
+ *   - The headline total raised for THIS meeting (succeeded only).
+ *   - Pending top-up (in-flight QR + unsettled cash) — useful in the
+ *     hours after a meeting before settlement.
+ *   - Sub-amount breakdown so the treasurer can see how the total split
+ *     across meeting fee / dining / charity / raffle / guest tickets.
+ *   - A "take a payment for this meeting" CTA that deep-links to the
+ *     take-payment app with the event pre-selected on the picker, so
+ *     the duty officer doesn't have to remember to attach.
+ *   - The lodge-wide all-time total, so anybody glancing at the meeting
+ *     page sees a real-time picture of fundraising momentum.
+ */
+function MoneyRaisedCard({
+  eventId,
+  finance,
+  meetingHasFees,
+}: {
+  eventId: string;
+  finance: MeetingFinance;
+  meetingHasFees: boolean;
+}) {
+  const { meeting, lodgeAllTime, currency } = finance;
+  const hasMeetingActivity =
+    meeting.succeededCount > 0 || meeting.pendingCount > 0;
+  const breakdownAll: Array<[string, number]> = [
+    ["Meeting fee", meeting.meetingFee],
+    ["Dining", meeting.dining],
+    ["Guest tickets", meeting.guestTicket],
+    ["Charity", meeting.charity],
+    ["Raffle", meeting.raffle],
+  ];
+  const breakdown: Array<[string, number]> = breakdownAll.filter(
+    (entry): entry is [string, number] => entry[1] > 0,
+  );
+
+  const chargeHref = `/admin/take-payment?event_id=${encodeURIComponent(eventId)}&tab=charge`;
+  const cashHref = `/admin/take-payment?event_id=${encodeURIComponent(eventId)}&tab=cash`;
+
+  return (
+    <Card variant="panel" className="overflow-hidden p-0">
+      <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
+        <div className="flex items-center gap-2">
+          <PoundSterling className="h-4 w-4 text-emerald-700" />
+          <h3 className="dash-panel-header-title">Money raised</h3>
+        </div>
+      </div>
+      <CardContent className="space-y-4 border-t border-dash-border bg-dash-surface p-5">
+        <div>
+          <p className="text-xs uppercase tracking-wide text-dash-muted">
+            This meeting
+          </p>
+          <p className="mt-1 text-2xl font-semibold text-dash-text">
+            {formatMoney(meeting.succeededTotal, currency)}
+          </p>
+          {meeting.pendingTotal > 0 ? (
+            <p className="mt-0.5 text-xs text-amber-700">
+              + {formatMoney(meeting.pendingTotal, currency)} pending (
+              {meeting.pendingCount} unsettled)
+            </p>
+          ) : null}
+          <p className="mt-0.5 text-xs text-dash-text-muted">
+            {meeting.succeededCount} payment
+            {meeting.succeededCount === 1 ? "" : "s"} settled
+            {meeting.refunded > 0
+              ? ` · ${formatMoney(meeting.refunded, currency)} refunded`
+              : ""}
+          </p>
+        </div>
+
+        {breakdown.length > 0 ? (
+          <dl className="grid grid-cols-2 gap-2 border-t border-dash-border pt-3 text-xs">
+            {breakdown.map(([label, value]) => (
+              <div
+                key={label}
+                className="rounded-md border border-dash-border bg-dash-surface-subtle/40 px-2 py-1.5"
+              >
+                <dt className="text-dash-muted">{label}</dt>
+                <dd className="font-semibold text-dash-text">
+                  {formatMoney(value, currency)}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+
+        {!hasMeetingActivity ? (
+          <p className="rounded-md border border-dashed border-dash-border bg-dash-surface-subtle/40 px-3 py-2 text-xs text-dash-text-muted">
+            {meetingHasFees
+              ? "No payments yet. Online RSVPs and in-person collections will appear here as they come in."
+              : "No payments yet. Use the buttons below to record charity, raffle, or guest-ticket money against this meeting."}
+          </p>
+        ) : null}
+
+        <div className="grid grid-cols-2 gap-2">
+          <Button asChild variant="primary" size="sm">
+            <Link href={chargeHref}>
+              <PoundSterling className="mr-1.5 h-3.5 w-3.5" />
+              Take payment
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href={cashHref}>Log cash</Link>
+          </Button>
+        </div>
+
+        <div className="border-t border-dash-border pt-3">
+          <p className="text-xs uppercase tracking-wide text-dash-muted">
+            All-time lodge total
+          </p>
+          <p className="mt-1 text-base font-semibold text-dash-text">
+            {formatMoney(lodgeAllTime, currency)}
+          </p>
+          <p className="mt-0.5 text-xs text-dash-text-muted">
+            Across every settled or in-flight payment, all meetings.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

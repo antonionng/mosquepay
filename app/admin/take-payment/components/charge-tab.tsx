@@ -12,6 +12,7 @@ import { ExtrasSection } from "./extras-section";
 import { ActiveSession, type ActiveSessionState } from "./active-session";
 import type {
   CategoryId,
+  EventOption,
   MemberOption,
   MintResponse,
   PayerSelection,
@@ -33,6 +34,7 @@ export async function generateQrForUrl(url: string) {
 
 export function ChargeTab({
   members,
+  events,
   amount,
   setAmount,
   category,
@@ -41,6 +43,8 @@ export function ChargeTab({
   setReference,
   description,
   setDescription,
+  eventId,
+  setEventId,
   payer,
   setPayer,
   session,
@@ -51,6 +55,7 @@ export function ChargeTab({
   onSessionMinted,
 }: {
   members: MemberOption[];
+  events: EventOption[];
   amount: string;
   setAmount: React.Dispatch<React.SetStateAction<string>>;
   category: CategoryId;
@@ -59,6 +64,8 @@ export function ChargeTab({
   setReference: (v: string) => void;
   description: string;
   setDescription: (v: string) => void;
+  eventId: string | null;
+  setEventId: (v: string | null) => void;
   payer: PayerSelection;
   setPayer: (v: PayerSelection) => void;
   session: ActiveSessionState | null;
@@ -101,6 +108,7 @@ export function ChargeTab({
             category,
             reference,
             description,
+            event_id: eventId,
             ...buildPayerPayload(payer),
           }),
         });
@@ -140,6 +148,7 @@ export function ChargeTab({
       category,
       reference,
       description,
+      eventId,
       payer,
       onRequireConnected,
       onSessionMinted,
@@ -181,6 +190,10 @@ export function ChargeTab({
           setReference={setReference}
           description={description}
           setDescription={setDescription}
+          events={events}
+          eventId={eventId}
+          setEventId={setEventId}
+          defaultOpen={Boolean(eventId) || category !== "general"}
         />
         {error ? (
           <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">

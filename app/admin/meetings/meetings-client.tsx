@@ -123,10 +123,21 @@ export function AdminMeetingsClient({
   meetings,
   rsvpMap,
   readinessMap,
+  financeMap,
 }: {
   meetings: MeetingEvent[];
   rsvpMap: Record<string, RsvpEntry[]>;
   readinessMap: Record<string, MeetingReadiness>;
+  /**
+   * Per-event money totals. Undefined buckets render as "—" so older
+   * meetings without any in-person/QR/online payments don't show a
+   * misleading £0. Populated from the canonical payments table by the
+   * server component above.
+   */
+  financeMap?: Record<
+    string,
+    { raised: number; pending: number; count: number }
+  >;
 }) {
   const router = useRouter();
   const [view, setView] = useState<View>("list");
@@ -560,6 +571,7 @@ export function AdminMeetingsClient({
                           rsvpCount={(rsvpMap[m.id] ?? []).length}
                           readiness={readinessMap[m.id]}
                           onDuplicate={() => duplicateMeeting(m)}
+                          finance={financeMap?.[m.id]}
                         />
                       ))}
                     </>
@@ -583,6 +595,7 @@ export function AdminMeetingsClient({
                           readiness={readinessMap[m.id]}
                           onDuplicate={() => duplicateMeeting(m)}
                           isPast
+                          finance={financeMap?.[m.id]}
                         />
                       ))}
                     </>
@@ -724,6 +737,7 @@ function MeetingCard({
   isPast,
   readiness,
   onDuplicate,
+  finance,
 }: {
   meeting: MeetingEvent;
   typeColor: Record<string, string>;
@@ -734,6 +748,7 @@ function MeetingCard({
   isPast?: boolean;
   readiness?: MeetingReadiness;
   onDuplicate?: () => void;
+  finance?: { raised: number; pending: number; count: number };
 }) {
   return (
     <div
@@ -789,6 +804,21 @@ function MeetingCard({
         <span className="flex items-center gap-1 text-xs text-dash-text-muted">
           <Users className="h-3.5 w-3.5" /> {rsvpCount}
         </span>
+        {finance && (finance.raised > 0 || finance.pending > 0) ? (
+          <span
+            className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-800"
+            title={
+              finance.pending > 0
+                ? `£${finance.raised.toFixed(2)} raised · £${finance.pending.toFixed(2)} pending`
+                : `£${finance.raised.toFixed(2)} raised across ${finance.count} payment${
+                    finance.count === 1 ? "" : "s"
+                  }`
+            }
+          >
+            £{finance.raised.toFixed(0)}
+            {finance.pending > 0 ? "+" : ""}
+          </span>
+        ) : null}
         <div className="flex items-center gap-1.5">
           <div
             className={cn("h-2 w-2 rounded-full", typeColor[meeting.event_type] ?? "bg-slate-400")}

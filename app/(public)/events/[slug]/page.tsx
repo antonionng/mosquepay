@@ -80,10 +80,22 @@ export async function EventPageContent({
   slug,
   lodge,
   linkMode = "query",
+  bypassVisibility = false,
+  adminPreviewBackHref,
 }: {
   slug: string;
   lodge?: string;
   linkMode?: LinkMode;
+  /**
+   * Skip the `isPubliclyVisible` gate. The caller is responsible for
+   * authorisation (e.g. the admin preview route, which uses
+   * `getAdminReadContext` to ensure only signed-in admins of this lodge can
+   * reach it). When true, a banner is rendered so the previewer knows the
+   * page is not currently public.
+   */
+  bypassVisibility?: boolean;
+  /** When previewing, where the back link should send the admin. */
+  adminPreviewBackHref?: string;
 }) {
   const lodgeSlug = resolveLodgeSlug(lodge);
   const defaultSlug = getDefaultLodgeSlug();
@@ -96,7 +108,9 @@ export async function EventPageContent({
 
   const event = await loadEvent(slug, lodgeSlug);
   if (!event) notFound();
-  if (!isPubliclyVisible(event)) notFound();
+  const visibleToPublic = isPubliclyVisible(event);
+  if (!visibleToPublic && !bypassVisibility) notFound();
+  const showAdminPreviewBanner = bypassVisibility && !visibleToPublic;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -129,6 +143,27 @@ export async function EventPageContent({
 
   return (
     <div className="public-page">
+      {showAdminPreviewBanner && (
+        <div className="sticky top-0 z-50 border-b border-amber-200 bg-amber-50/95 backdrop-blur">
+          <div className="container-full max-w-4xl px-6 py-3">
+            <div className="flex flex-col gap-2 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+              <p>
+                <span className="font-semibold">Admin preview.</span>{" "}
+                This meeting is not visible on the public site yet. Members
+                and visitors will see a 404 if they open this URL.
+              </p>
+              {adminPreviewBackHref && (
+                <Link
+                  href={adminPreviewBackHref}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-300 bg-white/60 px-3 py-1 text-xs font-medium text-amber-900 hover:bg-white"
+                >
+                  Back to admin
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

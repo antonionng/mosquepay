@@ -750,6 +750,26 @@ export async function getPayments(lodgeId: string): Promise<Payment[]> {
   return data as Payment[];
 }
 
+/**
+ * Payments linked to a specific meeting. Used by the admin meeting detail
+ * page's "Money raised" panel — pulls every row whose `event_id` matches,
+ * regardless of `status`, so the caller can decide which buckets (succeeded,
+ * pending, refunded) to surface.
+ */
+export async function getPaymentsByEventId(
+  eventId: string,
+  lodgeId: string,
+): Promise<Payment[]> {
+  const { data, error } = await db()
+    .from("payments")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .eq("event_id", eventId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data as Payment[];
+}
+
 export async function getPaymentByStripeId(
   stripePaymentIntentId: string
 ): Promise<Payment | null> {

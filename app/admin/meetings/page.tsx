@@ -22,6 +22,37 @@ export default async function AdminMeetingsPage() {
 
   const lodgeDefaults = lodgeId ? await db.getLodgeFeeDefaults(lodgeId) : null;
 
+  // Fetch every payment for the lodge once and bucket by event_id so each
+  // meeting row can show "£X raised". Pulling once is cheap (payments are
+  // a small table per lodge) and saves N round trips on the list page.
+  const allPayments =
+    lodgeId && !useMock ? await db.getPayments(lodgeId) : [];
+  const SUCCEEDED_STATUS = new Set([
+    "succeeded",
+    "completed",
+    "paid",
+    "partially_refunded",
+  ]);
+  const financeMap: Record<
+    string,
+    { raised: number; pending: number; count: number }
+  > = {};
+  for (const p of allPayments) {
+    if (!p.event_id) continue;
+    const bucket = financeMap[p.event_id] ?? {
+      raised: 0,
+      pending: 0,
+      count: 0,
+    };
+    if (SUCCEEDED_STATUS.has(p.status)) {
+      bucket.raised += Math.max(0, p.total_amount - (p.refund_amount ?? 0));
+      bucket.count += 1;
+    } else if (p.status === "pending") {
+      bucket.pending += p.total_amount;
+    }
+    financeMap[p.event_id] = bucket;
+  }
+
   const rsvpMap: Record<
     string,
     Array<{
@@ -107,6 +138,7 @@ export default async function AdminMeetingsPage() {
       meetings={JSON.parse(JSON.stringify(meetings))}
       rsvpMap={JSON.parse(JSON.stringify(rsvpMap))}
       readinessMap={JSON.parse(JSON.stringify(readinessMap))}
+      financeMap={financeMap}
     />
   );
 }

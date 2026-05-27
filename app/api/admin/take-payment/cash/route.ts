@@ -18,6 +18,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
+import * as db from "@/lib/db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { getCurrentAdminContextAny } from "@/lib/auth/permissions";
@@ -85,6 +86,13 @@ export async function POST(request: NextRequest) {
     typeof body.guest_id === "string" && body.guest_id.trim()
       ? body.guest_id.trim()
       : null;
+  // Optional meeting attribution. When set, the projected public.payments
+  // row sets event_id so per-meeting "Money raised" totals see it. The
+  // event itself is validated below (must belong to the active lodge).
+  const eventIdInput =
+    typeof body.event_id === "string" && body.event_id.trim()
+      ? body.event_id.trim()
+      : null;
   const guestInline = parseGuestInline(body.guest_inline);
   const clientToken =
     typeof body.client_token === "string" && body.client_token.trim()
@@ -125,6 +133,29 @@ export async function POST(request: NextRequest) {
 
   const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
   if (forbidden) return forbidden;
+
+  // Validate any provided event_id is for this lodge before we accept it on
+  // the projection. Anonymous payments (no event picked) are still fine.
+  let resolvedEventId: string | null = null;
+  if (eventIdInput) {
+    try {
+      const eventRow = await db.getEventById(eventIdInput, lodgeId);
+      if (eventRow) {
+        resolvedEventId = eventRow.id;
+      } else {
+        return NextResponse.json(
+          { error: "Selected meeting not found in this lodge." },
+          { status: 400 },
+        );
+      }
+    } catch (err) {
+      console.warn("Cash payment POST: event lookup failed (non-fatal)", {
+        lodge_id: lodgeId,
+        event_id: eventIdInput,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
 
   let createdByEmail: string | null = null;
   let createdByRole: string | null = null;
@@ -221,6 +252,7 @@ export async function POST(request: NextRequest) {
     created_at_iso: new Date().toISOString(),
     member_id: resolvedMemberId,
     guest_id: resolvedGuestId,
+    event_id: resolvedEventId,
     payer_name: payerName,
     payer_email: payerEmail,
     member_name: payerName,
@@ -251,6 +283,7 @@ export async function POST(request: NextRequest) {
         category,
         member_id: resolvedMemberId,
         guest_id: resolvedGuestId,
+        event_id: resolvedEventId,
         payer_name: payerName,
         payer_email: payerEmail,
         gift_aid_declaration_id: giftAidDeclarationId,
@@ -306,7 +339,7 @@ export async function POST(request: NextRequest) {
       currency,
       category,
       reference: reference || null,
-      eventId: null,
+      eventId: resolvedEventId,
       charityName: null,
       payerName,
       payerEmail,

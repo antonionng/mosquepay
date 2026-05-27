@@ -18,6 +18,8 @@ export type TakePaymentCategory =
   | "charity"
   | "raffle"
   | "dining"
+  | "meeting_fee"
+  | "guest_ticket"
   | "subscriptions"
   | "other";
 
@@ -25,12 +27,16 @@ export type Splits = {
   dining_amount: number;
   charity_amount: number;
   raffle_amount: number;
+  meeting_fee_amount: number;
+  guest_ticket_amount: number;
 };
 
 const ZERO: Splits = {
   dining_amount: 0,
   charity_amount: 0,
   raffle_amount: 0,
+  meeting_fee_amount: 0,
+  guest_ticket_amount: 0,
 };
 
 export function splitAmountByCategory(
@@ -45,8 +51,12 @@ export function splitAmountByCategory(
       return { ...ZERO, dining_amount: amountMajor };
     case "raffle":
       return { ...ZERO, raffle_amount: amountMajor };
+    case "meeting_fee":
+      return { ...ZERO, meeting_fee_amount: amountMajor };
+    case "guest_ticket":
+      return { ...ZERO, guest_ticket_amount: amountMajor };
     // general / subscriptions / other / unknown all stay in total_amount only;
-    // the projected row is still created with charity/dining/raffle=0 so the
+    // the projected row is still created with sub-amounts=0 so the
     // treasurer ledger shows the row by description without misclassifying it.
     default:
       return { ...ZERO };

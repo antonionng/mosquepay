@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
+import * as db from "@/lib/db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { getCurrentAdminContextAny } from "@/lib/auth/permissions";
@@ -104,6 +105,13 @@ export async function POST(request: NextRequest) {
     typeof body.guest_id === "string" && body.guest_id.trim()
       ? body.guest_id.trim()
       : null;
+  // Optional meeting attribution. When set, the webhook projector pulls this
+  // out of metadata.event_id and writes payments.event_id so the meeting
+  // detail page can roll it up.
+  const eventIdInput =
+    typeof body.event_id === "string" && body.event_id.trim()
+      ? body.event_id.trim()
+      : null;
   const guestInline = parseGuestInline(body.guest_inline);
 
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -134,6 +142,30 @@ export async function POST(request: NextRequest) {
 
   const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
   if (forbidden) return forbidden;
+
+  // Validate any provided event_id is for this lodge. If the lookup throws
+  // we treat it as non-fatal and proceed without an event link rather than
+  // failing the QR mint outright.
+  let resolvedEventId: string | null = null;
+  if (eventIdInput) {
+    try {
+      const eventRow = await db.getEventById(eventIdInput, lodgeId);
+      if (eventRow) {
+        resolvedEventId = eventRow.id;
+      } else {
+        return NextResponse.json(
+          { error: "Selected meeting not found in this lodge." },
+          { status: 400 },
+        );
+      }
+    } catch (err) {
+      console.warn("Take payment POST: event lookup failed (non-fatal)", {
+        lodge_id: lodgeId,
+        event_id: eventIdInput,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
 
   // Capture who is generating this QR so the history view can show
   // "created by Bro. Smith" and so audit trails attribute correctly.
@@ -238,6 +270,7 @@ export async function POST(request: NextRequest) {
     created_at_iso: new Date().toISOString(),
     member_id: resolvedMemberId,
     guest_id: resolvedGuestId,
+    event_id: resolvedEventId,
     payer_name: payerName,
     payer_email: payerEmail,
     // Legacy aliases retained so the webhook projector + history endpoint
@@ -268,6 +301,7 @@ export async function POST(request: NextRequest) {
         category,
         member_id: resolvedMemberId,
         guest_id: resolvedGuestId,
+        event_id: resolvedEventId,
         payer_name: payerName,
         payer_email: payerEmail,
         gift_aid_declaration_id: giftAidDeclarationId,
@@ -308,6 +342,7 @@ export async function POST(request: NextRequest) {
             lodge_slug: lodgeSlug,
             category,
             reference: reference || undefined,
+            event_id: resolvedEventId ?? undefined,
           },
         },
       },

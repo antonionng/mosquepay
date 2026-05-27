@@ -9,6 +9,15 @@ export type MemberOption = {
   email: string | null;
 };
 
+// Light-weight event option for the optional "Link to meeting" picker.
+// Loaded by the take-payment page (eu90d horizon, small list) so the
+// charge/cash forms can attribute the payment to a specific meeting.
+export type EventOption = {
+  id: string;
+  title: string;
+  event_date: string;
+};
+
 export type GuestOption = {
   id: string;
   full_name: string;
@@ -125,9 +134,11 @@ export type HistoryItem = {
 
 export const CATEGORIES = [
   { id: "general", label: "General lodge payment" },
+  { id: "meeting_fee", label: "Meeting fee" },
+  { id: "guest_ticket", label: "Guest ticket" },
+  { id: "dining", label: "Dining / festive board" },
   { id: "charity", label: "Charity collection" },
   { id: "raffle", label: "Raffle" },
-  { id: "dining", label: "Dining / festive board" },
   { id: "subscriptions", label: "Subscriptions / dues top-up" },
   { id: "other", label: "Other" },
 ] as const;
