@@ -193,8 +193,13 @@ export async function POST(request: NextRequest) {
   const idempotencyKey = `tip_${paymentId}`;
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const successUrl = `${siteUrl}/admin/take-payment/done?payment_id=${encodeURIComponent(paymentId)}`;
-  const cancelUrl = `${siteUrl}/admin/take-payment?cancelled=${encodeURIComponent(paymentId)}`;
+  // Mooov redirects the *cardholder* (not the treasurer) to these URLs after
+  // the hosted page closes, so both targets must be public and unprefixed by
+  // /admin — otherwise the payer hits our auth proxy and gets bounced into a
+  // login screen, or worse, a 404 if the route doesn't exist. The treasurer's
+  // active-session card keeps polling the LP-side status independently.
+  const successUrl = `${siteUrl}/take-payment/done?payment_id=${encodeURIComponent(paymentId)}`;
+  const cancelUrl = `${siteUrl}/take-payment/cancelled?payment_id=${encodeURIComponent(paymentId)}`;
   const intentDescription = description || `Payment to lodge (${reference || "in-person"})`;
 
   // Payer attribution. Resolved up front so the downstream webhook projector
