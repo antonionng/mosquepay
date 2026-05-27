@@ -84,22 +84,22 @@ async function getLodgeMembers(lodgeId: string) {
 
 /**
  * Events for the optional "Link to meeting" picker on the take-payment
- * form. We pull a small window: today + 90 days forward and 60 days back,
- * so the duty officer can attribute on the night and the treasurer can
- * back-fill cash collected the next day. Older meetings can still be
- * attached retroactively from the payment detail page.
+ * form. We include every upcoming meeting (no forward horizon — secretaries
+ * routinely schedule installations 6-12 months out) plus a 90-day back-tail
+ * for treasurers reconciling cash a few weeks after the night, then cap to
+ * the 20 closest entries to "now" so the dropdown stays scannable on a
+ * phone. Older meetings can still be attached retroactively from the
+ * payment detail page.
  */
 async function getLodgeEventsForPicker(lodgeId: string) {
   try {
     const events = await db.getEvents(lodgeId);
     const now = Date.now();
-    const horizonForwardMs = 90 * 24 * 60 * 60 * 1000;
-    const horizonBackMs = 60 * 24 * 60 * 60 * 1000;
+    const horizonBackMs = 90 * 24 * 60 * 60 * 1000;
     return events
       .filter((event) => {
         const ts = new Date(event.event_date).getTime();
         if (!Number.isFinite(ts)) return false;
-        if (ts > now + horizonForwardMs) return false;
         if (ts < now - horizonBackMs) return false;
         return true;
       })

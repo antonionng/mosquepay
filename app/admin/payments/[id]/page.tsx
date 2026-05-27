@@ -54,21 +54,25 @@ export default async function AdminPaymentDetailPage({
     db.getEvents(lodgeId),
   ]);
 
-  // Trim the picker to a reasonable window: ±180 days from the request.
-  // Older history can still be reached by searching from the meetings list;
-  // the typical "attach to meeting" flow targets meetings within the last
-  // few months. Computed on the server during render — the lint disable is
-  // for the react-hooks/purity rule which treats Date.now as impure even in
-  // server components where it's fine.
+  // Picker window: every upcoming meeting + 180 days of recent history,
+  // capped to the 30 closest. Wide enough that a treasurer attaching a
+  // payment after the fact can still see a future installation that was
+  // scheduled months ahead. The lint disable is for the react-hooks/purity
+  // rule which flags Date.now in a server component, where it's fine.
   // eslint-disable-next-line react-hooks/purity
   const nowMs = Date.now();
   const eventPickerOptions = allEvents
     .filter((evt) => {
       const ts = new Date(evt.event_date).getTime();
       if (!Number.isFinite(ts)) return false;
-      return Math.abs(ts - nowMs) <= 180 * 24 * 60 * 60 * 1000;
+      if (ts < nowMs - 180 * 24 * 60 * 60 * 1000) return false;
+      return true;
     })
-    .sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime())
+    .sort((a, b) => {
+      const aDist = Math.abs(new Date(a.event_date).getTime() - nowMs);
+      const bDist = Math.abs(new Date(b.event_date).getTime() - nowMs);
+      return aDist - bDist;
+    })
     .slice(0, 30)
     .map((evt) => ({
       id: evt.id,
