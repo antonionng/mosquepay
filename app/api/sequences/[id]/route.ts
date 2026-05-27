@@ -28,6 +28,57 @@ function parseInt0(value: unknown, min: number, max: number): number | undefined
   return n;
 }
 
+function parseWeekOfMonth(value: unknown): number | null {
+  const n = Number(value);
+  if (!Number.isInteger(n)) return null;
+  if (n === -1 || (n >= 1 && n <= 5)) return n;
+  return null;
+}
+
+function parseDayOfWeek(value: unknown): number | null {
+  const n = Number(value);
+  if (!Number.isInteger(n)) return null;
+  if (n >= 1 && n <= 7) return n;
+  return null;
+}
+
+function parseMonthOverrides(
+  input: unknown,
+  activeMonths: number[]
+):
+  | Record<string, { week_of_month?: number; day_of_week?: number }>
+  | undefined {
+  if (input === undefined) return undefined;
+  const out: Record<
+    string,
+    { week_of_month?: number; day_of_week?: number }
+  > = {};
+  if (input === null) return out;
+  if (typeof input !== "object" || Array.isArray(input)) return out;
+  const allowed = new Set(activeMonths);
+  for (const [rawKey, rawValue] of Object.entries(
+    input as Record<string, unknown>
+  )) {
+    const monthNum = Number(rawKey);
+    if (!Number.isInteger(monthNum) || !allowed.has(monthNum)) continue;
+    if (!rawValue || typeof rawValue !== "object") continue;
+    const obj = rawValue as Record<string, unknown>;
+    const entry: { week_of_month?: number; day_of_week?: number } = {};
+    if (obj.week_of_month !== undefined && obj.week_of_month !== null) {
+      const week = parseWeekOfMonth(obj.week_of_month);
+      if (week !== null) entry.week_of_month = week;
+    }
+    if (obj.day_of_week !== undefined && obj.day_of_week !== null) {
+      const day = parseDayOfWeek(obj.day_of_week);
+      if (day !== null) entry.day_of_week = day;
+    }
+    if (entry.week_of_month !== undefined || entry.day_of_week !== undefined) {
+      out[String(monthNum)] = entry;
+    }
+  }
+  return out;
+}
+
 function nullableNumber(value: unknown): number | null | undefined {
   if (value === undefined) return undefined;
   if (value === null || value === "") return null;
@@ -113,6 +164,27 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         );
       }
       updates.months = months;
+    }
+    if (body.month_overrides !== undefined) {
+      // Validate against either the incoming months list or, if unchanged,
+      // the existing one, so an override for a no-longer-selected month is
+      // dropped and never persisted.
+      let effectiveMonths = months;
+      if (effectiveMonths === undefined) {
+        const existing = await db.getMeetingSequenceById(id, lodgeId);
+        if (!existing) {
+          return NextResponse.json(
+            { error: "Sequence not found." },
+            { status: 404 }
+          );
+        }
+        effectiveMonths = existing.months;
+      }
+      const overrides = parseMonthOverrides(
+        body.month_overrides,
+        effectiveMonths
+      );
+      if (overrides !== undefined) updates.month_overrides = overrides;
     }
     const time = nullableTrim(body.default_event_time);
     if (time !== undefined) updates.default_event_time = time;

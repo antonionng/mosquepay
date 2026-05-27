@@ -69,13 +69,40 @@ function parseTimeToHours(time: string | null): { h: number; m: number } {
 }
 
 /**
+ * Resolve the (week_of_month, day_of_week) pair to use for a given calendar
+ * month, applying any per-month override on top of the sequence default.
+ */
+export function resolveMonthRule(
+  sequence: Pick<
+    MeetingSequence,
+    "day_of_week" | "week_of_month" | "month_overrides"
+  >,
+  month: number
+): { week_of_month: number; day_of_week: number } {
+  const override = sequence.month_overrides?.[String(month)];
+  const week =
+    override?.week_of_month !== undefined
+      ? override.week_of_month
+      : sequence.week_of_month;
+  const day =
+    override?.day_of_week !== undefined
+      ? override.day_of_week
+      : sequence.day_of_week;
+  return { week_of_month: week, day_of_week: day };
+}
+
+/**
  * Generate the dates a sequence will fall on between the given start
  * and end dates, inclusive. Both bounds are interpreted as UTC days.
  */
 export function generateSequenceDates(
   sequence: Pick<
     MeetingSequence,
-    "day_of_week" | "week_of_month" | "months" | "default_event_time"
+    | "day_of_week"
+    | "week_of_month"
+    | "months"
+    | "month_overrides"
+    | "default_event_time"
   >,
   startDate: Date,
   endDate: Date
@@ -105,11 +132,12 @@ export function generateSequenceDates(
     year++
   ) {
     for (const month of months) {
+      const rule = resolveMonthRule(sequence, month);
       const candidate = nthWeekdayOfMonth(
         year,
         month,
-        sequence.day_of_week,
-        sequence.week_of_month
+        rule.day_of_week,
+        rule.week_of_month
       );
       if (!candidate) continue;
       const candidateUtc = candidate.getTime();
@@ -156,20 +184,54 @@ const MONTH_LABELS: Record<number, string> = {
   12: "December",
 };
 
+function weekLabel(weekOfMonth: number): string {
+  if (weekOfMonth === -1) return "Last";
+  return (
+    ["1st", "2nd", "3rd", "4th", "5th"][weekOfMonth - 1] ?? "Nth"
+  );
+}
+
 export function describeSequence(
-  sequence: Pick<MeetingSequence, "day_of_week" | "week_of_month" | "months">
+  sequence: Pick<
+    MeetingSequence,
+    "day_of_week" | "week_of_month" | "months" | "month_overrides"
+  >
 ): string {
-  const week =
-    sequence.week_of_month === -1
-      ? "Last"
-      : ["1st", "2nd", "3rd", "4th", "5th"][sequence.week_of_month - 1] ?? "Nth";
-  const day = DAY_LABELS[sequence.day_of_week] ?? "day";
-  const months = sequence.months
+  const sortedMonths = sequence.months
     .slice()
-    .sort((a, b) => a - b)
-    .map((m) => MONTH_LABELS[m] ?? String(m))
-    .join(", ");
-  return `${week} ${day} of ${months}`;
+    .filter((m) => m >= 1 && m <= 12)
+    .sort((a, b) => a - b);
+
+  type Group = { week: number; day: number; months: number[] };
+  const groups: Group[] = [];
+  for (const month of sortedMonths) {
+    const rule = resolveMonthRule(sequence, month);
+    const existing = groups.find(
+      (g) => g.week === rule.week_of_month && g.day === rule.day_of_week
+    );
+    if (existing) {
+      existing.months.push(month);
+    } else {
+      groups.push({
+        week: rule.week_of_month,
+        day: rule.day_of_week,
+        months: [month],
+      });
+    }
+  }
+
+  if (groups.length === 0) return "No months selected";
+
+  return groups
+    .map((group) => {
+      const week = weekLabel(group.week);
+      const day = DAY_LABELS[group.day] ?? "day";
+      const monthsLabel = group.months
+        .map((m) => MONTH_LABELS[m] ?? String(m))
+        .join(", ");
+      return `${week} ${day} of ${monthsLabel}`;
+    })
+    .join("; ");
 }
 
 export function isSummonsLeadOverdue(

@@ -34,6 +34,52 @@ function parseWeekOfMonth(value: unknown): number | null {
   return null;
 }
 
+function parseDayOfWeek(value: unknown): number | null {
+  const n = Number(value);
+  if (!Number.isInteger(n)) return null;
+  if (n >= 1 && n <= 7) return n;
+  return null;
+}
+
+/**
+ * Validate the per-month overrides map. Keeps only entries whose key is a
+ * month in the active months[] list and whose values are valid week/day
+ * numbers. Empty entries are dropped. The map is stored keyed by month
+ * number as a string ("1".."12") to round-trip cleanly through JSON.
+ */
+function parseMonthOverrides(
+  input: unknown,
+  activeMonths: number[]
+): Record<string, { week_of_month?: number; day_of_week?: number }> {
+  const out: Record<
+    string,
+    { week_of_month?: number; day_of_week?: number }
+  > = {};
+  if (!input || typeof input !== "object" || Array.isArray(input)) return out;
+  const allowed = new Set(activeMonths);
+  for (const [rawKey, rawValue] of Object.entries(
+    input as Record<string, unknown>
+  )) {
+    const monthNum = Number(rawKey);
+    if (!Number.isInteger(monthNum) || !allowed.has(monthNum)) continue;
+    if (!rawValue || typeof rawValue !== "object") continue;
+    const obj = rawValue as Record<string, unknown>;
+    const entry: { week_of_month?: number; day_of_week?: number } = {};
+    if (obj.week_of_month !== undefined && obj.week_of_month !== null) {
+      const week = parseWeekOfMonth(obj.week_of_month);
+      if (week !== null) entry.week_of_month = week;
+    }
+    if (obj.day_of_week !== undefined && obj.day_of_week !== null) {
+      const day = parseDayOfWeek(obj.day_of_week);
+      if (day !== null) entry.day_of_week = day;
+    }
+    if (entry.week_of_month !== undefined || entry.day_of_week !== undefined) {
+      out[String(monthNum)] = entry;
+    }
+  }
+  return out;
+}
+
 function nullableNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
   const n = Number(value);
@@ -114,6 +160,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    const month_overrides = parseMonthOverrides(body.month_overrides, months);
 
     const admin = await getCurrentAdminContextAny(lodgeId);
     const sequence = await db.createMeetingSequence(lodgeId, {
@@ -125,6 +172,7 @@ export async function POST(request: NextRequest) {
       day_of_week,
       week_of_month,
       months,
+      month_overrides,
       default_event_time: nullableTrim(body.default_event_time),
       default_location: nullableTrim(body.default_location),
       default_temple_room: nullableTrim(body.default_temple_room),

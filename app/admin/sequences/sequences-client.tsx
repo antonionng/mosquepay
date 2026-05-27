@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Clock,
   FileText,
+  Pencil,
   Plus,
   ShieldCheck,
   Sparkles,
@@ -26,6 +27,9 @@ import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { describeSequence } from "@/lib/meetings/sequences";
 import { cn } from "@/lib/utils";
 
+type MonthOverride = { week_of_month?: number; day_of_week?: number };
+type MonthOverrides = Record<string, MonthOverride>;
+
 type SequenceRecord = {
   id: string;
   name: string;
@@ -34,6 +38,7 @@ type SequenceRecord = {
   day_of_week: number;
   week_of_month: number;
   months: number[];
+  month_overrides: MonthOverrides;
   default_event_time: string | null;
   default_location: string | null;
   default_temple_room: string | null;
@@ -68,6 +73,7 @@ type SequenceForm = {
   day_of_week: number;
   week_of_month: number;
   months: number[];
+  month_overrides: MonthOverrides;
   default_event_time: string;
   default_location: string;
   default_temple_room: string;
@@ -124,6 +130,7 @@ function defaultForm(): SequenceForm {
     day_of_week: 6,
     week_of_month: 3,
     months: [1, 3, 6, 9, 11],
+    month_overrides: {},
     default_event_time: "18:00",
     default_location: "Mark Masons' Hall",
     default_temple_room: "",
@@ -192,6 +199,7 @@ export function SequencesClient({
 }) {
   const router = useRouter();
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [createForm, setCreateForm] = useState<SequenceForm>(defaultForm);
   const [createError, setCreateError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -244,14 +252,90 @@ export function SequencesClient({
   function toggleMonth(month: number) {
     setCreateForm((current) => {
       const exists = current.months.includes(month);
-      const next = exists
+      const nextMonths = exists
         ? current.months.filter((m) => m !== month)
         : [...current.months, month];
-      return { ...current, months: next.sort((a, b) => a - b) };
+      const nextOverrides = { ...current.month_overrides };
+      if (exists) delete nextOverrides[String(month)];
+      return {
+        ...current,
+        months: nextMonths.sort((a, b) => a - b),
+        month_overrides: nextOverrides,
+      };
     });
   }
 
-  async function handleCreate(event: FormEvent<HTMLFormElement>) {
+  function setMonthOverride(
+    month: number,
+    field: "week_of_month" | "day_of_week",
+    value: number | null
+  ) {
+    setCreateForm((current) => {
+      const key = String(month);
+      const existing = current.month_overrides[key] ?? {};
+      const next: MonthOverride = { ...existing };
+      if (value === null) {
+        delete next[field];
+      } else {
+        next[field] = value;
+      }
+      const overrides = { ...current.month_overrides };
+      if (next.week_of_month === undefined && next.day_of_week === undefined) {
+        delete overrides[key];
+      } else {
+        overrides[key] = next;
+      }
+      return { ...current, month_overrides: overrides };
+    });
+  }
+
+  function closeDrawer() {
+    setCreateOpen(false);
+    setEditingId(null);
+    setCreateError(null);
+  }
+
+  function openCreate() {
+    setEditingId(null);
+    setCreateForm(defaultForm());
+    setCreateError(null);
+    setCreateOpen(true);
+  }
+
+  function openEdit(sequence: SequenceRecord) {
+    setEditingId(sequence.id);
+    setCreateForm({
+      name: sequence.name,
+      description: sequence.description ?? "",
+      day_of_week: sequence.day_of_week,
+      week_of_month: sequence.week_of_month,
+      months: [...sequence.months].sort((a, b) => a - b),
+      month_overrides: { ...(sequence.month_overrides ?? {}) },
+      default_event_time: sequence.default_event_time ?? "",
+      default_location: sequence.default_location ?? "",
+      default_temple_room: sequence.default_temple_room ?? "",
+      default_dress_code: sequence.default_dress_code ?? "",
+      default_dining_price:
+        sequence.default_dining_price !== null
+          ? String(sequence.default_dining_price)
+          : "",
+      default_meeting_fee_amount:
+        sequence.default_meeting_fee_amount !== null
+          ? String(sequence.default_meeting_fee_amount)
+          : "",
+      default_enable_dining_rsvp: sequence.default_enable_dining_rsvp,
+      default_enable_meeting_fee: sequence.default_enable_meeting_fee,
+      default_enable_charity_donation: sequence.default_enable_charity_donation,
+      default_charity_name: sequence.default_charity_name ?? "",
+      summons_lead_weeks: sequence.summons_lead_weeks,
+      summons_min_lead_weeks: sequence.summons_min_lead_weeks,
+      auto_draft_summons: sequence.auto_draft_summons,
+    });
+    setCreateError(null);
+    setCreateOpen(true);
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (createForm.months.length === 0) {
       setCreateError("Pick at least one month.");
@@ -259,9 +343,12 @@ export function SequencesClient({
     }
     setCreating(true);
     setCreateError(null);
+    const isEdit = editingId !== null;
+    const url = isEdit ? `/api/sequences/${editingId}` : "/api/sequences";
+    const method = isEdit ? "PATCH" : "POST";
     try {
-      const res = await fetch("/api/sequences", {
-        method: "POST",
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...createForm,
@@ -271,14 +358,21 @@ export function SequencesClient({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error ?? "Could not create sequence.");
+        throw new Error(
+          data.error ??
+            (isEdit ? "Could not update sequence." : "Could not create sequence.")
+        );
       }
-      setCreateOpen(false);
+      closeDrawer();
       setCreateForm(defaultForm());
       router.refresh();
     } catch (error) {
       setCreateError(
-        error instanceof Error ? error.message : "Could not create sequence."
+        error instanceof Error
+          ? error.message
+          : isEdit
+            ? "Could not update sequence."
+            : "Could not create sequence."
       );
     } finally {
       setCreating(false);
@@ -358,15 +452,7 @@ export function SequencesClient({
             Sending always needs a human approval.
           </p>
         </div>
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => {
-            setCreateForm(defaultForm());
-            setCreateError(null);
-            setCreateOpen(true);
-          }}
-        >
+        <Button variant="primary" size="sm" onClick={openCreate}>
           <Plus className="mr-1.5 h-4 w-4" />
           New sequence
         </Button>
@@ -465,14 +551,7 @@ export function SequencesClient({
             Create one to lay out the year. The most common pattern is the
             third Saturday of five months.
           </p>
-          <Button
-            className="mt-4"
-            variant="primary"
-            onClick={() => {
-              setCreateForm(defaultForm());
-              setCreateOpen(true);
-            }}
-          >
+          <Button className="mt-4" variant="primary" onClick={openCreate}>
             <Plus className="mr-1.5 h-4 w-4" />
             Create your first sequence
           </Button>
@@ -542,6 +621,15 @@ export function SequencesClient({
                       >
                         <Wand2 className="mr-1.5 h-4 w-4" />
                         Generate meetings
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="dashboard"
+                        size="sm"
+                        onClick={() => openEdit(sequence)}
+                      >
+                        <Pencil className="mr-1.5 h-4 w-4" />
+                        Edit
                       </Button>
                       <Button
                         type="button"
@@ -697,26 +785,28 @@ export function SequencesClient({
             type="button"
             aria-label="Close sequence form"
             className="absolute inset-0 bg-dash-text/20 backdrop-blur-[2px]"
-            onClick={() => setCreateOpen(false)}
+            onClick={closeDrawer}
           />
           <form
-            onSubmit={handleCreate}
+            onSubmit={handleSubmit}
             className="admin-drawer-panel relative flex h-full w-full max-w-2xl flex-col overflow-y-auto border-l border-dash-border bg-dash-surface shadow-xl"
           >
             <div className="flex items-center justify-between border-b border-dash-border px-6 py-4">
               <div>
                 <h2 className="text-lg font-semibold text-dash-text">
-                  New meeting sequence
+                  {editingId ? "Edit meeting sequence" : "New meeting sequence"}
                 </h2>
                 <p className="text-sm text-dash-muted">
-                  Define the recipe. You can generate the year afterwards.
+                  {editingId
+                    ? "Update the recipe. Existing generated meetings stay where they are."
+                    : "Define the recipe. You can generate the year afterwards."}
                 </p>
               </div>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                onClick={() => setCreateOpen(false)}
+                onClick={closeDrawer}
               >
                 <XCircle className="h-5 w-5" />
               </Button>
@@ -830,7 +920,106 @@ export function SequencesClient({
                     );
                   })}
                 </div>
+                {createForm.months.length > 0 && (
+                  <p className="text-xs text-dash-muted">
+                    {describeSequence({
+                      day_of_week: createForm.day_of_week,
+                      week_of_month: createForm.week_of_month,
+                      months: createForm.months,
+                      month_overrides: createForm.month_overrides,
+                    })}
+                  </p>
+                )}
               </div>
+
+              {createForm.months.length > 0 && (
+                <details className="rounded-xl border border-dash-border bg-dash-surface-subtle/40 p-4">
+                  <summary className="cursor-pointer list-none">
+                    <span className="text-sm font-medium text-dash-text">
+                      Per-month overrides
+                    </span>
+                    <span className="ml-2 text-xs text-dash-muted">
+                      {Object.keys(createForm.month_overrides).length === 0
+                        ? "All months use the default above"
+                        : `${Object.keys(createForm.month_overrides).length} month${
+                            Object.keys(createForm.month_overrides).length === 1
+                              ? ""
+                              : "s"
+                          } differ from the default`}
+                    </span>
+                  </summary>
+                  <p className="mt-2 text-xs text-dash-muted">
+                    Use this when a lodge meets on a different week (or
+                    weekday) in some months, for example {`"3rd Saturday`} in
+                    most months but {`2nd Saturday in June"`}.
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {createForm.months.map((month) => {
+                      const monthLabel =
+                        MONTH_OPTIONS.find((m) => m.value === month)?.label ??
+                        String(month);
+                      const override =
+                        createForm.month_overrides[String(month)] ?? {};
+                      const weekValue =
+                        override.week_of_month !== undefined
+                          ? String(override.week_of_month)
+                          : "";
+                      const dayValue =
+                        override.day_of_week !== undefined
+                          ? String(override.day_of_week)
+                          : "";
+                      return (
+                        <div
+                          key={month}
+                          className="grid grid-cols-[4rem_1fr_1fr] items-center gap-2"
+                        >
+                          <span className="text-sm font-medium text-dash-text">
+                            {monthLabel}
+                          </span>
+                          <select
+                            className="flex h-9 w-full rounded-lg border border-dash-border bg-dash-surface px-2 text-sm"
+                            value={weekValue}
+                            onChange={(event) => {
+                              const v = event.target.value;
+                              setMonthOverride(
+                                month,
+                                "week_of_month",
+                                v === "" ? null : Number(v)
+                              );
+                            }}
+                          >
+                            <option value="">Default week</option>
+                            {WEEK_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            className="flex h-9 w-full rounded-lg border border-dash-border bg-dash-surface px-2 text-sm"
+                            value={dayValue}
+                            onChange={(event) => {
+                              const v = event.target.value;
+                              setMonthOverride(
+                                month,
+                                "day_of_week",
+                                v === "" ? null : Number(v)
+                              );
+                            }}
+                          >
+                            <option value="">Default day</option>
+                            {DAY_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </details>
+              )}
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
@@ -961,15 +1150,17 @@ export function SequencesClient({
             </div>
 
             <div className="sticky bottom-0 flex items-center justify-end gap-3 border-t border-dash-border bg-dash-surface px-6 py-4">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setCreateOpen(false)}
-              >
+              <Button type="button" variant="ghost" onClick={closeDrawer}>
                 Cancel
               </Button>
               <Button type="submit" variant="primary" disabled={creating}>
-                {creating ? "Creating..." : "Create sequence"}
+                {creating
+                  ? editingId
+                    ? "Saving..."
+                    : "Creating..."
+                  : editingId
+                    ? "Save changes"
+                    : "Create sequence"}
               </Button>
             </div>
           </form>

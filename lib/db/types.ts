@@ -373,6 +373,16 @@ export type MeetingSequence = {
   week_of_month: number;
   /** Calendar months 1..12 the sequence runs in. */
   months: number[];
+  /**
+   * Per-month overrides keyed by month number as a string ("1".."12"). Each
+   * entry may override week_of_month and/or day_of_week. Anything unset
+   * falls back to the sequence default. Lets lodges express patterns like
+   * "3rd Saturday most months but 2nd Saturday in June".
+   */
+  month_overrides: Record<
+    string,
+    { week_of_month?: number; day_of_week?: number }
+  >;
   default_event_time: string | null;
   default_location: string | null;
   default_temple_room: string | null;
