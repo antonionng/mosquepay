@@ -1843,6 +1843,93 @@ export async function updateMember(
   return data as Member | null;
 }
 
+/**
+ * Rewrite a member's email everywhere it is used as a join key. Email is the
+ * de-facto link between the members row and historical payments / RSVPs / dues
+ * (instead of member_id), so changing it without backfilling these tables
+ * would orphan the member's history in the admin detail view.
+ *
+ * Returns the new member row plus per-table backfill counts so the caller can
+ * surface them in the audit log / response.
+ */
+export async function changeMemberEmail(
+  id: string,
+  lodgeId: string,
+  newEmail: string
+): Promise<{
+  member: Member | null;
+  oldEmail: string;
+  paymentsUpdated: number;
+  rsvpsUpdated: number;
+  duesUpdated: number;
+}> {
+  const supabase = db();
+  const normalised = newEmail.trim().toLowerCase();
+
+  const existing = await getMemberById(id, lodgeId);
+  if (!existing) {
+    return {
+      member: null,
+      oldEmail: "",
+      paymentsUpdated: 0,
+      rsvpsUpdated: 0,
+      duesUpdated: 0,
+    };
+  }
+  const oldEmail = existing.email;
+
+  if (oldEmail === normalised) {
+    return {
+      member: existing,
+      oldEmail,
+      paymentsUpdated: 0,
+      rsvpsUpdated: 0,
+      duesUpdated: 0,
+    };
+  }
+
+  const { data: updated, error: memberError } = await supabase
+    .from("members")
+    .update({ email: normalised, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("lodge_id", lodgeId)
+    .select("*")
+    .maybeSingle();
+  if (memberError) throw memberError;
+
+  const { data: paymentsRows, error: paymentsError } = await supabase
+    .from("payments")
+    .update({ user_email: normalised, updated_at: new Date().toISOString() })
+    .eq("lodge_id", lodgeId)
+    .eq("user_email", oldEmail)
+    .select("id");
+  if (paymentsError) throw paymentsError;
+
+  const { data: rsvpRows, error: rsvpError } = await supabase
+    .from("rsvps")
+    .update({ user_email: normalised, updated_at: new Date().toISOString() })
+    .eq("lodge_id", lodgeId)
+    .eq("user_email", oldEmail)
+    .select("id");
+  if (rsvpError) throw rsvpError;
+
+  const { data: duesRows, error: duesError } = await supabase
+    .from("member_dues")
+    .update({ member_email: normalised, updated_at: new Date().toISOString() })
+    .eq("lodge_id", lodgeId)
+    .eq("member_email", oldEmail)
+    .select("id");
+  if (duesError) throw duesError;
+
+  return {
+    member: updated as Member | null,
+    oldEmail,
+    paymentsUpdated: paymentsRows?.length ?? 0,
+    rsvpsUpdated: rsvpRows?.length ?? 0,
+    duesUpdated: duesRows?.length ?? 0,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Summons
 // ---------------------------------------------------------------------------

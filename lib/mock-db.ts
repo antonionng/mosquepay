@@ -1324,7 +1324,28 @@ export function updateMember(
   const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
   const i = members.findIndex((m) => m.id === id && m.lodge_slug === lodgeSlug);
   if (i === -1) return null;
-  Object.assign(members[i], updates, { updated_at: new Date().toISOString() });
+  const oldEmail = members[i].email;
+  const normalisedEmail =
+    typeof updates.email === "string"
+      ? updates.email.trim().toLowerCase()
+      : undefined;
+  const next: Partial<MockMember> =
+    normalisedEmail !== undefined
+      ? { ...updates, email: normalisedEmail }
+      : updates;
+  Object.assign(members[i], next, { updated_at: new Date().toISOString() });
+  if (normalisedEmail !== undefined && normalisedEmail !== oldEmail) {
+    for (const p of payments) {
+      if (p.lodge_slug === lodgeSlug && p.user_email.toLowerCase() === oldEmail.toLowerCase()) {
+        p.user_email = normalisedEmail;
+      }
+    }
+    for (const r of rsvps) {
+      if (r.lodge_slug === lodgeSlug && r.user_email.toLowerCase() === oldEmail.toLowerCase()) {
+        r.user_email = normalisedEmail;
+      }
+    }
+  }
   return members[i];
 }
 

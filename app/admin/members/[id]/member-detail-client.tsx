@@ -162,6 +162,7 @@ interface Props {
 function buildEditForm(member: Member) {
   return {
     full_name: member.full_name,
+    email: member.email,
     phone: member.phone ?? "",
     address_line_1: member.address_line_1 ?? "",
     address_line_2: member.address_line_2 ?? "",
@@ -189,6 +190,8 @@ function buildEditForm(member: Member) {
     public_bio: member.public_bio ?? "",
   };
 }
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function emptyToNull(value: string) {
   const trimmed = value.trim();
@@ -238,6 +241,10 @@ export function MemberDetailClient({
   const [duesWaiverNote, setDuesWaiverNote] = useState("");
   const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [pendingEmailChange, setPendingEmailChange] = useState<{
+    from: string;
+    to: string;
+  } | null>(null);
 
   const offices = initialOffices;
   const currentRungIds = offices
@@ -255,49 +262,69 @@ export function MemberDetailClient({
 
   const [editForm, setEditForm] = useState(() => buildEditFormWithOffice(member));
 
-  async function handleSave() {
+  function handleSave() {
+    const trimmedEmail = editForm.email.trim().toLowerCase();
+    const emailChanged = trimmedEmail !== member.email.toLowerCase();
+    if (emailChanged) {
+      if (!EMAIL_RE.test(trimmedEmail)) {
+        setFeedback({
+          type: "error",
+          message: "Enter a valid email address before saving.",
+        });
+        return;
+      }
+      setPendingEmailChange({ from: member.email, to: trimmedEmail });
+      return;
+    }
+    void performSave({ includeEmail: false });
+  }
+
+  async function performSave({ includeEmail }: { includeEmail: boolean }) {
     setSaving(true);
     setFeedback(null);
     try {
+      const body: Record<string, unknown> = {
+        full_name: editForm.full_name,
+        phone: emptyToNull(editForm.phone),
+        address_line_1: emptyToNull(editForm.address_line_1),
+        address_line_2: emptyToNull(editForm.address_line_2),
+        city: emptyToNull(editForm.city),
+        county: emptyToNull(editForm.county),
+        postcode: emptyToNull(editForm.postcode),
+        country: emptyToNull(editForm.country) ?? "United Kingdom",
+        country_list: editForm.country_list,
+        royal_arch: editForm.royal_arch,
+        honorary: editForm.honorary,
+        directory_sort_order: numberOrNull(editForm.directory_sort_order),
+        rank: emptyToNull(editForm.rank),
+        dietary_requirements: emptyToNull(editForm.dietary_requirements),
+        fee_use_custom: editForm.fee_use_custom,
+        member_levy_amount: editForm.fee_use_custom
+          ? numberOrNull(editForm.member_levy_amount)
+          : null,
+        member_dining_amount: editForm.fee_use_custom
+          ? numberOrNull(editForm.member_dining_amount)
+          : null,
+        levy_waived: editForm.levy_waived,
+        dining_waived: editForm.dining_waived,
+        annual_dues_waived: editForm.annual_dues_waived,
+        annual_dues_waiver_reason: editForm.annual_dues_waived
+          ? emptyToNull(editForm.annual_dues_waiver_reason)
+          : null,
+        date_of_initiation: editForm.date_of_initiation || null,
+        membership_status: editForm.membership_status,
+        show_on_website: editForm.show_on_website,
+        public_bio: editForm.show_on_website
+          ? emptyToNull(editForm.public_bio)
+          : null,
+      };
+      if (includeEmail) {
+        body.email = editForm.email.trim().toLowerCase();
+      }
       const res = await fetch(`/api/members/${member.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          full_name: editForm.full_name,
-          phone: emptyToNull(editForm.phone),
-          address_line_1: emptyToNull(editForm.address_line_1),
-          address_line_2: emptyToNull(editForm.address_line_2),
-          city: emptyToNull(editForm.city),
-          county: emptyToNull(editForm.county),
-          postcode: emptyToNull(editForm.postcode),
-          country: emptyToNull(editForm.country) ?? "United Kingdom",
-          country_list: editForm.country_list,
-          royal_arch: editForm.royal_arch,
-          honorary: editForm.honorary,
-          directory_sort_order: numberOrNull(editForm.directory_sort_order),
-          rank: emptyToNull(editForm.rank),
-          dietary_requirements: emptyToNull(editForm.dietary_requirements),
-          fee_use_custom: editForm.fee_use_custom,
-          member_levy_amount: editForm.fee_use_custom
-            ? numberOrNull(editForm.member_levy_amount)
-            : null,
-          member_dining_amount: editForm.fee_use_custom
-            ? numberOrNull(editForm.member_dining_amount)
-            : null,
-          levy_waived: editForm.levy_waived,
-          dining_waived: editForm.dining_waived,
-          annual_dues_waived: editForm.annual_dues_waived,
-          annual_dues_waiver_reason:
-            editForm.annual_dues_waived
-              ? emptyToNull(editForm.annual_dues_waiver_reason)
-              : null,
-          date_of_initiation: editForm.date_of_initiation || null,
-          membership_status: editForm.membership_status,
-          show_on_website: editForm.show_on_website,
-          public_bio: editForm.show_on_website
-            ? emptyToNull(editForm.public_bio)
-            : null,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -328,7 +355,45 @@ export function MemberDetailClient({
       setMember(data.member);
       setEditForm(buildEditFormWithOffice(data.member));
       setEditing(false);
-      setFeedback({ type: "success", message: "Member profile saved." });
+      setPendingEmailChange(null);
+      const change = data.email_change as
+        | {
+            payments_updated?: number;
+            rsvps_updated?: number;
+            dues_updated?: number;
+            auth_user_updated?: boolean;
+            stripe_customer_updated?: boolean;
+            warnings?: string[];
+          }
+        | undefined;
+      if (change) {
+        const parts: string[] = ["Member profile saved."];
+        const counts: string[] = [];
+        if ((change.payments_updated ?? 0) > 0) {
+          counts.push(`${change.payments_updated} payment(s)`);
+        }
+        if ((change.rsvps_updated ?? 0) > 0) {
+          counts.push(`${change.rsvps_updated} RSVP(s)`);
+        }
+        if ((change.dues_updated ?? 0) > 0) {
+          counts.push(`${change.dues_updated} dues record(s)`);
+        }
+        if (counts.length > 0) {
+          parts.push(`Re-linked ${counts.join(", ")}.`);
+        }
+        if (change.auth_user_updated) {
+          parts.push("Portal login email updated.");
+        }
+        if (change.stripe_customer_updated) {
+          parts.push("Stripe customer updated.");
+        }
+        if (change.warnings && change.warnings.length > 0) {
+          parts.push(...change.warnings);
+        }
+        setFeedback({ type: "success", message: parts.join(" ") });
+      } else {
+        setFeedback({ type: "success", message: "Member profile saved." });
+      }
       router.refresh();
     } catch (saveError) {
       setFeedback({
@@ -594,7 +659,19 @@ export function MemberDetailClient({
               </div>
               <div className="space-y-2">
                 <Label>Email</Label>
-                <Input value={member.email} disabled className="bg-dash-surface-subtle cursor-not-allowed" />
+                <Input
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, email: e.target.value })
+                  }
+                />
+                <p className="text-xs text-dash-muted">
+                  Changing this updates the member&apos;s portal login,
+                  Stripe customer, and re-links their payments, RSVPs, and
+                  dues history. You&apos;ll be asked to confirm before
+                  saving.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label>Phone</Label>
@@ -1466,6 +1543,24 @@ export function MemberDetailClient({
         loading={removing}
         tone="danger"
         onConfirm={handleRemoveMember}
+      />
+
+      <ConfirmActionDialog
+        open={Boolean(pendingEmailChange)}
+        onOpenChange={(open) => {
+          if (saving) return;
+          if (!open) setPendingEmailChange(null);
+        }}
+        title="Change member email?"
+        description={
+          pendingEmailChange
+            ? `This will change ${member.full_name}'s email from ${pendingEmailChange.from} to ${pendingEmailChange.to}. The new address becomes their portal login, the Stripe customer is updated, and their historical payments, RSVPs, and dues records get re-linked to the new email. They may need to sign in again.`
+            : ""
+        }
+        confirmLabel="Change email"
+        loading={saving}
+        tone="danger"
+        onConfirm={() => performSave({ includeEmail: true })}
       />
     </div>
   );

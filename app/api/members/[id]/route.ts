@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import Stripe from "stripe";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
@@ -6,8 +7,11 @@ import * as mockDb from "@/lib/mock-db";
 import { getLodgeSlugFromRequest } from "@/lib/tenant";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
+import { createServiceClient } from "@/lib/supabase/server";
 
 type Params = { params: Promise<{ id: string }> };
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function GET(request: NextRequest, { params }: Params) {
   const _rejectMock = rejectIfMockDisabled();
@@ -75,19 +79,69 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       const forbidden = await requireAdminApiPermission("members:write", lodgeId);
       if (forbidden) return forbidden;
 
-      const updated = await db.updateMember(id, lodgeId, body);
+      const { email: rawEmail, ...otherFields } = body as Record<string, unknown>;
+      const emailChange = await applyMemberEmailChange({
+        memberId: id,
+        lodgeId,
+        rawEmail,
+      });
+      if (emailChange.kind === "error") {
+        return NextResponse.json(
+          { error: emailChange.message },
+          { status: emailChange.status }
+        );
+      }
+
+      let updated: db.Member | null = emailChange.member;
+      if (Object.keys(otherFields).length > 0) {
+        updated = await db.updateMember(id, lodgeId, otherFields);
+      }
+
       if (!updated) {
         return NextResponse.json({ error: "Member not found." }, { status: 404 });
       }
+
       await writeAuditLog({
         lodgeId,
         action: "updated",
         entityType: "member",
         entityId: updated.id,
         summary: `Updated member ${updated.full_name}`,
-        metadata: { fields: Object.keys(body) },
+        metadata: {
+          fields: Object.keys(body),
+          ...(emailChange.kind === "changed"
+            ? {
+                email_change: {
+                  from: emailChange.oldEmail,
+                  to: emailChange.newEmail,
+                  auth_user_updated: emailChange.authUserUpdated,
+                  stripe_customer_updated: emailChange.stripeCustomerUpdated,
+                  payments_updated: emailChange.paymentsUpdated,
+                  rsvps_updated: emailChange.rsvpsUpdated,
+                  dues_updated: emailChange.duesUpdated,
+                  warnings: emailChange.warnings,
+                },
+              }
+            : {}),
+        },
       });
-      return NextResponse.json({ member: updated });
+      return NextResponse.json({
+        member: updated,
+        ...(emailChange.kind === "changed"
+          ? {
+              email_change: {
+                from: emailChange.oldEmail,
+                to: emailChange.newEmail,
+                payments_updated: emailChange.paymentsUpdated,
+                rsvps_updated: emailChange.rsvpsUpdated,
+                dues_updated: emailChange.duesUpdated,
+                auth_user_updated: emailChange.authUserUpdated,
+                stripe_customer_updated: emailChange.stripeCustomerUpdated,
+                warnings: emailChange.warnings,
+              },
+            }
+          : {}),
+      });
     }
 
     const updated = mockDb.updateMember(id, body, { lodge_slug: lodgeSlug });
@@ -99,6 +153,146 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     console.error("Member PATCH error:", e);
     return NextResponse.json({ error: "Failed to update member." }, { status: 500 });
   }
+}
+
+type EmailChangeResult =
+  | { kind: "noop"; member: db.Member }
+  | {
+      kind: "changed";
+      member: db.Member;
+      oldEmail: string;
+      newEmail: string;
+      paymentsUpdated: number;
+      rsvpsUpdated: number;
+      duesUpdated: number;
+      authUserUpdated: boolean;
+      stripeCustomerUpdated: boolean;
+      warnings: string[];
+    }
+  | { kind: "error"; status: number; message: string };
+
+/**
+ * Apply a member email change end-to-end: validate, sync the Supabase auth
+ * user (so they can still log in), best-effort sync the Stripe customer
+ * record, then rewrite the email in `members` and every email-keyed
+ * historical table (payments, rsvps, member_dues) so the admin detail view
+ * stays joined up.
+ *
+ * Returns `noop` when no email change is being requested so the caller can
+ * continue with the rest of the PATCH untouched.
+ */
+async function applyMemberEmailChange({
+  memberId,
+  lodgeId,
+  rawEmail,
+}: {
+  memberId: string;
+  lodgeId: string;
+  rawEmail: unknown;
+}): Promise<EmailChangeResult> {
+  if (rawEmail === undefined) {
+    const current = await db.getMemberById(memberId, lodgeId);
+    if (!current) {
+      return { kind: "error", status: 404, message: "Member not found." };
+    }
+    return { kind: "noop", member: current };
+  }
+
+  if (typeof rawEmail !== "string") {
+    return { kind: "error", status: 400, message: "Email must be a string." };
+  }
+
+  const normalised = rawEmail.trim().toLowerCase();
+  if (!EMAIL_RE.test(normalised)) {
+    return {
+      kind: "error",
+      status: 400,
+      message: "Enter a valid email address.",
+    };
+  }
+
+  const current = await db.getMemberById(memberId, lodgeId);
+  if (!current) {
+    return { kind: "error", status: 404, message: "Member not found." };
+  }
+
+  if (current.email === normalised) {
+    return { kind: "noop", member: current };
+  }
+
+  const collision = await db.getMemberByEmail(normalised, lodgeId);
+  if (collision && collision.id !== memberId) {
+    return {
+      kind: "error",
+      status: 409,
+      message: "Another member in this lodge already has that email.",
+    };
+  }
+
+  const warnings: string[] = [];
+  let authUserUpdated = false;
+  if (current.auth_user_id) {
+    try {
+      const supabaseAdmin = createServiceClient();
+      const { error } = await supabaseAdmin.auth.admin.updateUserById(
+        current.auth_user_id,
+        { email: normalised, email_confirm: true }
+      );
+      if (error) {
+        return {
+          kind: "error",
+          status: 400,
+          message: `Could not update portal login email: ${error.message}`,
+        };
+      }
+      authUserUpdated = true;
+    } catch (authError) {
+      const message =
+        authError instanceof Error ? authError.message : "Unknown auth error.";
+      return {
+        kind: "error",
+        status: 500,
+        message: `Could not update portal login email: ${message}`,
+      };
+    }
+  }
+
+  let stripeCustomerUpdated = false;
+  if (current.stripe_customer_id && process.env.STRIPE_SECRET_KEY) {
+    try {
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+        apiVersion: "2025-02-24.acacia",
+      });
+      await stripe.customers.update(current.stripe_customer_id, {
+        email: normalised,
+      });
+      stripeCustomerUpdated = true;
+    } catch (stripeError) {
+      const message =
+        stripeError instanceof Error
+          ? stripeError.message
+          : "Unknown Stripe error.";
+      warnings.push(`Stripe customer email not updated: ${message}.`);
+    }
+  }
+
+  const change = await db.changeMemberEmail(memberId, lodgeId, normalised);
+  if (!change.member) {
+    return { kind: "error", status: 404, message: "Member not found." };
+  }
+
+  return {
+    kind: "changed",
+    member: change.member,
+    oldEmail: change.oldEmail,
+    newEmail: change.member.email,
+    paymentsUpdated: change.paymentsUpdated,
+    rsvpsUpdated: change.rsvpsUpdated,
+    duesUpdated: change.duesUpdated,
+    authUserUpdated,
+    stripeCustomerUpdated,
+    warnings,
+  };
 }
 
 export async function DELETE(request: NextRequest, { params }: Params) {
