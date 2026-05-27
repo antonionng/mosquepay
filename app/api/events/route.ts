@@ -4,6 +4,7 @@ import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getAdminReadContext } from "@/lib/admin/read-context";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
 import { filterPubliclyVisible } from "@/lib/events/public-visibility";
@@ -37,7 +38,9 @@ export async function POST(request: NextRequest) {
     const unauthorized = await requireAdminApiAuth();
     if (unauthorized) return unauthorized;
 
-    const lodgeSlug = getLodgeSlugFromRequest(request);
+    const adminCtx = await getAdminReadContext();
+    const lodgeSlug =
+      adminCtx.mode === "database" ? adminCtx.lodgeSlug : "";
     const body = await request.json();
     const title = body.title?.trim();
     const slug = body.slug?.trim()?.toLowerCase().replace(/[^a-z0-9-]/g, "-");
@@ -121,10 +124,10 @@ export async function POST(request: NextRequest) {
     >;
 
     if (isSupabaseConfigured()) {
-      const lodgeId = await db.resolveLodgeId(lodgeSlug);
-      if (!lodgeId) {
-        return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+      if (adminCtx.mode !== "database" || !adminCtx.lodgeId) {
+        return NextResponse.json({ error: "Lodge not selected." }, { status: 404 });
       }
+      const lodgeId = adminCtx.lodgeId;
       const forbidden = await requireAdminApiPermission("meetings:write", lodgeId);
       if (forbidden) return forbidden;
       const event = await db.addEvent(lodgeId, eventData);

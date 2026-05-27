@@ -3,7 +3,7 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getAdminReadContext } from "@/lib/admin/read-context";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
 
@@ -19,7 +19,12 @@ export async function PATCH(
     const unauthorized = await requireAdminApiAuth();
     if (unauthorized) return unauthorized;
 
-    const lodgeSlug = getLodgeSlugFromRequest(request);
+    // Resolve the lodge from the admin's actual scope (same path the page
+    // side uses). This is immune to stale ADMIN_LODGE_COOKIE values, which
+    // is the recurring source of "Save changes returns 401/403" bugs.
+    const adminCtx = await getAdminReadContext();
+    const lodgeSlug =
+      adminCtx.mode === "database" ? adminCtx.lodgeSlug : "";
     const body = await request.json();
 
     const updates: Record<string, unknown> = {};
@@ -93,10 +98,10 @@ export async function PATCH(
       updates.feature_on_website = body.feature_on_website;
 
     if (isSupabaseConfigured()) {
-      const lodgeId = await db.resolveLodgeId(lodgeSlug);
-      if (!lodgeId) {
-        return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+      if (adminCtx.mode !== "database" || !adminCtx.lodgeId) {
+        return NextResponse.json({ error: "Lodge not selected." }, { status: 404 });
       }
+      const lodgeId = adminCtx.lodgeId;
       const forbidden = await requireAdminApiPermission("meetings:write", lodgeId);
       if (forbidden) return forbidden;
       const updated = await db.updateEvent(id, lodgeId, updates as Parameters<typeof db.updateEvent>[2]);
@@ -144,17 +149,19 @@ export async function DELETE(
     const unauthorized = await requireAdminApiAuth();
     if (unauthorized) return unauthorized;
 
-    const lodgeSlug = getLodgeSlugFromRequest(request);
+    const adminCtx = await getAdminReadContext();
+    const lodgeSlug =
+      adminCtx.mode === "database" ? adminCtx.lodgeSlug : "";
     const updates = {
       published: false,
       updated_at: new Date().toISOString(),
     };
 
     if (isSupabaseConfigured()) {
-      const lodgeId = await db.resolveLodgeId(lodgeSlug);
-      if (!lodgeId) {
-        return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+      if (adminCtx.mode !== "database" || !adminCtx.lodgeId) {
+        return NextResponse.json({ error: "Lodge not selected." }, { status: 404 });
       }
+      const lodgeId = adminCtx.lodgeId;
       const forbidden = await requireAdminApiPermission("meetings:write", lodgeId);
       if (forbidden) return forbidden;
 

@@ -9,6 +9,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
+import { ADMIN_LODGE_COOKIE } from "@/lib/tenant";
 
 async function getStaffAdminCookieEmail(): Promise<string | null> {
   try {
@@ -311,24 +312,54 @@ export async function requireAdminPermission(
   }
 
   if (scope.kind === "lodge" && lodgeId != null && !scope.lodgeIds.includes(lodgeId)) {
-    // Cross-tenant attempt. Usually means the route resolved the lodge via
-    // getLodgeSlugFromRequest's default-slug fallback while the admin's
-    // ADMIN_LODGE_COOKIE was missing or stale. We log it to make the next
-    // recurrence trivially diagnosable.
+    // The request resolved a lodgeId the admin doesn't administer. This is
+    // almost always caused by a stale ADMIN_LODGE_COOKIE -- the page-side
+    // scope resolver ignores stale cookies and uses the admin's actual
+    // lodge, but the API side resolves the lodge via getLodgeSlugFromRequest
+    // which reads the cookie verbatim. Self-heal the cookie on the way out
+    // and tell the client to retry; their next attempt will resolve to the
+    // correct lodge.
     console.warn(
-      "[permissions] admin attempted action on out-of-scope lodge",
+      "[permissions] healing stale lodge cookie on out-of-scope request",
       {
         email: scope.email,
         role: scope.role,
         permission,
         requestedLodgeId: lodgeId,
+        scopeLodgeId: scope.lodgeId,
         scopeLodgeIds: scope.lodgeIds,
       }
     );
-    return NextResponse.json(
-      { error: "This action is not available for the selected lodge." },
-      { status: 403 }
+
+    const response = NextResponse.json(
+      {
+        error:
+          "Your lodge selection was out of date. We've refreshed it -- please retry.",
+        code: "lodge_cookie_healed",
+        retry: true,
+      },
+      { status: 409 }
     );
+
+    try {
+      const adminLodge = await db.getLodgeById(scope.lodgeId);
+      if (adminLodge?.slug) {
+        response.cookies.set(ADMIN_LODGE_COOKIE, adminLodge.slug, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          maxAge: 60 * 60 * 24 * 30,
+          path: "/",
+        });
+      }
+    } catch (error) {
+      console.error(
+        "[permissions] failed to heal ADMIN_LODGE_COOKIE on out-of-scope request",
+        { email: scope.email, scopeLodgeId: scope.lodgeId, error }
+      );
+    }
+
+    return response;
   }
 
   if (roleHasPermission(scope.role, permission)) {

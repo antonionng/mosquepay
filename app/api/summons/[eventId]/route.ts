@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getAdminReadContext } from "@/lib/admin/read-context";
 import { writeAuditLog } from "@/lib/audit";
 import { defaultAgendaItems, renderDefaultSummonsOpening } from "@/lib/summons/defaults";
 
@@ -61,11 +61,11 @@ export async function GET(request: NextRequest, { params }: Params) {
   }
 
   const { eventId } = await params;
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const adminCtx = await getAdminReadContext();
+  if (adminCtx.mode !== "database" || !adminCtx.lodgeId) {
+    return NextResponse.json({ error: "Lodge not selected." }, { status: 404 });
   }
+  const lodgeId = adminCtx.lodgeId;
 
   const [event, lodge] = await Promise.all([
     db.getEventById(eventId, lodgeId),
@@ -110,11 +110,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   try {
     const { eventId } = await params;
-    const lodgeSlug = getLodgeSlugFromRequest(request);
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    if (!lodgeId) {
-      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    const adminCtx = await getAdminReadContext();
+    if (adminCtx.mode !== "database" || !adminCtx.lodgeId) {
+      return NextResponse.json({ error: "Lodge not selected." }, { status: 404 });
     }
+    const lodgeId = adminCtx.lodgeId;
     const forbidden = await requireAdminApiPermission("summons:write", lodgeId);
     if (forbidden) return forbidden;
 
