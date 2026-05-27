@@ -214,12 +214,12 @@ export function MarketingLanding() {
                 </Link>
               </div>
             </div>
-            <div className="relative aspect-[4/5] w-full max-lg:max-w-md overflow-hidden border border-dash-border bg-dash-surface-subtle shadow-dash">
+            <div className="relative aspect-[16/10] w-full max-lg:max-w-md overflow-hidden border border-dash-border bg-dash-surface-subtle shadow-dash">
               <Image
-                src="/marketing/hero-brethren.png"
-                alt="Brethren in lodge temple after meeting, formal suits and white gloves"
+                src="/marketing/hero-main.png"
+                alt="Two lodge leaders in formal attire in a wood-paneled temple room"
                 fill
-                className="object-cover object-[center_20%]"
+                className="object-cover object-center"
                 sizes="(max-width: 1024px) 100vw, 42vw"
                 priority
               />
