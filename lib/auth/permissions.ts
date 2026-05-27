@@ -158,11 +158,50 @@ export async function getCurrentStaffAdminContext(lodgeId?: string | null) {
       }
     } catch (error) {
       // Log so this stops manifesting as a silent 401 in production. We
-      // intentionally fall through to the Supabase-session path below so a
-      // non-platform admin with a still-valid Supabase access token isn't
-      // locked out by a transient cookie-path failure.
+      // intentionally fall through to the broader membership lookup below
+      // so a non-platform admin with a still-valid Supabase access token
+      // isn't locked out by a transient cookie-path failure.
       console.error(
         "[permissions] getAdminUserByEmail failed for staff cookie",
+        { email: cookieEmail, lodgeId, error }
+      );
+    }
+
+    // Fallback: ask the DB for every active admin_users row matching this
+    // email and pick the one that proves access for the requested scope.
+    // listAdminUsersByEmail uses the simpler email + active query without
+    // the ordered-by-lodge_id-desc-limit-1 shape that getAdminUserByEmail
+    // uses, so it's the safer source of truth for "does this email have
+    // admin access here?".
+    //
+    // Tenant safety: when a lodgeId is supplied we ONLY accept a membership
+    // that either matches that lodge or is a platform-wide row. We never
+    // silently swap in a different-lodge membership -- doing so would let a
+    // lodge-scoped admin pass a permission check against a lodge they don't
+    // administer, even though downstream queries would still target the
+    // mismatched lodge. When no lodgeId is supplied we just need to confirm
+    // they're an admin somewhere (callers like requireAdminApiAuth use this
+    // for the "is the user an admin at all?" question).
+    try {
+      const memberships = await db.listAdminUsersByEmail(cookieEmail);
+      if (memberships.length > 0) {
+        const preferred = lodgeId
+          ? memberships.find((m) => m.lodge_id === lodgeId) ??
+            memberships.find(
+              (m) => m.lodge_id == null && isPlatformRole(m.role)
+            )
+          : memberships.find((m) => m.lodge_id == null) ?? memberships[0];
+        if (preferred) {
+          return {
+            email: preferred.email,
+            role: preferred.role as AdminRole,
+            permissions: (preferred.permissions ?? []) as AdminPermission[],
+          };
+        }
+      }
+    } catch (error) {
+      console.error(
+        "[permissions] listAdminUsersByEmail fallback failed",
         { email: cookieEmail, lodgeId, error }
       );
     }
@@ -176,7 +215,21 @@ export async function getCurrentStaffAdminContext(lodgeId?: string | null) {
       data: { user },
       error,
     } = await supabase.auth.getUser();
-    if (error || !user?.email) return null;
+    if (error || !user?.email) {
+      if (cookieEmail) {
+        // Useful breadcrumb: the staff cookie was present, but the cookie
+        // email did not match any active admin_users row above AND there is
+        // no Supabase session to fall back on. Most common cause is the
+        // admin row was deactivated/deleted while the cookie was still in
+        // effect; less common is a stale-cookie + signed-out-of-Supabase
+        // pair after a member-side logout.
+        console.warn(
+          "[permissions] staff cookie present but unresolvable to an admin",
+          { email: cookieEmail, lodgeId, supabaseError: error?.message }
+        );
+      }
+      return null;
+    }
 
     if (isPlatformOwnerEmail(user.email)) {
       return {
@@ -187,12 +240,30 @@ export async function getCurrentStaffAdminContext(lodgeId?: string | null) {
     }
 
     const admin = await db.getAdminUserByEmail(user.email, lodgeId);
-    if (!admin) return null;
+    if (admin) {
+      return {
+        email: admin.email,
+        role: admin.role as AdminRole,
+        permissions: (admin.permissions ?? []) as AdminPermission[],
+      };
+    }
 
+    // Same list-based fallback for the Supabase-session path. Tenant
+    // safety mirrors the staff-cookie path above: with a lodgeId we only
+    // accept a row that matches that lodge or is a platform-wide row.
+    const memberships = await db.listAdminUsersByEmail(user.email);
+    if (memberships.length === 0) return null;
+    const preferred = lodgeId
+      ? memberships.find((m) => m.lodge_id === lodgeId) ??
+        memberships.find(
+          (m) => m.lodge_id == null && isPlatformRole(m.role)
+        )
+      : memberships.find((m) => m.lodge_id == null) ?? memberships[0];
+    if (!preferred) return null;
     return {
-      email: admin.email,
-      role: admin.role as AdminRole,
-      permissions: (admin.permissions ?? []) as AdminPermission[],
+      email: preferred.email,
+      role: preferred.role as AdminRole,
+      permissions: (preferred.permissions ?? []) as AdminPermission[],
     };
   } catch (error) {
     console.error(

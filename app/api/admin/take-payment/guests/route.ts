@@ -17,7 +17,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getAdminReadContext } from "@/lib/admin/read-context";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -43,11 +43,17 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const search = url.searchParams.get("q")?.trim() || undefined;
 
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  // Resolve the lodge from the admin's scope (same logic the page uses), not
+  // from the request host/cookie/default. Otherwise a lodge-scoped admin
+  // whose ADMIN_LODGE_COOKIE has not been set yet (e.g. a single-lodge
+  // treasurer who never used the lodge switcher) lands on the DEFAULT lodge
+  // here, fails the permission check, and gets a 401 even though the page
+  // rendered fine using their actual lodge.
+  const ctx = await getAdminReadContext();
+  if (ctx.mode !== "database" || !ctx.lodgeId) {
+    return NextResponse.json({ error: "Lodge not selected." }, { status: 404 });
   }
+  const lodgeId = ctx.lodgeId;
 
   const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
   if (forbidden) return forbidden;
@@ -104,11 +110,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const ctx = await getAdminReadContext();
+  if (ctx.mode !== "database" || !ctx.lodgeId) {
+    return NextResponse.json({ error: "Lodge not selected." }, { status: 404 });
   }
+  const lodgeId = ctx.lodgeId;
 
   const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
   if (forbidden) return forbidden;

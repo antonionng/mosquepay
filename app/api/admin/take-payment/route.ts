@@ -11,8 +11,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getAdminReadContext } from "@/lib/admin/read-context";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { getCurrentAdminContextAny } from "@/lib/auth/permissions";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -122,11 +121,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  // Use the admin's scoped lodge (same logic as the page) so a lodge-scoped
+  // treasurer whose ADMIN_LODGE_COOKIE has not been set never mints a QR
+  // against the wrong lodge -- they'd previously fall through to the
+  // platform default lodge here and 401 on the permission check.
+  const ctx = await getAdminReadContext();
+  if (ctx.mode !== "database" || !ctx.lodgeId) {
+    return NextResponse.json({ error: "Lodge not selected." }, { status: 404 });
   }
+  const lodgeId = ctx.lodgeId;
+  const lodgeSlug = ctx.lodgeSlug;
 
   const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
   if (forbidden) return forbidden;

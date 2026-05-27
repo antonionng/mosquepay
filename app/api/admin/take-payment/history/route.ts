@@ -19,8 +19,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getAdminReadContext } from "@/lib/admin/read-context";
 import { createServiceClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -102,11 +101,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ items: [] });
   }
 
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  // Resolve the lodge from the admin's scope so a lodge-scoped treasurer
+  // whose ADMIN_LODGE_COOKIE is unset doesn't fall through to the platform
+  // default lodge and 401 on a page that rendered fine for them.
+  const ctx = await getAdminReadContext();
+  if (ctx.mode !== "database" || !ctx.lodgeId) {
+    return NextResponse.json({ items: [] });
   }
+  const lodgeId = ctx.lodgeId;
 
   const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
   if (forbidden) return forbidden;

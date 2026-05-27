@@ -12,8 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getAdminReadContext } from "@/lib/admin/read-context";
 import { createServiceClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -38,11 +37,14 @@ export async function GET(
     );
   }
 
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  // Anchor to the admin's scoped lodge (same logic as the page) so an
+  // unset ADMIN_LODGE_COOKIE doesn't silently swap us onto the platform
+  // default lodge and 401 a polling tablet mid-payment.
+  const ctx = await getAdminReadContext();
+  if (ctx.mode !== "database" || !ctx.lodgeId) {
+    return NextResponse.json({ error: "Lodge not selected." }, { status: 404 });
   }
+  const lodgeId = ctx.lodgeId;
 
   const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
   if (forbidden) return forbidden;

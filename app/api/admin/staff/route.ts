@@ -3,7 +3,7 @@ import { requireAdminApiPermission } from "@/lib/auth/api";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getAdminReadContext } from "@/lib/admin/read-context";
 import { sendStaffInvite as sendInvite } from "@/lib/auth/invites";
 
 const ROLES = new Set([
@@ -27,10 +27,18 @@ function cleanRole(value: unknown) {
   return typeof value === "string" && ROLES.has(value) ? value : "secretary";
 }
 
-async function selectedLodgeId(request: NextRequest) {
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  return { lodgeSlug, lodgeId };
+async function selectedLodgeId(_request: NextRequest) {
+  // Resolve the lodge from the admin's scope (same logic the page uses), not
+  // from the request host/cookie/default. Otherwise a lodge-scoped admin
+  // whose ADMIN_LODGE_COOKIE has not been set yet (e.g. a single-lodge
+  // secretary who never used the lodge switcher) lands on the DEFAULT lodge
+  // here, fails the admin:all permission check, and gets a 401 even though
+  // the page rendered fine using their actual lodge.
+  const ctx = await getAdminReadContext();
+  if (ctx.mode !== "database" || !ctx.lodgeId) {
+    return { lodgeSlug: ctx.mode === "database" ? ctx.lodgeSlug : "", lodgeId: null };
+  }
+  return { lodgeSlug: ctx.lodgeSlug, lodgeId: ctx.lodgeId };
 }
 
 async function sendStaffInvite({
