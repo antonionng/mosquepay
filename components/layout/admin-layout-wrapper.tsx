@@ -88,7 +88,12 @@ function adminHeaderMeta(pathname: string): { title: string; parent?: HeaderPare
 export function AdminLayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const isAuthPage = pathname === "/admin/login" || pathname === "/admin/accept-invite";
+  const isAuthPage =
+    pathname === "/admin/login" ||
+    pathname === "/admin/signin" ||
+    pathname === "/admin/accept-invite" ||
+    pathname === "/admin/forgot-password" ||
+    pathname === "/admin/reset-password";
 
   // Routes that should run as a kiosk on phones: full-bleed, no admin
   // header/breadcrumb chrome eating vertical space. We keep the sidebar

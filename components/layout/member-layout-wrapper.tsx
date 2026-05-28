@@ -11,7 +11,9 @@ export function MemberLayoutWrapper({ children }: { children: React.ReactNode })
   const isAuth =
     pathname === "/member/login" ||
     pathname === "/member/signup" ||
-    pathname === "/member/accept-invite";
+    pathname === "/member/accept-invite" ||
+    pathname === "/member/forgot-password" ||
+    pathname === "/member/reset-password";
 
   if (isAuth) {
     return (
