@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import {
   ArrowLeft,
@@ -44,6 +44,7 @@ import {
   type MeetingFormMeeting,
 } from "../meeting-form";
 import type { LodgeFeeDefaults } from "@/lib/fees/resolve";
+import { MeetingClosePanel } from "./meeting-close-panel";
 
 type MeetingEvent = MeetingFormMeeting;
 
@@ -60,10 +61,54 @@ type RsvpEntry = {
   special_requests: string | null;
   payment_required: boolean;
   payment_completed: boolean;
+  payment_id: string | null;
   raffle_wine_pledged?: boolean;
   raffle_wine_bottles?: number;
   raffle_wine_note?: string | null;
 };
+
+type GuestEntry = {
+  id: string;
+  rsvp_id: string | null;
+  event_id: string;
+  guest_name: string;
+  dietary_requirements: string | null;
+  email: string | null;
+  phone: string | null;
+};
+
+type PaymentEntry = {
+  id: string;
+  rsvp_id: string | null;
+  event_id: string | null;
+  user_email: string;
+  user_name: string | null;
+  dining_amount: number;
+  charity_amount: number;
+  raffle_amount: number;
+  meeting_fee_amount: number;
+  guest_ticket_amount: number;
+  total_amount: number;
+  currency: string;
+  status: string;
+  refund_amount: number;
+  completed_at: string | null;
+};
+
+/**
+ * A row in the rsvps table with `status === "payment_pending"` represents
+ * a brother who tapped through to checkout but never finished paying.
+ * Until the Mooov webhook flips it to `confirmed` we treat it as a ghost:
+ * no dining count, no guest count, no wine pledge, no CSV row. They still
+ * show up in the dedicated "Unpaid" tile/export so the secretary can chase
+ * them, but they no longer pollute the main RSVP list.
+ */
+function isConfirmedRsvp(rsvp: RsvpEntry): boolean {
+  if (rsvp.status === "payment_pending") return false;
+  if (rsvp.status === "cancelled") return false;
+  if (rsvp.payment_required && !rsvp.payment_completed) return false;
+  return true;
+}
 
 type SummonsSummary = {
   id: string;
@@ -134,7 +179,9 @@ export type MeetingFinance = {
 
 export function MeetingDetailClient({
   meeting,
-  rsvps,
+  rsvps: allRsvps,
+  guests,
+  payments,
   readiness,
   summons,
   sends,
@@ -146,9 +193,12 @@ export function MeetingDetailClient({
   canFeatureOnWebsite,
   lodgeDefaults,
   finance,
+  closeState,
 }: {
   meeting: MeetingEvent;
   rsvps: RsvpEntry[];
+  guests: GuestEntry[];
+  payments: PaymentEntry[];
   readiness: MeetingReadiness;
   summons: SummonsSummary | null;
   sends: SummonsSend[];
@@ -165,6 +215,20 @@ export function MeetingDetailClient({
   canFeatureOnWebsite: boolean;
   lodgeDefaults: LodgeFeeDefaults | null;
   finance?: MeetingFinance;
+  /**
+   * Per-meeting Gift Aid close state (migration 059 + 060). Populated by
+   * the meeting page when supabase is configured; absent for mock mode.
+   */
+  closeState?: {
+    meeting_closed_at: string | null;
+    meeting_closed_by_email: string | null;
+    charity_amount: number;
+    charity_count: number;
+    new_declarations_preview: number;
+    closed_batch_id: string | null;
+    closed_batch_declarations_count: number;
+    currency: string;
+  };
 }) {
   const router = useRouter();
   const [formOpen, setFormOpen] = useState(false);
@@ -176,11 +240,20 @@ export function MeetingDetailClient({
   const [linkCopied, setLinkCopied] = useState(false);
 
   const isPast = new Date(meeting.event_date) < new Date();
+
+  // Split confirmed (paid or no payment required) RSVPs from
+  // abandoned-checkout ones. The main RSVP/dining/guest views only count
+  // confirmed rows, but the Unpaid tile + export still surface the
+  // abandoned ones so the secretary can chase them.
+  const rsvps = useMemo(() => allRsvps.filter(isConfirmedRsvp), [allRsvps]);
+  const abandonedRsvps = useMemo(
+    () => allRsvps.filter((r) => !isConfirmedRsvp(r)),
+    [allRsvps]
+  );
+
   const diningCount = rsvps.filter((r) => r.attending_dining).length;
   const guestCount = rsvps.reduce((sum, r) => sum + r.number_of_guests, 0);
-  const unpaidCount = rsvps.filter(
-    (r) => r.payment_required && !r.payment_completed
-  ).length;
+  const unpaidCount = abandonedRsvps.length;
   const dietaryCount = rsvps.filter((r) => r.dietary_requirements).length;
   const winePledgers = rsvps.filter((r) => r.raffle_wine_pledged === true);
   const wineBottleCount = winePledgers.reduce(
@@ -188,6 +261,49 @@ export function MeetingDetailClient({
     0
   );
   const latestSend = sends[0] ?? null;
+
+  // Index guests by their RSVP so each card can show the actual people
+  // the brother is bringing. Guests added directly against an event with
+  // no RSVP (rare) are dropped here on purpose: they show up in the
+  // dedicated Guests export below.
+  const guestsByRsvp = useMemo(() => {
+    const map = new Map<string, GuestEntry[]>();
+    for (const g of guests) {
+      if (!g.rsvp_id) continue;
+      const list = map.get(g.rsvp_id) ?? [];
+      list.push(g);
+      map.set(g.rsvp_id, list);
+    }
+    return map;
+  }, [guests]);
+
+  // Map each RSVP to its succeeded payment row so the export can write
+  // out the per-bucket money. Only succeeded payments contribute, since a
+  // pending/abandoned payment didn't actually raise anything.
+  const paymentByRsvp = useMemo(() => {
+    const succeededSet = new Set([
+      "succeeded",
+      "completed",
+      "paid",
+      "partially_refunded",
+    ]);
+    const map = new Map<string, PaymentEntry>();
+    for (const p of payments) {
+      if (!p.rsvp_id) continue;
+      if (!succeededSet.has(p.status)) continue;
+      const existing = map.get(p.rsvp_id);
+      if (!existing) {
+        map.set(p.rsvp_id, p);
+        continue;
+      }
+      const existingDate = existing.completed_at ?? existing.id;
+      const candidateDate = p.completed_at ?? p.id;
+      if (candidateDate > existingDate) map.set(p.rsvp_id, p);
+    }
+    return map;
+  }, [payments]);
+
+  const moneyFmt = (n: number) => n.toFixed(2);
 
   function openEdit() {
     setMeetingForm(formFromMeeting(meeting));
@@ -324,26 +440,57 @@ export function MeetingDetailClient({
         "Ceremony",
         "Dining",
         "Guests",
-        "Dietary",
+        "Guest names",
+        "Dietary (brother)",
+        "Dietary (guests)",
         "Requests",
-        "Payment",
+        "Wine bottles",
+        "Wine note",
+        "Payment status",
+        "Meeting fee (\u00a3)",
+        "Dining (\u00a3)",
+        "Guest tickets (\u00a3)",
+        "Charity (\u00a3)",
+        "Raffle (\u00a3)",
+        "Total paid (\u00a3)",
+        "Refunded (\u00a3)",
       ],
-      rsvps.map((rsvp) => [
-        rsvp.user_name,
-        rsvp.user_email,
-        rsvp.user_phone ?? "",
-        rsvp.status,
-        rsvp.attending_ceremony ? "yes" : "no",
-        rsvp.attending_dining ? "yes" : "no",
-        String(rsvp.number_of_guests),
-        rsvp.dietary_requirements ?? "",
-        rsvp.special_requests ?? "",
-        rsvp.payment_required
-          ? rsvp.payment_completed
-            ? "paid"
-            : "unpaid"
-          : "not required",
-      ])
+      rsvps.map((rsvp) => {
+        const partyGuests = guestsByRsvp.get(rsvp.id) ?? [];
+        const payment = paymentByRsvp.get(rsvp.id) ?? null;
+        return [
+          rsvp.user_name,
+          rsvp.user_email,
+          rsvp.user_phone ?? "",
+          rsvp.status,
+          rsvp.attending_ceremony ? "yes" : "no",
+          rsvp.attending_dining ? "yes" : "no",
+          String(rsvp.number_of_guests),
+          partyGuests.map((g) => g.guest_name).join("; "),
+          rsvp.dietary_requirements ?? "",
+          partyGuests
+            .filter((g) => g.dietary_requirements)
+            .map((g) => `${g.guest_name}: ${g.dietary_requirements}`)
+            .join("; "),
+          rsvp.special_requests ?? "",
+          rsvp.raffle_wine_pledged ? String(rsvp.raffle_wine_bottles ?? 0) : "",
+          rsvp.raffle_wine_pledged ? rsvp.raffle_wine_note ?? "" : "",
+          rsvp.payment_required
+            ? rsvp.payment_completed
+              ? "paid"
+              : "unpaid"
+            : "not required",
+          payment ? moneyFmt(payment.meeting_fee_amount) : "",
+          payment ? moneyFmt(payment.dining_amount) : "",
+          payment ? moneyFmt(payment.guest_ticket_amount) : "",
+          payment ? moneyFmt(payment.charity_amount) : "",
+          payment ? moneyFmt(payment.raffle_amount) : "",
+          payment ? moneyFmt(payment.total_amount) : "",
+          payment && payment.refund_amount > 0
+            ? moneyFmt(payment.refund_amount)
+            : "",
+        ];
+      })
     );
   }
 
@@ -351,18 +498,41 @@ export function MeetingDetailClient({
     const dining = rsvps.filter((r) => r.attending_dining);
     downloadCsv(
       `${meeting.slug}-dining.csv`,
-      ["Name", "Guests", "Dietary", "Requests", "Payment"],
-      dining.map((r) => [
-        r.user_name,
-        String(r.number_of_guests),
-        r.dietary_requirements ?? "",
-        r.special_requests ?? "",
-        r.payment_required
-          ? r.payment_completed
-            ? "paid"
-            : "unpaid"
-          : "n/a",
-      ])
+      [
+        "Name",
+        "Email",
+        "Guests",
+        "Guest names",
+        "Dietary (brother)",
+        "Dietary (guests)",
+        "Requests",
+        "Dining paid (\u00a3)",
+        "Guest tickets paid (\u00a3)",
+        "Payment status",
+      ],
+      dining.map((r) => {
+        const partyGuests = guestsByRsvp.get(r.id) ?? [];
+        const payment = paymentByRsvp.get(r.id) ?? null;
+        return [
+          r.user_name,
+          r.user_email,
+          String(r.number_of_guests),
+          partyGuests.map((g) => g.guest_name).join("; "),
+          r.dietary_requirements ?? "",
+          partyGuests
+            .filter((g) => g.dietary_requirements)
+            .map((g) => `${g.guest_name}: ${g.dietary_requirements}`)
+            .join("; "),
+          r.special_requests ?? "",
+          payment ? moneyFmt(payment.dining_amount) : "",
+          payment ? moneyFmt(payment.guest_ticket_amount) : "",
+          r.payment_required
+            ? r.payment_completed
+              ? "paid"
+              : "unpaid"
+            : "n/a",
+        ];
+      })
     );
   }
 
@@ -383,13 +553,101 @@ export function MeetingDetailClient({
   }
 
   function exportUnpaid() {
-    const unpaid = rsvps.filter(
-      (r) => r.payment_required && !r.payment_completed
-    );
+    // Drives off the abandoned-checkout pool that we hide from the main
+    // list. The secretary still needs this view to chase them.
     downloadCsv(
       `${meeting.slug}-unpaid.csv`,
-      ["Name", "Email", "Phone", "Status"],
-      unpaid.map((r) => [r.user_name, r.user_email, r.user_phone ?? "", r.status])
+      [
+        "Name",
+        "Email",
+        "Phone",
+        "Status",
+        "Ceremony",
+        "Dining",
+        "Guests",
+        "Started checkout at",
+      ],
+      abandonedRsvps.map((r) => [
+        r.user_name,
+        r.user_email,
+        r.user_phone ?? "",
+        r.status,
+        r.attending_ceremony ? "yes" : "no",
+        r.attending_dining ? "yes" : "no",
+        String(r.number_of_guests),
+        "",
+      ])
+    );
+  }
+
+  function exportGuests() {
+    // One row per guest (not per RSVP) so the dining secretary can
+    // build their place-card list directly from this CSV.
+    const rows: string[][] = [];
+    for (const rsvp of rsvps) {
+      const partyGuests = guestsByRsvp.get(rsvp.id) ?? [];
+      for (const g of partyGuests) {
+        rows.push([
+          g.guest_name,
+          rsvp.user_name,
+          rsvp.user_email,
+          g.dietary_requirements ?? "",
+          g.email ?? "",
+          g.phone ?? "",
+        ]);
+      }
+    }
+    downloadCsv(
+      `${meeting.slug}-guests.csv`,
+      [
+        "Guest name",
+        "Brought by",
+        "Brother email",
+        "Dietary",
+        "Guest email",
+        "Guest phone",
+      ],
+      rows
+    );
+  }
+
+  function exportDonations() {
+    // Charity + raffle ticket strips per brother. Only includes RSVPs
+    // whose payment actually settled, so the total here matches the
+    // money-raised card on the right.
+    const rows: string[][] = [];
+    for (const rsvp of rsvps) {
+      const payment = paymentByRsvp.get(rsvp.id);
+      if (!payment) continue;
+      if (
+        payment.charity_amount <= 0 &&
+        payment.raffle_amount <= 0 &&
+        !rsvp.raffle_wine_pledged
+      ) {
+        continue;
+      }
+      rows.push([
+        rsvp.user_name,
+        rsvp.user_email,
+        moneyFmt(payment.charity_amount),
+        moneyFmt(payment.raffle_amount),
+        rsvp.raffle_wine_pledged
+          ? String(rsvp.raffle_wine_bottles ?? 0)
+          : "0",
+        rsvp.raffle_wine_pledged ? rsvp.raffle_wine_note ?? "" : "",
+      ]);
+    }
+    downloadCsv(
+      `${meeting.slug}-donations.csv`,
+      [
+        "Name",
+        "Email",
+        "Charity (\u00a3)",
+        "Raffle strips (\u00a3)",
+        "Wine bottles pledged",
+        "Wine note",
+      ],
+      rows
     );
   }
 
@@ -795,7 +1053,7 @@ export function MeetingDetailClient({
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
                 <Button
                   type="button"
                   variant="ghost"
@@ -815,6 +1073,26 @@ export function MeetingDetailClient({
                   disabled={diningCount === 0}
                 >
                   <Download className="mr-1.5 h-3.5 w-3.5" /> Dining
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="justify-start"
+                  onClick={exportGuests}
+                  disabled={guestCount === 0}
+                >
+                  <Download className="mr-1.5 h-3.5 w-3.5" /> Guests
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="justify-start"
+                  onClick={exportDonations}
+                  disabled={rsvps.length === 0}
+                >
+                  <Download className="mr-1.5 h-3.5 w-3.5" /> Donations
                 </Button>
                 <Button
                   type="button"
@@ -842,71 +1120,118 @@ export function MeetingDetailClient({
                 <div className="rounded-xl border border-dashed border-dash-border bg-dash-surface-subtle/40 py-10 text-center">
                   <Users className="mx-auto h-7 w-7 text-dash-text-faint" />
                   <p className="mt-3 text-sm text-dash-text-muted">
-                    No RSVPs yet.
+                    No confirmed RSVPs yet.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {rsvps.map((r) => (
-                    <div
-                      key={r.id}
-                      className="flex items-start justify-between gap-3 rounded-lg border border-dash-border bg-dash-surface-subtle/60 px-3 py-2.5"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-dash-text">
-                          {r.user_name}
-                        </p>
-                        <p className="truncate text-xs text-dash-text-muted">
-                          {r.user_email}
-                        </p>
-                        <p className="mt-1 text-xs text-dash-text-muted">
-                          {r.attending_dining ? "Dining" : "No dining"}
-                          {r.number_of_guests > 0
-                            ? `, ${r.number_of_guests} guest${r.number_of_guests === 1 ? "" : "s"}`
-                            : ""}
-                          {r.dietary_requirements
-                            ? `, Dietary: ${r.dietary_requirements}`
-                            : ""}
-                        </p>
-                        {r.special_requests && (
-                          <p className="mt-1 text-xs text-dash-text-muted">
-                            Request: {r.special_requests}
+                  {rsvps.map((r) => {
+                    const partyGuests = guestsByRsvp.get(r.id) ?? [];
+                    return (
+                      <div
+                        key={r.id}
+                        className="flex items-start justify-between gap-3 rounded-lg border border-dash-border bg-dash-surface-subtle/60 px-3 py-2.5"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-dash-text">
+                            {r.user_name}
                           </p>
-                        )}
-                        {r.raffle_wine_pledged && (
-                          <p className="mt-1 text-xs font-medium text-violet-700">
-                            Wine pledge:{" "}
-                            {r.raffle_wine_bottles ?? 1}{" "}
-                            bottle
-                            {(r.raffle_wine_bottles ?? 1) === 1 ? "" : "s"}
-                            {r.raffle_wine_note
-                              ? ` — ${r.raffle_wine_note}`
+                          <p className="truncate text-xs text-dash-text-muted">
+                            {r.user_email}
+                          </p>
+                          <p className="mt-1 text-xs text-dash-text-muted">
+                            {r.attending_dining ? "Dining" : "No dining"}
+                            {r.number_of_guests > 0
+                              ? `, ${r.number_of_guests} guest${r.number_of_guests === 1 ? "" : "s"}`
+                              : ""}
+                            {r.dietary_requirements
+                              ? `, Dietary: ${r.dietary_requirements}`
                               : ""}
                           </p>
-                        )}
-                      </div>
-                      <div className="flex shrink-0 flex-col items-end gap-1">
-                        {r.status === "confirmed" ? (
-                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                        ) : (
-                          <XCircle className="h-4 w-4 text-dash-text-faint" />
-                        )}
-                        {r.payment_required && (
-                          <span
-                            className={cn(
-                              "rounded-full px-2 py-0.5 text-[10px] font-medium",
-                              r.payment_completed
-                                ? "bg-emerald-50 text-emerald-700"
-                                : "bg-amber-50 text-amber-700"
+                          {partyGuests.length > 0 && (
+                            <ul className="mt-1 space-y-0.5 text-xs text-dash-text-muted">
+                              {partyGuests.map((g) => (
+                                <li key={g.id} className="flex flex-wrap items-baseline gap-1">
+                                  <span className="font-medium text-dash-text">
+                                    {g.guest_name}
+                                  </span>
+                                  {g.dietary_requirements ? (
+                                    <span className="text-dash-text-muted">
+                                      ({g.dietary_requirements})
+                                    </span>
+                                  ) : null}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {r.number_of_guests > 0 &&
+                            partyGuests.length < r.number_of_guests && (
+                              <p className="mt-1 text-xs text-amber-700">
+                                {r.number_of_guests - partyGuests.length} guest
+                                name{r.number_of_guests - partyGuests.length === 1 ? "" : "s"}
+                                {" "}not captured yet.
+                              </p>
                             )}
-                          >
-                            {r.payment_completed ? "Paid" : "Unpaid"}
-                          </span>
-                        )}
+                          {r.special_requests && (
+                            <p className="mt-1 text-xs text-dash-text-muted">
+                              Request: {r.special_requests}
+                            </p>
+                          )}
+                          {r.raffle_wine_pledged && (
+                            <p className="mt-1 text-xs font-medium text-violet-700">
+                              Wine pledge: {r.raffle_wine_bottles ?? 1} bottle
+                              {(r.raffle_wine_bottles ?? 1) === 1 ? "" : "s"}
+                              {r.raffle_wine_note
+                                ? ` (${r.raffle_wine_note})`
+                                : ""}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          {r.status === "confirmed" ? (
+                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-dash-text-faint" />
+                          )}
+                          {r.payment_required && (
+                            <span
+                              className={cn(
+                                "rounded-full px-2 py-0.5 text-[10px] font-medium",
+                                r.payment_completed
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : "bg-amber-50 text-amber-700"
+                              )}
+                            >
+                              {r.payment_completed ? "Paid" : "Unpaid"}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
+              )}
+
+              {abandonedRsvps.length > 0 && (
+                <details className="rounded-lg border border-amber-200 bg-amber-50/60">
+                  <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-amber-900">
+                    {abandonedRsvps.length} abandoned checkout
+                    {abandonedRsvps.length === 1 ? "" : "s"} (not counted)
+                  </summary>
+                  <ul className="space-y-1 px-3 pb-3 text-xs text-amber-900/90">
+                    {abandonedRsvps.map((r) => (
+                      <li key={r.id} className="flex flex-wrap items-baseline gap-2">
+                        <span className="font-medium">{r.user_name}</span>
+                        <span className="text-amber-900/70">
+                          {r.user_email}
+                        </span>
+                        <span className="rounded-full bg-white/70 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-amber-800">
+                          {r.status}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
               )}
             </CardContent>
           </Card>
@@ -924,6 +1249,28 @@ export function MeetingDetailClient({
                   meeting.enable_charity_donation ||
                   meeting.enable_raffle_donation,
               )}
+              enabled={{
+                meetingFee: Boolean(meeting.enable_meeting_fee),
+                dining: Boolean(meeting.enable_dining_rsvp),
+                guestTicket: Boolean(meeting.enable_guest_tickets),
+                charity: Boolean(meeting.enable_charity_donation),
+                raffle: Boolean(meeting.enable_raffle_donation),
+              }}
+            />
+          ) : null}
+
+          {closeState ? (
+            <MeetingClosePanel
+              eventId={meeting.id}
+              isPast={isPast}
+              closedAt={closeState.meeting_closed_at}
+              closedByEmail={closeState.meeting_closed_by_email}
+              charityAmount={closeState.charity_amount}
+              charityCount={closeState.charity_count}
+              newDeclarationsPreview={closeState.new_declarations_preview}
+              closedBatchId={closeState.closed_batch_id}
+              closedBatchDeclarationsCount={closeState.closed_batch_declarations_count}
+              currency={closeState.currency}
             />
           ) : null}
 
@@ -1247,24 +1594,44 @@ function MoneyRaisedCard({
   eventId,
   finance,
   meetingHasFees,
+  enabled,
 }: {
   eventId: string;
   finance: MeetingFinance;
   meetingHasFees: boolean;
+  /**
+   * Which fee buckets this meeting has switched on. When a bucket is
+   * enabled we render its row even when nothing has been raised yet, so
+   * the treasurer sees the stable list of categories and zeros instead
+   * of a single £0.00 headline. When disabled the row stays hidden even
+   * if a stray legacy payment carries an amount, to avoid implying the
+   * meeting expects that money.
+   */
+  enabled: {
+    meetingFee: boolean;
+    dining: boolean;
+    guestTicket: boolean;
+    charity: boolean;
+    raffle: boolean;
+  };
 }) {
   const { meeting, lodgeAllTime, currency } = finance;
   const hasMeetingActivity =
     meeting.succeededCount > 0 || meeting.pendingCount > 0;
-  const breakdownAll: Array<[string, number]> = [
-    ["Meeting fee", meeting.meetingFee],
-    ["Dining", meeting.dining],
-    ["Guest tickets", meeting.guestTicket],
-    ["Charity", meeting.charity],
-    ["Raffle", meeting.raffle],
+  const breakdownAll: Array<[string, number, boolean]> = [
+    ["Meeting fee", meeting.meetingFee, enabled.meetingFee],
+    ["Dining", meeting.dining, enabled.dining],
+    ["Guest tickets", meeting.guestTicket, enabled.guestTicket],
+    ["Charity", meeting.charity, enabled.charity],
+    ["Raffle", meeting.raffle, enabled.raffle],
   ];
-  const breakdown: Array<[string, number]> = breakdownAll.filter(
-    (entry): entry is [string, number] => entry[1] > 0,
-  );
+  // Show every bucket that is either enabled on the event OR has money
+  // sitting against it (defensive against legacy data). This way the
+  // treasurer sees Charity / Raffle / Dining / Levy etc. as soon as the
+  // meeting toggles them on, even before the first payment lands.
+  const breakdown: Array<[string, number]> = breakdownAll
+    .filter(([, amount, isEnabled]) => isEnabled || amount > 0)
+    .map(([label, amount]) => [label, amount]);
 
   const chargeHref = `/admin/take-payment?event_id=${encodeURIComponent(eventId)}&tab=charge`;
   const cashHref = `/admin/take-payment?event_id=${encodeURIComponent(eventId)}&tab=cash`;

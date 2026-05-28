@@ -3,10 +3,10 @@ import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { getCurrentAdminScope } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit";
 import * as db from "@/lib/db";
-import type { Donation, GiftAidDeclaration } from "@/lib/db/types";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { getLodgeSlugFromRequest } from "@/lib/tenant";
-import { isSuccessfulPaymentStatus } from "@/lib/reports";
+import { eligibleDonationRows } from "@/lib/gift-aid/eligible";
+import { resolveDeclarationsForBatch } from "@/lib/gift-aid/new-declarations";
 
 export async function GET(request: NextRequest) {
   const unauthorized = await requireAdminApiAuth();
@@ -118,6 +118,34 @@ export async function POST(request: NextRequest) {
     )
   );
 
+  // Sweep + attach declarations created since the previous batch so the
+  // pack we ship to UGLE includes copies. Per-period batches share this
+  // logic with per-meeting close (see lib/gift-aid/new-declarations.ts).
+  let newDeclarationsCount = 0;
+  try {
+    const resolved = await resolveDeclarationsForBatch({
+      lodgeId,
+      newBatch: { created_at: batch.created_at, id: batch.id },
+      donorDeclarationIds: eligible
+        .map((row) => row.gift_aid_declaration_id)
+        .filter((id): id is string => Boolean(id)),
+    });
+    if (resolved.links.length > 0) {
+      await db.linkDeclarationsToClaimBatch(lodgeId, batch.id, resolved.links);
+      await db.setClaimBatchDeclarationsCount(
+        batch.id,
+        lodgeId,
+        resolved.links.length
+      );
+      newDeclarationsCount = resolved.links.length;
+    }
+  } catch (err) {
+    console.error("gift-aid claims POST: declaration linkage failed", {
+      batch_id: batch.id,
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   await writeAuditLog({
     lodgeId,
     action: "gift_aid_claim_batch_created",
@@ -129,48 +157,17 @@ export async function POST(request: NextRequest) {
       period_end: periodEnd,
       eligible_amount: eligibleAmount,
       reclaimable_amount: eligibleAmount * 0.25,
+      new_declarations_count: newDeclarationsCount,
     },
   });
 
-  return NextResponse.json({ claim: batch }, { status: 201 });
+  return NextResponse.json(
+    { claim: batch, new_declarations_count: newDeclarationsCount },
+    { status: 201 }
+  );
 }
 
 async function resolveLodge(request: NextRequest) {
   const lodgeSlug = getLodgeSlugFromRequest(request);
   return db.resolveLodgeId(lodgeSlug);
-}
-
-function eligibleDonationRows(
-  donations: Donation[],
-  declarations: GiftAidDeclaration[]
-) {
-  const declarationByEmail = new Map(
-    declarations
-      .filter((declaration) => !declaration.revoked_at && declaration.declaration_confirmed && declaration.hmrc_eligible)
-      .map((declaration) => [declaration.donor_email.toLowerCase(), declaration])
-  );
-
-  return donations
-    .filter((donation) => isSuccessfulPaymentStatus(donation.status))
-    .filter((donation) => !donation.gift_aid_claim_batch_id)
-    .map((donation) => {
-      const declaration = donation.gift_aid_declaration_id
-        ? declarations.find((item) => item.id === donation.gift_aid_declaration_id)
-        : declarationByEmail.get(donation.donor_email.toLowerCase());
-      const declared =
-        donation.gift_aid_status === "declared" ||
-        Boolean(declaration && !declaration.revoked_at);
-      const eligibleAmount =
-        donation.gift_aid_eligible_amount && donation.gift_aid_eligible_amount > 0
-          ? donation.gift_aid_eligible_amount
-          : declared
-            ? donation.amount
-            : 0;
-      return {
-        ...donation,
-        gift_aid_declaration_id: declaration?.id ?? donation.gift_aid_declaration_id,
-        eligible_amount: eligibleAmount,
-      };
-    })
-    .filter((donation) => donation.eligible_amount > 0);
 }

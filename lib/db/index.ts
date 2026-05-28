@@ -11,6 +11,7 @@ import type {
   Payment,
   Donation,
   GiftAidDeclaration,
+  GiftAidDeclarationEvent,
   LodgeSubscription,
   BlogPost,
   CharityCampaign,
@@ -19,9 +20,13 @@ import type {
   LodgeMasonicYear,
   MemberDues,
   MemberDuesInstalment,
+  DuesSchedule,
+  DuesScheduleStatus,
+  DuesSplitStrategy,
   MeetingCollection,
   GasdsClaim,
   GiftAidClaimBatch,
+  GiftAidClaimDeclaration,
   GiftAidClaimItem,
   LedgerEntry,
   BankStatementImport,
@@ -606,7 +611,11 @@ type AddEventOptional =
   | "summons_approved_at"
   | "summons_approved_by_email"
   | "summons_last_sent_at"
-  | "dining_waived_for_all";
+  | "dining_waived_for_all"
+  // Per-meeting close (migration 059). Defaulted in DB; callers don't set.
+  | "meeting_closed_at"
+  | "meeting_closed_by_email"
+  | "meeting_close_notes";
 
 export async function addEvent(
   lodgeId: string,
@@ -958,8 +967,20 @@ export async function createGiftAidClaimBatch(
   lodgeId: string,
   data: Omit<
     GiftAidClaimBatch,
-    "id" | "lodge_id" | "created_at" | "updated_at"
-  >
+    | "id"
+    | "lodge_id"
+    | "created_at"
+    | "updated_at"
+    | "declarations_count"
+    | "pack_generated_at"
+    | "pack_generated_by_email"
+  > &
+    Partial<
+      Pick<
+        GiftAidClaimBatch,
+        "declarations_count" | "pack_generated_at" | "pack_generated_by_email"
+      >
+    >
 ): Promise<GiftAidClaimBatch> {
   const { data: row, error } = await db()
     .from("gift_aid_claim_batches")
@@ -968,6 +989,39 @@ export async function createGiftAidClaimBatch(
     .single();
   if (error) throw error;
   return row as GiftAidClaimBatch;
+}
+
+export async function setClaimBatchDeclarationsCount(
+  id: string,
+  lodgeId: string,
+  count: number
+): Promise<void> {
+  const { error } = await db()
+    .from("gift_aid_claim_batches")
+    .update({
+      declarations_count: count,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("lodge_id", lodgeId);
+  if (error) throw error;
+}
+
+export async function markClaimBatchPackGenerated(
+  id: string,
+  lodgeId: string,
+  actorEmail: string | null
+): Promise<void> {
+  const { error } = await db()
+    .from("gift_aid_claim_batches")
+    .update({
+      pack_generated_at: new Date().toISOString(),
+      pack_generated_by_email: actorEmail,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("lodge_id", lodgeId);
+  if (error) throw error;
 }
 
 export async function updateGiftAidClaimBatch(
@@ -1018,6 +1072,109 @@ export async function createGiftAidClaimItems(
     .select("*");
   if (error) throw error;
   return data as GiftAidClaimItem[];
+}
+
+// ---------------------------------------------------------------------------
+// Claim batch -> declaration linkage (migration 060)
+// ---------------------------------------------------------------------------
+
+/**
+ * Find the previously-created claim batch for this lodge. Used by the
+ * close flow to compute "what declarations are new since the last pack".
+ * Returns null if this is the lodge's first batch.
+ */
+export async function getMostRecentClaimBatchBefore(
+  lodgeId: string,
+  beforeIso: string
+): Promise<GiftAidClaimBatch | null> {
+  const { data, error } = await db()
+    .from("gift_aid_claim_batches")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .lt("created_at", beforeIso)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data as GiftAidClaimBatch | null;
+}
+
+/**
+ * Declarations whose `created_at` falls in (startIso, endIso]. Includes
+ * revoked ones intentionally: if a declaration was created AND revoked in
+ * the window, UGLE still wants to know it existed.
+ */
+export async function getDeclarationsCreatedBetween(
+  lodgeId: string,
+  startIso: string,
+  endIso: string
+): Promise<GiftAidDeclaration[]> {
+  const { data, error } = await db()
+    .from("gift_aid_declarations")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .gt("created_at", startIso)
+    .lte("created_at", endIso)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data as GiftAidDeclaration[];
+}
+
+export async function getGiftAidDeclarationsByIds(
+  lodgeId: string,
+  ids: string[]
+): Promise<GiftAidDeclaration[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await db()
+    .from("gift_aid_declarations")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .in("id", ids);
+  if (error) throw error;
+  return data as GiftAidDeclaration[];
+}
+
+export async function linkDeclarationsToClaimBatch(
+  lodgeId: string,
+  claimBatchId: string,
+  links: Array<{
+    gift_aid_declaration_id: string;
+    inclusion_reason: GiftAidClaimDeclaration["inclusion_reason"];
+  }>
+): Promise<GiftAidClaimDeclaration[]> {
+  if (links.length === 0) return [];
+  const payload = links.map((row) => ({
+    ...row,
+    lodge_id: lodgeId,
+    claim_batch_id: claimBatchId,
+  }));
+  // Best-effort insert. The unique index on
+  // (claim_batch_id, gift_aid_declaration_id, inclusion_reason) catches a
+  // re-attach race; we swallow that and re-read so the caller gets the
+  // canonical row regardless of which leg won.
+  const { data, error } = await db()
+    .from("gift_aid_claim_declarations")
+    .upsert(payload, {
+      onConflict: "claim_batch_id,gift_aid_declaration_id,inclusion_reason",
+      ignoreDuplicates: true,
+    })
+    .select("*");
+  if (error) throw error;
+  return (data ?? []) as GiftAidClaimDeclaration[];
+}
+
+export async function listClaimBatchDeclarations(
+  lodgeId: string,
+  claimBatchId: string
+): Promise<GiftAidClaimDeclaration[]> {
+  const { data, error } = await db()
+    .from("gift_aid_claim_declarations")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .eq("claim_batch_id", claimBatchId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data as GiftAidClaimDeclaration[];
 }
 
 // ---------------------------------------------------------------------------
@@ -1118,22 +1275,43 @@ export async function listAuditLogsByEntity(
   return data as AuditLog[];
 }
 
+export type AddGiftAidDeclarationInput = {
+  donor_name: string;
+  donor_email: string;
+  declaration_text: string;
+  declaration_confirmed: boolean;
+  confirmation_method: string;
+  hmrc_eligible: boolean;
+  donor_address_line_1?: string | null;
+  donor_address_line_2?: string | null;
+  donor_city?: string | null;
+  donor_postcode?: string | null;
+  donor_country?: string | null;
+  declaration_source?: string;
+  retained_until?: string | null;
+  revoked_reason?: string | null;
+  // Evidence (migration 059). Evidence rows can be stamped after the
+  // insert via updateGiftAidDeclarationEvidence; passing them on insert is
+  // a convenience for callers that already have the file in hand.
+  evidence_source?: GiftAidDeclaration["evidence_source"];
+  evidence_storage_bucket?: string | null;
+  evidence_storage_path?: string | null;
+  evidence_sha256?: string | null;
+  evidence_size_bytes?: number | null;
+  evidence_mime_type?: string | null;
+  evidence_uploaded_at?: string | null;
+  evidence_uploaded_by_email?: string | null;
+  paper_received_date?: string | null;
+  paper_filing_reference?: string | null;
+  digital_signature_ip?: string | null;
+  digital_signature_user_agent?: string | null;
+  digital_declaration_text_snapshot?: string | null;
+  member_id?: string | null;
+};
+
 export async function addGiftAidDeclaration(
   lodgeId: string,
-  data: Omit<
-    GiftAidDeclaration,
-    | "id"
-    | "lodge_id"
-    | "created_at"
-    | "updated_at"
-    | "revoked_at"
-    | "declaration_source"
-    | "retained_until"
-    | "revoked_reason"
-  > &
-    Partial<
-      Pick<GiftAidDeclaration, "declaration_source" | "retained_until" | "revoked_reason">
-    >
+  data: AddGiftAidDeclarationInput
 ): Promise<GiftAidDeclaration> {
   const { data: row, error } = await db()
     .from("gift_aid_declarations")
@@ -1144,19 +1322,175 @@ export async function addGiftAidDeclaration(
   return row as GiftAidDeclaration;
 }
 
-export async function revokeGiftAidDeclaration(
+/**
+ * Stamp evidence metadata on an existing declaration after the file has
+ * been uploaded to storage. Used by the paper-upload flow which writes the
+ * row first (to get an id for the storage path), then stores the bytes,
+ * then comes back here to record the hash + path.
+ */
+export async function updateGiftAidDeclarationEvidence(
   id: string,
-  lodgeId: string
+  lodgeId: string,
+  evidence: {
+    evidence_source: GiftAidDeclaration["evidence_source"];
+    evidence_storage_bucket: string;
+    evidence_storage_path: string;
+    evidence_sha256: string;
+    evidence_size_bytes: number;
+    evidence_mime_type: string;
+    evidence_uploaded_at: string;
+    evidence_uploaded_by_email: string | null;
+  }
 ): Promise<GiftAidDeclaration | null> {
   const { data, error } = await db()
     .from("gift_aid_declarations")
-    .update({ revoked_at: new Date().toISOString() })
+    .update({ ...evidence, updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("lodge_id", lodgeId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
   return data as GiftAidDeclaration | null;
+}
+
+export async function revokeGiftAidDeclaration(
+  id: string,
+  lodgeId: string,
+  opts?: { reason?: string | null }
+): Promise<GiftAidDeclaration | null> {
+  const { data, error } = await db()
+    .from("gift_aid_declarations")
+    .update({
+      revoked_at: new Date().toISOString(),
+      revoked_reason: opts?.reason ?? null,
+    })
+    .eq("id", id)
+    .eq("lodge_id", lodgeId)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  return data as GiftAidDeclaration | null;
+}
+
+/**
+ * Active declaration for a known member. Prefers the explicit member_id
+ * link (migration 059) but falls back to the email lookup for declarations
+ * recorded before the link existed.
+ */
+export async function getActiveGiftAidDeclarationByMember(
+  lodgeId: string,
+  member: { id: string; email: string }
+): Promise<GiftAidDeclaration | null> {
+  const { data: linked, error: linkedError } = await db()
+    .from("gift_aid_declarations")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .eq("member_id", member.id)
+    .is("revoked_at", null)
+    .eq("declaration_confirmed", true)
+    .eq("hmrc_eligible", true)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (linkedError) throw linkedError;
+  if (linked) return linked as GiftAidDeclaration;
+  return getActiveGiftAidDeclarationByEmail(lodgeId, member.email);
+}
+
+// ---------------------------------------------------------------------------
+// Gift Aid declaration events (append-only audit trail, migration 059)
+// ---------------------------------------------------------------------------
+
+export type InsertGiftAidDeclarationEventInput = Omit<
+  GiftAidDeclarationEvent,
+  "id" | "lodge_id" | "declaration_id" | "created_at"
+> & {
+  declaration_id: string;
+};
+
+export async function insertGiftAidDeclarationEvent(
+  lodgeId: string,
+  input: InsertGiftAidDeclarationEventInput
+): Promise<GiftAidDeclarationEvent> {
+  const { data, error } = await db()
+    .from("gift_aid_declaration_events")
+    .insert({ ...input, lodge_id: lodgeId })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as GiftAidDeclarationEvent;
+}
+
+export async function listGiftAidDeclarationEvents(
+  lodgeId: string,
+  declarationId: string
+): Promise<GiftAidDeclarationEvent[]> {
+  const { data, error } = await db()
+    .from("gift_aid_declaration_events")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .eq("declaration_id", declarationId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data as GiftAidDeclarationEvent[];
+}
+
+// ---------------------------------------------------------------------------
+// Member-level Gift Aid posture (migration 059)
+// ---------------------------------------------------------------------------
+
+export async function updateMemberGiftAidPosture(
+  memberId: string,
+  lodgeId: string,
+  patch: {
+    gift_aid_consent_status?: "unknown" | "declared" | "declined";
+    gift_aid_prompted_at?: string | null;
+  }
+): Promise<void> {
+  const { error } = await db()
+    .from("members")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", memberId)
+    .eq("lodge_id", lodgeId);
+  if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
+// Meeting close helpers (migration 059)
+// ---------------------------------------------------------------------------
+
+export async function markEventMeetingClosed(
+  eventId: string,
+  lodgeId: string,
+  patch: {
+    meeting_closed_at: string;
+    meeting_closed_by_email: string | null;
+    meeting_close_notes: string | null;
+  }
+): Promise<void> {
+  const { error } = await db()
+    .from("events")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", eventId)
+    .eq("lodge_id", lodgeId);
+  if (error) throw error;
+}
+
+export async function attachClaimBatchToMeetingCollection(
+  collectionId: string,
+  lodgeId: string,
+  patch: {
+    gift_aid_claim_batch_id: string;
+    relief_chest_delivered_at?: string | null;
+    relief_chest_delivered_to?: string | null;
+  }
+): Promise<void> {
+  const { error } = await db()
+    .from("meeting_collections")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", collectionId)
+    .eq("lodge_id", lodgeId);
+  if (error) throw error;
 }
 
 // ---------------------------------------------------------------------------
@@ -1436,6 +1770,8 @@ export async function createMemberDues(
     | "gift_aid_status"
     | "gift_aid_eligible_amount"
     | "waiver_reason"
+    | "is_advance"
+    | "advance_for_year_id"
   > &
     Partial<
       Pick<
@@ -1449,6 +1785,8 @@ export async function createMemberDues(
         | "gift_aid_status"
         | "gift_aid_eligible_amount"
         | "waiver_reason"
+        | "is_advance"
+        | "advance_for_year_id"
       >
     >
 ): Promise<MemberDues> {
@@ -1500,8 +1838,9 @@ export async function createMemberDuesInstalments(
   rows: Array<
     Omit<
       MemberDuesInstalment,
-      "id" | "lodge_id" | "created_at" | "updated_at"
-    >
+      "id" | "lodge_id" | "created_at" | "updated_at" | "mooov_payment_id" | "schedule_id"
+    > &
+      Partial<Pick<MemberDuesInstalment, "mooov_payment_id" | "schedule_id">>
   >
 ): Promise<MemberDuesInstalment[]> {
   if (rows.length === 0) return [];
@@ -1568,6 +1907,203 @@ export async function updateInstalment(
 }
 
 // ---------------------------------------------------------------------------
+// Dues schedules (saved-charge subscription state)
+// ---------------------------------------------------------------------------
+
+export type CreateDuesScheduleInput = {
+  member_id: string | null;
+  member_dues_id: string;
+  member_email: string;
+  customer_ref: string;
+  cadence: "monthly" | "quarterly";
+  split_strategy: DuesSplitStrategy;
+  auto_renew: boolean;
+  status?: DuesScheduleStatus;
+  next_charge_at?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+export async function createDuesSchedule(
+  lodgeId: string,
+  input: CreateDuesScheduleInput
+): Promise<DuesSchedule> {
+  const { data, error } = await db()
+    .from("dues_schedules")
+    .insert({
+      lodge_id: lodgeId,
+      member_id: input.member_id,
+      member_dues_id: input.member_dues_id,
+      member_email: input.member_email,
+      customer_ref: input.customer_ref,
+      cadence: input.cadence,
+      split_strategy: input.split_strategy,
+      auto_renew: input.auto_renew,
+      status: input.status ?? "pending",
+      next_charge_at: input.next_charge_at ?? null,
+      metadata: input.metadata ?? {},
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as DuesSchedule;
+}
+
+export async function getDuesSchedule(
+  id: string,
+  lodgeId: string
+): Promise<DuesSchedule | null> {
+  const { data, error } = await db()
+    .from("dues_schedules")
+    .select("*")
+    .eq("id", id)
+    .eq("lodge_id", lodgeId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as DuesSchedule | null) ?? null;
+}
+
+export async function getDuesSchedulesForMember(
+  lodgeId: string,
+  memberEmail: string
+): Promise<DuesSchedule[]> {
+  const { data, error } = await db()
+    .from("dues_schedules")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .eq("member_email", memberEmail)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as DuesSchedule[];
+}
+
+export async function getDuesSchedulesDue(
+  onOrBefore: string,
+  limit = 100
+): Promise<DuesSchedule[]> {
+  const { data, error } = await db()
+    .from("dues_schedules")
+    .select("*")
+    .in("status", ["active", "past_due"])
+    .lte("next_charge_at", onOrBefore)
+    .order("next_charge_at", { ascending: true })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []) as DuesSchedule[];
+}
+
+export async function listDuesSchedules(
+  lodgeId: string,
+  opts?: {
+    status?: DuesScheduleStatus | DuesScheduleStatus[];
+    memberEmail?: string;
+    limit?: number;
+  }
+): Promise<DuesSchedule[]> {
+  let query = db()
+    .from("dues_schedules")
+    .select("*")
+    .eq("lodge_id", lodgeId);
+
+  if (opts?.status) {
+    if (Array.isArray(opts.status)) {
+      query = query.in("status", opts.status);
+    } else {
+      query = query.eq("status", opts.status);
+    }
+  }
+  if (opts?.memberEmail) {
+    query = query.ilike("member_email", `%${opts.memberEmail}%`);
+  }
+
+  const { data, error } = await query
+    .order("created_at", { ascending: false })
+    .limit(opts?.limit ?? 500);
+  if (error) throw error;
+  return (data ?? []) as DuesSchedule[];
+}
+
+// Treasurer dashboard: count of schedules grouped by status. Returned
+// as a record keyed on DuesScheduleStatus with 0-fill for missing
+// statuses so callers can index without checks.
+export async function countDuesSchedulesByStatus(
+  lodgeId: string
+): Promise<Record<DuesScheduleStatus, number>> {
+  const { data, error } = await db()
+    .from("dues_schedules")
+    .select("status")
+    .eq("lodge_id", lodgeId);
+  if (error) throw error;
+
+  const counts: Record<DuesScheduleStatus, number> = {
+    pending: 0,
+    active: 0,
+    action_required: 0,
+    past_due: 0,
+    paused: 0,
+    cancelled: 0,
+    completed: 0,
+    active_stripe: 0,
+  };
+  for (const row of (data ?? []) as { status: DuesScheduleStatus }[]) {
+    if (row.status in counts) {
+      counts[row.status] += 1;
+    }
+  }
+  return counts;
+}
+
+export async function updateDuesSchedule(
+  id: string,
+  lodgeId: string,
+  updates: Partial<
+    Pick<
+      DuesSchedule,
+      | "status"
+      | "mooov_payment_method_id"
+      | "stripe_customer_id"
+      | "mooov_subscription_id"
+      | "consecutive_failures"
+      | "last_failure_code"
+      | "last_failure_category"
+      | "last_failure_at"
+      | "next_action_client_secret"
+      | "next_action_connected_account_id"
+      | "next_action_expires_at"
+      | "next_charge_at"
+      | "last_charged_at"
+      | "cancelled_at"
+      | "cancelled_by_actor"
+      | "auto_renew"
+      | "metadata"
+    >
+  >
+): Promise<DuesSchedule | null> {
+  const { data, error } = await db()
+    .from("dues_schedules")
+    .update(updates)
+    .eq("id", id)
+    .eq("lodge_id", lodgeId)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  return (data as DuesSchedule | null) ?? null;
+}
+
+export async function getMemberDuesById(
+  id: string,
+  lodgeId: string
+): Promise<MemberDues | null> {
+  const { data, error } = await db()
+    .from("member_dues")
+    .select("*")
+    .eq("id", id)
+    .eq("lodge_id", lodgeId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as MemberDues | null) ?? null;
+}
+
+// ---------------------------------------------------------------------------
 // Meeting collections and GASDS
 // ---------------------------------------------------------------------------
 
@@ -1593,8 +2129,22 @@ export async function createMeetingCollection(
   lodgeId: string,
   data: Omit<
     MeetingCollection,
-    "id" | "lodge_id" | "created_at" | "updated_at"
-  >
+    | "id"
+    | "lodge_id"
+    | "created_at"
+    | "updated_at"
+    | "gift_aid_claim_batch_id"
+    | "relief_chest_delivered_at"
+    | "relief_chest_delivered_to"
+  > &
+    Partial<
+      Pick<
+        MeetingCollection,
+        | "gift_aid_claim_batch_id"
+        | "relief_chest_delivered_at"
+        | "relief_chest_delivered_to"
+      >
+    >
 ): Promise<MeetingCollection> {
   const { data: row, error } = await db()
     .from("meeting_collections")
@@ -1688,6 +2238,24 @@ export async function getGuestsByRsvp(
     .eq("lodge_id", lodgeId);
   if (error) throw error;
   return data as EventGuest[];
+}
+
+/**
+ * Drop every event_guests row attached to a single RSVP. Used by the
+ * Mooov webhook when a checkout is abandoned: the speculative RSVP gets
+ * cancelled, and the placeholder guests we wrote in pre-checkout would
+ * otherwise linger in the table and pollute the dining list.
+ */
+export async function deleteEventGuestsByRsvp(
+  rsvpId: string,
+  lodgeId: string
+): Promise<void> {
+  const { error } = await db()
+    .from("event_guests")
+    .delete()
+    .eq("rsvp_id", rsvpId)
+    .eq("lodge_id", lodgeId);
+  if (error) throw error;
 }
 
 export async function getGuestsByEvent(
@@ -1824,6 +2392,8 @@ export async function createMember(
     | "annual_dues_waiver_reason"
     | "show_on_website"
     | "public_bio"
+    | "gift_aid_prompted_at"
+    | "gift_aid_consent_status"
   > &
     Partial<
       Pick<
@@ -1846,6 +2416,8 @@ export async function createMember(
         | "annual_dues_waiver_reason"
         | "show_on_website"
         | "public_bio"
+        | "gift_aid_prompted_at"
+        | "gift_aid_consent_status"
       >
     >
 ): Promise<Member> {
@@ -2353,7 +2925,32 @@ export async function getDonationsByEmail(
 
 export async function upsertLodgeDues(
   lodgeId: string,
-  data: Omit<LodgeDues, "id" | "lodge_id" | "created_at" | "updated_at">
+  data: Omit<
+    LodgeDues,
+    | "id"
+    | "lodge_id"
+    | "created_at"
+    | "updated_at"
+    | "enable_strategy_catch_up_lump"
+    | "enable_strategy_balloon"
+    | "enable_strategy_reslice"
+    | "auto_renew_default"
+    | "year_start_prompt_days"
+    | "catch_up_max_months"
+    | "advance_discount_percent"
+  > &
+    Partial<
+      Pick<
+        LodgeDues,
+        | "enable_strategy_catch_up_lump"
+        | "enable_strategy_balloon"
+        | "enable_strategy_reslice"
+        | "auto_renew_default"
+        | "year_start_prompt_days"
+        | "catch_up_max_months"
+        | "advance_discount_percent"
+      >
+    >
 ): Promise<LodgeDues> {
   const existing = await getLodgeDues(lodgeId);
   if (existing.length > 0) {
@@ -3600,13 +4197,17 @@ export async function enqueueJob(
 }
 
 export async function listJobs(
-  opts?: { lodgeId?: string; status?: JobStatus; limit?: number }
+  opts?: { lodgeId?: string | null; status?: JobStatus; limit?: number }
 ): Promise<Job[]> {
   let query = db()
     .from("jobs")
     .select("*")
     .order("created_at", { ascending: false });
-  if (opts?.lodgeId) query = query.eq("lodge_id", opts.lodgeId);
+  if (opts && opts.lodgeId === null) {
+    query = query.is("lodge_id", null);
+  } else if (opts?.lodgeId) {
+    query = query.eq("lodge_id", opts.lodgeId);
+  }
   if (opts?.status) query = query.eq("status", opts.status);
   if (opts?.limit) query = query.limit(opts.limit);
   const { data, error } = await query;

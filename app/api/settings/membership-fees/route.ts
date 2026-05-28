@@ -78,6 +78,16 @@ export async function PUT(request: NextRequest) {
       charitable_amount,
       charitable_label,
       gift_aid_enabled,
+      // Subscription / advance settings (migration 061). All optional;
+      // omitted fields fall back to migration defaults the next time
+      // the row is read.
+      enable_strategy_catch_up_lump,
+      enable_strategy_balloon,
+      enable_strategy_reslice,
+      auto_renew_default,
+      year_start_prompt_days,
+      catch_up_max_months,
+      advance_discount_percent,
     } = body;
 
     if (!name || amount === undefined) {
@@ -86,6 +96,21 @@ export async function PUT(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Clamp numeric inputs to migration check-constraints so a bad
+    // form value returns a clean 400 instead of a Postgres CHECK error.
+    const clampedYearStartPromptDays =
+      typeof year_start_prompt_days === "number"
+        ? Math.min(180, Math.max(1, Math.round(year_start_prompt_days)))
+        : undefined;
+    const clampedCatchUpMaxMonths =
+      typeof catch_up_max_months === "number"
+        ? Math.min(12, Math.max(1, Math.round(catch_up_max_months)))
+        : undefined;
+    const clampedAdvanceDiscount =
+      typeof advance_discount_percent === "number"
+        ? Math.min(50, Math.max(0, advance_discount_percent))
+        : undefined;
 
     const fees = await db.upsertLodgeDues(lodgeId, {
       name,
@@ -99,6 +124,27 @@ export async function PUT(request: NextRequest) {
       charitable_amount: Number(charitable_amount ?? 0),
       charitable_label: charitable_label ?? "Charitable portion",
       gift_aid_enabled: gift_aid_enabled ?? false,
+      ...(typeof enable_strategy_catch_up_lump === "boolean"
+        ? { enable_strategy_catch_up_lump }
+        : {}),
+      ...(typeof enable_strategy_balloon === "boolean"
+        ? { enable_strategy_balloon }
+        : {}),
+      ...(typeof enable_strategy_reslice === "boolean"
+        ? { enable_strategy_reslice }
+        : {}),
+      ...(typeof auto_renew_default === "boolean"
+        ? { auto_renew_default }
+        : {}),
+      ...(clampedYearStartPromptDays !== undefined
+        ? { year_start_prompt_days: clampedYearStartPromptDays }
+        : {}),
+      ...(clampedCatchUpMaxMonths !== undefined
+        ? { catch_up_max_months: clampedCatchUpMaxMonths }
+        : {}),
+      ...(clampedAdvanceDiscount !== undefined
+        ? { advance_discount_percent: clampedAdvanceDiscount }
+        : {}),
     });
 
     return NextResponse.json({ fees });

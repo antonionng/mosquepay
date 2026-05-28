@@ -69,6 +69,11 @@ export default function MemberSignupPage() {
             We&apos;ve sent a verification link to <strong className="text-dash-text">{email}</strong>.
             Please click the link to activate your account.
           </p>
+          <p className="mt-4 text-xs leading-relaxed text-dash-muted">
+            When you first sign in, we&apos;ll ask if you&apos;d like to set up
+            Gift Aid so we can claim an extra 25 percent on every donation
+            you make to the lodge.
+          </p>
           <Link href="/member/login">
             <Button variant="brand" className="mt-8">
               Back to sign in

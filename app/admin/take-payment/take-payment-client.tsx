@@ -3,13 +3,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { RotateCcw, ShieldAlert } from "lucide-react";
+import { CalendarPlus, CheckCircle2, RotateCcw, ShieldAlert } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TabBar } from "./components/tab-bar";
 import { ChargeTab, generateQrForUrl } from "./components/charge-tab";
 import { CashTab } from "./components/cash-tab";
 import { HistoryTab } from "./components/history-tab";
+import {
+  AdvanceDuesDialog,
+  type AdvanceDuesCashResult,
+  type AdvanceDuesQrResult,
+} from "./components/advance-dues-dialog";
 import type { ActiveSessionState } from "./components/active-session";
 import type {
   CategoryId,
@@ -123,6 +128,15 @@ export function TakePaymentClient({
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
+  // Advance dues dialog state. The dialog handles next-year resolution
+  // server-side via /api/admin/take-payment/advance-dues. On QR mint we
+  // promote the result into a regular ActiveSessionState so the existing
+  // Charge tab QR card renders it; on cash record we surface a
+  // dismissible green toast.
+  const [advanceOpen, setAdvanceOpen] = useState(false);
+  const [advanceCashToast, setAdvanceCashToast] =
+    useState<AdvanceDuesCashResult | null>(null);
+
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
     try {
@@ -146,6 +160,45 @@ export function TakePaymentClient({
     }
   }, [connected, loadHistory]);
 
+  const handleAdvanceQrReady = useCallback(
+    async (
+      result: AdvanceDuesQrResult,
+      member: { id: string; full_name: string; email: string | null }
+    ) => {
+      try {
+        const qrDataUrl = await generateQrForUrl(result.url);
+        setSession({
+          paymentId: result.payment_id,
+          url: result.url,
+          qrDataUrl,
+          amountMinor: Math.round(result.amount * 100),
+          currency: result.currency,
+          reference: "Advance dues",
+          description: "Advance dues for next year",
+          memberName: member.full_name,
+          giftAidEligible: false,
+          payerKind: "member",
+          payerEmail: member.email ?? null,
+          memberId: member.id,
+          category: "subscriptions",
+        });
+        setStatus(null);
+        setTab("charge");
+      } catch (err) {
+        console.error("advance dues QR mount failed", err);
+      }
+    },
+    [setTab]
+  );
+
+  const handleAdvanceCashRecorded = useCallback(
+    (result: AdvanceDuesCashResult) => {
+      setAdvanceCashToast(result);
+      void loadHistory();
+    },
+    [loadHistory]
+  );
+
   // Refresh history once a session reaches a terminal phase, so the
   // "Recent" tab shows the just-completed payment.
   useEffect(() => {
@@ -164,6 +217,20 @@ export function TakePaymentClient({
       if (!item.hosted_url) return;
       try {
         const qrDataUrl = await generateQrForUrl(item.hosted_url);
+        // Re-opening a QR from history: we don't know the original
+        // PayerSelection.kind, so we infer from member_id (member if
+        // present, otherwise guest if there's an email, otherwise
+        // anonymous). Category falls back to "general" if the stored
+        // string doesn't match a known CategoryId -- the on-screen GA
+        // nudge will simply not show, which is the right behaviour.
+        const knownCategory = CATEGORIES.find(
+          (c) => c.id === item.category,
+        )?.id as CategoryId | undefined;
+        const inferredKind: PayerSelection["kind"] = item.member_id
+          ? "member"
+          : item.paid_by_email || item.member_email
+            ? "guest"
+            : "anonymous";
         setSession({
           paymentId: item.payment_id,
           url: item.hosted_url,
@@ -174,6 +241,10 @@ export function TakePaymentClient({
           description: item.description ?? "",
           memberName: item.member_name,
           giftAidEligible: item.gift_aid_eligible,
+          payerKind: inferredKind,
+          payerEmail: item.member_email ?? item.paid_by_email ?? null,
+          memberId: item.member_id,
+          category: knownCategory ?? "general",
         });
         setStatus(null);
         setTab("charge");
@@ -230,6 +301,50 @@ export function TakePaymentClient({
 
   return (
     <Shell session={session} onReset={() => setSession(null)}>
+      {advanceCashToast ? (
+        <Card className="flex items-start gap-3 border-emerald-200 bg-emerald-50/70 p-3 text-sm text-emerald-900">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none" />
+          <div className="flex-1">
+            <div className="font-medium">
+              Advance dues recorded for {advanceCashToast.payer_name ?? "member"}
+            </div>
+            <div className="text-xs text-emerald-800">
+              {advanceCashToast.next_year_label} ·{" "}
+              £{(advanceCashToast.amount / 100).toFixed(2)} cash
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setAdvanceCashToast(null)}
+          >
+            Dismiss
+          </Button>
+        </Card>
+      ) : null}
+
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setAdvanceOpen(true)}
+        >
+          <CalendarPlus className="mr-2 h-4 w-4" />
+          Charge advance dues
+        </Button>
+      </div>
+
+      <AdvanceDuesDialog
+        open={advanceOpen}
+        onOpenChange={setAdvanceOpen}
+        members={members}
+        initialMemberId={
+          payer.kind === "member" ? payer.member.id : null
+        }
+        onQrReady={handleAdvanceQrReady}
+        onCashRecorded={handleAdvanceCashRecorded}
+      />
+
       <TabBar
         value={tab}
         onChange={(next) => setTab(next)}

@@ -20,6 +20,22 @@ import type {
 } from "./types";
 import { buildPayerPayload, displayPayerName } from "./payer-payload";
 
+/** Extract a best-effort email for a payer selection so we can pre-fill
+ *  the Gift Aid capture dialog post-payment. Anonymous payers naturally
+ *  return null because we have nothing to attribute. */
+function payerEmail(payer: PayerSelection): string | null {
+  switch (payer.kind) {
+    case "member":
+      return payer.member.email ?? null;
+    case "guest":
+      return payer.guest.email ?? null;
+    case "guest_inline":
+      return payer.draft.email ?? null;
+    default:
+      return null;
+  }
+}
+
 // Charge tab — live card/QR mint flow. The parent owns the active session
 // so "Show QR" from the History tab can drop a re-opened QR into this view
 // without prop-drilling a setter.
@@ -134,6 +150,10 @@ export function ChargeTab({
           description,
           memberName: displayPayerName(payer),
           giftAidEligible: false,
+          payerKind: payer.kind,
+          payerEmail: payerEmail(payer),
+          memberId: payer.kind === "member" ? payer.member.id : null,
+          category,
         });
         onSessionMinted?.();
       } catch (err) {

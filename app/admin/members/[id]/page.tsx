@@ -3,6 +3,7 @@ import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
 import { computeNextDuesForMember } from "@/lib/dues/next-due";
+import type { DuesSchedule, MemberDuesInstalment } from "@/lib/db/types";
 import { MemberDetailClient } from "./member-detail-client";
 
 export default async function AdminMemberDetailPage({
@@ -29,6 +30,7 @@ export default async function AdminMemberDetailPage({
         paymentHistory={JSON.parse(JSON.stringify(paymentHistory))}
         duesRecords={[]}
         nextDues={null}
+        subscription={null}
       />
     );
   }
@@ -45,6 +47,7 @@ export default async function AdminMemberDetailPage({
     offices,
     currentYear,
     lodgeDues,
+    schedules,
   ] = await Promise.all([
     db.getRsvpDietaryByEmail(member.email, lodgeId),
     db.getPaymentsByEmail(member.email, lodgeId),
@@ -52,6 +55,7 @@ export default async function AdminMemberDetailPage({
     db.listOfficerLadder(lodgeId),
     db.getCurrentMasonicYear(lodgeId),
     db.getLodgeDues(lodgeId),
+    db.getDuesSchedulesForMember(lodgeId, member.email),
   ]);
 
   const nextDues = computeNextDuesForMember({
@@ -63,6 +67,40 @@ export default async function AdminMemberDetailPage({
     annualDuesWaiverReason: member.annual_dues_waiver_reason ?? null,
   });
 
+  // Pick the most relevant subscription for the panel: prefer any
+  // active/needs-attention schedule over completed/cancelled history.
+  // Returned schedules from db.getDuesSchedulesForMember are already
+  // ordered created_at DESC.
+  const subscriptionPriority: Record<string, number> = {
+    action_required: 0,
+    past_due: 1,
+    paused: 2,
+    pending: 3,
+    active: 4,
+    active_stripe: 5,
+    completed: 6,
+    cancelled: 7,
+  };
+  const activeSchedule = [...schedules].sort(
+    (a, b) =>
+      (subscriptionPriority[a.status] ?? 99) -
+      (subscriptionPriority[b.status] ?? 99)
+  )[0] as DuesSchedule | undefined;
+
+  let subscription:
+    | {
+        schedule: DuesSchedule;
+        instalments: MemberDuesInstalment[];
+      }
+    | null = null;
+  if (activeSchedule) {
+    const instalments = await db.getInstalmentsForDues(
+      activeSchedule.member_dues_id,
+      lodgeId
+    );
+    subscription = { schedule: activeSchedule, instalments };
+  }
+
   return (
     <MemberDetailClient
       member={JSON.parse(JSON.stringify(member))}
@@ -71,6 +109,9 @@ export default async function AdminMemberDetailPage({
       duesRecords={JSON.parse(JSON.stringify(duesRecords))}
       offices={JSON.parse(JSON.stringify(offices))}
       nextDues={nextDues ? JSON.parse(JSON.stringify(nextDues)) : null}
+      subscription={
+        subscription ? JSON.parse(JSON.stringify(subscription)) : null
+      }
     />
   );
 }

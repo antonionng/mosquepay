@@ -61,6 +61,19 @@ export async function POST(request: NextRequest) {
       support_email: body.support_email?.trim() ?? null,
       support_phone: body.support_phone?.trim() ?? null,
       is_active: body.is_active !== false,
+      // Gift Aid / Relief Chest (migration 059). All optional on the
+      // wire so older API clients keep working; defaults match the DB.
+      gift_aid_default_mode:
+        body.gift_aid_default_mode === "digital" ||
+        body.gift_aid_default_mode === "paper" ||
+        body.gift_aid_default_mode === "both"
+          ? body.gift_aid_default_mode
+          : "both",
+      relief_chest_name: body.relief_chest_name?.trim() ?? null,
+      relief_chest_email: body.relief_chest_email?.trim() ?? null,
+      relief_chest_charity_number:
+        body.relief_chest_charity_number?.trim() ?? null,
+      hmrc_charity_reference: body.hmrc_charity_reference?.trim() ?? null,
     };
 
     if (isSupabaseConfigured()) {

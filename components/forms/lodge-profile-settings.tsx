@@ -49,6 +49,14 @@ type Lodge = {
   primary_color: string | null;
   secondary_color: string | null;
   is_active: boolean;
+  // Gift Aid / Relief Chest (migration 059). Drives both the per-meeting
+  // close workflow and the claim pack export. Treasurer-editable here so
+  // we don't need to SQL-poke the lodges table for each new lodge.
+  gift_aid_default_mode?: "digital" | "paper" | "both" | null;
+  relief_chest_name?: string | null;
+  relief_chest_email?: string | null;
+  relief_chest_charity_number?: string | null;
+  hmrc_charity_reference?: string | null;
 };
 
 type AdminLodgeContext = {
@@ -163,6 +171,13 @@ export function LodgeProfileSettings() {
         primary_color: lodgeForm.primary_color?.trim() || null,
         secondary_color: lodgeForm.secondary_color?.trim() || null,
         is_active: lodgeForm.is_active !== false,
+        gift_aid_default_mode: lodgeForm.gift_aid_default_mode ?? "both",
+        relief_chest_name: lodgeForm.relief_chest_name?.trim() || null,
+        relief_chest_email: lodgeForm.relief_chest_email?.trim() || null,
+        relief_chest_charity_number:
+          lodgeForm.relief_chest_charity_number?.trim() || null,
+        hmrc_charity_reference:
+          lodgeForm.hmrc_charity_reference?.trim() || null,
       };
       const res = await fetch("/api/lodges", {
         method: "POST",
@@ -431,6 +446,102 @@ export function LodgeProfileSettings() {
                     setLodgeForm((prev) => ({ ...prev, accessibility_notes: e.target.value }))
                   }
                   className="min-h-24 border-dash-border bg-dash-surface text-dash-text placeholder:text-dash-faint"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-dash-border bg-dash-surface-subtle p-4">
+              <h3 className="text-sm font-semibold text-dash-text">
+                Gift Aid &amp; Relief Chest
+              </h3>
+              <p className="mt-1 text-xs leading-5 text-dash-muted">
+                Tells LodgePay how to collect Gift Aid declarations and where
+                to forward the claim pack after each meeting close. Required
+                fields for the HMRC reclaim end up in MANIFEST.txt of every
+                downloaded pack.
+              </p>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs uppercase tracking-[0.16em] text-dash-faint">
+                    Default declaration capture
+                  </label>
+                  <Select
+                    value={lodgeForm.gift_aid_default_mode ?? "both"}
+                    onValueChange={(value) =>
+                      setLodgeForm((prev) => ({
+                        ...prev,
+                        gift_aid_default_mode: value as
+                          | "digital"
+                          | "paper"
+                          | "both",
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="border-dash-border bg-dash-surface text-dash-text">
+                      <SelectValue placeholder="Both digital and paper" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="both">
+                        Both digital and paper (recommended)
+                      </SelectItem>
+                      <SelectItem value="digital">
+                        Digital only (in-portal signature)
+                      </SelectItem>
+                      <SelectItem value="paper">
+                        Paper only (scan signed slip)
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="mt-1 text-[11px] leading-snug text-dash-muted">
+                    Paper-friendly lodges (Lester&apos;s rule) should pick
+                    &quot;Both&quot; or &quot;Paper only&quot; so the on-the-day
+                    capture flow stays in front of treasurers.
+                  </p>
+                </div>
+                <Input
+                  placeholder="Relief Chest name (e.g. Provincial Grand Charity)"
+                  value={lodgeForm.relief_chest_name ?? ""}
+                  onChange={(e) =>
+                    setLodgeForm((prev) => ({
+                      ...prev,
+                      relief_chest_name: e.target.value,
+                    }))
+                  }
+                  className="border-dash-border bg-dash-surface text-dash-text placeholder:text-dash-faint"
+                />
+                <Input
+                  placeholder="Relief Chest email (where you forward the pack)"
+                  type="email"
+                  value={lodgeForm.relief_chest_email ?? ""}
+                  onChange={(e) =>
+                    setLodgeForm((prev) => ({
+                      ...prev,
+                      relief_chest_email: e.target.value,
+                    }))
+                  }
+                  className="border-dash-border bg-dash-surface text-dash-text placeholder:text-dash-faint"
+                />
+                <Input
+                  placeholder="Relief Chest charity number"
+                  value={lodgeForm.relief_chest_charity_number ?? ""}
+                  onChange={(e) =>
+                    setLodgeForm((prev) => ({
+                      ...prev,
+                      relief_chest_charity_number: e.target.value,
+                    }))
+                  }
+                  className="border-dash-border bg-dash-surface text-dash-text placeholder:text-dash-faint"
+                />
+                <Input
+                  placeholder="HMRC charity reference (e.g. XR12345)"
+                  value={lodgeForm.hmrc_charity_reference ?? ""}
+                  onChange={(e) =>
+                    setLodgeForm((prev) => ({
+                      ...prev,
+                      hmrc_charity_reference: e.target.value,
+                    }))
+                  }
+                  className="border-dash-border bg-dash-surface text-dash-text placeholder:text-dash-faint"
                 />
               </div>
             </div>

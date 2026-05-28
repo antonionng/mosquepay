@@ -47,6 +47,8 @@ type ClaimBatch = {
   period_end: string;
   status: "draft" | "exported" | "filed" | "paid";
   donation_count: number;
+  declarations_count?: number;
+  pack_generated_at?: string | null;
   eligible_amount: number;
   reclaimable_amount: number;
   exported_at: string | null;
@@ -388,7 +390,20 @@ export function GiftAidClient({
                   <p className="mt-2 text-sm text-dash-text">
                     £{claim.reclaimable_amount.toFixed(2)} reclaimable from {claim.donation_count} donations
                   </p>
+                  {typeof claim.declarations_count === "number" && claim.declarations_count > 0 ? (
+                    <p className="mt-1 text-xs text-emerald-700">
+                      Includes {claim.declarations_count} declaration
+                      {claim.declarations_count === 1 ? "" : "s"} for the Relief Chest
+                    </p>
+                  ) : null}
                   <div className="mt-3 flex flex-wrap gap-2">
+                    <a
+                      href={`/api/admin/gift-aid/claims/${claim.id}/pack`}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-dash-border bg-dash-surface px-2.5 py-1 text-xs font-medium text-dash-text hover:bg-dash-surface-subtle"
+                    >
+                      <Download className="h-3 w-3" />
+                      Download pack (ZIP)
+                    </a>
                     {claim.status === "draft" ? (
                       <button
                         type="button"

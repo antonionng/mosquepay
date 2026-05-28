@@ -33,6 +33,7 @@ import {
   Globe,
   UserPlus,
   Sparkles,
+  Repeat,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -49,6 +50,7 @@ const nav = [
   { href: "/admin/payments", label: "Payments", icon: CreditCard, permission: "payments:write" },
   { href: "/admin/take-payment", label: "Take payment", icon: ScanLine, permission: "payments:write" },
   { href: "/admin/treasurer", label: "Treasurer", icon: Wallet, permission: "payments:write" },
+  { href: "/admin/dues/schedules", label: "Subscriptions", icon: Repeat, permission: "payments:write" },
   { href: "/admin/charity", label: "Charity", icon: Heart, permission: "charity:write", flag: "charity_campaigns" },
   { href: "/admin/donations", label: "Donations", icon: Gift, permission: "charity:write", flag: "gift_aid" },
   { href: "/admin/gift-aid", label: "Gift Aid", icon: Shield, permission: "charity:write", flag: "gift_aid" },

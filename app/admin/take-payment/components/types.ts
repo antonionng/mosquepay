@@ -59,11 +59,21 @@ export type StatusResponse = {
   currency: string;
   failure_reason: string | null;
   projected: {
+    /** LP-side payments.id (NOT the mooov payment_id). Used for downstream
+     *  calls like /api/admin/take-payment/[id]/gift-aid-attach. */
     id: string;
     total: number;
     refunded_total: number;
     completed_at: string | null;
+    charity_amount: number;
+    category: string | null;
+    user_name: string | null;
+    user_email: string | null;
+    user_id: string | null;
   } | null;
+  /** True when a donation row exists with a non-null gift_aid_declaration_id. */
+  gift_aid_eligible: boolean;
+  gift_aid_declaration_id: string | null;
 };
 
 export type MintResponse =
@@ -132,18 +142,81 @@ export type HistoryItem = {
   payment_method: string | null;
 };
 
+/**
+ * Categories shown in the take-payment "Extras" picker.
+ *
+ * `giftAidable` marks the lines HMRC will accept as donations under the
+ * Gift Aid scheme. Dining and raffle tickets are explicitly NOT eligible
+ * (they're "benefits in return" under HMRC rules); meeting fees and
+ * subscriptions are member dues, not donations. `explainer` is the
+ * one-line note shown under the dropdown so the treasurer sees why.
+ */
 export const CATEGORIES = [
-  { id: "general", label: "General lodge payment" },
-  { id: "meeting_fee", label: "Meeting fee" },
-  { id: "guest_ticket", label: "Guest ticket" },
-  { id: "dining", label: "Dining / festive board" },
-  { id: "charity", label: "Charity collection" },
-  { id: "raffle", label: "Raffle ticket strips" },
-  { id: "subscriptions", label: "Subscriptions / dues top-up" },
-  { id: "other", label: "Other" },
+  {
+    id: "general",
+    label: "General lodge payment",
+    giftAidable: false,
+    explainer:
+      "General lodge income (admin, miscellaneous). Not a charitable donation.",
+  },
+  {
+    id: "meeting_fee",
+    label: "Meeting fee",
+    giftAidable: false,
+    explainer: "Per-meeting dues. Member receives a benefit, not Gift Aid eligible.",
+  },
+  {
+    id: "guest_ticket",
+    label: "Guest ticket",
+    giftAidable: false,
+    explainer: "Guest pays for attendance/dining. Not a donation under HMRC rules.",
+  },
+  {
+    id: "dining",
+    label: "Dining / festive board",
+    giftAidable: false,
+    explainer: "Dining is a benefit in return, so not eligible for Gift Aid.",
+  },
+  {
+    id: "charity",
+    label: "Charity collection",
+    giftAidable: true,
+    explainer:
+      "Voluntary donation to a registered Masonic charity. Eligible for Gift Aid with a declaration.",
+  },
+  {
+    id: "raffle",
+    label: "Raffle ticket strips",
+    giftAidable: false,
+    explainer:
+      "Raffle entries are a payment for a chance to win, so HMRC excludes them from Gift Aid.",
+  },
+  {
+    id: "subscriptions",
+    label: "Subscriptions / dues top-up",
+    giftAidable: false,
+    explainer: "Subscriptions are member dues, not donations.",
+  },
+  {
+    id: "other",
+    label: "Other",
+    giftAidable: false,
+    explainer: "Use a more specific category if you want this to count towards Gift Aid.",
+  },
 ] as const;
 
 export type CategoryId = (typeof CATEGORIES)[number]["id"];
+
+export const CATEGORY_BY_ID: Record<
+  CategoryId,
+  (typeof CATEGORIES)[number]
+> = CATEGORIES.reduce(
+  (acc, cat) => {
+    acc[cat.id] = cat;
+    return acc;
+  },
+  {} as Record<CategoryId, (typeof CATEGORIES)[number]>,
+);
 
 export const PRESET_AMOUNTS = [1, 2, 5, 10, 20, 50, 100] as const;
 

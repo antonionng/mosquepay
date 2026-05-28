@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+import { MemberSubscriptionPanel } from "@/components/admin/member-subscription-panel";
 import {
   Dialog,
   DialogContent,
@@ -150,6 +151,11 @@ interface NextDuesSummary {
   waiverReason?: string | null;
 }
 
+interface SubscriptionData {
+  schedule: import("@/lib/db/types").DuesSchedule;
+  instalments: import("@/lib/db/types").MemberDuesInstalment[];
+}
+
 interface Props {
   member: Member;
   dietaryHistory: DietaryEntry[];
@@ -157,6 +163,7 @@ interface Props {
   duesRecords: DuesEntry[];
   offices?: OfficeRung[];
   nextDues: NextDuesSummary | null;
+  subscription?: SubscriptionData | null;
 }
 
 function buildEditForm(member: Member) {
@@ -222,6 +229,7 @@ export function MemberDetailClient({
   duesRecords: initialDues,
   offices: initialOffices = [],
   nextDues,
+  subscription = null,
 }: Props) {
   const router = useRouter();
   const [member, setMember] = useState(initialMember);
@@ -1198,6 +1206,14 @@ export function MemberDetailClient({
             )}
           </div>
         </div>
+
+        {subscription ? (
+          <MemberSubscriptionPanel
+            schedule={subscription.schedule}
+            instalments={subscription.instalments}
+            memberName={member.full_name}
+          />
+        ) : null}
 
         <div className="rounded-2xl border border-dash-border bg-dash-surface shadow-sm">
           <div className="border-b border-dash-border px-6 py-4">

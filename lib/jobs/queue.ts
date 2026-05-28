@@ -62,6 +62,41 @@ const HANDLERS: Record<string, Handler> = {
     const { generateWelfareAlerts } = await import("@/lib/welfare/alerts");
     await generateWelfareAlerts(job.lodge_id);
   },
+  // Daily cron: drives the saved-charge subscription cycles. Mooov-side
+  // contract: 2026-05-28 reply, task L1.3. The handler scans for
+  // dues_schedules due today across ALL lodges in a single pass.
+  // payload.day is just an idempotency stamp; lodge_id is intentionally
+  // null on the job row.
+  "dues.schedule.charge": async (_job) => {
+    const { runDuesScheduleCharge } = await import(
+      "@/lib/jobs/handlers/dues-schedule-charge"
+    );
+    const summary = await runDuesScheduleCharge();
+    console.log("dues.schedule.charge summary", summary);
+  },
+  // Daily cron: ensures member_dues rows exist for the current masonic
+  // year for every active member, the day after the year flips. Audit
+  // entries flag schedules that need rolling forward (auto_renew=true
+  // schedules that completed last year). v1: just flags; v2: actually
+  // re-creates the schedule against the new dues row.
+  "dues.year_start_create": async (_job) => {
+    const { runDuesYearStartCreate } = await import(
+      "@/lib/jobs/handlers/dues-year-start"
+    );
+    const summary = await runDuesYearStartCreate();
+    console.log("dues.year_start_create summary", summary);
+  },
+  // Daily cron: emails members in the run-up to the year flip so they
+  // can prepay or set up monthly before dues fall due. Lead time comes
+  // from lodge_dues.year_start_prompt_days. Idempotent on
+  // (year_id, member_email) via audit_log dedup.
+  "dues.year_start_prompt": async (_job) => {
+    const { runDuesYearStartPrompt } = await import(
+      "@/lib/jobs/handlers/dues-year-start"
+    );
+    const summary = await runDuesYearStartPrompt();
+    console.log("dues.year_start_prompt summary", summary);
+  },
 };
 
 /**
@@ -75,6 +110,33 @@ async function scheduleRecurringJobs(): Promise<void> {
   const dayKey = now.toISOString().slice(0, 10);
   const isMonday = now.getUTCDay() === 1;
   const weekKey = isMonday ? dayKey : null;
+
+  // Global (lodge_id = null) daily crons. Each handler scans all lodges
+  // in a single pass so we only need ONE job row per day, not one per
+  // lodge. payload.day is the dedup key.
+  const recentGlobal = await db.listJobs({ lodgeId: null, limit: 100 });
+  const globalJobsToday: Array<{ jobType: string }> = [
+    { jobType: "dues.schedule.charge" },
+    { jobType: "dues.year_start_create" },
+    { jobType: "dues.year_start_prompt" },
+  ];
+  for (const { jobType } of globalJobsToday) {
+    const already = recentGlobal.some(
+      (job) =>
+        job.job_type === jobType &&
+        (job.payload as { day?: string } | null)?.day === dayKey
+    );
+    if (!already) {
+      await db.enqueueJob({
+        lodge_id: null,
+        job_type: jobType,
+        payload: { day: dayKey },
+        scheduled_at: now.toISOString(),
+        max_attempts: 3,
+        created_by_admin_user_id: null,
+      });
+    }
+  }
 
   for (const lodge of lodges) {
     const recent = await db.listJobs({ lodgeId: lodge.id, limit: 50 });

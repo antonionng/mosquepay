@@ -56,6 +56,18 @@ export type Lodge = {
   custom_domain_verification_token: string | null;
   accepts_self_registration: boolean;
   current_charity_campaign_id: string | null;
+  /**
+   * Gift Aid capture mode for this lodge (migration 059).
+   *   - `digital`: member portal self-serve only.
+   *   - `paper`:   admin captures paper declarations, members are pointed at
+   *                the printable form.
+   *   - `both`:    member portal AND admin paper-upload paths are surfaced.
+   */
+  gift_aid_default_mode: "digital" | "paper" | "both";
+  /** Where to email the per-meeting Gift Aid claim pack (Relief Chest). */
+  relief_chest_email: string | null;
+  relief_chest_charity_number: string | null;
+  hmrc_charity_reference: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -327,6 +339,14 @@ export type Event = {
   summons_approved_at: string | null;
   summons_approved_by_email: string | null;
   summons_last_sent_at: string | null;
+  /**
+   * Per-meeting close (migration 059). When a treasurer hits "Close
+   * meeting and send Gift Aid" we stamp these and create a same-day
+   * Gift Aid claim batch for everything attributed to this event_id.
+   */
+  meeting_closed_at: string | null;
+  meeting_closed_by_email: string | null;
+  meeting_close_notes: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -527,8 +547,58 @@ export type GiftAidDeclaration = {
   retained_until: string | null;
   revoked_at: string | null;
   revoked_reason: string | null;
+  // Tamper-evident evidence (migration 059). Both digital and paper
+  // declarations carry an artefact: paper is the scanned wet-ink slip,
+  // digital is a server-rendered HTML/PDF snapshot of the e-signed form.
+  // The SHA-256 lets an auditor verify the stored file has not been
+  // swapped after the fact.
+  evidence_source: "digital" | "paper" | "verbal" | "import_legacy";
+  evidence_storage_bucket: string | null;
+  evidence_storage_path: string | null;
+  evidence_sha256: string | null;
+  evidence_size_bytes: number | null;
+  evidence_mime_type: string | null;
+  evidence_uploaded_at: string | null;
+  evidence_uploaded_by_email: string | null;
+  paper_received_date: string | null;
+  paper_filing_reference: string | null;
+  digital_signature_ip: string | null;
+  digital_signature_user_agent: string | null;
+  digital_declaration_text_snapshot: string | null;
+  member_id: string | null;
   created_at: string;
   updated_at: string;
+};
+
+/**
+ * Append-only audit event for a Gift Aid declaration. The events table has
+ * no UPDATE/DELETE grants and a row-level trigger that refuses mutation, so
+ * once a row lands here it is the source of truth for "what happened".
+ */
+export type GiftAidDeclarationEvent = {
+  id: string;
+  lodge_id: string;
+  declaration_id: string;
+  event_type:
+    | "created_digital"
+    | "created_paper"
+    | "evidence_uploaded"
+    | "evidence_replaced"
+    | "evidence_downloaded"
+    | "address_updated"
+    | "revoked"
+    | "reinstated"
+    | "imported"
+    | "printed_pdf";
+  actor_kind: "member" | "admin" | "platform" | "system";
+  actor_email: string | null;
+  actor_ip: string | null;
+  actor_user_agent: string | null;
+  before_state: Record<string, unknown> | null;
+  after_state: Record<string, unknown> | null;
+  evidence_sha256: string | null;
+  notes: string | null;
+  created_at: string;
 };
 
 export type LodgeSubscription = {
@@ -632,6 +702,13 @@ export type LodgeDues = {
   charitable_amount: number;
   charitable_label: string;
   gift_aid_enabled: boolean;
+  enable_strategy_catch_up_lump: boolean;
+  enable_strategy_balloon: boolean;
+  enable_strategy_reslice: boolean;
+  auto_renew_default: boolean;
+  year_start_prompt_days: number;
+  catch_up_max_months: number;
+  advance_discount_percent: number;
   created_at: string;
   updated_at: string;
 };
@@ -661,6 +738,8 @@ export type MemberDues = {
   is_pro_rata: boolean;
   full_year_amount: number | null;
   waiver_reason: string | null;
+  is_advance: boolean;
+  advance_for_year_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -677,6 +756,55 @@ export type MemberDuesInstalment = {
   paid_at: string | null;
   reminder_sent_at: string | null;
   payment_reference: string | null;
+  mooov_payment_id: string | null;
+  schedule_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DuesSplitStrategy =
+  | "pro_rata"
+  | "even_full_year"
+  | "catch_up_lump_then_monthly"
+  | "monthly_then_balloon"
+  | "reslice_remaining";
+
+export type DuesScheduleStatus =
+  | "pending"
+  | "active"
+  | "action_required"
+  | "past_due"
+  | "paused"
+  | "cancelled"
+  | "completed"
+  | "active_stripe";
+
+export type DuesSchedule = {
+  id: string;
+  lodge_id: string;
+  member_id: string | null;
+  member_dues_id: string;
+  member_email: string;
+  customer_ref: string;
+  mooov_payment_method_id: string | null;
+  stripe_customer_id: string | null;
+  mooov_subscription_id: string | null;
+  cadence: "monthly" | "quarterly";
+  split_strategy: DuesSplitStrategy;
+  auto_renew: boolean;
+  status: DuesScheduleStatus;
+  consecutive_failures: number;
+  last_failure_code: string | null;
+  last_failure_category: string | null;
+  last_failure_at: string | null;
+  next_action_client_secret: string | null;
+  next_action_connected_account_id: string | null;
+  next_action_expires_at: string | null;
+  next_charge_at: string | null;
+  last_charged_at: string | null;
+  cancelled_at: string | null;
+  cancelled_by_actor: string | null;
+  metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 };
@@ -698,6 +826,14 @@ export type MeetingCollection = {
   gasds_tax_year: string | null;
   notes: string | null;
   recorded_by_email: string | null;
+  /**
+   * Set by the per-meeting close flow (migration 059) when the meeting
+   * collection has been rolled into a Gift Aid claim batch for the same
+   * date. Lets the meeting detail page show "submitted to Relief Chest".
+   */
+  gift_aid_claim_batch_id: string | null;
+  relief_chest_delivered_at: string | null;
+  relief_chest_delivered_to: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -733,8 +869,28 @@ export type GiftAidClaimBatch = {
   paid_at: string | null;
   notes: string | null;
   created_by_email: string | null;
+  /**
+   * Number of Gift Aid declarations bundled into this pack (migration
+   * 060). Set at batch creation by the close flow; updated only when an
+   * additional declaration is manually attached afterwards. UI uses this
+   * to surface "X new declarations" without joining.
+   */
+  declarations_count: number;
+  /** Last time someone downloaded the full pack ZIP, for audit. */
+  pack_generated_at: string | null;
+  pack_generated_by_email: string | null;
   created_at: string;
   updated_at: string;
+};
+
+/** Per-batch linkage of a declaration that was included in the claim pack. */
+export type GiftAidClaimDeclaration = {
+  id: string;
+  lodge_id: string;
+  claim_batch_id: string;
+  gift_aid_declaration_id: string;
+  inclusion_reason: "new_in_window" | "donor_in_batch" | "manual";
+  created_at: string;
 };
 
 export type GiftAidClaimItem = {
@@ -1255,6 +1411,21 @@ export type Member = {
   public_bio: string | null;
   archived_at: string | null;
   archived_reason: string | null;
+  /**
+   * Set the first time we show a member the Gift Aid onboarding prompt
+   * (migration 059). After this is non-null, the portal degrades the
+   * full-screen modal to a dismissible banner.
+   */
+  gift_aid_prompted_at: string | null;
+  /**
+   * Member-level cache of Gift Aid posture. `unknown` until they answer,
+   * `declared` when an active declaration exists for this member, and
+   * `declined` when they have explicitly opted out (still surfaces a
+   * "change your mind" link but no banner). Source of truth remains
+   * `gift_aid_declarations`; this column is a denormalised hint for the
+   * banner and the dashboard counters.
+   */
+  gift_aid_consent_status: "unknown" | "declared" | "declined";
   created_at: string;
   updated_at: string;
 };

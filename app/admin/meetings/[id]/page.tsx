@@ -46,6 +46,13 @@ export default async function AdminMeetingDetailPage({
       ? await db.getRsvpsByEventId(id, lodgeId)
       : [];
 
+  // Guests are saved into a separate `event_guests` table at RSVP time
+  // (see /api/summons/access and /api/payments/create-checkout-session).
+  // Without this load the admin page can only show the count, not the
+  // actual names/dietary the brother typed in.
+  const eventGuests =
+    lodgeId && !useMock ? await db.getGuestsByEvent(id, lodgeId) : [];
+
   let summons: Awaited<ReturnType<typeof db.getEventSummons>> | null = null;
   let sends: Awaited<ReturnType<typeof db.listEventSummonsSends>> = [];
   if (lodgeId) {
@@ -115,6 +122,89 @@ export default async function AdminMeetingDetailPage({
   const lodgeFinance = bucketTotals(lodgePaymentsAll);
   const lodgeAllTimeTotal =
     lodgeFinance.succeededTotal + lodgeFinance.pendingTotal;
+
+  // Per-meeting Gift Aid close state (migration 059). Donor-linked donations
+  // for this event are what the per-meeting batch will sweep. Treasurer sees
+  // the totals before they hit Close. Migration 060 adds a preview of how
+  // many new declarations will ship to UGLE with the pack.
+  const eventDonations =
+    lodgeId && !useMock ? await db.getDonationsByEvent(id, lodgeId) : [];
+  const charityDonorAmount = eventDonations.reduce(
+    (sum, d) => sum + Number(d.amount ?? 0),
+    0,
+  );
+
+  // Compute "new declarations since previous batch" for the preview UI.
+  // We use the same lib that the close endpoint will use at submit time
+  // so the preview matches what actually gets sent.
+  let newDeclarationsPreview = 0;
+  let closedBatchId: string | null = null;
+  let closedBatchDeclarationsCount = 0;
+  if (lodgeId && !useMock) {
+    try {
+      const { resolveDeclarationsForBatch } = await import(
+        "@/lib/gift-aid/new-declarations"
+      );
+      const previewBatch = {
+        created_at: new Date().toISOString(),
+        id: "preview",
+      };
+      const preview = await resolveDeclarationsForBatch({
+        lodgeId,
+        newBatch: previewBatch,
+        donorDeclarationIds: eventDonations
+          .map((d) => d.gift_aid_declaration_id)
+          .filter((id): id is string => Boolean(id)),
+      });
+      newDeclarationsPreview = preview.links.length;
+    } catch {
+      /* non-fatal: panel still renders without preview */
+    }
+    // If the meeting is already closed, surface the resulting batch + the
+    // declarations count on the panel so the treasurer can download.
+    const meetingClosed =
+      "meeting_closed_at" in event
+        ? ((event as { meeting_closed_at: string | null })
+            .meeting_closed_at ?? null)
+        : null;
+    if (meetingClosed) {
+      try {
+        const collections = await db.getMeetingCollections(lodgeId, {
+          eventId: id,
+        });
+        const collectionWithBatch = collections.find(
+          (c) => c.gift_aid_claim_batch_id,
+        );
+        if (collectionWithBatch?.gift_aid_claim_batch_id) {
+          closedBatchId = collectionWithBatch.gift_aid_claim_batch_id;
+          const batches = await db.getGiftAidClaimBatches(lodgeId);
+          const batch = batches.find((b) => b.id === closedBatchId);
+          closedBatchDeclarationsCount = batch?.declarations_count ?? 0;
+        }
+      } catch {
+        /* non-fatal */
+      }
+    }
+  }
+
+  const closeState = {
+    meeting_closed_at:
+      "meeting_closed_at" in event
+        ? ((event as { meeting_closed_at: string | null }).meeting_closed_at ??
+          null)
+        : null,
+    meeting_closed_by_email:
+      "meeting_closed_by_email" in event
+        ? ((event as { meeting_closed_by_email: string | null })
+            .meeting_closed_by_email ?? null)
+        : null,
+    charity_amount: charityDonorAmount,
+    charity_count: eventDonations.length,
+    new_declarations_preview: newDeclarationsPreview,
+    closed_batch_id: closedBatchId,
+    closed_batch_declarations_count: closedBatchDeclarationsCount,
+    currency: "GBP",
+  };
 
   const readiness = getMeetingReadiness({
     event_date: event.event_date,
@@ -187,6 +277,8 @@ export default async function AdminMeetingDetailPage({
     <MeetingDetailClient
       meeting={JSON.parse(JSON.stringify(event))}
       rsvps={JSON.parse(JSON.stringify(rsvps))}
+      guests={JSON.parse(JSON.stringify(eventGuests))}
+      payments={JSON.parse(JSON.stringify(eventPayments))}
       readiness={JSON.parse(JSON.stringify(readiness))}
       summons={
         summons
@@ -215,6 +307,7 @@ export default async function AdminMeetingDetailPage({
         lodgeAllTime: lodgeAllTimeTotal,
         currency: "GBP",
       }}
+      closeState={closeState}
     />
   );
 }

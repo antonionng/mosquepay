@@ -26,6 +26,8 @@ import type {
   PayerSelection,
 } from "./types";
 import { buildPayerPayload, displayPayerName } from "./payer-payload";
+import { GiftAidCaptureDialog } from "./gift-aid-capture-dialog";
+import { CATEGORY_BY_ID } from "./types";
 
 // Cash tab — treasurer-recorded cash entry.
 //
@@ -38,11 +40,17 @@ import { buildPayerPayload, displayPayerName } from "./payer-payload";
 const VOID_WINDOW_MS = 5 * 60 * 1000;
 
 type ConfirmationState = {
+  /** Mooov payment_id; used as the human-facing ref on the success card. */
   paymentId: string;
+  /** LP-side public.payments.id; required by /gift-aid-attach which looks
+   *  up via getPaymentById. Distinct from the mooov id. */
+  ledgerPaymentId: string;
   amountMinor: number;
   currency: string;
   payerName: string | null;
+  payerEmail: string | null;
   payerKind: PayerSelection["kind"];
+  memberId: string | null;
   giftAidEligible: boolean;
   loggedAt: number;
   category: CategoryId;
@@ -98,6 +106,8 @@ export function CashTab({
   // fat-fingered £200 instead of £20. QR side has the visible amount the
   // payer sees, so it's far less likely to be a typo.
   const [pendingHighValueConfirm, setPendingHighValueConfirm] = useState(false);
+  const [giftAidCaptureOpen, setGiftAidCaptureOpen] = useState(false);
+  const [giftAidCaptured, setGiftAidCaptured] = useState(false);
 
   // Tick once a second while a confirmation is showing so the undo countdown
   // re-renders. Drops when confirmation is null.
@@ -122,6 +132,8 @@ export function CashTab({
     setError(null);
     setConfirmation(null);
     setPendingHighValueConfirm(false);
+    setGiftAidCaptured(false);
+    setGiftAidCaptureOpen(false);
     clientTokenRef.current = newClientToken();
     // Keep category sticky — treasurers logging a row of cash payments
     // usually want the same category (e.g. raffle, dining) without
@@ -170,10 +182,14 @@ export function CashTab({
       }
       setConfirmation({
         paymentId: body.payment_id,
+        ledgerPaymentId: body.ledger_payment_id,
         amountMinor: body.amount,
         currency: body.currency,
         payerName: body.payer_name ?? body.member_name ?? displayPayerName(payer),
+        payerEmail: body.payer_email ?? null,
         payerKind: payer.kind,
+        memberId:
+          payer.kind === "member" ? payer.member.id ?? null : null,
         giftAidEligible: body.gift_aid_eligible,
         loggedAt: Date.now(),
         category,
@@ -262,7 +278,7 @@ export function CashTab({
                 {confirmation.payerName}
               </Badge>
             ) : null}
-            {confirmation.giftAidEligible ? (
+            {confirmation.giftAidEligible || giftAidCaptured ? (
               <Badge variant="success" className="gap-1">
                 <HeartHandshake className="h-3 w-3" />
                 Gift Aid auto-logged
@@ -273,6 +289,29 @@ export function CashTab({
             Ref: {confirmation.paymentId}
           </p>
         </div>
+
+        {CATEGORY_BY_ID[confirmation.category]?.giftAidable &&
+        confirmation.payerKind !== "anonymous" &&
+        !confirmation.giftAidEligible &&
+        !giftAidCaptured ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-sm text-amber-900">
+            <p className="font-medium">No Gift Aid declaration on file</p>
+            <p className="mt-1 text-xs text-amber-800">
+              If the donor is a UK taxpayer, capture the paper slip now and
+              we&apos;ll add a 25 percent reclaim to this £
+              {(confirmation.amountMinor / 100).toFixed(2)}.
+            </p>
+            <Button
+              size="sm"
+              variant="primary"
+              className="mt-2"
+              onClick={() => setGiftAidCaptureOpen(true)}
+            >
+              <HeartHandshake className="mr-2 h-4 w-4" />
+              Add Gift Aid declaration
+            </Button>
+          </div>
+        ) : null}
         <div className="flex flex-wrap justify-center gap-2">
           <Button size="lg" onClick={reset}>
             <RotateCcw className="mr-2 h-5 w-5" />
@@ -303,6 +342,21 @@ export function CashTab({
         {error ? (
           <p className="text-center text-xs text-red-700">{error}</p>
         ) : null}
+        <GiftAidCaptureDialog
+          open={giftAidCaptureOpen}
+          onOpenChange={setGiftAidCaptureOpen}
+          paymentId={confirmation.ledgerPaymentId}
+          payer={{
+            kind: confirmation.payerKind === "anonymous" ? "anonymous" : confirmation.payerKind === "member" ? "member" : "guest",
+            memberId: confirmation.memberId,
+            payerName: confirmation.payerName,
+            payerEmail: confirmation.payerEmail,
+          }}
+          onCaptured={() => {
+            setGiftAidCaptured(true);
+            onLogged();
+          }}
+        />
       </Card>
     );
   }

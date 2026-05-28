@@ -5,6 +5,7 @@ import { MemberSidebar } from "@/components/layout/member-sidebar";
 import { MemberBottomTabs } from "@/components/layout/member-bottom-tabs";
 import { MemberTopBar } from "@/components/layout/member-top-bar";
 import { PwaBootstrapper } from "@/components/member/pwa-bootstrapper";
+import { GiftAidOnboarding } from "@/components/member/gift-aid-onboarding";
 
 export function MemberLayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -36,6 +37,7 @@ export function MemberLayoutWrapper({ children }: { children: React.ReactNode })
         <main
           className="flex-1 px-4 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-4 sm:p-6 lg:p-8 lg:pb-8"
         >
+          <GiftAidOnboarding />
           {children}
         </main>
       </div>

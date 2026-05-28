@@ -4,14 +4,21 @@ import { useState } from "react";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatDate } from "@/lib/utils";
-import { CATEGORIES, type CategoryId, type EventOption } from "./types";
+import {
+  CATEGORIES,
+  CATEGORY_BY_ID,
+  type CategoryId,
+  type EventOption,
+} from "./types";
 
 // Collapsible "extras" panel: meeting link, category, reference, receipt
 // note. Hidden by default to keep the entry form to the essentials — most
@@ -109,13 +116,33 @@ export function ExtrasSection({
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
-                {CATEGORIES.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.label}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  <SelectLabel>Gift Aid eligible</SelectLabel>
+                  {CATEGORIES.filter((c) => c.giftAidable).map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+                <SelectGroup>
+                  <SelectLabel>Not Gift Aid eligible</SelectLabel>
+                  {CATEGORIES.filter((c) => !c.giftAidable).map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
+            <p
+              className={`text-xs leading-snug ${
+                CATEGORY_BY_ID[category]?.giftAidable
+                  ? "text-emerald-700"
+                  : "text-slate-500"
+              }`}
+            >
+              {CATEGORY_BY_ID[category]?.explainer}
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="tp-reference">Reference (optional)</Label>

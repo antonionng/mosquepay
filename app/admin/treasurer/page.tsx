@@ -29,11 +29,18 @@ export default async function TreasurerPage() {
   }
   const lodgeId = ctx.lodgeId;
 
-  const [ledger, lodgeDues, members, outstandingInstalments] = await Promise.all([
+  const [
+    ledger,
+    lodgeDues,
+    members,
+    outstandingInstalments,
+    scheduleCounts,
+  ] = await Promise.all([
     db.getTreasurerLedger(lodgeId),
     db.getLodgeDues(lodgeId),
     db.getMembers(lodgeId, { status: "active" }),
     db.getOutstandingInstalments(lodgeId),
+    db.countDuesSchedulesByStatus(lodgeId),
   ]);
 
   return (
@@ -44,6 +51,7 @@ export default async function TreasurerPage() {
       outstandingInstalments={JSON.parse(
         JSON.stringify(outstandingInstalments)
       )}
+      scheduleCounts={scheduleCounts}
     />
   );
 }

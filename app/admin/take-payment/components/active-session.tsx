@@ -29,7 +29,14 @@ import {
   formatMoney,
   humanizeFailureReason,
 } from "./helpers";
-import type { StatusPhase, StatusResponse } from "./types";
+import type {
+  CategoryId,
+  PayerSelection,
+  StatusPhase,
+  StatusResponse,
+} from "./types";
+import { CATEGORY_BY_ID } from "./types";
+import { GiftAidCaptureDialog } from "./gift-aid-capture-dialog";
 
 // QR / awaiting-payment view for the Charge tab. Same behaviour as before
 // the refactor: polls every 2s, wake-lock to keep the screen on, web-share +
@@ -46,6 +53,15 @@ export type ActiveSessionState = {
   description: string;
   memberName: string | null;
   giftAidEligible: boolean;
+  /**
+   * Payer context captured at mint time so the post-payment success screen
+   * can offer on-the-day Gift Aid capture for non-anonymous donors paying
+   * into a Gift-Aidable category (Charge tab parity with the Cash tab).
+   */
+  payerKind: PayerSelection["kind"];
+  payerEmail: string | null;
+  memberId: string | null;
+  category: CategoryId;
 };
 
 export function ActiveSession({
@@ -66,6 +82,8 @@ export function ActiveSession({
   const [copied, setCopied] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [shareError, setShareError] = useState<string | null>(null);
+  const [giftAidCaptureOpen, setGiftAidCaptureOpen] = useState(false);
+  const [giftAidCaptured, setGiftAidCaptured] = useState(false);
 
   useEffect(() => {
     stopRef.current = false;
@@ -213,6 +231,18 @@ export function ActiveSession({
 
   if (phase === "succeeded") {
     const completedAt = status?.projected?.completed_at;
+    // Eligibility check mirrors the Cash tab's success screen so the same
+    // amber "capture Gift Aid" nudge appears here: charity-categorised,
+    // payer not anonymous, no declaration on file already (status fetched
+    // post-projection by the poller).
+    const showGiftAidNudge =
+      Boolean(CATEGORY_BY_ID[session.category]?.giftAidable) &&
+      session.payerKind !== "anonymous" &&
+      !status?.gift_aid_eligible &&
+      !giftAidCaptured;
+    // LP payments.id is required by /gift-aid-attach. Comes from the
+    // status projection (only after the webhook has projected).
+    const lpPaymentId = status?.projected?.id ?? null;
     return (
       <Card className="space-y-4 border-emerald-200 bg-emerald-50/40 p-6 text-center sm:p-10">
         <CheckCircle2 className="mx-auto h-16 w-16 text-emerald-600 sm:h-20 sm:w-20" />
@@ -229,16 +259,69 @@ export function ActiveSession({
               Payment captured. Receipt sent by Mooov.
             </p>
           )}
+          {status?.gift_aid_eligible || giftAidCaptured ? (
+            <div className="mt-2 flex justify-center">
+              <Badge variant="success" className="gap-1">
+                <HeartHandshake className="h-3 w-3" />
+                Gift Aid auto-logged
+              </Badge>
+            </div>
+          ) : null}
           <p className="mt-2 text-xs text-emerald-700/80">
             Ref: {session.paymentId}
           </p>
         </div>
+
+        {showGiftAidNudge ? (
+          <div className="mx-auto max-w-md rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-sm text-amber-900">
+            <p className="font-medium">No Gift Aid declaration on file</p>
+            <p className="mt-1 text-xs text-amber-800">
+              If the donor is a UK taxpayer, capture the paper slip now and
+              we&apos;ll add a 25 percent reclaim to this {amountLabel}.
+            </p>
+            <Button
+              size="sm"
+              variant="primary"
+              className="mt-2"
+              disabled={!lpPaymentId}
+              onClick={() => setGiftAidCaptureOpen(true)}
+            >
+              <HeartHandshake className="mr-2 h-4 w-4" />
+              {lpPaymentId
+                ? "Add Gift Aid declaration"
+                : "Waiting for ledger projection…"}
+            </Button>
+          </div>
+        ) : null}
+
         <div className="flex justify-center gap-2">
           <Button onClick={onReset} size="lg">
             <RotateCcw className="mr-2 h-5 w-5" />
             Take another payment
           </Button>
         </div>
+
+        {lpPaymentId ? (
+          <GiftAidCaptureDialog
+            open={giftAidCaptureOpen}
+            onOpenChange={setGiftAidCaptureOpen}
+            paymentId={lpPaymentId}
+            payer={{
+              kind:
+                session.payerKind === "anonymous"
+                  ? "anonymous"
+                  : session.payerKind === "member"
+                    ? "member"
+                    : "guest",
+              memberId: session.memberId,
+              payerName: session.memberName,
+              payerEmail: session.payerEmail,
+            }}
+            onCaptured={() => {
+              setGiftAidCaptured(true);
+            }}
+          />
+        ) : null}
       </Card>
     );
   }

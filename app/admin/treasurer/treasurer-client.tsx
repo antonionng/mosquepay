@@ -13,6 +13,7 @@ import {
   Loader2,
   Mail,
   PlayCircle,
+  Repeat,
   Wallet,
 } from "lucide-react";
 import {
@@ -120,16 +121,29 @@ function downloadCsv(filename: string, rows: Array<Record<string, unknown>>) {
   URL.revokeObjectURL(url);
 }
 
+type ScheduleCounts = {
+  pending: number;
+  active: number;
+  action_required: number;
+  past_due: number;
+  paused: number;
+  cancelled: number;
+  completed: number;
+  active_stripe: number;
+};
+
 export function TreasurerClient({
   ledger,
   lodgeDues,
   activeMembers,
   outstandingInstalments,
+  scheduleCounts,
 }: {
   ledger: LedgerEntry[];
   lodgeDues: LodgeDues[];
   activeMembers: number;
   outstandingInstalments: Instalment[];
+  scheduleCounts: ScheduleCounts;
 }) {
   const router = useRouter();
   const [busyAction, setBusyAction] = useState<"run" | "remind" | null>(null);
@@ -323,50 +337,77 @@ export function TreasurerClient({
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi
-          icon={Banknote}
-          label="Inflow"
-          value={`£${totals.inflow.toFixed(2)}`}
-          color="emerald"
-        />
-        <Kpi
-          icon={Wallet}
-          label="Outstanding dues"
-          value={`£${totals.outstandingDues.toFixed(2)}`}
-          color="amber"
-          onClick={
-            outstandingByContact.length > 0
-              ? () => setOutstandingOpen(true)
-              : undefined
-          }
-          hint={
-            outstandingByContact.length > 0
-              ? `${outstandingByContact.length} ${
-                  outstandingByContact.length === 1 ? "member" : "members"
-                }`
-              : undefined
-          }
-        />
-        <Kpi
-          icon={CheckCircle2}
-          label="Active members"
-          value={String(activeMembers)}
-          color="blue"
-        />
-        <Kpi
-          icon={AlertTriangle}
-          label="Overdue instalments"
-          value={String(overdueInstalments.length)}
-          color={overdueInstalments.length > 0 ? "red" : "slate"}
-          onClick={
-            overdueInstalments.length > 0
-              ? () => setActiveTab("instalments")
-              : undefined
-          }
-          hint={overdueInstalments.length > 0 ? "View list" : undefined}
-        />
-      </div>
+      {(() => {
+        const subscriptionsActive =
+          scheduleCounts.active +
+          scheduleCounts.action_required +
+          scheduleCounts.past_due +
+          scheduleCounts.active_stripe;
+        const subscriptionsAttention =
+          scheduleCounts.action_required +
+          scheduleCounts.past_due +
+          scheduleCounts.paused;
+        return (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <Kpi
+              icon={Banknote}
+              label="Inflow"
+              value={`£${totals.inflow.toFixed(2)}`}
+              color="emerald"
+            />
+            <Kpi
+              icon={Wallet}
+              label="Outstanding dues"
+              value={`£${totals.outstandingDues.toFixed(2)}`}
+              color="amber"
+              onClick={
+                outstandingByContact.length > 0
+                  ? () => setOutstandingOpen(true)
+                  : undefined
+              }
+              hint={
+                outstandingByContact.length > 0
+                  ? `${outstandingByContact.length} ${
+                      outstandingByContact.length === 1 ? "member" : "members"
+                    }`
+                  : undefined
+              }
+            />
+            <Kpi
+              icon={CheckCircle2}
+              label="Active members"
+              value={String(activeMembers)}
+              color="blue"
+            />
+            <Kpi
+              icon={Repeat}
+              label="Monthly subscriptions"
+              value={String(subscriptionsActive)}
+              color={subscriptionsAttention > 0 ? "amber" : "blue"}
+              hint={
+                subscriptionsAttention > 0
+                  ? `${subscriptionsAttention} need attention`
+                  : subscriptionsActive > 0
+                    ? "All healthy"
+                    : undefined
+              }
+              link="/admin/dues/schedules"
+            />
+            <Kpi
+              icon={AlertTriangle}
+              label="Overdue instalments"
+              value={String(overdueInstalments.length)}
+              color={overdueInstalments.length > 0 ? "red" : "slate"}
+              onClick={
+                overdueInstalments.length > 0
+                  ? () => setActiveTab("instalments")
+                  : undefined
+              }
+              hint={overdueInstalments.length > 0 ? "View list" : undefined}
+            />
+          </div>
+        );
+      })()}
 
       {feedback && (
         <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
@@ -813,6 +854,7 @@ function Kpi({
   color,
   onClick,
   hint,
+  link,
 }: {
   icon: React.ElementType;
   label: string;
@@ -820,6 +862,7 @@ function Kpi({
   color: "emerald" | "amber" | "blue" | "red" | "slate";
   onClick?: () => void;
   hint?: string;
+  link?: string;
 }) {
   const colorMap = {
     emerald: "bg-emerald-50 text-emerald-600",
@@ -828,7 +871,7 @@ function Kpi({
     red: "bg-red-50 text-red-600",
     slate: "bg-slate-100 text-slate-600",
   };
-  const interactive = typeof onClick === "function";
+  const interactive = typeof onClick === "function" || typeof link === "string";
   const content = (
     <>
       <div className="flex items-start justify-between">
@@ -850,6 +893,16 @@ function Kpi({
       </div>
     </>
   );
+  if (typeof link === "string") {
+    return (
+      <Link
+        href={link}
+        className="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+      >
+        {content}
+      </Link>
+    );
+  }
   if (interactive) {
     return (
       <button

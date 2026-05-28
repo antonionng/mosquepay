@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { GiftAidStatusPanel } from "@/components/member/gift-aid-onboarding";
 
 interface UserProfile {
   full_name: string;
@@ -365,34 +366,8 @@ export default function MemberProfilePage() {
         <div className="p-6">
           {loading ? (
             <div className="h-20 rounded-xl bg-slate-100 animate-pulse" />
-          ) : profile?.gift_aid_declared ? (
-            <div className="flex items-start gap-4 rounded-xl bg-emerald-50 border border-emerald-100 p-4">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600 mt-0.5" />
-              <div>
-                <p className="font-medium text-emerald-900">Gift Aid is active</p>
-                <p className="text-sm text-emerald-700 mt-1">
-                  Your donations are being boosted by 25% through Gift Aid. The lodge can
-                  reclaim basic rate tax on your donations.
-                </p>
-                <button className="mt-2 text-sm text-emerald-700 font-medium hover:text-emerald-800 underline underline-offset-2">
-                  Manage declaration
-                </button>
-              </div>
-            </div>
           ) : (
-            <div className="flex items-start gap-4 rounded-xl bg-slate-50 border border-slate-200 p-4">
-              <FileCheck className="h-5 w-5 text-slate-400 mt-0.5" />
-              <div>
-                <p className="font-medium text-slate-700">Gift Aid not declared</p>
-                <p className="text-sm text-slate-500 mt-1">
-                  If you are a UK taxpayer, you can boost your donations by 25% at no extra
-                  cost to you.
-                </p>
-                <Button variant="primary" size="sm" className="mt-3">
-                  Set up Gift Aid
-                </Button>
-              </div>
-            </div>
+            <GiftAidStatusPanel />
           )}
         </div>
       </div>

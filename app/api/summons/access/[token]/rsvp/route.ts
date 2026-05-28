@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import { sendWinePledgeConfirmationEmail } from "@/lib/email/wine-pledge";
+import { resolveCheckoutFeesForMember } from "@/lib/fees/server-resolve";
 
 function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
@@ -76,6 +77,34 @@ export async function POST(
   const dietary = trimOrNull(body.dietary_requirements);
   const notes = trimOrNull(body.special_requests);
   const guests = attendingCeremony ? parseGuests(body.guests) : [];
+
+  // Defence in depth: never let an attending RSVP land here when the
+  // event has payments enabled and the brother actually owes something
+  // (meeting fee, dining, guest tickets). The form is supposed to send
+  // them through /api/payments/create-checkout-session instead. If they
+  // bypass it we refuse with a 402 so the RSVP can only ever land
+  // alongside a settled payment via the Mooov webhook.
+  if (attendingCeremony && event.enable_payments) {
+    const resolved = await resolveCheckoutFeesForMember({
+      lodgeId: accessLink.lodge_id,
+      event,
+      memberEmail: accessLink.recipient_email,
+      attendingCeremony: true,
+      attendingDining,
+      guests: guests.map((g) => ({ guest_name: g.guest_name })),
+    });
+    if (resolved.total > 0) {
+      return NextResponse.json(
+        {
+          error:
+            "This meeting requires payment to confirm attendance. Please use the Confirm and pay button.",
+          requires_checkout: true,
+          amount_due: resolved.total,
+        },
+        { status: 402 }
+      );
+    }
+  }
 
   // Wine pledge is only honoured when the event has it switched on and the
   // brother is actually planning to attend. Bottles is clamped to a sane

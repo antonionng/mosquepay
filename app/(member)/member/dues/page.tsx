@@ -11,10 +11,48 @@ import {
   Calendar,
   PoundSterling,
   Repeat,
+  ShieldAlert,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+
+interface AdvanceInfo {
+  alreadyPaid: boolean;
+  memberDuesId: string | null;
+  nextYearLabel: string | null;
+  baseAmount: number | null;
+  discountPercent: number;
+  amount: number | null;
+  currency: string;
+}
+
+interface ScheduleInfo {
+  id: string;
+  status:
+    | "pending"
+    | "active"
+    | "action_required"
+    | "past_due"
+    | "paused"
+    | "cancelled"
+    | "completed"
+    | "active_stripe";
+  cadence: "monthly" | "quarterly";
+  splitStrategy: string;
+  autoRenew: boolean;
+  cyclesTotal: number;
+  cyclesPaid: number;
+  cyclesOutstanding: number;
+  nextChargeAt: string | null;
+  nextAmount: number | null;
+  lastChargedAt: string | null;
+  consecutiveFailures: number;
+  lastFailureCode: string | null;
+  requiresAction: boolean;
+  currency: string;
+}
 
 interface DuesInfo {
   annualAmount: number;
@@ -27,6 +65,9 @@ interface DuesInfo {
   allowInstalments: boolean;
   instalmentCount: number;
   instalmentFrequency: string;
+  yearLabel?: string | null;
+  advance?: AdvanceInfo | null;
+  schedule?: ScheduleInfo | null;
   history: {
     id: string;
     date: string;
@@ -115,6 +156,86 @@ export default function MemberDuesPage() {
     dues?.allowInstalments && dues.instalmentCount > 0
       ? (dues.annualAmount / dues.instalmentCount).toFixed(2)
       : null;
+  const advance = dues?.advance ?? null;
+  const schedule = dues?.schedule ?? null;
+  const [advanceLoading, setAdvanceLoading] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
+
+  async function handleCancelSchedule() {
+    if (!schedule) return;
+    setCancelling(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/dues/schedules/${schedule.id}/cancel`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actor: "member",
+            reason: "member_self_cancel",
+          }),
+        }
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        throw new Error(body.error ?? "Could not cancel.");
+      }
+      window.location.reload();
+    } catch (cancelErr) {
+      setError(
+        cancelErr instanceof Error
+          ? cancelErr.message
+          : "Could not cancel."
+      );
+    } finally {
+      setCancelling(false);
+      setCancelConfirmOpen(false);
+    }
+  }
+
+  async function handlePayInAdvance() {
+    if (!advance || advance.alreadyPaid) return;
+    setAdvanceLoading(true);
+    setError(null);
+    try {
+      const mintRes = await fetch("/api/dues/pay-in-advance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const mintData = await mintRes.json().catch(() => ({}));
+      if (!mintRes.ok || !mintData.member_dues_id) {
+        throw new Error(
+          mintData.error ?? "Could not start advance payment."
+        );
+      }
+      const payRes = await fetch("/api/dues/pay", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dues_id: mintData.member_dues_id,
+          member_email: dues?.memberEmail,
+          member_name: dues?.memberName,
+          mode: "one_off",
+        }),
+      });
+      const payData = await payRes.json().catch(() => ({}));
+      if (payRes.ok && payData.url) {
+        window.location.href = payData.url;
+        return;
+      }
+      throw new Error(payData.error ?? "Could not start advance payment.");
+    } catch (advErr) {
+      setError(
+        advErr instanceof Error ? advErr.message : "Could not start advance payment."
+      );
+    } finally {
+      setAdvanceLoading(false);
+    }
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -244,7 +365,15 @@ export default function MemberDuesPage() {
             </div>
           </div>
 
-          {!isPaid && (
+          {schedule && (
+            <ScheduleStatusCard
+              schedule={schedule}
+              cancelling={cancelling}
+              onCancelClick={() => setCancelConfirmOpen(true)}
+            />
+          )}
+
+          {!isPaid && !schedule && (
             <div className="space-y-3">
               <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-6 shadow-sm">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -299,6 +428,45 @@ export default function MemberDuesPage() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {isPaid && advance && advance.amount != null && (
+            <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-6 shadow-sm">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100">
+                    <Calendar className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-slate-900">
+                      {advance.alreadyPaid
+                        ? `${advance.nextYearLabel} dues are paid in advance`
+                        : `Pay your ${advance.nextYearLabel} dues now`}
+                    </p>
+                    <p className="text-sm text-slate-600">
+                      {advance.alreadyPaid
+                        ? `Thank you — you're set for the next masonic year.`
+                        : advance.discountPercent > 0 && advance.baseAmount
+                        ? `£${advance.amount.toFixed(2)} now — saves ${advance.discountPercent}% vs the £${advance.baseAmount.toFixed(2)} standard rate.`
+                        : `£${advance.amount.toFixed(2)} locks in next year now.`}
+                    </p>
+                  </div>
+                </div>
+                {!advance.alreadyPaid && (
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    disabled={advanceLoading}
+                    onClick={handlePayInAdvance}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    {advanceLoading
+                      ? "Redirecting..."
+                      : `Pay £${advance.amount.toFixed(2)} for ${advance.nextYearLabel}`}
+                  </Button>
+                )}
+              </div>
             </div>
           )}
 
@@ -362,6 +530,170 @@ export default function MemberDuesPage() {
           if (payMode) void handlePay(payMode);
         }}
       />
+      <ConfirmActionDialog
+        open={cancelConfirmOpen}
+        onOpenChange={(open) => {
+          if (!open && !cancelling) setCancelConfirmOpen(false);
+        }}
+        title="Cancel monthly dues?"
+        description={
+          schedule
+            ? `We'll stop charging your card at the start of each month. Any cycles already paid stay paid; you can pay the remaining balance one-off whenever you're ready.`
+            : ""
+        }
+        confirmLabel="Cancel monthly dues"
+        cancelLabel="Keep monthly"
+        tone="danger"
+        loading={cancelling}
+        onConfirm={handleCancelSchedule}
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ScheduleStatusCard
+// ---------------------------------------------------------------------------
+
+function formatNextChargeDate(value: string | null): string {
+  if (!value) return "scheduled";
+  return new Date(value).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function ScheduleStatusCard({
+  schedule,
+  cancelling,
+  onCancelClick,
+}: {
+  schedule: ScheduleInfo;
+  cancelling: boolean;
+  onCancelClick: () => void;
+}) {
+  const isActionRequired = schedule.requiresAction;
+  const isPaused = schedule.status === "paused";
+  const isPastDue = schedule.status === "past_due";
+  const accent = isActionRequired || isPastDue
+    ? "border-amber-200 bg-amber-50/50"
+    : isPaused
+      ? "border-slate-300 bg-slate-50"
+      : "border-emerald-200 bg-emerald-50/40";
+
+  const progressPct =
+    schedule.cyclesTotal > 0
+      ? Math.round((schedule.cyclesPaid / schedule.cyclesTotal) * 100)
+      : 0;
+
+  return (
+    <div className={`rounded-2xl border p-6 shadow-sm ${accent}`}>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/70">
+              <Repeat className="h-5 w-5 text-slate-700" />
+            </div>
+            <div>
+              <p className="font-semibold text-slate-900">
+                Monthly dues subscription
+              </p>
+              <p className="text-sm text-slate-600">
+                {schedule.cyclesPaid} of {schedule.cyclesTotal} months paid ·{" "}
+                {schedule.cyclesOutstanding} remaining
+              </p>
+            </div>
+          </div>
+          <Badge
+            variant={
+              isActionRequired
+                ? "warning"
+                : isPaused
+                  ? "default"
+                  : isPastDue
+                    ? "warning"
+                    : "success"
+            }
+          >
+            {isActionRequired
+              ? "Action needed"
+              : isPaused
+                ? "Paused"
+                : isPastDue
+                  ? "Past due"
+                  : "Active"}
+          </Badge>
+        </div>
+
+        <div className="h-2 rounded-full bg-white/70 overflow-hidden">
+          <div
+            className="h-full rounded-full bg-emerald-500 transition-all"
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
+
+        {isActionRequired ? (
+          <div className="flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-100/50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-2">
+              <ShieldAlert className="h-4 w-4 mt-0.5 flex-none text-amber-700" />
+              <p className="text-sm text-amber-900">
+                Your bank wants to verify this month&apos;s charge. Tap below
+                to complete it — usually under a minute.
+              </p>
+            </div>
+            <Button
+              asChild
+              variant="primary"
+              size="sm"
+              className="shrink-0"
+            >
+              <a href={`/dues/schedules/${schedule.id}/resume`}>
+                <ShieldAlert className="h-4 w-4 mr-2" />
+                Verify card
+              </a>
+            </Button>
+          </div>
+        ) : isPastDue && schedule.consecutiveFailures > 0 ? (
+          <div className="rounded-xl border border-amber-300 bg-amber-100/50 p-4 text-sm text-amber-900">
+            <p className="font-medium">Last charge didn&apos;t go through.</p>
+            <p className="mt-1">
+              We&apos;ll automatically try again on{" "}
+              {formatNextChargeDate(schedule.nextChargeAt)}. If your card is
+              expiring or has changed, please contact your lodge secretary.
+            </p>
+          </div>
+        ) : null}
+
+        <dl className="grid grid-cols-2 gap-y-2 text-sm">
+          <dt className="text-slate-500">Next charge</dt>
+          <dd className="text-right text-slate-900 tabular-nums">
+            {schedule.nextAmount != null
+              ? `£${schedule.nextAmount.toFixed(2)} on ${formatNextChargeDate(schedule.nextChargeAt)}`
+              : "—"}
+          </dd>
+          {schedule.lastChargedAt ? (
+            <>
+              <dt className="text-slate-500">Last charge</dt>
+              <dd className="text-right text-slate-900 tabular-nums">
+                {formatNextChargeDate(schedule.lastChargedAt)}
+              </dd>
+            </>
+          ) : null}
+        </dl>
+
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onCancelClick}
+            disabled={cancelling}
+          >
+            <XCircle className="h-4 w-4 mr-2" />
+            Cancel monthly dues
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

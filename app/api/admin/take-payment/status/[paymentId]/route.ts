@@ -82,7 +82,7 @@ export async function GET(
   const { data: projected } = await supa
     .from("payments")
     .select(
-      "id, status, total_amount, refund_amount, currency, completed_at, mooov_payment_id",
+      "id, status, total_amount, refund_amount, currency, completed_at, mooov_payment_id, charity_amount, category, user_name, user_email, user_id",
     )
     .eq("mooov_payment_id", paymentId)
     .maybeSingle<{
@@ -93,7 +93,35 @@ export async function GET(
       currency: string | null;
       completed_at: string | null;
       mooov_payment_id: string;
+      charity_amount: number | null;
+      category: string | null;
+      user_name: string | null;
+      user_email: string | null;
+      user_id: string | null;
     }>();
+
+  // Lift gift-aid status from the projected donation row so the polling UI
+  // can decide whether to nudge the treasurer to capture a paper slip.
+  // Most payments won't have a donation row (non-charity income); we treat
+  // "no donation row" as "no Gift Aid on file" which is the worst-case
+  // we want to surface anyway.
+  let giftAidEligible = false;
+  let giftAidDeclarationId: string | null = null;
+  if (projected?.id) {
+    const { data: donation } = await supa
+      .from("donations")
+      .select("id, gift_aid_declaration_id")
+      .eq("payment_id", projected.id)
+      .eq("lodge_id", lodgeId)
+      .maybeSingle<{
+        id: string;
+        gift_aid_declaration_id: string | null;
+      }>();
+    if (donation?.gift_aid_declaration_id) {
+      giftAidEligible = true;
+      giftAidDeclarationId = donation.gift_aid_declaration_id;
+    }
+  }
 
   const projectedStatus = projected?.status ?? null;
   const rawStatus = projectedStatus ?? attempt.status;
@@ -112,8 +140,15 @@ export async function GET(
           total: projected.total_amount,
           refunded_total: projected.refund_amount ?? 0,
           completed_at: projected.completed_at,
+          charity_amount: projected.charity_amount ?? 0,
+          category: projected.category,
+          user_name: projected.user_name,
+          user_email: projected.user_email,
+          user_id: projected.user_id,
         }
       : null,
+    gift_aid_eligible: giftAidEligible,
+    gift_aid_declaration_id: giftAidDeclarationId,
   });
 }
 

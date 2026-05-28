@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import * as db from "@/lib/db";
+import { computeYearPosition } from "@/lib/dues/year-position";
+import { duesSubscriptionEnabled } from "@/lib/dues/feature-flags";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +63,7 @@ export async function GET() {
       // non-fatal
     }
 
-    const [upcomingEventRows, allEvents, payments, donations, duesRecords, lodgeDues, rsvps, summonsLinks] = await Promise.all([
+    const [upcomingEventRows, allEvents, payments, donations, duesRecords, lodgeDues, rsvps, summonsLinks, activeGiftAidDeclaration, currentMasonicYear, allMasonicYears, duesSchedules] = await Promise.all([
       db.getEvents(member.lodge_id, { published: true, upcoming: true }),
       db.getEvents(member.lodge_id, { published: true }),
       db.getPaymentsByEmail(member.email, member.lodge_id),
@@ -70,7 +72,17 @@ export async function GET() {
       db.getLodgeDues(member.lodge_id),
       db.getRsvpsByEmail(member.email, member.lodge_id),
       db.getSummonsAccessLinksByEmail(member.email, member.lodge_id),
+      db
+        .getActiveGiftAidDeclarationByMember(member.lodge_id, {
+          id: member.id,
+          email: member.email,
+        })
+        .catch(() => null),
+      db.getCurrentMasonicYear(member.lodge_id).catch(() => null),
+      db.listLodgeMasonicYears(member.lodge_id).catch(() => []),
+      db.getDuesSchedulesForMember(member.lodge_id, member.email).catch(() => []),
     ]);
+    const giftAidDeclarationId = activeGiftAidDeclaration?.id ?? null;
 
     const eventById = new Map(allEvents.map((event) => [event.id, event]));
     const upcomingEvents = upcomingEventRows.length;
@@ -102,12 +114,127 @@ export async function GET() {
       )
       .reduce((sum, d) => sum + (d.amount ?? 0), 0);
 
-    const unpaidDues = duesRecords.filter((d) => d.status !== "paid");
+    const unpaidDues = duesRecords.filter(
+      (d) => d.status !== "paid" && !d.is_advance
+    );
     const paidDues = duesRecords.filter((d) => d.status === "paid");
+    const advanceDues = duesRecords.filter((d) => d.is_advance);
     const outstandingDues = unpaidDues.reduce((sum, d) => sum + (d.amount ?? 0), 0);
-    const currentDues = unpaidDues[0] ?? duesRecords[0] ?? null;
+    const currentDues = unpaidDues[0] ?? duesRecords.find((d) => !d.is_advance) ?? null;
     const duesConfig = lodgeDues[0] ?? null;
     const paidAmount = paidDues.reduce((sum, d) => sum + (d.amount ?? 0), 0);
+
+    // Resolve year position for the dues UX router on the member portal.
+    // Defaults are safe for lodges that haven't configured a masonic year:
+    // we omit `yearPosition` and the portal falls back to the legacy view.
+    const yearPosition = currentMasonicYear
+      ? computeYearPosition({
+          yearStartDate: currentMasonicYear.start_date,
+          yearEndDate: currentMasonicYear.end_date,
+          dateOfInitiation: member.date_of_initiation ?? null,
+          hasPaidCurrentYear:
+            !!currentDues && currentDues.status === "paid",
+          hasOutstandingCurrentYear:
+            !!currentDues &&
+            currentDues.status !== "paid" &&
+            currentDues.status !== "waived",
+        })
+      : null;
+
+    // Resolve next masonic year for the pay-in-advance card. Only surfaced
+    // when (a) the lodge has more than one masonic year row configured or
+    // we can synthesise next year's bounds from the current one, AND (b)
+    // the member is paid up for current year.
+    const nextMasonicYear = currentMasonicYear
+      ? allMasonicYears.find(
+          (y) =>
+            y.start_date.slice(0, 10) >
+            currentMasonicYear.end_date.slice(0, 10)
+        ) ?? null
+      : null;
+    const advanceForNextYear = nextMasonicYear
+      ? advanceDues.find((d) => d.advance_for_year_id === nextMasonicYear.id) ??
+        null
+      : null;
+    const advanceCardEligible =
+      !!yearPosition &&
+      yearPosition.quadrant === "paid_up_current_year" &&
+      !!duesConfig &&
+      duesConfig.active === true;
+    const advanceBaseAmount =
+      nextMasonicYear?.annual_dues_amount ??
+      duesConfig?.amount ??
+      currentMasonicYear?.annual_dues_amount ??
+      null;
+    const advanceDiscountPct = duesConfig?.advance_discount_percent ?? 0;
+    const advanceDiscountedAmount =
+      advanceBaseAmount != null
+        ? Math.round(advanceBaseAmount * (1 - advanceDiscountPct / 100) * 100) /
+          100
+        : null;
+
+    // Active dues schedule (saved-charge subscription). Surfaced as a
+    // status card with a cancel button + an SCA resume CTA when the
+    // last cycle returned requires_action. We only consider schedules
+    // tied to the current-year dues record so a paused/cancelled
+    // last-year schedule doesn't pollute the dashboard.
+    const activeSchedule =
+      currentDues != null
+        ? duesSchedules.find(
+            (s) =>
+              s.member_dues_id === currentDues.id &&
+              s.status !== "cancelled" &&
+              s.status !== "completed"
+          ) ?? null
+        : null;
+    let scheduleCard: {
+      id: string;
+      status: string;
+      cadence: string;
+      splitStrategy: string;
+      autoRenew: boolean;
+      cyclesTotal: number;
+      cyclesPaid: number;
+      cyclesOutstanding: number;
+      nextChargeAt: string | null;
+      nextAmount: number | null;
+      lastChargedAt: string | null;
+      consecutiveFailures: number;
+      lastFailureCode: string | null;
+      requiresAction: boolean;
+      currency: string;
+    } | null = null;
+    if (activeSchedule && currentDues) {
+      const instalments = await db
+        .getInstalmentsForDues(currentDues.id, member.lodge_id)
+        .catch(() => []);
+      const scoped = instalments.filter(
+        (i) => i.schedule_id === activeSchedule.id
+      );
+      const paid = scoped.filter((i) => i.status === "paid");
+      const outstanding = scoped
+        .filter(
+          (i) => i.status === "outstanding" || i.status === "overdue"
+        )
+        .sort((a, b) => a.sequence - b.sequence);
+      scheduleCard = {
+        id: activeSchedule.id,
+        status: activeSchedule.status,
+        cadence: activeSchedule.cadence,
+        splitStrategy: activeSchedule.split_strategy,
+        autoRenew: activeSchedule.auto_renew,
+        cyclesTotal: scoped.length,
+        cyclesPaid: paid.length,
+        cyclesOutstanding: outstanding.length,
+        nextChargeAt: activeSchedule.next_charge_at,
+        nextAmount: outstanding[0]?.amount ?? null,
+        lastChargedAt: activeSchedule.last_charged_at,
+        consecutiveFailures: activeSchedule.consecutive_failures ?? 0,
+        lastFailureCode: activeSchedule.last_failure_code ?? null,
+        requiresAction: activeSchedule.status === "action_required",
+        currency: (currentDues.currency ?? "gbp").toUpperCase(),
+      };
+    }
 
     type ActivityItem = {
       id: string;
@@ -255,9 +382,41 @@ export async function GET() {
             duesId: currentDues.id,
             memberEmail: currentDues.member_email,
             memberName: currentDues.member_name ?? member.full_name,
-            allowInstalments: duesConfig?.allow_instalments ?? false,
+            // allowInstalments is the AND of (lodge configured them) AND
+            // (the platform-level subscription path is enabled). Hides
+            // the "Set up instalments" CTA in the portal until Mooov has
+            // shipped the saved-charge subscription contract to prod.
+            allowInstalments:
+              (duesConfig?.allow_instalments ?? false) &&
+              duesSubscriptionEnabled(),
             instalmentCount: duesConfig?.instalment_count ?? 12,
             instalmentFrequency: duesConfig?.instalment_frequency ?? "monthly",
+            yearPosition,
+            yearLabel: currentMasonicYear?.label ?? null,
+            yearStart: currentMasonicYear?.start_date ?? null,
+            yearEnd: currentMasonicYear?.end_date ?? null,
+            strategies: duesConfig
+              ? {
+                  catch_up_lump_then_monthly:
+                    duesConfig.enable_strategy_catch_up_lump,
+                  monthly_then_balloon:
+                    duesConfig.enable_strategy_balloon,
+                  reslice_remaining: duesConfig.enable_strategy_reslice,
+                }
+              : null,
+            catchUpMaxMonths: duesConfig?.catch_up_max_months ?? 6,
+            advance: advanceCardEligible
+              ? {
+                  alreadyPaid: !!advanceForNextYear,
+                  memberDuesId: advanceForNextYear?.id ?? null,
+                  nextYearLabel: nextMasonicYear?.label ?? null,
+                  baseAmount: advanceBaseAmount,
+                  discountPercent: advanceDiscountPct,
+                  amount: advanceDiscountedAmount,
+                  currency: duesConfig?.currency ?? "gbp",
+                }
+              : null,
+            schedule: scheduleCard,
             history: paidDues.map((d) => ({
               id: d.id,
               date: d.paid_at ?? d.updated_at,
@@ -277,13 +436,23 @@ export async function GET() {
       })),
       donationData: {
         totalThisYear: donationTotal,
-        giftAidDeclared: false,
+        giftAidDeclared: Boolean(activeGiftAidDeclaration),
+        giftAidEvidenceSource: activeGiftAidDeclaration?.evidence_source ?? null,
+        giftAidConsentStatus: member.gift_aid_consent_status ?? "unknown",
+        giftAidPrompted: Boolean(member.gift_aid_prompted_at),
         donations: donations.map((d) => ({
           id: d.id,
           date: d.created_at,
           amount: d.amount ?? 0,
           fund: d.source ?? "General Fund",
-          giftAid: false,
+          // Donation is Gift Aided when it was explicitly linked to a
+          // declaration at projection time, or when an active declaration
+          // exists for this member today (covers in-person cash entries
+          // attributed to the member where the donation row may have been
+          // inserted before the declaration was captured).
+          giftAid:
+            Boolean(d.gift_aid_declaration_id) ||
+            (Boolean(giftAidDeclarationId) && d.gift_aid_status !== "declined"),
         })),
       },
     });

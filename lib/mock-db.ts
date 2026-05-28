@@ -74,6 +74,10 @@ export type MockLodge = {
   custom_domain_verification_token: string | null;
   accepts_self_registration: boolean;
   current_charity_campaign_id: string | null;
+  gift_aid_default_mode: "digital" | "paper" | "both";
+  relief_chest_email: string | null;
+  relief_chest_charity_number: string | null;
+  hmrc_charity_reference: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -130,6 +134,10 @@ const lodges: MockLodge[] = [
     custom_domain_verification_token: null,
     accepts_self_registration: true,
     current_charity_campaign_id: null,
+    gift_aid_default_mode: "both",
+    relief_chest_email: null,
+    relief_chest_charity_number: null,
+    hmrc_charity_reference: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   },
@@ -249,6 +257,10 @@ export function upsertLodge(
     custom_domain_verification_token: input.custom_domain_verification_token ?? null,
     accepts_self_registration: input.accepts_self_registration ?? false,
     current_charity_campaign_id: null,
+    gift_aid_default_mode: input.gift_aid_default_mode ?? "both",
+    relief_chest_email: input.relief_chest_email ?? null,
+    relief_chest_charity_number: input.relief_chest_charity_number ?? null,
+    hmrc_charity_reference: input.hmrc_charity_reference ?? null,
     created_at: now,
     updated_at: now,
   };

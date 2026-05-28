@@ -29,6 +29,27 @@ type MooovConnectEvent = {
     failure_reason?: string;
     failure_code?: string;
     failure_category?: string;
+    // Mooov 2026-05-28 reply, Q-A: stamped on payment.succeeded /
+    // payment.failed for any payment created with customer_ref. Used by
+    // the dues subscription enrolment projector to seed
+    // dues_schedules.mooov_payment_method_id + stripe_customer_id once.
+    payment_method_id?: string;
+    stripe_customer_id?: string;
+    customer_ref?: string;
+    // Mooov 2026-05-28 post-lock: Slice 3a fields. Present on
+    // subscription.* events (subscription.activated, .updated,
+    // .canceled, .invoice_paid, .invoice_failed). subscription_metadata
+    // carries LP correlation IDs (lp_schedule_id, lp_member_dues_id)
+    // verbatim from the Stripe Subscription object's metadata. Fields
+    // are omitted entirely (not null) when unpopulated.
+    subscription_id?: string;
+    stripe_subscription_id?: string;
+    subscription_status?: string;
+    period_start?: string;
+    period_end?: string;
+    cancel_at?: string;
+    canceled_at?: string;
+    subscription_metadata?: Record<string, unknown>;
     [key: string]: unknown;
   };
 };
@@ -278,6 +299,10 @@ async function projectConnectEvent(
       await projectEventCaptured(lodgeId, attempt);
     } else if (attempt.intent === "dues") {
       await projectDuesCaptured(lodgeId, attempt);
+    } else if (attempt.intent === "dues_subscription_enrol") {
+      await projectDuesSubscriptionEnrolCaptured(lodgeId, attempt, event);
+    } else if (attempt.intent === "dues_subscription_cycle") {
+      await projectDuesSubscriptionCycleCaptured(lodgeId, attempt, event);
     } else if (
       attempt.intent === "take_payment" ||
       attempt.intent === "lodge_generic_standing_qr" ||
@@ -310,6 +335,22 @@ async function projectConnectEvent(
           ? event.data.failure_category
           : null;
 
+      // Look up the attempt before we mark it failed so we can find the
+      // speculative RSVP that was created pre-checkout. The webhook is
+      // the only place where we learn the brother walked away without
+      // paying, so without this step the abandoned RSVP would linger
+      // forever as `payment_pending`.
+      const { data: attemptRow } = await supa
+        .schema("mooov")
+        .from("payment_attempts")
+        .select("guest_descriptor, intent")
+        .eq("lodge_id", lodgeId)
+        .eq("payment_id", paymentId)
+        .maybeSingle<{
+          guest_descriptor: Record<string, unknown> | null;
+          intent: string | null;
+        }>();
+
       await supa
         .schema("mooov")
         .from("payment_attempts")
@@ -319,6 +360,53 @@ async function projectConnectEvent(
         })
         .eq("lodge_id", lodgeId)
         .eq("payment_id", paymentId);
+
+      // Reverse the speculative event RSVP, if any. We only do this for
+      // `intent: "event"` attempts so we never accidentally cancel a
+      // donation-attached RSVP or anything else. We mark the RSVP
+      // `cancelled` (not delete it) so the audit trail survives, and
+      // drop the placeholder guests so they don't show up in the
+      // dining/place-card exports.
+      const descriptor = attemptRow?.guest_descriptor ?? {};
+      const rsvpIdFromAttempt =
+        typeof descriptor.rsvp_id === "string" ? descriptor.rsvp_id : null;
+      if (rsvpIdFromAttempt && (attemptRow?.intent === "event" || !attemptRow?.intent)) {
+        try {
+          await db.updateRsvp(rsvpIdFromAttempt, lodgeId, {
+            status: "cancelled",
+          });
+          await db.deleteEventGuestsByRsvp(rsvpIdFromAttempt, lodgeId);
+        } catch (cancelErr) {
+          console.error("mooov webhook: failed to cancel abandoned RSVP", {
+            event_id: event.id,
+            payment_id: paymentId,
+            rsvp_id: rsvpIdFromAttempt,
+            failure_code: failureCode,
+            message:
+              cancelErr instanceof Error
+                ? cancelErr.message
+                : String(cancelErr),
+          });
+        }
+      }
+
+      // For dues subscription cycles or enrolment, bump dunning state
+      // on the schedule so the cron + treasurer notifications branch
+      // correctly. Donations/events/standing-QR remain unaffected.
+      if (
+        attemptRow &&
+        (attemptRow.intent === "dues_subscription_enrol" ||
+          attemptRow.intent === "dues_subscription_cycle")
+      ) {
+        await handleDuesSubscriptionFailure(lodgeId, {
+          intent: attemptRow.intent,
+          guest_descriptor: descriptor,
+        }, {
+          failureCode,
+          failureCategory,
+          failureReason,
+        });
+      }
 
       // account_invalid means the lodge's underlying PSP connection got
       // severed (typically: the lodge clicked "Disconnect" from inside
@@ -394,6 +482,53 @@ async function projectConnectEvent(
         })
         .eq("id", lodgeId);
       return;
+    case "subscription.activated":
+    case "subscription.updated":
+    case "subscription.canceled":
+    case "subscription.invoice_paid":
+    case "subscription.invoice_failed": {
+      // Mooov 2026-05-28 reply (post-lock): subscription pass-through
+      // Slices 1, 2, 3a, 4, 5 are live in prod; 3b (invoice.paid /
+      // invoice.payment_failed projection) is dispatcher-routed but
+      // stub. We are NOT migrating any live schedule to Stripe
+      // Subscription mode until 3b lands and we ship the migration
+      // script (app/api/admin/dues/migrate-to-stripe-subscriptions).
+      //
+      // Until then any subscription.* event we receive is either:
+      //   (a) a Mooov-side test fixture (merch_lodgepaytest_3f3a5w),
+      //   (b) a probe from operators, or
+      //   (c) noise from the dual-emit fan-out on a schedule we did
+      //       NOT migrate (shouldn't happen but is the dangerous case
+      //       to flag loudly if it ever does).
+      //
+      // Persist (already done by the parent insert) + log + ack 200.
+      // Per-cycle money projection comes from the paired payment.captured
+      // event on the payment lane, which our existing handler at the top
+      // of this function already covers.
+      const subscriptionId =
+        typeof event.data?.subscription_id === "string"
+          ? event.data.subscription_id
+          : null;
+      const subscriptionMetadata =
+        event.data?.subscription_metadata &&
+        typeof event.data.subscription_metadata === "object"
+          ? (event.data.subscription_metadata as Record<string, unknown>)
+          : null;
+      console.log("mooov webhook: subscription event ack-only (no projection)", {
+        event_id: event.id,
+        event_type: event.type,
+        merchant_id: event.merchant.id,
+        subscription_id: subscriptionId,
+        lp_schedule_id:
+          typeof subscriptionMetadata?.lp_schedule_id === "string"
+            ? subscriptionMetadata.lp_schedule_id
+            : null,
+        slice_3b_required:
+          event.type === "subscription.invoice_paid" ||
+          event.type === "subscription.invoice_failed",
+      });
+      return;
+    }
   }
 }
 
@@ -897,4 +1032,437 @@ async function projectStandingOrTakePaymentCaptured(
       },
     );
   }
+}
+
+// Project a captured Mooov dues SUBSCRIPTION ENROLMENT payment.
+//
+// First cycle of a yearly dues schedule. We:
+//   1. Persist the saved Stripe PM + Customer onto dues_schedules so the
+//      daily cron has what it needs to run subsequent cycles via
+//      /v1/charges/saved (Mooov 2026-05-28 reply, Q-A — both fields
+//      stamped on data when customer_ref was set on the create call).
+//   2. Flip the schedule status pending -> active and stamp next_charge_at
+//      to the second instalment's due_date.
+//   3. Mark instalment #1 paid + project a public.payments row so the
+//      Treasurer ledger picks the cycle up (existing reporting query).
+//   4. If this was a single-cycle schedule (e.g. one-shot subscription
+//      that just collects month 1 because remaining months <= 1) flip
+//      member_dues to paid at this point.
+//
+// Idempotent on payments.mooov_payment_id (re-deliveries skip the
+// duplicate payments insert) and on dues_schedules.status (only the
+// first transition writes the saved PM + customer).
+async function projectDuesSubscriptionEnrolCaptured(
+  lodgeId: string,
+  attempt: {
+    payment_id: string;
+    amount: number;
+    currency: string;
+    guest_descriptor: Record<string, unknown> | null;
+    metadata: Record<string, unknown> | null;
+  },
+  event: MooovConnectEvent
+) {
+  const existingPayment = await db.getPaymentByMooovId(attempt.payment_id);
+  if (existingPayment) {
+    console.log(
+      "mooov webhook: dues subscription enrolment already projected (idempotent)",
+      { payment_id: attempt.payment_id }
+    );
+    return;
+  }
+
+  const guest = (attempt.guest_descriptor ?? {}) as Record<string, unknown>;
+  const scheduleId =
+    typeof guest.schedule_id === "string" ? guest.schedule_id : null;
+  const duesId = typeof guest.dues_id === "string" ? guest.dues_id : null;
+  if (!scheduleId || !duesId) {
+    console.error(
+      "mooov webhook: dues enrolment missing schedule_id/dues_id in guest_descriptor",
+      { payment_id: attempt.payment_id }
+    );
+    return;
+  }
+
+  const schedule = await db.getDuesSchedule(scheduleId, lodgeId);
+  if (!schedule) {
+    console.error("mooov webhook: dues schedule not found", {
+      payment_id: attempt.payment_id,
+      schedule_id: scheduleId,
+    });
+    return;
+  }
+
+  const allDues = await db.getMemberDues(lodgeId);
+  const duesRecord = allDues.find((d) => d.id === duesId);
+  if (!duesRecord) {
+    console.error("mooov webhook: dues record not found for enrolment capture", {
+      payment_id: attempt.payment_id,
+      dues_id: duesId,
+    });
+    return;
+  }
+
+  const paymentMethodId =
+    typeof event.data?.payment_method_id === "string"
+      ? event.data.payment_method_id
+      : null;
+  const stripeCustomerId =
+    typeof event.data?.stripe_customer_id === "string"
+      ? event.data.stripe_customer_id
+      : null;
+
+  if (!paymentMethodId) {
+    // Per Mooov's 2026-05-28 reply: payment_method_id should ALWAYS be on
+    // the webhook for an enrolment intent that set customer_ref. If it's
+    // missing, log loud and refuse to flip the schedule active — without
+    // a saved PM the cron has no card to charge against.
+    console.error(
+      "mooov webhook: dues enrolment payment.succeeded missing data.payment_method_id; schedule remains pending",
+      {
+        payment_id: attempt.payment_id,
+        schedule_id: scheduleId,
+        event_id: event.id,
+      }
+    );
+    return;
+  }
+
+  const instalments = await db.getInstalmentsForDues(duesId, lodgeId);
+  const firstInstalment = instalments.find((i) => i.sequence === 1);
+  const secondInstalment = instalments.find((i) => i.sequence === 2);
+
+  // 1. Stamp saved PM + customer + status active on the schedule.
+  await db.updateDuesSchedule(scheduleId, lodgeId, {
+    mooov_payment_method_id: paymentMethodId,
+    stripe_customer_id: stripeCustomerId,
+    status: "active",
+    next_charge_at: secondInstalment?.due_date ?? null,
+    last_charged_at: new Date().toISOString(),
+    consecutive_failures: 0,
+    last_failure_code: null,
+    last_failure_category: null,
+    last_failure_at: null,
+    next_action_client_secret: null,
+    next_action_connected_account_id: null,
+    next_action_expires_at: null,
+  });
+
+  // 2. Project the public.payments row + mark instalment #1 paid.
+  const totalMajor = (attempt.amount ?? 0) / 100;
+  const currencyMajor = (attempt.currency ?? "GBP").toUpperCase();
+  const charitablePerCycle = computeCyclicalCharitable(
+    duesRecord.charitable_amount,
+    instalments.length
+  );
+  const completedAt = new Date().toISOString();
+
+  const payment = await db.addPayment(lodgeId, {
+    rsvp_id: null,
+    event_id: null,
+    user_email: duesRecord.member_email,
+    user_name: duesRecord.member_name,
+    stripe_payment_intent_id: null,
+    stripe_charge_id: null,
+    stripe_customer_id: stripeCustomerId,
+    mooov_payment_id: attempt.payment_id,
+    dining_amount: 0,
+    charity_amount: charitablePerCycle,
+    raffle_amount: 0,
+    meeting_fee_amount: 0,
+    guest_ticket_amount: 0,
+    total_amount: totalMajor,
+    currency: currencyMajor,
+    charity_name: charitablePerCycle > 0 ? "Dues charitable portion" : null,
+    status: "succeeded",
+    refund_amount: 0,
+    refund_reason: null,
+    completed_at: completedAt,
+  });
+
+  if (firstInstalment) {
+    await db.updateInstalment(firstInstalment.id, lodgeId, {
+      status: "paid",
+      paid_at: completedAt,
+      payment_reference: attempt.payment_id,
+    });
+  }
+
+  // 3. If the schedule has only one cycle (degenerate case: e.g. someone
+  //    enrolled with 1 month remaining), flip the parent member_dues to
+  //    paid right now and mark the schedule completed.
+  if (instalments.length <= 1) {
+    await db.updateMemberDuesStatus(duesId, lodgeId, {
+      status: "paid",
+      payment_id: payment.id,
+      paid_at: completedAt,
+    });
+    await db.updateDuesSchedule(scheduleId, lodgeId, {
+      status: "completed",
+    });
+  }
+
+  // 4. Charitable donation row for the cycle, mirroring the one-off
+  //    dues path. Per-cycle attribution keeps the Gift Aid claim
+  //    batcher's date alignment correct (gift made on charge date).
+  if (charitablePerCycle > 0) {
+    const declaration = await db.getActiveGiftAidDeclarationByEmail(
+      lodgeId,
+      duesRecord.member_email
+    );
+    await db.addDonation(lodgeId, {
+      event_id: null,
+      payment_id: payment.id,
+      donor_name: duesRecord.member_name,
+      donor_email: duesRecord.member_email,
+      amount: charitablePerCycle,
+      currency: currencyMajor,
+      source: "dues_charitable_portion",
+      status: "completed",
+      gift_aid_declaration_id: declaration?.id ?? null,
+      gift_aid_status: declaration ? "declared" : "eligible",
+      gift_aid_eligible_amount: declaration ? charitablePerCycle : 0,
+    });
+  }
+}
+
+// Project a captured Mooov dues SUBSCRIPTION CYCLE payment. Driven by
+// the daily cron's runSavedDuesCharge call (Mooov 2026-05-28 reply,
+// task L1.3). One row per cycle.
+//
+// Cycle correlation: the cron stamps payment_id =
+// pay_dues_<schedule_id>_<NNN> on the matching member_dues_instalments
+// row at preflight time, then this projector flips that row to paid.
+//
+// When the last outstanding instalment is paid we flip the parent
+// member_dues to paid and the schedule to completed.
+async function projectDuesSubscriptionCycleCaptured(
+  lodgeId: string,
+  attempt: {
+    payment_id: string;
+    amount: number;
+    currency: string;
+    guest_descriptor: Record<string, unknown> | null;
+    metadata: Record<string, unknown> | null;
+  },
+  _event: MooovConnectEvent
+) {
+  const existingPayment = await db.getPaymentByMooovId(attempt.payment_id);
+  if (existingPayment) {
+    console.log(
+      "mooov webhook: dues subscription cycle already projected (idempotent)",
+      { payment_id: attempt.payment_id }
+    );
+    return;
+  }
+
+  const guest = (attempt.guest_descriptor ?? {}) as Record<string, unknown>;
+  const scheduleId =
+    typeof guest.schedule_id === "string" ? guest.schedule_id : null;
+  const duesId = typeof guest.dues_id === "string" ? guest.dues_id : null;
+  const instalmentId =
+    typeof guest.instalment_id === "string" ? guest.instalment_id : null;
+  if (!scheduleId || !duesId) {
+    console.error(
+      "mooov webhook: dues cycle missing schedule_id/dues_id in guest_descriptor",
+      { payment_id: attempt.payment_id }
+    );
+    return;
+  }
+
+  const schedule = await db.getDuesSchedule(scheduleId, lodgeId);
+  if (!schedule) {
+    console.error("mooov webhook: dues schedule not found for cycle capture", {
+      payment_id: attempt.payment_id,
+      schedule_id: scheduleId,
+    });
+    return;
+  }
+
+  const allDues = await db.getMemberDues(lodgeId);
+  const duesRecord = allDues.find((d) => d.id === duesId);
+  if (!duesRecord) {
+    console.error("mooov webhook: dues record not found for cycle capture", {
+      payment_id: attempt.payment_id,
+      dues_id: duesId,
+    });
+    return;
+  }
+
+  const totalMajor = (attempt.amount ?? 0) / 100;
+  const currencyMajor = (attempt.currency ?? "GBP").toUpperCase();
+  const completedAt = new Date().toISOString();
+  const allInstalments = await db.getInstalmentsForDues(duesId, lodgeId);
+  const charitablePerCycle = computeCyclicalCharitable(
+    duesRecord.charitable_amount,
+    allInstalments.length
+  );
+
+  const payment = await db.addPayment(lodgeId, {
+    rsvp_id: null,
+    event_id: null,
+    user_email: duesRecord.member_email,
+    user_name: duesRecord.member_name,
+    stripe_payment_intent_id: null,
+    stripe_charge_id: null,
+    stripe_customer_id: schedule.stripe_customer_id ?? null,
+    mooov_payment_id: attempt.payment_id,
+    dining_amount: 0,
+    charity_amount: charitablePerCycle,
+    raffle_amount: 0,
+    meeting_fee_amount: 0,
+    guest_ticket_amount: 0,
+    total_amount: totalMajor,
+    currency: currencyMajor,
+    charity_name: charitablePerCycle > 0 ? "Dues charitable portion" : null,
+    status: "succeeded",
+    refund_amount: 0,
+    refund_reason: null,
+    completed_at: completedAt,
+  });
+
+  // Find the matching instalment row. Prefer explicit guest.instalment_id,
+  // fall back to "next outstanding for this schedule" by sequence.
+  let target = instalmentId
+    ? allInstalments.find((i) => i.id === instalmentId)
+    : null;
+  if (!target) {
+    target = allInstalments
+      .filter(
+        (i) =>
+          i.schedule_id === scheduleId &&
+          (i.status === "outstanding" || i.status === "overdue")
+      )
+      .sort((a, b) => a.sequence - b.sequence)[0];
+  }
+  if (target) {
+    await db.updateInstalment(target.id, lodgeId, {
+      status: "paid",
+      paid_at: completedAt,
+      payment_reference: attempt.payment_id,
+    });
+  }
+
+  // Find the next outstanding instalment for the schedule to drive the
+  // cron's next_charge_at. If there's none, the schedule is complete.
+  const remaining = allInstalments
+    .filter(
+      (i) =>
+        i.schedule_id === scheduleId &&
+        i.id !== (target?.id ?? "") &&
+        (i.status === "outstanding" || i.status === "overdue")
+    )
+    .sort((a, b) => a.sequence - b.sequence);
+
+  if (remaining.length === 0) {
+    await db.updateDuesSchedule(scheduleId, lodgeId, {
+      status: "completed",
+      next_charge_at: null,
+      last_charged_at: completedAt,
+      consecutive_failures: 0,
+      last_failure_code: null,
+      last_failure_category: null,
+      last_failure_at: null,
+    });
+    await db.updateMemberDuesStatus(duesId, lodgeId, {
+      status: "paid",
+      payment_id: payment.id,
+      paid_at: completedAt,
+    });
+  } else {
+    await db.updateDuesSchedule(scheduleId, lodgeId, {
+      status: "active",
+      next_charge_at: remaining[0].due_date,
+      last_charged_at: completedAt,
+      consecutive_failures: 0,
+      last_failure_code: null,
+      last_failure_category: null,
+      last_failure_at: null,
+      next_action_client_secret: null,
+      next_action_connected_account_id: null,
+      next_action_expires_at: null,
+    });
+  }
+
+  if (charitablePerCycle > 0) {
+    const declaration = await db.getActiveGiftAidDeclarationByEmail(
+      lodgeId,
+      duesRecord.member_email
+    );
+    await db.addDonation(lodgeId, {
+      event_id: null,
+      payment_id: payment.id,
+      donor_name: duesRecord.member_name,
+      donor_email: duesRecord.member_email,
+      amount: charitablePerCycle,
+      currency: currencyMajor,
+      source: "dues_charitable_portion",
+      status: "completed",
+      gift_aid_declaration_id: declaration?.id ?? null,
+      gift_aid_status: declaration ? "declared" : "eligible",
+      gift_aid_eligible_amount: declaration ? charitablePerCycle : 0,
+    });
+  }
+}
+
+// Bump consecutive_failures + status on the dues_schedules row when a
+// cycle (or the enrolment intent) fails. The cron retries on its next
+// tick and Mooov's idempotency replay protects against double-charge.
+async function handleDuesSubscriptionFailure(
+  lodgeId: string,
+  attempt: {
+    intent: string;
+    guest_descriptor: Record<string, unknown> | null;
+  },
+  failure: {
+    failureCode: string | null;
+    failureCategory: string | null;
+    failureReason: string | null;
+  }
+) {
+  const guest = (attempt.guest_descriptor ?? {}) as Record<string, unknown>;
+  const scheduleId =
+    typeof guest.schedule_id === "string" ? guest.schedule_id : null;
+  if (!scheduleId) return;
+
+  const schedule = await db.getDuesSchedule(scheduleId, lodgeId);
+  if (!schedule) return;
+
+  const nextFailures = (schedule.consecutive_failures ?? 0) + 1;
+  // Threshold policy from 2026-05-28 design: notify treasurer at 1,
+  // escalate at 3, pause at 5. The cron treats `paused` as a hard stop;
+  // a treasurer can flip back to `active` from the admin schedule card.
+  const status: "past_due" | "paused" =
+    nextFailures >= 5 ? "paused" : "past_due";
+
+  await db.updateDuesSchedule(scheduleId, lodgeId, {
+    status,
+    consecutive_failures: nextFailures,
+    last_failure_code: failure.failureCode,
+    last_failure_category: failure.failureCategory,
+    last_failure_at: new Date().toISOString(),
+  });
+
+  console.log("dues subscription failure", {
+    schedule_id: scheduleId,
+    intent: attempt.intent,
+    consecutive_failures: nextFailures,
+    failure_code: failure.failureCode,
+    failure_category: failure.failureCategory,
+    failure_reason: failure.failureReason,
+    status,
+  });
+}
+
+// Per-cycle attribution of the charitable portion of the annual dues.
+// The full-year charitable amount is divided across the cycles so the
+// donations row at each capture lines up with the cycle's tax-year date,
+// keeping the Gift Aid claim batcher's date alignment correct.
+function computeCyclicalCharitable(
+  fullYearCharitable: number | null | undefined,
+  cycles: number
+): number {
+  const total = Number(fullYearCharitable ?? 0);
+  if (total <= 0 || cycles <= 0) return 0;
+  return Math.round((total / cycles) * 100) / 100;
 }

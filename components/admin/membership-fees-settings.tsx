@@ -6,8 +6,11 @@ import {
   Save,
   CheckCircle2,
   AlertCircle,
+  CalendarPlus,
   CreditCard,
+  Percent,
   Repeat,
+  Sliders,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +29,14 @@ interface FeesData {
   charitable_amount: number;
   charitable_label: string;
   gift_aid_enabled: boolean;
+  // Subscription / advance settings (migration 061).
+  enable_strategy_catch_up_lump: boolean;
+  enable_strategy_balloon: boolean;
+  enable_strategy_reslice: boolean;
+  auto_renew_default: boolean;
+  year_start_prompt_days: number;
+  catch_up_max_months: number;
+  advance_discount_percent: number;
 }
 
 export function MembershipFeesSettings() {
@@ -41,6 +52,13 @@ export function MembershipFeesSettings() {
     charitable_amount: 0,
     charitable_label: "Charitable portion",
     gift_aid_enabled: false,
+    enable_strategy_catch_up_lump: true,
+    enable_strategy_balloon: false,
+    enable_strategy_reslice: true,
+    auto_renew_default: true,
+    year_start_prompt_days: 30,
+    catch_up_max_months: 6,
+    advance_discount_percent: 0,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -65,6 +83,17 @@ export function MembershipFeesSettings() {
               charitable_amount: data.fees.charitable_amount ?? 0,
               charitable_label: data.fees.charitable_label ?? "Charitable portion",
               gift_aid_enabled: data.fees.gift_aid_enabled ?? false,
+              enable_strategy_catch_up_lump:
+                data.fees.enable_strategy_catch_up_lump ?? true,
+              enable_strategy_balloon:
+                data.fees.enable_strategy_balloon ?? false,
+              enable_strategy_reslice:
+                data.fees.enable_strategy_reslice ?? true,
+              auto_renew_default: data.fees.auto_renew_default ?? true,
+              year_start_prompt_days: data.fees.year_start_prompt_days ?? 30,
+              catch_up_max_months: data.fees.catch_up_max_months ?? 6,
+              advance_discount_percent:
+                Number(data.fees.advance_discount_percent ?? 0),
             });
           }
         }
@@ -340,6 +369,178 @@ export function MembershipFeesSettings() {
             )}
           </div>
 
+          {fees.allow_instalments && (
+            <div className="rounded-xl border border-dash-border p-4 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-dash-surface-subtle">
+                  <Sliders className="h-4 w-4 text-dash-muted" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-dash-text">
+                    Catch-up options for mid-year sign-ups
+                  </p>
+                  <p className="text-xs text-dash-muted">
+                    Existing members signing up to monthly partway through
+                    the lodge year see whichever options you enable below.
+                    The default (Reslice over remaining months) is always
+                    available.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3 border-t border-dash-border pt-3">
+                <ToggleRow
+                  label="Reslice over remaining months"
+                  description="Divide the full annual amount across the remaining months for an even monthly. Always on."
+                  checked={fees.enable_strategy_reslice}
+                  onToggle={() =>
+                    setFees({
+                      ...fees,
+                      enable_strategy_reslice: !fees.enable_strategy_reslice,
+                    })
+                  }
+                />
+                <ToggleRow
+                  label="Catch-up lump + monthly"
+                  description="Member pays the missed months as a lump sum today, then £X/month for the rest of the year."
+                  checked={fees.enable_strategy_catch_up_lump}
+                  onToggle={() =>
+                    setFees({
+                      ...fees,
+                      enable_strategy_catch_up_lump:
+                        !fees.enable_strategy_catch_up_lump,
+                    })
+                  }
+                />
+                <ToggleRow
+                  label="Monthly with year-end balloon"
+                  description="Member pays £X/month and the missed months as one balloon at the end. Default off — higher dropout risk."
+                  checked={fees.enable_strategy_balloon}
+                  onToggle={() =>
+                    setFees({
+                      ...fees,
+                      enable_strategy_balloon: !fees.enable_strategy_balloon,
+                    })
+                  }
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 border-t border-dash-border pt-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="catchUpMaxMonths">
+                    Cap catch-up lump at
+                  </Label>
+                  <select
+                    id="catchUpMaxMonths"
+                    className="flex h-11 w-full rounded-xl border border-dash-border bg-dash-surface px-3 py-2 text-sm"
+                    value={fees.catch_up_max_months}
+                    onChange={(e) =>
+                      setFees({
+                        ...fees,
+                        catch_up_max_months: Number(e.target.value),
+                      })
+                    }
+                  >
+                    {[3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
+                      <option key={n} value={n}>
+                        {n} months
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-dash-muted">
+                    Members further into the year are routed to a treasurer
+                    conversation instead of self-service.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="yearStartPromptDays">
+                    Notify members before year start
+                  </Label>
+                  <select
+                    id="yearStartPromptDays"
+                    className="flex h-11 w-full rounded-xl border border-dash-border bg-dash-surface px-3 py-2 text-sm"
+                    value={fees.year_start_prompt_days}
+                    onChange={(e) =>
+                      setFees({
+                        ...fees,
+                        year_start_prompt_days: Number(e.target.value),
+                      })
+                    }
+                  >
+                    {[7, 14, 21, 30, 45, 60, 90].map((n) => (
+                      <option key={n} value={n}>
+                        {n} days before
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-dash-muted">
+                    Driver for the year-start auto-create + reminder job.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-xl border border-dash-border p-4 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-dash-surface-subtle">
+                <CalendarPlus className="h-4 w-4 text-dash-muted" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-dash-text">
+                  Pay-in-advance for next year
+                </p>
+                <p className="text-xs text-dash-muted">
+                  Paid-up members can prepay next year&apos;s dues from their
+                  portal. Optional discount rewards early payment.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 border-t border-dash-border pt-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="advanceDiscount">Advance discount</Label>
+                <div className="relative">
+                  <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-dash-muted" />
+                  <Input
+                    id="advanceDiscount"
+                    type="number"
+                    step="0.5"
+                    min={0}
+                    max={50}
+                    className="pl-9"
+                    value={fees.advance_discount_percent}
+                    onChange={(e) =>
+                      setFees({
+                        ...fees,
+                        advance_discount_percent: Math.max(
+                          0,
+                          Math.min(50, Number(e.target.value))
+                        ),
+                      })
+                    }
+                  />
+                </div>
+                <p className="text-xs text-dash-muted">
+                  {fees.advance_discount_percent > 0
+                    ? `Members who prepay save ${fees.advance_discount_percent}%`
+                    : "0% locks in next year without a discount."}
+                </p>
+              </div>
+              <ToggleRow
+                label="Auto-renew default"
+                description="When monthly subscriptions reach their final cycle, default to rolling members onto the next year automatically."
+                checked={fees.auto_renew_default}
+                onToggle={() =>
+                  setFees({
+                    ...fees,
+                    auto_renew_default: !fees.auto_renew_default,
+                  })
+                }
+              />
+            </div>
+          </div>
+
           <div className="flex justify-end pt-2">
             <Button type="submit" variant="primary" disabled={saving}>
               {saving ? (
@@ -358,5 +559,41 @@ export function MembershipFeesSettings() {
         </CardContent>
       </Card>
     </form>
+  );
+}
+
+function ToggleRow({
+  label,
+  description,
+  checked,
+  onToggle,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div className="flex-1">
+        <p className="text-sm font-medium text-dash-text">{label}</p>
+        <p className="text-xs text-dash-muted">{description}</p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={onToggle}
+        className={`relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors ${
+          checked ? "bg-emerald-500" : "bg-slate-200"
+        }`}
+      >
+        <span
+          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+            checked ? "translate-x-6" : "translate-x-1"
+          }`}
+        />
+      </button>
+    </div>
   );
 }

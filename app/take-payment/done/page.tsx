@@ -32,7 +32,6 @@ type AttemptRow = {
 
 type ProjectedRow = {
   status: string;
-  total_amount: number;
   currency: string | null;
 };
 
@@ -83,13 +82,19 @@ async function loadSummary(paymentId: string | null) {
       .maybeSingle<AttemptRow>();
     if (!attempt) return null;
 
-    // The LP-side projection is the canonical source of truth once the
-    // webhook has fired. The Mooov redirect can race the webhook by a second
-    // or two, so we tolerate either "succeeded on the projection" OR
+    // The LP-side projection is the canonical source of truth for *status*
+    // once the webhook has fired. The Mooov redirect can race the webhook by
+    // a second or two, so we tolerate either "succeeded on the projection" OR
     // "succeeded on the attempt" as a positive outcome.
+    //
+    // Amount stays sourced from payment_attempts because that table stores it
+    // in minor units (pence), matching the status polling endpoint and what
+    // formatAmount below expects. payments.total_amount is in major units
+    // (pounds) per the LP-side schema convention, so reading it here would
+    // double-divide by 100 and render £1.00 as £0.01.
     const { data: projected } = await supa
       .from("payments")
-      .select("status, total_amount, currency")
+      .select("status, currency")
       .eq("mooov_payment_id", paymentId)
       .maybeSingle<ProjectedRow>();
 
@@ -104,7 +109,7 @@ async function loadSummary(paymentId: string | null) {
     const status = projected?.status ?? attempt.status;
     return {
       paymentId: attempt.payment_id,
-      amountMinor: projected?.total_amount ?? attempt.amount,
+      amountMinor: attempt.amount,
       currency: projected?.currency ?? attempt.currency,
       phase: phaseFor(status),
       lodgeName,

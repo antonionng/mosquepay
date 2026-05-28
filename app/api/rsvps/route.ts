@@ -7,6 +7,7 @@ import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { resolveCheckoutFeesForMember } from "@/lib/fees/server-resolve";
 
 export async function POST(request: NextRequest) {
   const _rejectMock = rejectIfMockDisabled();
@@ -24,6 +25,7 @@ export async function POST(request: NextRequest) {
     const number_of_guests = Math.min(10, Math.max(0, Number(body.number_of_guests) || 0));
     const dietary_requirements = body.dietary_requirements?.trim() ?? null;
     const special_requests = body.special_requests?.trim() ?? null;
+    const rawGuests = Array.isArray(body.guests) ? body.guests : [];
 
     if (!event_id || !user_name || !user_email) {
       return NextResponse.json(
@@ -53,6 +55,40 @@ export async function POST(request: NextRequest) {
       if (!lodgeId) {
         return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
       }
+
+      // Same defence as the summons access route: when this meeting has
+      // payments enabled and the brother owes something, refuse the
+      // no-payment branch. The form must route through checkout so the
+      // RSVP only lands alongside a settled payment.
+      if (attending_ceremony) {
+        const event = await db.getEventById(event_id, lodgeId);
+        if (event && event.enable_payments) {
+          const resolved = await resolveCheckoutFeesForMember({
+            lodgeId,
+            event,
+            memberEmail: user_email,
+            attendingCeremony: true,
+            attendingDining: attending_dining,
+            guests: rawGuests
+              .map((g: { guest_name?: string }) => ({
+                guest_name: typeof g?.guest_name === "string" ? g.guest_name.trim() : "",
+              }))
+              .filter((g: { guest_name: string }) => g.guest_name.length > 0),
+          });
+          if (resolved.total > 0) {
+            return NextResponse.json(
+              {
+                error:
+                  "This event requires payment to confirm attendance. Please complete checkout.",
+                requires_checkout: true,
+                amount_due: resolved.total,
+              },
+              { status: 402 }
+            );
+          }
+        }
+      }
+
       const rsvp = await db.addRsvp(lodgeId, rsvpData);
       return NextResponse.json({ id: rsvp.id, success: true });
     }
