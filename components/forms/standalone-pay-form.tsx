@@ -233,7 +233,7 @@ export function StandalonePayForm({
 
         {enableRaffle && (
           <div className="space-y-2">
-            <Label>Raffle contribution</Label>
+            <Label>Raffle ticket strips</Label>
             <div className="flex flex-wrap gap-2">
               {raffleSuggestedAmounts.map((a) => (
                 <Button key={a} type="button" variant={raffleAmount === a ? "default" : "secondary"} size="sm" onClick={() => setRaffleAmount(a)}>

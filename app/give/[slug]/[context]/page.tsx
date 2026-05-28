@@ -321,12 +321,18 @@ async function resolveContext({
         intent: "event_raffle_standing_qr",
         presetAmounts: presets,
         campaignId: null,
+        // Heading + subheading below frame this as buying physical strips
+        // of raffle tickets so the QR landing is consistent with the
+        // summons form copy.
         eventId: event?.id ?? null,
         description: event
-          ? `Raffle support — ${event.title}`
-          : "Raffle support",
-        heading: event ? `Raffle at ${event.title}` : "Raffle",
-        subheading: "Pick a contribution to buy tickets.",
+          ? `Raffle ticket strips — ${event.title}`
+          : "Raffle ticket strips",
+        heading: event
+          ? `Raffle tickets at ${event.title}`
+          : "Raffle ticket strips",
+        subheading:
+          "Pick a price to buy a strip (or multiple strips) of raffle tickets.",
         customAllowed: event?.raffle_allow_custom !== false,
       };
     }

@@ -195,7 +195,8 @@ export function parseSuggestedAmounts(input: string): number[] {
 
 const DEFAULT_CHARITY_SUGGESTED = "10, 20, 50, 100";
 const DEFAULT_RAFFLE_SUGGESTED = "5, 10, 20, 50";
-const DEFAULT_RAFFLE_DESCRIPTION = "Help fund evening raffle prizes";
+const DEFAULT_RAFFLE_DESCRIPTION =
+  "Buy strips of raffle tickets — proceeds fund the evening prizes";
 const DEFAULT_WINE_DESCRIPTION =
   "Bring a bottle of wine for the evening raffle";
 
@@ -946,8 +947,13 @@ export function MeetingFormDrawer({
                     })
                   }
                 />
-                Sell raffle tickets at this meeting
+                Sell strips of raffle tickets at this meeting
               </label>
+              <p className="pl-6 text-xs text-dash-muted">
+                Members pre-pay for a strip (or strips) of raffle tickets on
+                the summons. The strips are drawn at the evening raffle on
+                the night, with the proceeds funding the prizes.
+              </p>
               {form.enable_raffle_donation && (
                 <div className="grid gap-4 pl-6 sm:grid-cols-2">
                   <div className="space-y-2 sm:col-span-2">
@@ -955,11 +961,11 @@ export function MeetingFormDrawer({
                       className="text-sm text-dash-text"
                       htmlFor="raffle-description"
                     >
-                      Raffle description
+                      Raffle ticket description
                     </label>
                     <Input
                       id="raffle-description"
-                      placeholder="e.g. Help fund evening raffle prizes"
+                      placeholder="e.g. Buy strips of raffle tickets — proceeds fund the evening prizes"
                       value={form.raffle_description}
                       onChange={(event) =>
                         updateForm({ raffle_description: event.target.value })
@@ -971,7 +977,7 @@ export function MeetingFormDrawer({
                       className="text-sm text-dash-text"
                       htmlFor="raffle-suggested"
                     >
-                      Suggested amounts (£)
+                      Suggested strip prices (£)
                     </label>
                     <Input
                       id="raffle-suggested"
@@ -984,8 +990,8 @@ export function MeetingFormDrawer({
                       }
                     />
                     <p className="text-xs text-dash-muted">
-                      Comma-separated list. Members can tap one of these
-                      buttons on the summons.
+                      Comma-separated list of price points members can tap
+                      to buy a strip (or multiple strips) on the summons.
                     </p>
                   </div>
                   <label className="flex items-center gap-2 text-sm text-dash-text sm:col-span-2">

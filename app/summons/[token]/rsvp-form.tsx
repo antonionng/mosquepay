@@ -176,7 +176,7 @@ export function SummonsRsvpForm({
     if (enableRaffleDonation && raffleAmount > 0) {
       items.push({
         key: "raffle",
-        label: "Raffle contribution",
+        label: "Raffle ticket strips",
         amount: raffleAmount,
       });
     }
@@ -548,11 +548,12 @@ export function SummonsRsvpForm({
           {enableRaffleDonation ? (
             <div className="space-y-2">
               <Label className="font-semibold text-slate-950">
-                Raffle contribution
+                Raffle ticket strips
               </Label>
-              {raffleDescription ? (
-                <p className="text-xs text-slate-600">{raffleDescription}</p>
-              ) : null}
+              <p className="text-xs text-slate-600">
+                {raffleDescription ??
+                  "Pre-pay for a strip (or strips) of raffle tickets for the evening draw."}
+              </p>
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"

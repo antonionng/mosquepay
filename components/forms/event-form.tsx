@@ -244,12 +244,18 @@ export function EventForm({ eventId, defaultValues }: { eventId?: string; defaul
               )}
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="enable_raffle_donation" {...register("enable_raffle_donation")} className="h-4 w-4 rounded border-input text-blue-600 focus:ring-blue-500" />
-                <Label htmlFor="enable_raffle_donation">Raffle contribution (optional)</Label>
+                <Label htmlFor="enable_raffle_donation">
+                  Raffle ticket strips (optional)
+                </Label>
               </div>
               {watch("enable_raffle_donation") && (
                 <div className="space-y-2">
                   <Label htmlFor="raffle_description">Raffle description</Label>
-                  <Input id="raffle_description" {...register("raffle_description")} placeholder="Help fund evening raffle prizes" />
+                  <Input
+                    id="raffle_description"
+                    {...register("raffle_description")}
+                    placeholder="Buy strips of raffle tickets — proceeds fund the evening prizes"
+                  />
                 </div>
               )}
               <div className="flex items-center gap-2">

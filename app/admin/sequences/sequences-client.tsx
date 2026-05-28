@@ -150,7 +150,8 @@ function defaultForm(): SequenceForm {
     default_enable_charity_donation: false,
     default_charity_name: "",
     default_enable_raffle_donation: false,
-    default_raffle_description: "",
+    default_raffle_description:
+      "Buy strips of raffle tickets — proceeds fund the evening prizes",
     default_enable_raffle_wine_pledge: false,
     default_raffle_wine_description: "Bring a bottle of wine for the evening raffle",
     summons_lead_weeks: 6,
@@ -1154,17 +1155,18 @@ export function SequencesClient({
                     }
                   />
                   <span className="text-sm text-dash-text">
-                    Collect cash contributions for the evening raffle.
+                    Sell strips of raffle tickets at every meeting in this
+                    sequence.
                   </span>
                 </label>
                 {createForm.default_enable_raffle_donation && (
                   <div className="space-y-2 pl-7">
                     <label className="text-xs font-medium text-dash-muted">
-                      Raffle description shown on RSVP
+                      Raffle ticket description shown on RSVP
                     </label>
                     <Input
                       value={createForm.default_raffle_description}
-                      placeholder="Help fund evening raffle prizes"
+                      placeholder="Buy strips of raffle tickets — proceeds fund the evening prizes"
                       onChange={(event) =>
                         setCreateForm((current) => ({
                           ...current,

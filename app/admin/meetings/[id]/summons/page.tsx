@@ -285,10 +285,11 @@ export default async function MeetingSummonsPage({
                 </dd>
               </div>
               <div className="flex justify-between gap-4">
-                <dt className="text-slate-500">Raffle</dt>
+                <dt className="text-slate-500">Raffle tickets</dt>
                 <dd className="font-medium">
                   {event.enable_raffle_donation
-                    ? event.raffle_description ?? "Optional contribution"
+                    ? event.raffle_description ??
+                      "Strips of raffle tickets sold on the night"
                     : "Not configured"}
                 </dd>
               </div>

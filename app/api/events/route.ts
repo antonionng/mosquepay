@@ -83,7 +83,9 @@ export async function POST(request: NextRequest) {
         : [10, 20, 50, 100],
       charity_allow_custom: body.charity_allow_custom !== false,
       enable_raffle_donation: body.enable_raffle_donation === true,
-      raffle_description: body.raffle_description?.trim() ?? "Help fund evening raffle prizes",
+      raffle_description:
+        body.raffle_description?.trim() ??
+        "Buy strips of raffle tickets — proceeds fund the evening prizes",
       raffle_suggested_amounts: Array.isArray(body.raffle_suggested_amounts)
         ? body.raffle_suggested_amounts
             .map((n: unknown) => Number(n))
@@ -121,6 +123,9 @@ export async function POST(request: NextRequest) {
       | "summons_approved_at"
       | "summons_approved_by_email"
       | "summons_last_sent_at"
+      | "meeting_closed_at"
+      | "meeting_closed_by_email"
+      | "meeting_close_notes"
     >;
 
     if (isSupabaseConfigured()) {

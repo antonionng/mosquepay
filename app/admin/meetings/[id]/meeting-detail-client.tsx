@@ -969,7 +969,7 @@ export function MeetingDetailClient({
                   hint={meeting.charity_description ?? undefined}
                 />
                 <ConfigRow
-                  label="Raffle (cash)"
+                  label="Raffle ticket strips"
                   value={meeting.enable_raffle_donation ? "Enabled" : "Off"}
                   hint={meeting.raffle_description ?? undefined}
                 />

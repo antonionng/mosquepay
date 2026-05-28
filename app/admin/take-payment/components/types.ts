@@ -138,7 +138,7 @@ export const CATEGORIES = [
   { id: "guest_ticket", label: "Guest ticket" },
   { id: "dining", label: "Dining / festive board" },
   { id: "charity", label: "Charity collection" },
-  { id: "raffle", label: "Raffle" },
+  { id: "raffle", label: "Raffle ticket strips" },
   { id: "subscriptions", label: "Subscriptions / dues top-up" },
   { id: "other", label: "Other" },
 ] as const;
