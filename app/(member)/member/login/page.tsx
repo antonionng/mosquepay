@@ -101,7 +101,15 @@ function MemberLoginContent() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link
+                  href="/member/forgot-password"
+                  className="text-xs font-medium text-dash-muted transition-colors hover:text-brand"
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-dash-faint" />
                 <Input
@@ -109,7 +117,7 @@ function MemberLoginContent() {
                   name="password"
                   variant="dashboard"
                   type="password"
-                  placeholder="••••••••"
+                  placeholder="********"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10"

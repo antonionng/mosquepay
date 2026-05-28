@@ -87,7 +87,15 @@ function LoginForm() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              <Link
+                href="/admin/forgot-password"
+                className="text-xs font-medium text-dash-muted transition-colors hover:text-brand"
+              >
+                Forgot password?
+              </Link>
+            </div>
             <Input
               id="password"
               name="password"
@@ -109,7 +117,7 @@ function LoginForm() {
 
       <p className="mt-5 text-center sm:mt-6">
         <Link href="/" className="text-sm text-dash-muted transition-colors hover:text-brand">
-          ← Back to site
+          &larr; Back to site
         </Link>
       </p>
     </div>

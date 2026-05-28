@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Send, ShieldCheck, UserPlus } from "lucide-react";
+import { KeyRound, Loader2, Send, ShieldCheck, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -120,6 +120,38 @@ export function PlatformConsoleManager({
   }
 
   const roleOptions = scopeType === "platform" ? PLATFORM_ROLES : TENANT_ROLES;
+
+  async function sendPasswordReset(admin: AdminUser) {
+    if (
+      !window.confirm(
+        `Send a password reset email to ${admin.email}? They'll get a link to choose a new password.`
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/admin/platform/admins", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: admin.id, action: "send_password_reset" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error ?? "Could not send password reset email.");
+      }
+      setMessage(`Password reset email sent to ${admin.email}.`);
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not send password reset email."
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
@@ -286,11 +318,15 @@ export function PlatformConsoleManager({
             title="Platform team"
             rows={platformAdmins}
             getScope={() => "Platform"}
+            onResetPassword={sendPasswordReset}
+            busy={busy}
           />
           <AdminList
             title="Tenant admins"
             rows={tenantAdmins}
             getScope={(admin) => lodgeById.get(admin.lodge_id ?? "")?.name ?? "Unknown lodge"}
+            onResetPassword={sendPasswordReset}
+            busy={busy}
           />
         </div>
       </Card>
@@ -330,10 +366,14 @@ function AdminList({
   title,
   rows,
   getScope,
+  onResetPassword,
+  busy,
 }: {
   title: string;
   rows: AdminUser[];
   getScope: (admin: AdminUser) => string;
+  onResetPassword: (admin: AdminUser) => void;
+  busy: boolean;
 }) {
   return (
     <div className="mb-6 last:mb-0">
@@ -347,7 +387,7 @@ function AdminList({
           {rows.map((admin) => (
             <div
               key={admin.id}
-              className="grid gap-2 p-3 text-sm sm:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_auto]"
+              className="grid gap-2 p-3 text-sm sm:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_auto_auto]"
             >
               <div>
                 <p className="font-medium text-dash-text">{admin.full_name}</p>
@@ -366,6 +406,17 @@ function AdminList({
               >
                 {admin.active ? "Active" : "Inactive"}
               </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={busy || !admin.active}
+                onClick={() => onResetPassword(admin)}
+                className="self-start"
+              >
+                <KeyRound className="mr-1.5 h-3.5 w-3.5" />
+                Reset password
+              </Button>
             </div>
           ))}
         </div>

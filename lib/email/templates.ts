@@ -268,6 +268,49 @@ export function renderStaffInviteEmail({
   });
 }
 
+export function renderPasswordResetEmail({
+  name,
+  actionUrl,
+  audience,
+  lodgeName,
+}: {
+  name: string;
+  actionUrl: string;
+  audience: "admin" | "member";
+  lodgeName?: string | null;
+}) {
+  const eyebrow = audience === "admin" ? "Admin password reset" : "Member password reset";
+  const heading =
+    audience === "admin"
+      ? "Reset your admin password"
+      : "Reset your member portal password";
+  const intro =
+    audience === "admin"
+      ? `We received a request to reset the password for your LodgePay admin account${
+          lodgeName ? ` for ${lodgeName}` : ""
+        }.`
+      : `We received a request to reset the password for your LodgePay member portal${
+          lodgeName ? ` at ${lodgeName}` : ""
+        }.`;
+  return renderShell({
+    eyebrow,
+    title: heading,
+    preview: heading,
+    children: `
+      <h1 style="margin:0;color:${brand.ink};font-size:28px;line-height:1.15;">${escapeEmailHtml(heading)}</h1>
+      <p style="margin:18px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;">Hello ${escapeEmailHtml(name)},</p>
+      <p style="margin:12px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;">
+        ${escapeEmailHtml(intro)} Click the button below to choose a new password. This link will expire shortly for your security.
+      </p>
+      <div style="margin:26px 0 24px;">${button("Reset password", actionUrl)}</div>
+      <div style="border-radius:18px;border:1px solid ${brand.border};background:${brand.surfaceSubtle};padding:16px 18px;">
+        <p style="margin:0;color:${brand.ink};font-size:14px;font-weight:800;">Didn&rsquo;t request this?</p>
+        <p style="margin:6px 0 0;color:${brand.muted};font-size:14px;line-height:1.6;">You can safely ignore this email. Your password will stay the same until you choose a new one.</p>
+      </div>
+    `,
+  });
+}
+
 export function renderMemberInviteEmail({
   name,
   lodgeName,

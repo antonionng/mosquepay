@@ -4,7 +4,10 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { getAdminReadContext } from "@/lib/admin/read-context";
-import { sendStaffInvite as sendInvite } from "@/lib/auth/invites";
+import {
+  sendStaffInvite as sendInvite,
+  sendStaffPasswordReset,
+} from "@/lib/auth/invites";
 
 const ROLES = new Set([
   "secretary",
@@ -178,6 +181,36 @@ export async function PATCH(request: NextRequest) {
       metadata: { via: "resend" },
     });
     return NextResponse.json({ invite });
+  }
+
+  if (body.action === "send_password_reset") {
+    const existing = (await db.listAdminUsersForLodge(lodgeId)).find(
+      (member) => member.id === id
+    );
+    if (!existing) {
+      return NextResponse.json({ error: "Staff user not found." }, { status: 404 });
+    }
+    const lodge = await db.getLodgeById(lodgeId).catch(() => null);
+    const reset = await sendStaffPasswordReset({
+      request,
+      staff: existing,
+      lodgeName: lodge?.name ?? lodgeSlug,
+    });
+    if (!reset.sent) {
+      return NextResponse.json(
+        { error: reset.error ?? "Could not send password reset email." },
+        { status: 500 }
+      );
+    }
+    await writeAuditLog({
+      lodgeId,
+      action: "password_reset_sent",
+      entityType: "admin_user",
+      entityId: existing.id,
+      summary: `Sent password reset email to ${existing.email}`,
+      metadata: { via: "resend" },
+    });
+    return NextResponse.json({ reset });
   }
 
   const role = cleanRole(body.role);

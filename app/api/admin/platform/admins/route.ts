@@ -5,7 +5,7 @@ import {
   requirePlatformScope,
 } from "@/lib/auth/platform";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import { sendStaffInvite } from "@/lib/auth/invites";
+import { sendStaffInvite, sendStaffPasswordReset } from "@/lib/auth/invites";
 import { writeAuditLog } from "@/lib/audit";
 import * as db from "@/lib/db";
 
@@ -225,4 +225,82 @@ export async function POST(request: NextRequest) {
   });
 
   return NextResponse.json({ staff, invite }, { status: 201 });
+}
+
+/**
+ * Platform-level support actions on a single admin_users row. Currently
+ * supports:
+ *   - send_password_reset: emails the admin a Resend-powered password reset
+ *     link so a platform team member can unblock a tenant owner / treasurer
+ *     / officer who has lost their password.
+ *
+ * Gated on requirePlatformScope() so any platform admin (operator or owner)
+ * can perform the action. Tenant admins manage their own staff via
+ * /api/admin/staff -- they should not be able to reach this route at all.
+ */
+export async function PATCH(request: NextRequest) {
+  const unauthorized = await requireAdminApiAuth();
+  if (unauthorized) return unauthorized;
+
+  const { response } = await requirePlatformScope();
+  if (response) return response;
+
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json(
+      { error: "Database not configured." },
+      { status: 503 }
+    );
+  }
+
+  const body = await request.json().catch(() => ({}));
+  const id = typeof body.id === "string" ? body.id : "";
+  const action = typeof body.action === "string" ? body.action : "";
+
+  if (!id) {
+    return NextResponse.json({ error: "Admin id is required." }, { status: 400 });
+  }
+
+  const target = await db.getAdminUserById(id);
+  if (!target) {
+    return NextResponse.json({ error: "Admin not found." }, { status: 404 });
+  }
+
+  if (action === "send_password_reset") {
+    let lodgeName = target.lodge_id ? "your lodge" : "LodgePay platform";
+    if (target.lodge_id) {
+      try {
+        const lodge = await db.getLodgeById(target.lodge_id);
+        if (lodge?.name) lodgeName = lodge.name;
+      } catch {
+        // Non-fatal: stick with the generic lodge label.
+      }
+    }
+
+    const reset = await sendStaffPasswordReset({
+      request,
+      staff: target,
+      lodgeName,
+    });
+    if (!reset.sent) {
+      return NextResponse.json(
+        { error: reset.error ?? "Could not send password reset email." },
+        { status: 500 }
+      );
+    }
+
+    await writeAuditLog({
+      lodgeId: target.lodge_id,
+      action: target.lodge_id
+        ? "tenant_admin_password_reset_sent"
+        : "platform_admin_password_reset_sent",
+      entityType: "admin_user",
+      entityId: target.id,
+      summary: `Platform team sent password reset email to ${target.email}`,
+      metadata: { via: "resend", target_email: target.email, role: target.role },
+    });
+
+    return NextResponse.json({ reset });
+  }
+
+  return NextResponse.json({ error: "Unsupported action." }, { status: 400 });
 }

@@ -6,6 +6,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import {
   lodgePayFromEmail,
   renderMemberInviteEmail,
+  renderPasswordResetEmail,
   renderStaffInviteEmail,
 } from "@/lib/email/templates";
 
@@ -183,6 +184,206 @@ export async function sendStaffInvite({
   }
 
   return { sent: true, error: null };
+}
+
+function resendFromAddress() {
+  return lodgePayFromEmail(
+    process.env.RESEND_FROM_EMAIL ??
+    process.env.EMAIL_FROM ??
+    "LodgePay <noreply@lodgepayments.co.uk>"
+  );
+}
+
+/**
+ * Low-level helper that generates a Supabase recovery link and delivers it
+ * via Resend with our branded password-reset template. Used directly by the
+ * public forgot-password endpoints for platform owners (who may have no
+ * admin_users row to anchor on) and indirectly by the higher-level staff
+ * and member reset helpers below.
+ *
+ * Callers are responsible for ensuring the email actually identifies the
+ * intended recipient (e.g. by looking it up in admin_users or members
+ * first). This function does NOT enforce its own access control.
+ */
+async function sendPasswordResetEmail({
+  email,
+  recipientName,
+  audience,
+  redirectTo,
+  lodgeName,
+}: {
+  email: string;
+  recipientName: string;
+  audience: "admin" | "member";
+  redirectTo: string;
+  lodgeName: string | null;
+}): Promise<{ sent: boolean; error: string | null }> {
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey) {
+    return { sent: false, error: "Resend is not configured." };
+  }
+
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.auth.admin.generateLink({
+    type: "recovery",
+    email,
+    options: { redirectTo },
+  });
+  if (error || !data.properties?.action_link) {
+    return {
+      sent: false,
+      error: error?.message ?? "Could not create a password reset link.",
+    };
+  }
+
+  const resend = new Resend(resendKey);
+  const subject =
+    audience === "admin"
+      ? "Reset your LodgePay admin password"
+      : "Reset your LodgePay member portal password";
+  const { error: resendError } = await resend.emails.send({
+    from: resendFromAddress(),
+    to: email,
+    subject,
+    html: renderPasswordResetEmail({
+      name: recipientName,
+      actionUrl: data.properties.action_link,
+      audience,
+      lodgeName,
+    }),
+    text: `Hello ${recipientName},\n\nReset your LodgePay ${audience === "admin" ? "admin" : "member portal"} password here: ${data.properties.action_link}\n\nIf you did not request this, you can ignore this email.\n`,
+  });
+
+  if (resendError) {
+    return { sent: false, error: resendError.message };
+  }
+  return { sent: true, error: null };
+}
+
+/**
+ * Public forgot-password entry point. Resolves the redirect target from the
+ * caller's request origin (so dev/staging/prod all work) and delegates to
+ * sendPasswordResetEmail. Use this directly for platform owners that have
+ * no admin_users row to anchor on.
+ */
+export async function sendPasswordResetByEmail({
+  request,
+  email,
+  recipientName,
+  audience,
+  lodgeName,
+}: {
+  request: NextRequest;
+  email: string;
+  recipientName: string;
+  audience: "admin" | "member";
+  lodgeName: string | null;
+}): Promise<{ sent: boolean; error: string | null }> {
+  const baseUrl = getBaseUrl(request);
+  const redirectTo =
+    audience === "admin"
+      ? `${baseUrl}/admin/reset-password`
+      : `${baseUrl}/member/reset-password`;
+  return sendPasswordResetEmail({
+    email,
+    recipientName,
+    audience,
+    redirectTo,
+    lodgeName,
+  });
+}
+
+/**
+ * Sends a password reset email to an admin/staff user. The link lands on the
+ * admin reset-password page where Supabase exchanges it for a session and
+ * lets the user choose a new password.
+ *
+ * Safe to call for both first-time and existing users: if no auth.users row
+ * exists yet, one is created on the fly so the recovery link works.
+ */
+/**
+ * Sends a password reset email to a staff/admin user. Ensures an auth.users
+ * row exists first (and back-links it onto admin_users) so first-time staff
+ * can use the link to set their initial password.
+ */
+export async function sendStaffPasswordReset({
+  request,
+  staff,
+  lodgeName,
+}: {
+  request: NextRequest;
+  staff: db.AdminUser;
+  lodgeName: string;
+}): Promise<{ sent: boolean; error: string | null }> {
+  if (!staff.auth_user_id) {
+    const supabase = createServiceClient();
+    const ensured = await ensureAuthUser({
+      supabase,
+      email: staff.email,
+      fullName: staff.full_name,
+      metadata: { admin_role: staff.role },
+    });
+    if (!ensured.id) {
+      return {
+        sent: false,
+        error: ensured.error ?? "Could not create the staff auth user.",
+      };
+    }
+    await db.updateAdminUser(staff.id, { auth_user_id: ensured.id });
+  }
+
+  return sendPasswordResetByEmail({
+    request,
+    email: staff.email,
+    recipientName: staff.full_name,
+    audience: "admin",
+    lodgeName,
+  });
+}
+
+/**
+ * Sends a password reset email to a lodge member. Same shape as
+ * sendStaffPasswordReset but lands on the member reset-password page.
+ */
+export async function sendMemberPasswordReset({
+  request,
+  member,
+  lodgeName,
+}: {
+  request: NextRequest;
+  member: db.Member;
+  lodgeName: string;
+}): Promise<{ sent: boolean; error: string | null }> {
+  if (!member.email) {
+    return { sent: false, error: "Member has no email on file." };
+  }
+
+  if (!member.auth_user_id) {
+    const supabase = createServiceClient();
+    const ensured = await ensureAuthUser({
+      supabase,
+      email: member.email,
+      fullName: member.full_name,
+      metadata: { member_id: member.id },
+    });
+    if (!ensured.id) {
+      return {
+        sent: false,
+        error: ensured.error ?? "Could not create the member auth user.",
+      };
+    }
+    await db.updateMember(member.id, member.lodge_id, {
+      auth_user_id: ensured.id,
+    });
+  }
+
+  return sendPasswordResetByEmail({
+    request,
+    email: member.email,
+    recipientName: member.full_name,
+    audience: "member",
+    lodgeName,
+  });
 }
 
 /**

@@ -39,7 +39,9 @@ export function proxy(request: NextRequest) {
     path.startsWith("/admin") &&
     path !== "/admin/login" &&
     path !== "/admin/signin" &&
-    path !== "/admin/accept-invite"
+    path !== "/admin/accept-invite" &&
+    path !== "/admin/forgot-password" &&
+    path !== "/admin/reset-password"
   ) {
     const token = request.cookies.get(SESSION_COOKIE)?.value;
     const staffToken = request.cookies.get(STAFF_ADMIN_COOKIE)?.value;
@@ -73,7 +75,9 @@ export function proxy(request: NextRequest) {
     path.startsWith("/member") &&
     path !== "/member/login" &&
     path !== "/member/signup" &&
-    path !== "/member/accept-invite"
+    path !== "/member/accept-invite" &&
+    path !== "/member/forgot-password" &&
+    path !== "/member/reset-password"
   ) {
     if (!hasSupabaseSession(request)) {
       const login = new URL("/member/login", request.url);

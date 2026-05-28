@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
+  KeyRound,
   Mail,
   Save,
   ShieldCheck,
@@ -196,6 +197,43 @@ export function StaffSettings() {
       setMessage({
         type: "error",
         text: error instanceof Error ? error.message : "Could not send staff invite.",
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function sendPasswordReset(id: string, email: string) {
+    if (
+      !window.confirm(
+        `Send a password reset email to ${email}? They'll get a link to choose a new password.`
+      )
+    ) {
+      return;
+    }
+    setSaving(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/admin/staff", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action: "send_password_reset" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error ?? "Could not send password reset email.");
+      }
+      setMessage({
+        type: "success",
+        text: `Password reset email sent to ${email}.`,
+      });
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Could not send password reset email.",
       });
     } finally {
       setSaving(false);
@@ -434,7 +472,7 @@ export function StaffSettings() {
                     >
                       {draft.active ? "Active" : "Inactive"}
                     </button>
-                    <div className="flex justify-end gap-2">
+                    <div className="flex flex-wrap justify-end gap-2">
                       <Button
                         type="button"
                         variant="dashboard"
@@ -444,6 +482,16 @@ export function StaffSettings() {
                       >
                         <Mail className="mr-1.5 h-4 w-4" />
                         Invite
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="dashboard"
+                        size="sm"
+                        disabled={saving}
+                        onClick={() => sendPasswordReset(member.id, member.email)}
+                      >
+                        <KeyRound className="mr-1.5 h-4 w-4" />
+                        Reset password
                       </Button>
                       <Button
                         type="button"
