@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import * as db from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { ShieldCheck, ShieldAlert } from "lucide-react";
+import { rankLabel } from "@/lib/members/rank";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +48,7 @@ export default async function VerifyMemberPage({
               <p className="text-sm text-slate-600">{member.office_title}</p>
             )}
             {member.rank && (
-              <p className="text-xs text-slate-500">{member.rank}</p>
+              <p className="text-xs text-slate-500">{rankLabel(member.rank)}</p>
             )}
           </div>
           {lodge && (

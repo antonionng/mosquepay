@@ -31,6 +31,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+import { rankLabel } from "@/lib/members/rank";
 
 type MemberMini = {
   id: string;
@@ -299,7 +300,7 @@ export function MentoringClient({
                       </Link>
                       {member.rank && (
                         <span className="ml-2 text-xs text-slate-500">
-                          {member.rank}
+                          {rankLabel(member.rank)}
                         </span>
                       )}
                     </TableCell>

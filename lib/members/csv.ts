@@ -3,6 +3,8 @@
  * Pure functions, used both for preview and import in admin members UI.
  */
 
+import { RANK_CODES, RANK_LABELS, isRank } from "./rank";
+
 export type ParsedMemberRow = {
   rowIndex: number;
   data: Record<string, string>;
@@ -85,6 +87,18 @@ export function parseMembersCsv(
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
       errors.push("Invalid email");
 
+    const rawRank = (data.rank ?? "").trim();
+    if (rawRank) {
+      const canonical = canonicalRank(rawRank);
+      if (canonical) {
+        data.rank = canonical;
+      } else {
+        errors.push(
+          `Invalid rank "${rawRank}". Use one of: ${RANK_CODES.join(", ")} (or the full label).`
+        );
+      }
+    }
+
     const isDuplicate = email.length > 0 && seenEmails.has(email);
     const isExisting = email.length > 0 && existingEmails.has(email);
     if (isDuplicate) errors.push("Duplicate within file");
@@ -131,4 +145,25 @@ export function buildImportPayload(row: ParsedMemberRow) {
     dietary_requirements: r.dietary_requirements || null,
     date_of_initiation: r.date_of_initiation || null,
   };
+}
+
+/**
+ * Map a free-form CSV rank cell to a canonical code, or null if no
+ * match. Accepts the canonical codes themselves, the full human labels,
+ * and a couple of common informal variants. Case-insensitive.
+ */
+function canonicalRank(value: string): string | null {
+  const normalised = value.trim().toLowerCase();
+  if (!normalised) return null;
+  if (isRank(value.trim())) return value.trim();
+  for (const code of RANK_CODES) {
+    if (code.toLowerCase() === normalised) return code;
+    if (RANK_LABELS[code].toLowerCase() === normalised) return code;
+  }
+  if (normalised === "wm" || normalised === "worshipful master") return "Master";
+  if (normalised === "past master" || normalised === "p.m.") return "PM";
+  if (normalised === "entered apprentice" || normalised === "e.a.") return "EA";
+  if (normalised === "fellow craft" || normalised === "f.c.") return "FC";
+  if (normalised === "master mason" || normalised === "m.m.") return "MM";
+  return null;
 }

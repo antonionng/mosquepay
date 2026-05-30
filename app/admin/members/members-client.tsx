@@ -29,6 +29,7 @@ import { parseMembersCsv, type ParsedMemberRow } from "@/lib/members/csv";
 import { MemberImportPreview } from "@/components/members/import-preview";
 import { MemberOrderPanel } from "@/components/members/officer-order";
 import { OfficesPanel, type OfficeRung } from "@/components/members/offices-panel";
+import { RANK_CODES, RANK_LABELS, rankLabel } from "@/lib/members/rank";
 
 interface MemberRow {
   id: string;
@@ -566,7 +567,7 @@ export function AdminMembersClient({
                     </td>
                     <td className="px-4 py-3.5 text-dash-muted">{m.email}</td>
                     <td className="px-4 py-3.5 text-dash-muted hidden md:table-cell">
-                      {m.rank ?? "Not recorded"}
+                      {rankLabel(m.rank) ?? "Not recorded"}
                     </td>
                     <td className="px-4 py-3.5 text-dash-muted hidden lg:table-cell">
                       {m.date_of_initiation
@@ -785,9 +786,11 @@ export function AdminMembersClient({
                     onChange={(e) => setFormData({ ...formData, rank: e.target.value })}
                   >
                     <option value="">Select...</option>
-                    <option value="EA">Entered Apprentice</option>
-                    <option value="FC">Fellow Craft</option>
-                    <option value="MM">Master Mason</option>
+                    {RANK_CODES.map((code) => (
+                      <option key={code} value={code}>
+                        {RANK_LABELS[code]}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="space-y-2">

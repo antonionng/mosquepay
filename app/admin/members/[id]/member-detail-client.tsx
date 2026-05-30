@@ -40,6 +40,12 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import {
+  RANK_CODES,
+  RANK_LABELS,
+  masonicTitleFor,
+  rankLabel,
+} from "@/lib/members/rank";
 
 interface Member {
   id: string;
@@ -747,10 +753,21 @@ export function MemberDetailClient({
                   onChange={(e) => setEditForm({ ...editForm, rank: e.target.value })}
                 >
                   <option value="">Select...</option>
-                  <option value="EA">Entered Apprentice</option>
-                  <option value="FC">Fellow Craft</option>
-                  <option value="MM">Master Mason</option>
+                  {RANK_CODES.map((code) => (
+                    <option key={code} value={code}>
+                      {RANK_LABELS[code]}
+                    </option>
+                  ))}
                 </select>
+                {editForm.rank && masonicTitleFor(editForm.rank) && (
+                  <p className="text-xs text-dash-muted">
+                    Masonic title:{" "}
+                    <span className="font-medium text-dash-text">
+                      {masonicTitleFor(editForm.rank)}
+                    </span>{" "}
+                    (derived automatically from rank)
+                  </p>
+                )}
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label>Offices held</Label>
@@ -1072,8 +1089,13 @@ export function MemberDetailClient({
                 <div>
                   <p className="text-xs text-dash-muted">Rank</p>
                   <p className="text-sm font-medium text-dash-text">
-                    {member.rank ?? "Not recorded"}
+                    {rankLabel(member.rank) ?? "Not recorded"}
                   </p>
+                  {masonicTitleFor(member.rank) && (
+                    <p className="text-xs text-dash-muted">
+                      Masonic title: {masonicTitleFor(member.rank)}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex items-start gap-3">

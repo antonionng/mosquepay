@@ -14,11 +14,11 @@ const SAMPLE_MEMBERS: Array<{
   rank: string;
   office_title: string | null;
 }> = [
-  { full_name: "Sample · James Carter", email: "sample-james@example.com", rank: "MM", office_title: "Worshipful Master" },
+  { full_name: "Sample · James Carter", email: "sample-james@example.com", rank: "Master", office_title: "Worshipful Master" },
   { full_name: "Sample · Robert Hughes", email: "sample-robert@example.com", rank: "MM", office_title: "Senior Warden" },
   { full_name: "Sample · Edward Fielding", email: "sample-edward@example.com", rank: "MM", office_title: "Junior Warden" },
-  { full_name: "Sample · Thomas Whitaker", email: "sample-thomas@example.com", rank: "MM", office_title: "Treasurer" },
-  { full_name: "Sample · Michael Anderson", email: "sample-michael@example.com", rank: "MM", office_title: "Secretary" },
+  { full_name: "Sample · Thomas Whitaker", email: "sample-thomas@example.com", rank: "PM", office_title: "Treasurer" },
+  { full_name: "Sample · Michael Anderson", email: "sample-michael@example.com", rank: "PM", office_title: "Secretary" },
   { full_name: "Sample · Daniel Reyes", email: "sample-daniel@example.com", rank: "MM", office_title: "Almoner" },
   { full_name: "Sample · William Pearce", email: "sample-william@example.com", rank: "MM", office_title: "Charity Steward" },
   { full_name: "Sample · George Holmes", email: "sample-george@example.com", rank: "FC", office_title: null },

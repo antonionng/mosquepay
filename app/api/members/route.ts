@@ -6,6 +6,7 @@ import * as mockDb from "@/lib/mock-db";
 import { getLodgeSlugFromRequest } from "@/lib/tenant";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
+import { isRank, RANK_CODES } from "@/lib/members/rank";
 
 export async function GET(request: NextRequest) {
   const _rejectMock = rejectIfMockDisabled();
@@ -73,6 +74,15 @@ export async function POST(request: NextRequest) {
     if (!email || !full_name) {
       return NextResponse.json(
         { error: "email and full_name are required." },
+        { status: 400 }
+      );
+    }
+
+    if (rank != null && rank !== "" && !isRank(rank)) {
+      return NextResponse.json(
+        {
+          error: `Invalid rank "${rank}". Must be one of: ${RANK_CODES.join(", ")}.`,
+        },
         { status: 400 }
       );
     }

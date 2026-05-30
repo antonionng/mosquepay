@@ -6,6 +6,7 @@ import * as db from "@/lib/db";
 import { formatDate } from "@/lib/utils";
 import { defaultAgendaItems, renderDefaultSummonsOpening } from "@/lib/summons/defaults";
 import type { Member } from "@/lib/db/types";
+import { masonicTitleFor } from "@/lib/members/rank";
 
 type DirectoryMember = Pick<
   Member,
@@ -146,7 +147,9 @@ export default async function MemberMeetingSummonsPage({
                   className="flex justify-between gap-4 border-b border-slate-100 pb-1"
                 >
                   <span>
-                    {officer.rank ? `${officer.rank} ` : ""}
+                    {masonicTitleFor(officer.rank)
+                      ? `${masonicTitleFor(officer.rank)} `
+                      : ""}
                     {officer.full_name}
                     {memberSuffix(officer) ? ` ${memberSuffix(officer)}` : ""}
                   </span>
@@ -201,7 +204,9 @@ export default async function MemberMeetingSummonsPage({
                 return (
                   <div key={m.id} className="grid gap-2 sm:grid-cols-[1fr_2fr_auto]">
                     <span className="font-medium">
-                      {m.rank ? `${m.rank} ` : ""}
+                      {masonicTitleFor(m.rank)
+                        ? `${masonicTitleFor(m.rank)} `
+                        : ""}
                       {m.full_name}
                       {suffix ? ` ${suffix}` : ""}
                     </span>

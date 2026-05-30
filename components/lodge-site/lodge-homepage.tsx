@@ -28,6 +28,7 @@ import {
 import { FadeIn, StaggerChildren, StaggerItem } from "@/components/motion";
 import type { LodgeSiteSection } from "@/lib/db/types";
 import type { LodgeSiteFooterSettings, LodgeSiteHeaderSettings } from "@/lib/db/types";
+import { rankLabel } from "@/lib/members/rank";
 import {
   heroBackgroundLayers,
   mergeHeroPrimaryColor,
@@ -977,7 +978,7 @@ function OfficersSection({
                   </p>
                   {officer.rank ? (
                     <p className="mt-1 text-sm text-slate-500">
-                      {officer.rank}
+                      {rankLabel(officer.rank)}
                     </p>
                   ) : null}
                   {officer.public_bio ? (

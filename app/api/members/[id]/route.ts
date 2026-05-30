@@ -8,6 +8,7 @@ import { getLodgeSlugFromRequest } from "@/lib/tenant";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
 import { createServiceClient } from "@/lib/supabase/server";
+import { isRank, RANK_CODES } from "@/lib/members/rank";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -70,6 +71,20 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const { id } = await params;
     const lodgeSlug = getLodgeSlugFromRequest(request);
     const body = await request.json();
+
+    if (
+      Object.prototype.hasOwnProperty.call(body, "rank") &&
+      body.rank != null &&
+      body.rank !== "" &&
+      !isRank(body.rank)
+    ) {
+      return NextResponse.json(
+        {
+          error: `Invalid rank "${body.rank}". Must be one of: ${RANK_CODES.join(", ")}.`,
+        },
+        { status: 400 }
+      );
+    }
 
     if (isSupabaseConfigured()) {
       const lodgeId = await db.resolveLodgeId(lodgeSlug);

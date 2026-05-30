@@ -7,6 +7,7 @@ import { getLodgeSlugFromRequest } from "@/lib/tenant";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
 import { calculateProRataDues } from "@/lib/dues/pro-rata";
+import { isRank, RANK_CODES } from "@/lib/members/rank";
 
 /**
  * Convert an approved/initiated lead into a member record.
@@ -29,6 +30,19 @@ export async function POST(
 
     const lodgeSlug = getLodgeSlugFromRequest(request);
     const body = await request.json().catch(() => ({}));
+
+    if (
+      body.rank != null &&
+      body.rank !== "" &&
+      !isRank(body.rank)
+    ) {
+      return NextResponse.json(
+        {
+          error: `Invalid rank "${body.rank}". Must be one of: ${RANK_CODES.join(", ")}.`,
+        },
+        { status: 400 }
+      );
+    }
 
     if (isSupabaseConfigured()) {
       const lodgeId = await db.resolveLodgeId(lodgeSlug);

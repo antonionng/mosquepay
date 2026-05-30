@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Award, CheckCircle2, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { masonicTitleFor } from "@/lib/members/rank";
 
 export type OfficeRung = {
   id: string;
@@ -141,7 +142,9 @@ export function OfficesPanel({
                         href={`/admin/members/${holder.id}`}
                         className="font-medium text-blue-700 hover:underline"
                       >
-                        {holder.rank ? `${holder.rank} ` : ""}
+                        {masonicTitleFor(holder.rank)
+                          ? `${masonicTitleFor(holder.rank)} `
+                          : ""}
                         {holder.full_name}
                       </Link>
                     </p>
@@ -171,7 +174,9 @@ export function OfficesPanel({
                           : "";
                       return (
                         <option key={m.id} value={m.id}>
-                          {m.rank ? `${m.rank} ` : ""}
+                          {masonicTitleFor(m.rank)
+                            ? `${masonicTitleFor(m.rank)} `
+                            : ""}
                           {m.full_name}
                           {suffix}
                         </option>

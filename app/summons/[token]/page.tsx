@@ -7,6 +7,7 @@ import { formatDate } from "@/lib/utils";
 import { defaultAgendaItems, renderDefaultSummonsOpening } from "@/lib/summons/defaults";
 import type { Member } from "@/lib/db/types";
 import { SummonsRsvpForm } from "./rsvp-form";
+import { masonicTitleFor } from "@/lib/members/rank";
 
 type DirectoryMember = Pick<
   Member,
@@ -158,7 +159,9 @@ export default async function PublicSummonsPage({
                     {member.office_title}
                   </span>
                   <span className="text-right text-slate-700">
-                    {member.rank ? `${member.rank} ` : ""}
+                    {masonicTitleFor(member.rank)
+                      ? `${masonicTitleFor(member.rank)} `
+                      : ""}
                     {member.full_name}
                     {memberSuffix(member) ? ` ${memberSuffix(member)}` : ""}
                   </span>
@@ -285,7 +288,9 @@ export default async function PublicSummonsPage({
                 return (
                   <div key={member.id} className="grid gap-2 sm:grid-cols-[1fr_2fr_auto]">
                     <span className="font-medium">
-                      {member.rank ? `${member.rank} ` : ""}
+                      {masonicTitleFor(member.rank)
+                        ? `${masonicTitleFor(member.rank)} `
+                        : ""}
                       {member.full_name}
                       {suffix ? ` ${suffix}` : ""}
                     </span>

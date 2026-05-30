@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { Calendar, Check, Copy, Download, ShieldCheck } from "lucide-react";
+import { rankLabel } from "@/lib/members/rank";
 
 type Member = {
   full_name: string;
@@ -103,7 +104,7 @@ export function MemberCardClient({
               <p className="text-sm text-white/80">{member.office_title}</p>
             )}
             {member.rank && (
-              <p className="text-xs text-white/70">{member.rank}</p>
+              <p className="text-xs text-white/70">{rankLabel(member.rank)}</p>
             )}
             {member.date_of_initiation && (
               <p className="mt-2 text-xs text-white/70">
