@@ -255,6 +255,9 @@ export function MeetingDetailClient({
   const guestCount = rsvps.reduce((sum, r) => sum + r.number_of_guests, 0);
   const unpaidCount = abandonedRsvps.length;
   const dietaryCount = rsvps.filter((r) => r.dietary_requirements).length;
+  const apologiesCount = rsvps.filter(
+    (r) => !r.attending_ceremony && r.status !== "cancelled"
+  ).length;
   const winePledgers = rsvps.filter((r) => r.raffle_wine_pledged === true);
   const wineBottleCount = winePledgers.reduce(
     (sum, r) => sum + (r.raffle_wine_bottles ?? 0),
@@ -1008,12 +1011,13 @@ export function MeetingDetailClient({
                 <p className="dash-panel-header-description">
                   {rsvps.length} RSVP{rsvps.length === 1 ? "" : "s"} ·{" "}
                   {diningCount} dining · {guestCount} guest
-                  {guestCount === 1 ? "" : "s"}
+                  {guestCount === 1 ? "" : "s"} · {apologiesCount}{" "}
+                  apolog{apologiesCount === 1 ? "y" : "ies"}
                 </p>
               </div>
             </div>
             <CardContent className="space-y-4 border-t border-dash-border bg-dash-surface p-6">
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                 <div className="rounded-lg border border-dash-border bg-dash-surface-subtle px-3 py-2">
                   <p className="text-xs text-dash-muted">Dining</p>
                   <p className="font-semibold text-dash-text">{diningCount}</p>
@@ -1025,6 +1029,12 @@ export function MeetingDetailClient({
                 <div className="rounded-lg border border-dash-border bg-dash-surface-subtle px-3 py-2">
                   <p className="text-xs text-dash-muted">Dietary</p>
                   <p className="font-semibold text-dash-text">{dietaryCount}</p>
+                </div>
+                <div className="rounded-lg border border-dash-border bg-dash-surface-subtle px-3 py-2">
+                  <p className="text-xs text-dash-muted">Apologies</p>
+                  <p className="font-semibold text-dash-text">
+                    {apologiesCount}
+                  </p>
                 </div>
                 <div className="rounded-lg border border-dash-border bg-dash-surface-subtle px-3 py-2">
                   <p className="text-xs text-dash-muted">Unpaid</p>
@@ -1100,7 +1110,7 @@ export function MeetingDetailClient({
                   size="sm"
                   className="justify-start"
                   onClick={exportApologies}
-                  disabled={rsvps.length === 0}
+                  disabled={apologiesCount === 0}
                 >
                   <Download className="mr-1.5 h-3.5 w-3.5" /> Apologies
                 </Button>
