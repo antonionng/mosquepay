@@ -3,7 +3,11 @@ import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
 import { computeNextDuesForMember } from "@/lib/dues/next-due";
-import type { DuesSchedule, MemberDuesInstalment } from "@/lib/db/types";
+import type {
+  DuesSchedule,
+  GiftAidDeclaration,
+  MemberDuesInstalment,
+} from "@/lib/db/types";
 import { MemberDetailClient } from "./member-detail-client";
 
 export default async function AdminMemberDetailPage({
@@ -31,6 +35,7 @@ export default async function AdminMemberDetailPage({
         duesRecords={[]}
         nextDues={null}
         subscription={null}
+        giftAidDeclaration={null}
       />
     );
   }
@@ -48,6 +53,7 @@ export default async function AdminMemberDetailPage({
     currentYear,
     lodgeDues,
     schedules,
+    giftAidDeclaration,
   ] = await Promise.all([
     db.getRsvpDietaryByEmail(member.email, lodgeId),
     db.getPaymentsByEmail(member.email, lodgeId),
@@ -56,6 +62,13 @@ export default async function AdminMemberDetailPage({
     db.getCurrentMasonicYear(lodgeId),
     db.getLodgeDues(lodgeId),
     db.getDuesSchedulesForMember(lodgeId, member.email),
+    // Seed the Gift Aid panel with the active declaration. The panel
+    // re-fetches on mount so an upload from another tab will update; the
+    // server seed just avoids the empty-flash on first paint.
+    db.getActiveGiftAidDeclarationByMember(lodgeId, {
+      id: member.id,
+      email: member.email,
+    }),
   ]);
 
   const nextDues = computeNextDuesForMember({
@@ -111,6 +124,13 @@ export default async function AdminMemberDetailPage({
       nextDues={nextDues ? JSON.parse(JSON.stringify(nextDues)) : null}
       subscription={
         subscription ? JSON.parse(JSON.stringify(subscription)) : null
+      }
+      giftAidDeclaration={
+        giftAidDeclaration
+          ? (JSON.parse(
+              JSON.stringify(giftAidDeclaration),
+            ) as GiftAidDeclaration)
+          : null
       }
     />
   );

@@ -16,6 +16,7 @@ import {
   ChevronRight,
   UtensilsCrossed,
   ArrowDownUp,
+  HeartHandshake,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,10 +71,17 @@ const STATUS_VARIANTS: Record<string, string> = {
 export function AdminMembersClient({
   members,
   offices = [],
+  giftAidDeclaredMemberIds = [],
 }: {
   members: MemberRow[];
   offices?: OfficeRung[];
+  /** Member ids that have an active (non-revoked, confirmed) Gift Aid
+   *  declaration on file in this lodge. Drives the "missing Gift Aid"
+   *  and "has declaration" quick filters; computed server-side once so
+   *  we avoid an N+1 against gift_aid_declarations. */
+  giftAidDeclaredMemberIds?: string[];
 }) {
+  const giftAidDeclaredSet = new Set(giftAidDeclaredMemberIds);
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab") === "offices" ? "offices" : "members";
@@ -137,6 +145,16 @@ export function AdminMembersClient({
         matchQuick =
           !m.dietary_requirements || m.dietary_requirements.trim().length === 0;
         break;
+      case "missing_gift_aid":
+        // Only chase active members: chasing a resigned/excluded Brother
+        // for a Gift Aid slip would be silly, and the Charity Steward
+        // wants the stack-of-slips workflow as short as possible.
+        matchQuick =
+          m.membership_status === "active" && !giftAidDeclaredSet.has(m.id);
+        break;
+      case "has_gift_aid":
+        matchQuick = giftAidDeclaredSet.has(m.id);
+        break;
     }
     return matchSearch && matchStatus && matchQuick;
   });
@@ -148,6 +166,11 @@ export function AdminMembersClient({
     royal_arch: members.filter((m) => m.royal_arch).length,
     missing_address: members.filter((m) => !m.address_line_1).length,
     missing_dietary: members.filter((m) => !m.dietary_requirements).length,
+    missing_gift_aid: members.filter(
+      (m) =>
+        m.membership_status === "active" && !giftAidDeclaredSet.has(m.id),
+    ).length,
+    has_gift_aid: members.filter((m) => giftAidDeclaredSet.has(m.id)).length,
   };
 
   const activeCount = members.filter((m) => m.membership_status === "active").length;
@@ -459,6 +482,16 @@ export function AdminMembersClient({
               { id: "royal_arch", label: "Royal Arch", count: quickFilterCounts.royal_arch },
               { id: "missing_address", label: "Missing address", count: quickFilterCounts.missing_address },
               { id: "missing_dietary", label: "Missing dietary", count: quickFilterCounts.missing_dietary },
+              {
+                id: "missing_gift_aid",
+                label: "Missing Gift Aid",
+                count: quickFilterCounts.missing_gift_aid,
+              },
+              {
+                id: "has_gift_aid",
+                label: "Gift Aid on file",
+                count: quickFilterCounts.has_gift_aid,
+              },
             ] as const
           ).map((f) => (
             <button
@@ -518,7 +551,18 @@ export function AdminMembersClient({
                     onClick={() => router.push(`/admin/members/${m.id}`)}
                   >
                     <td className="px-4 py-3.5 font-medium text-dash-text">
-                      {m.full_name}
+                      <span className="inline-flex items-center gap-2">
+                        {m.full_name}
+                        {m.membership_status === "active" &&
+                        !giftAidDeclaredSet.has(m.id) ? (
+                          <span
+                            title="No Gift Aid declaration on file. Open the profile to upload a paper slip."
+                            className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"
+                          >
+                            <HeartHandshake className="h-2.5 w-2.5" />
+                          </span>
+                        ) : null}
+                      </span>
                     </td>
                     <td className="px-4 py-3.5 text-dash-muted">{m.email}</td>
                     <td className="px-4 py-3.5 text-dash-muted hidden md:table-cell">

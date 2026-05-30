@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { MemberSubscriptionPanel } from "@/components/admin/member-subscription-panel";
+import { MemberGiftAidPanel } from "@/components/admin/member-gift-aid-panel";
 import {
   Dialog,
   DialogContent,
@@ -164,6 +165,9 @@ interface Props {
   offices?: OfficeRung[];
   nextDues: NextDuesSummary | null;
   subscription?: SubscriptionData | null;
+  /** Active (non-revoked) Gift Aid declaration if one is on file for this
+   *  member. Drives the post-meeting paper-upload panel. */
+  giftAidDeclaration?: import("@/lib/db/types").GiftAidDeclaration | null;
 }
 
 function buildEditForm(member: Member) {
@@ -230,6 +234,7 @@ export function MemberDetailClient({
   offices: initialOffices = [],
   nextDues,
   subscription = null,
+  giftAidDeclaration = null,
 }: Props) {
   const router = useRouter();
   const [member, setMember] = useState(initialMember);
@@ -1214,6 +1219,39 @@ export function MemberDetailClient({
             memberName={member.full_name}
           />
         ) : null}
+
+        <MemberGiftAidPanel
+          member={{
+            id: member.id,
+            full_name: member.full_name,
+            email: member.email,
+            address_line_1: member.address_line_1 ?? null,
+            address_line_2: member.address_line_2 ?? null,
+            city: member.city ?? null,
+            postcode: member.postcode ?? null,
+          }}
+          declaration={
+            giftAidDeclaration
+              ? {
+                  id: giftAidDeclaration.id,
+                  donor_name: giftAidDeclaration.donor_name,
+                  donor_email: giftAidDeclaration.donor_email,
+                  donor_address_line_1: giftAidDeclaration.donor_address_line_1,
+                  donor_postcode: giftAidDeclaration.donor_postcode,
+                  created_at: giftAidDeclaration.created_at,
+                  evidence_source: giftAidDeclaration.evidence_source,
+                  evidence_sha256: giftAidDeclaration.evidence_sha256,
+                  evidence_uploaded_at: giftAidDeclaration.evidence_uploaded_at,
+                  evidence_uploaded_by_email:
+                    giftAidDeclaration.evidence_uploaded_by_email,
+                  paper_received_date: giftAidDeclaration.paper_received_date,
+                  paper_filing_reference:
+                    giftAidDeclaration.paper_filing_reference,
+                  revoked_at: giftAidDeclaration.revoked_at,
+                }
+              : null
+          }
+        />
 
         <div className="rounded-2xl border border-dash-border bg-dash-surface shadow-sm">
           <div className="border-b border-dash-border px-6 py-4">
