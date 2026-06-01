@@ -13,10 +13,38 @@ import {
   Repeat,
   ShieldAlert,
   XCircle,
+  Loader2,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+interface SubscriptionPreview {
+  memberEmail: string;
+  memberName: string | null;
+  currency: string;
+  annualAmount: number;
+  cadence: "monthly" | "quarterly";
+  strategy: string;
+  strategyDescription: string;
+  autoRenew: boolean;
+  yearLabel: string;
+  yearStartDate: string;
+  yearEndDate: string;
+  cycleCount: number;
+  firstCycleAmount: number;
+  total: number;
+  cycles: { sequence: number; dueDate: string; amount: number }[];
+}
 
 interface AdvanceInfo {
   alreadyPaid: boolean;
@@ -95,6 +123,14 @@ export default function MemberDuesPage() {
   const [paying, setPaying] = useState(false);
   const [payMode, setPayMode] = useState<"payment" | "subscription" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [subscriptionPreview, setSubscriptionPreview] =
+    useState<SubscriptionPreview | null>(null);
+  const [subscriptionPreviewOpen, setSubscriptionPreviewOpen] = useState(false);
+  const [subscriptionPreviewLoading, setSubscriptionPreviewLoading] =
+    useState(false);
+  const [autoRenewOverride, setAutoRenewOverride] = useState<boolean | null>(
+    null,
+  );
 
   useEffect(() => {
     async function load() {
@@ -121,6 +157,7 @@ export default function MemberDuesPage() {
         "We couldn't load your dues record. Please refresh the page, or contact your lodge secretary if this persists."
       );
       setPayMode(null);
+      setSubscriptionPreviewOpen(false);
       return;
     }
     setPaying(true);
@@ -134,6 +171,9 @@ export default function MemberDuesPage() {
           member_email: dues.memberEmail,
           member_name: dues.memberName,
           mode,
+          ...(mode === "subscription" && autoRenewOverride !== null
+            ? { auto_renew: autoRenewOverride }
+            : {}),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -147,6 +187,48 @@ export default function MemberDuesPage() {
     } finally {
       setPaying(false);
       setPayMode(null);
+      setSubscriptionPreviewOpen(false);
+    }
+  }
+
+  // Open the rich plan preview dialog. Hits the side-effect-free
+  // /api/dues/subscription-preview endpoint so the member sees the full
+  // schedule (cycles, dates, amounts, total) BEFORE we redirect them
+  // to Mooov hosted Checkout — which only shows cycle 1.
+  async function openSubscriptionPreview() {
+    if (!dues?.duesId || !dues?.memberEmail) {
+      setError(
+        "We couldn't load your dues record. Please refresh the page, or contact your lodge secretary if this persists.",
+      );
+      return;
+    }
+    setSubscriptionPreviewLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/dues/subscription-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dues_id: dues.duesId,
+          member_email: dues.memberEmail,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.plan) {
+        throw new Error(data.error ?? "Could not preview your plan.");
+      }
+      const plan = data.plan as SubscriptionPreview;
+      setSubscriptionPreview(plan);
+      setAutoRenewOverride(plan.autoRenew);
+      setSubscriptionPreviewOpen(true);
+    } catch (previewError) {
+      setError(
+        previewError instanceof Error
+          ? previewError.message
+          : "Could not preview your plan.",
+      );
+    } finally {
+      setSubscriptionPreviewLoading(false);
     }
   }
 
@@ -419,11 +501,20 @@ export default function MemberDuesPage() {
                     <Button
                       variant="secondary"
                       size="lg"
-                      disabled={paying}
-                      onClick={() => setPayMode("subscription")}
+                      disabled={paying || subscriptionPreviewLoading}
+                      onClick={openSubscriptionPreview}
                     >
-                      <Repeat className="h-4 w-4 mr-2" />
-                      {paying ? "Redirecting..." : "Set Up Instalments"}
+                      {subscriptionPreviewLoading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Loading plan...
+                        </>
+                      ) : (
+                        <>
+                          <Repeat className="h-4 w-4 mr-2" />
+                          Set Up Instalments
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -514,21 +605,28 @@ export default function MemberDuesPage() {
         </>
       )}
       <ConfirmActionDialog
-        open={Boolean(payMode)}
+        open={payMode === "payment"}
         onOpenChange={(open) => {
           if (!open) setPayMode(null);
         }}
-        title={payMode === "subscription" ? "Set up instalments?" : "Pay dues in full?"}
-        description={
-          payMode === "subscription"
-            ? `You will be taken to Mooov to set up ${dues?.instalmentCount ?? 0} instalments.`
-            : `You will be taken to Mooov to pay £${outstanding.toFixed(2)} securely.`
-        }
-        confirmLabel={payMode === "subscription" ? "Continue to Mooov" : "Pay securely"}
+        title="Pay dues in full?"
+        description={`You will be taken to a secure checkout to pay £${outstanding.toFixed(2)}.`}
+        confirmLabel="Continue to checkout"
         loading={paying}
         onConfirm={() => {
-          if (payMode) void handlePay(payMode);
+          if (payMode === "payment") void handlePay("payment");
         }}
+      />
+      <SubscriptionPreviewDialog
+        open={subscriptionPreviewOpen}
+        plan={subscriptionPreview}
+        loading={paying}
+        autoRenewOverride={autoRenewOverride}
+        onAutoRenewChange={setAutoRenewOverride}
+        onOpenChange={(open) => {
+          if (!open && !paying) setSubscriptionPreviewOpen(false);
+        }}
+        onConfirm={() => void handlePay("subscription")}
       />
       <ConfirmActionDialog
         open={cancelConfirmOpen}
@@ -695,5 +793,209 @@ function ScheduleStatusCard({
         </div>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SubscriptionPreviewDialog
+// ---------------------------------------------------------------------------
+// Shown after the member clicks "Set Up Instalments" on /member/dues.
+// Hosted Mooov Checkout will only show cycle 1 + saved-card setup, so
+// the full schedule context (cycle count, dates, amounts, total,
+// auto-renew choice, cancel-anytime note) has to live here, server-
+// computed by /api/dues/subscription-preview against the same code path
+// as /api/dues/pay so the preview cannot disagree with the actual charge.
+
+function formatPlanDate(value: string): string {
+  return new Date(`${value.slice(0, 10)}T12:00:00.000Z`).toLocaleDateString(
+    "en-GB",
+    { day: "numeric", month: "short", year: "numeric" },
+  );
+}
+
+function formatPlanCycleLabel(
+  cycle: { sequence: number; dueDate: string },
+  isFirst: boolean,
+): string {
+  if (isFirst) return `Today (${formatPlanDate(cycle.dueDate)})`;
+  return formatPlanDate(cycle.dueDate);
+}
+
+function SubscriptionPreviewDialog({
+  open,
+  plan,
+  loading,
+  autoRenewOverride,
+  onAutoRenewChange,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean;
+  plan: SubscriptionPreview | null;
+  loading: boolean;
+  autoRenewOverride: boolean | null;
+  onAutoRenewChange: (next: boolean) => void;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}) {
+  const showAutoRenew =
+    autoRenewOverride !== null
+      ? autoRenewOverride
+      : (plan?.autoRenew ?? true);
+  const finalCycle = plan?.cycles[plan.cycles.length - 1] ?? null;
+  const tailCount = plan ? Math.max(0, plan.cycleCount - 1) : 0;
+  const currencySymbol = plan?.currency === "GBP" ? "£" : (plan?.currency ?? "");
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !loading && onOpenChange(next)}
+    >
+      <DialogContent
+        showClose={!loading}
+        className="border-dash-border bg-dash-surface p-0 text-dash-text shadow-2xl sm:max-w-lg"
+      >
+        <DialogHeader className="space-y-3 border-b border-dash-border px-6 py-5 text-left">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+            <Repeat className="h-5 w-5" />
+          </div>
+          <div>
+            <DialogTitle className="text-lg font-semibold text-dash-text">
+              {plan
+                ? `Your ${plan.cadence} dues plan`
+                : "Your dues plan"}
+            </DialogTitle>
+            <DialogDescription className="mt-1 text-sm leading-6 text-dash-muted">
+              {plan
+                ? `Masonic year ${plan.yearLabel} · ${plan.strategyDescription}`
+                : "Loading your plan..."}
+            </DialogDescription>
+          </div>
+        </DialogHeader>
+
+        {plan ? (
+          <div className="max-h-[55vh] space-y-5 overflow-y-auto px-6 py-5">
+            <div className="rounded-xl border border-purple-100 bg-purple-50/40 p-4">
+              <p className="text-xs font-medium uppercase tracking-wider text-purple-700">
+                Today&apos;s charge
+              </p>
+              <p className="mt-1 text-3xl font-bold tabular-nums text-slate-900">
+                {currencySymbol}
+                {plan.firstCycleAmount.toFixed(2)}
+              </p>
+              <p className="mt-1 text-sm text-slate-600">
+                {tailCount > 0
+                  ? `Then ${tailCount} more ${plan.cadence === "monthly" ? "monthly" : "quarterly"} payment${tailCount === 1 ? "" : "s"} on file.`
+                  : "Single cycle — your card stays on file in case auto-renew kicks in."}
+                {" "}
+                <span className="text-slate-500">
+                  Total {currencySymbol}
+                  {plan.total.toFixed(2)} for {plan.yearLabel}.
+                </span>
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
+                Schedule
+              </p>
+              <ul className="mt-2 divide-y divide-slate-100 rounded-xl border border-slate-200">
+                {plan.cycles.map((cycle, idx) => (
+                  <li
+                    key={cycle.sequence}
+                    className="flex items-center justify-between px-4 py-2.5 text-sm"
+                  >
+                    <span
+                      className={
+                        idx === 0
+                          ? "font-medium text-slate-900"
+                          : "text-slate-700"
+                      }
+                    >
+                      {formatPlanCycleLabel(cycle, idx === 0)}
+                    </span>
+                    <span className="font-medium tabular-nums text-slate-900">
+                      {currencySymbol}
+                      {cycle.amount.toFixed(2)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {finalCycle ? (
+                <p className="mt-2 text-xs text-slate-500">
+                  Final charge {formatPlanDate(finalCycle.dueDate)} — covers{" "}
+                  {plan.yearLabel} in full.
+                </p>
+              ) : null}
+            </div>
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-4 py-3">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                checked={showAutoRenew}
+                onChange={(event) =>
+                  onAutoRenewChange(event.target.checked)
+                }
+                disabled={loading}
+              />
+              <span className="text-sm">
+                <span className="block font-medium text-slate-900">
+                  Auto-renew next year
+                </span>
+                <span className="mt-0.5 block text-slate-600">
+                  Keep paying monthly when the next masonic year starts. You
+                  can cancel from this page anytime — including before the
+                  first renewal cycle.
+                </span>
+              </span>
+            </label>
+
+            <div className="flex items-start gap-2 text-xs text-slate-500">
+              <Lock className="mt-0.5 h-3.5 w-3.5 flex-none" />
+              <span>
+                You&apos;ll be redirected to a secure hosted card form to
+                authorise today&apos;s charge and save your card. Subsequent
+                charges run automatically — no further action needed.
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="px-6 py-10 text-center text-sm text-slate-500">
+            <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin text-slate-400" />
+            Building your plan...
+          </div>
+        )}
+
+        <DialogFooter className="gap-2 border-t border-dash-border px-6 py-4 sm:justify-end [&_button]:w-full sm:[&_button]:w-auto">
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={loading}
+            onClick={() => onOpenChange(false)}
+          >
+            Back
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            disabled={loading || !plan}
+            onClick={onConfirm}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Redirecting...
+              </>
+            ) : (
+              <>
+                <ExternalLink className="mr-2 h-4 w-4" />
+                Continue to secure checkout
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

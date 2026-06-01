@@ -1,0 +1,294 @@
+// lib/dues/enrolment-plan.ts
+//
+// Pure orchestrator that resolves everything needed to show OR start a
+// saved-charge dues subscription enrolment for a single member-dues row:
+// merchant, member, lodge dues template, current masonic year, year
+// position, default strategy, and the per-cycle instalment plan.
+//
+// Same code path used by:
+//
+//   * POST /api/dues/subscription-preview
+//       Returns the plan to the member portal so the "Set up instalments"
+//       confirmation dialog can show a real schedule (cycles, amounts,
+//       dates, total) BEFORE redirecting the member to Mooov hosted
+//       Checkout. The Mooov/Stripe surface only knows about cycle 1 +
+//       saved-card setup, so all multi-cycle UX has to live in LP.
+//
+//   * POST /api/dues/pay (mode: "subscription")
+//       Calls this helper, then writes the plan into dues_schedules +
+//       member_dues_instalments and posts the enrolment intent to
+//       Mooov. Pulled out so preview and pay can never disagree.
+//
+// Side-effect free: this function reads database rows but never writes.
+// The dues_schedules row, instalment rows, and Mooov payment_attempt
+// row are written by the caller (lib/dues/pay/route.ts) only on the
+// real-charge path.
+
+import * as db from "@/lib/db";
+import { createServiceClient } from "@/lib/supabase/server";
+import { computeYearPosition, type YearPosition } from "@/lib/dues/year-position";
+import { buildSchedule, isStrategyEnabledForLodge } from "@/lib/dues/strategies";
+import type {
+  DuesSplitStrategy,
+  LodgeDues,
+  LodgeMasonicYear,
+  Member,
+  MemberDues,
+} from "@/lib/db/types";
+
+export type EnrolmentPlanArgs = {
+  lodgeId: string;
+  duesRecord: MemberDues;
+  memberEmail: string;
+  /** Caller-chosen strategy. Falls back to the year-position default. */
+  strategy?: DuesSplitStrategy;
+  /** Caller-chosen auto-renew. Falls back to the lodge default. */
+  autoRenew?: boolean;
+};
+
+export type EnrolmentPlan = {
+  merchantId: string;
+  member: Member;
+  lodgeDues: LodgeDues;
+  masonicYear: LodgeMasonicYear;
+  yearPosition: YearPosition;
+  /** Strategy actually used (after lodge enable + cap checks). */
+  strategy: DuesSplitStrategy;
+  autoRenew: boolean;
+  cadence: "monthly" | "quarterly";
+  customerRef: string;
+  /** Schedule rows. cycle 1 is collected today by the enrolment intent. */
+  schedule: ReturnType<typeof buildSchedule>;
+  annualAmount: number;
+  currency: string;
+};
+
+export type EnrolmentPlanError = {
+  code:
+    | "lodge_not_connected"
+    | "member_not_found"
+    | "instalments_not_enabled"
+    | "no_masonic_year"
+    | "catch_up_exceeds_cap"
+    | "schedule_build_failed"
+    | "internal";
+  message: string;
+  /** Suggested HTTP status for caller to surface. */
+  status: number;
+  /** Extra details (e.g. catch_up_max_months) for callers that want to render them. */
+  details?: Record<string, unknown>;
+};
+
+export type EnrolmentPlanResult =
+  | { ok: true; plan: EnrolmentPlan }
+  | { ok: false; error: EnrolmentPlanError };
+
+export async function computeEnrolmentPlan(
+  args: EnrolmentPlanArgs,
+): Promise<EnrolmentPlanResult> {
+  const { lodgeId, duesRecord, memberEmail } = args;
+
+  let supa: ReturnType<typeof createServiceClient>;
+  try {
+    supa = createServiceClient();
+  } catch {
+    return {
+      ok: false,
+      error: {
+        code: "internal",
+        message: "Payments are not configured.",
+        status: 503,
+      },
+    };
+  }
+
+  // 1. Resolve merchant.
+  const { data: merchantRow } = await supa
+    .schema("mooov")
+    .from("lodges")
+    .select("merchant_id, status")
+    .eq("id", lodgeId)
+    .maybeSingle<{ merchant_id: string; status: string }>();
+
+  if (
+    !merchantRow ||
+    !merchantRow.merchant_id ||
+    (merchantRow.status && merchantRow.status !== "active")
+  ) {
+    return {
+      ok: false,
+      error: {
+        code: "lodge_not_connected",
+        message:
+          "This lodge has not finished setting up online payments yet. Please contact the lodge directly.",
+        status: 503,
+      },
+    };
+  }
+  const merchantId = merchantRow.merchant_id;
+
+  // 2. Resolve member. Prefer FK on the dues row, fall back to (email, lodgeId).
+  const member =
+    duesRecord.member_id != null
+      ? await db
+          .getMemberById(duesRecord.member_id, lodgeId)
+          .catch(() => null)
+      : await db.getMemberByEmail(memberEmail, lodgeId).catch(() => null);
+
+  if (!member) {
+    return {
+      ok: false,
+      error: {
+        code: "member_not_found",
+        message:
+          "Could not resolve your member profile. Please contact your lodge secretary.",
+        status: 404,
+      },
+    };
+  }
+  const customerRef = `mbr_${member.id}`;
+
+  // 3. Resolve the lodge dues template.
+  const lodgeDuesList = await db.getLodgeDues(lodgeId);
+  const duesTemplate = lodgeDuesList[0] ?? null;
+  if (!duesTemplate || duesTemplate.allow_instalments !== true) {
+    return {
+      ok: false,
+      error: {
+        code: "instalments_not_enabled",
+        message: "Monthly subscriptions are not enabled for this lodge.",
+        status: 409,
+      },
+    };
+  }
+
+  // 4. Resolve masonic year + year position.
+  const currentYear = await db.getCurrentMasonicYear(lodgeId);
+  if (!currentYear) {
+    return {
+      ok: false,
+      error: {
+        code: "no_masonic_year",
+        message:
+          "Your lodge has not configured a masonic year yet. Please contact your lodge secretary.",
+        status: 409,
+      },
+    };
+  }
+
+  const memberDuesList = await db.getMemberDues(lodgeId, { memberEmail });
+  const paidThisYear = memberDuesList.some(
+    (d) =>
+      !d.is_advance &&
+      d.status === "paid" &&
+      d.period_start.slice(0, 10) <= currentYear.end_date.slice(0, 10) &&
+      d.period_end.slice(0, 10) >= currentYear.start_date.slice(0, 10),
+  );
+
+  const yearPosition = computeYearPosition({
+    yearStartDate: currentYear.start_date,
+    yearEndDate: currentYear.end_date,
+    dateOfInitiation: member.date_of_initiation ?? null,
+    hasPaidCurrentYear: paidThisYear,
+    hasOutstandingCurrentYear: !paidThisYear,
+  });
+
+  // 5. Pick the strategy. Caller > default, but always honour lodge config.
+  const defaultStrategy: DuesSplitStrategy =
+    yearPosition.quadrant === "pre_year" ||
+    yearPosition.quadrant === "at_year_start"
+      ? "even_full_year"
+      : yearPosition.quadrant === "mid_year_new_initiate"
+        ? "pro_rata"
+        : "reslice_remaining";
+
+  let strategy: DuesSplitStrategy = args.strategy ?? defaultStrategy;
+  if (!isStrategyEnabledForLodge(strategy, duesTemplate)) {
+    strategy = defaultStrategy;
+  }
+  if (
+    strategy === "catch_up_lump_then_monthly" &&
+    yearPosition.monthsElapsed > duesTemplate.catch_up_max_months
+  ) {
+    return {
+      ok: false,
+      error: {
+        code: "catch_up_exceeds_cap",
+        message: `You're more than ${duesTemplate.catch_up_max_months} months into the year. Please speak to your treasurer to set up a tailored payment plan.`,
+        status: 409,
+        details: { catch_up_max_months: duesTemplate.catch_up_max_months },
+      },
+    };
+  }
+
+  // 6. Build the per-cycle plan.
+  const annualAmount = duesRecord.full_year_amount ?? duesRecord.amount;
+  const today = new Date().toISOString().slice(0, 10);
+  const schedule = buildSchedule({
+    annualAmount,
+    today,
+    yearStartDate: currentYear.start_date,
+    yearEndDate: currentYear.end_date,
+    monthsElapsed: yearPosition.monthsElapsed,
+    monthsRemaining: yearPosition.monthsRemaining,
+    monthsTotal: yearPosition.monthsTotal,
+    strategy,
+  });
+
+  if (schedule.cycleCount === 0 || schedule.firstCycleAmount <= 0) {
+    return {
+      ok: false,
+      error: {
+        code: "schedule_build_failed",
+        message:
+          "Could not work out a payment schedule for the current year. Please contact your lodge secretary.",
+        status: 500,
+      },
+    };
+  }
+
+  const autoRenew =
+    args.autoRenew === undefined ? duesTemplate.auto_renew_default : args.autoRenew;
+
+  return {
+    ok: true,
+    plan: {
+      merchantId,
+      member,
+      lodgeDues: duesTemplate,
+      masonicYear: currentYear,
+      yearPosition,
+      strategy,
+      autoRenew,
+      cadence: "monthly",
+      customerRef,
+      schedule,
+      annualAmount,
+      currency: (duesRecord.currency ?? "GBP").toUpperCase(),
+    },
+  };
+}
+
+/**
+ * Human-readable rationale for why the helper picked this strategy.
+ * Drives the "Why this plan?" line in the member portal preview dialog.
+ */
+export function describeStrategy(
+  strategy: DuesSplitStrategy,
+  yearPosition: YearPosition,
+): string {
+  switch (strategy) {
+    case "even_full_year":
+      return yearPosition.quadrant === "pre_year"
+        ? "Spread evenly across the upcoming year."
+        : "Spread evenly across the masonic year.";
+    case "pro_rata":
+      return "Pro-rated for the remainder of the year — only pay for the months you've been a member.";
+    case "catch_up_lump_then_monthly":
+      return "Today's payment covers the months already elapsed in the year, then a smaller standard amount each month.";
+    case "monthly_then_balloon":
+      return "Standard monthly amount each cycle, with a single larger top-up on the final month.";
+    case "reslice_remaining":
+      return "Your full annual dues spread evenly across the months still to go.";
+  }
+}

@@ -23,9 +23,8 @@ import * as db from "@/lib/db";
 import { getDefaultLodgeSlug } from "@/lib/tenant";
 import { createServiceClient } from "@/lib/supabase/server";
 import { callMooovConnect, MooovApiError } from "@/lib/mooov";
-import { computeYearPosition } from "@/lib/dues/year-position";
-import { buildSchedule, isStrategyEnabledForLodge } from "@/lib/dues/strategies";
 import { duesSubscriptionEnabled } from "@/lib/dues/feature-flags";
+import { computeEnrolmentPlan } from "@/lib/dues/enrolment-plan";
 import type { DuesSplitStrategy, MemberDues } from "@/lib/db/types";
 
 export const runtime = "nodejs";
@@ -381,6 +380,38 @@ type EnrolmentArgs = {
 async function startDuesSubscriptionEnrolment(args: EnrolmentArgs) {
   const { lodgeId, lodgeSlug, duesRecord, memberEmail } = args;
 
+  // Compute the full plan first. Same helper backs the
+  // /api/dues/subscription-preview endpoint so the dialog the member
+  // confirms cannot disagree with what we actually charge.
+  const planResult = await computeEnrolmentPlan({
+    lodgeId,
+    duesRecord,
+    memberEmail,
+    strategy: args.strategy,
+    autoRenew: args.autoRenew,
+  });
+  if (!planResult.ok) {
+    return NextResponse.json(
+      {
+        error: planResult.error.message,
+        code: planResult.error.code,
+        ...(planResult.error.details ?? {}),
+      },
+      { status: planResult.error.status },
+    );
+  }
+  const plan = planResult.plan;
+  const {
+    merchantId,
+    member,
+    masonicYear: currentYear,
+    strategy,
+    autoRenew,
+    customerRef,
+    schedule: schedulePlan,
+    annualAmount,
+  } = plan;
+
   let supa: ReturnType<typeof createServiceClient>;
   try {
     supa = createServiceClient();
@@ -394,171 +425,10 @@ async function startDuesSubscriptionEnrolment(args: EnrolmentArgs) {
     );
   }
 
-  // Resolve merchant. Same lookup as the one-off path.
-  const { data: merchantRow, error: merchantErr } = await supa
-    .schema("mooov")
-    .from("lodges")
-    .select("merchant_id, status")
-    .eq("id", lodgeId)
-    .maybeSingle<{ merchant_id: string; status: string }>();
-  if (merchantErr) {
-    console.error("dues/pay subscription: merchant lookup failed", {
-      lodge_id: lodgeId,
-      message: merchantErr.message,
-    });
-    return NextResponse.json(
-      { error: "Could not look up payment processor for this lodge." },
-      { status: 500 }
-    );
-  }
-  if (
-    !merchantRow ||
-    !merchantRow.merchant_id ||
-    (merchantRow.status && merchantRow.status !== "active")
-  ) {
-    return NextResponse.json(
-      {
-        error:
-          "This lodge has not finished setting up online payments yet. Please contact the lodge directly.",
-        code: "lodge_not_connected",
-      },
-      { status: 503 }
-    );
-  }
-  const merchantId = merchantRow.merchant_id;
-
-  // Resolve member identity for the customer_ref. customer_ref is the
-  // stable LP -> Mooov key that lets the saved-charge cron find the
-  // right Stripe Customer + PaymentMethod on Mooov's side. Shape locked
-  // with Mooov 2026-05-28: `mbr_<uuid>`, never recycled.
-  //
-  // Prefer the FK on the dues row when present (it's the most direct
-  // path); otherwise look up by email scoped to this lodge. Note:
-  // db.getMemberByEmail is (email, lodgeId) -- previous order was
-  // swapped which always returned null.
-  const member =
-    duesRecord.member_id != null
-      ? await db
-          .getMemberById(duesRecord.member_id, lodgeId)
-          .catch(() => null)
-      : await db.getMemberByEmail(memberEmail, lodgeId).catch(() => null);
-  if (!member) {
-    return NextResponse.json(
-      {
-        error:
-          "Could not resolve your member profile. Please contact your lodge secretary.",
-        code: "member_not_found",
-      },
-      { status: 404 }
-    );
-  }
-  const customerRef = `mbr_${member.id}`;
-
-  // Resolve the lodge dues template (per-lodge subscription policy).
-  const lodgeDuesList = await db.getLodgeDues(lodgeId);
-  const duesTemplate = lodgeDuesList[0] ?? null;
-  if (!duesTemplate || duesTemplate.allow_instalments !== true) {
-    return NextResponse.json(
-      {
-        error:
-          "Monthly subscriptions are not enabled for this lodge.",
-        code: "instalments_not_enabled",
-      },
-      { status: 409 }
-    );
-  }
-
-  // Resolve year position to choose a sensible default split strategy
-  // when the caller did not pass one. v1 defaults: even_full_year
-  // (pre-year / at-start), pro_rata (mid-year new initiate),
-  // reslice_remaining (mid-year existing behind). Catch-up lump and
-  // balloon strategies are opt-in via explicit body.split_strategy.
-  const currentYear = await db.getCurrentMasonicYear(lodgeId);
-  if (!currentYear) {
-    return NextResponse.json(
-      {
-        error:
-          "Your lodge has not configured a masonic year yet. Please contact your lodge secretary.",
-        code: "no_masonic_year",
-      },
-      { status: 409 }
-    );
-  }
-  const memberDuesList = await db.getMemberDues(lodgeId, { memberEmail });
-  const paidThisYear = memberDuesList.some(
-    (d) =>
-      !d.is_advance &&
-      d.status === "paid" &&
-      d.period_start.slice(0, 10) <= currentYear.end_date.slice(0, 10) &&
-      d.period_end.slice(0, 10) >= currentYear.start_date.slice(0, 10)
-  );
-
-  const yearPosition = computeYearPosition({
-    yearStartDate: currentYear.start_date,
-    yearEndDate: currentYear.end_date,
-    dateOfInitiation: member.date_of_initiation ?? null,
-    hasPaidCurrentYear: paidThisYear,
-    hasOutstandingCurrentYear: !paidThisYear,
-  });
-
-  const defaultStrategy: DuesSplitStrategy =
-    yearPosition.quadrant === "pre_year" ||
-    yearPosition.quadrant === "at_year_start"
-      ? "even_full_year"
-      : yearPosition.quadrant === "mid_year_new_initiate"
-        ? "pro_rata"
-        : "reslice_remaining";
-
-  let strategy: DuesSplitStrategy = args.strategy ?? defaultStrategy;
-  if (!isStrategyEnabledForLodge(strategy, duesTemplate)) {
-    strategy = defaultStrategy;
-  }
-  if (
-    strategy === "catch_up_lump_then_monthly" &&
-    yearPosition.monthsElapsed > duesTemplate.catch_up_max_months
-  ) {
-    return NextResponse.json(
-      {
-        error: `You're more than ${duesTemplate.catch_up_max_months} months into the year. Please speak to your treasurer to set up a tailored payment plan.`,
-        code: "catch_up_exceeds_cap",
-      },
-      { status: 409 }
-    );
-  }
-
-  const annualAmount = duesRecord.full_year_amount ?? duesRecord.amount;
-  const today = new Date().toISOString().slice(0, 10);
-  const schedulePlan = buildSchedule({
-    annualAmount,
-    today,
-    yearStartDate: currentYear.start_date,
-    yearEndDate: currentYear.end_date,
-    monthsElapsed: yearPosition.monthsElapsed,
-    monthsRemaining: yearPosition.monthsRemaining,
-    monthsTotal: yearPosition.monthsTotal,
-    strategy,
-  });
-
-  if (schedulePlan.cycleCount === 0 || schedulePlan.firstCycleAmount <= 0) {
-    return NextResponse.json(
-      {
-        error:
-          "Could not work out a payment schedule for the current year. Please contact your lodge secretary.",
-        code: "schedule_build_failed",
-      },
-      { status: 500 }
-    );
-  }
-
   // Mint the schedule + instalment rows BEFORE talking to Mooov so the
   // webhook (which fires after the member completes hosted Checkout)
   // has somewhere to write the saved PM. Status=pending until the
   // enrolment intent succeeds.
-  const autoRenew =
-    args.autoRenew === undefined
-      ? duesTemplate.auto_renew_default
-      : args.autoRenew;
-
   const schedule = await db.createDuesSchedule(lodgeId, {
     member_id: member.id,
     member_dues_id: duesRecord.id,
