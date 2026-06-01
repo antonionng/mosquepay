@@ -431,12 +431,17 @@ async function startDuesSubscriptionEnrolment(args: EnrolmentArgs) {
   // stable LP -> Mooov key that lets the saved-charge cron find the
   // right Stripe Customer + PaymentMethod on Mooov's side. Shape locked
   // with Mooov 2026-05-28: `mbr_<uuid>`, never recycled.
+  //
+  // Prefer the FK on the dues row when present (it's the most direct
+  // path); otherwise look up by email scoped to this lodge. Note:
+  // db.getMemberByEmail is (email, lodgeId) -- previous order was
+  // swapped which always returned null.
   const member =
     duesRecord.member_id != null
       ? await db
-          .getMemberByEmail(lodgeId, memberEmail)
+          .getMemberById(duesRecord.member_id, lodgeId)
           .catch(() => null)
-      : await db.getMemberByEmail(lodgeId, memberEmail).catch(() => null);
+      : await db.getMemberByEmail(memberEmail, lodgeId).catch(() => null);
   if (!member) {
     return NextResponse.json(
       {
