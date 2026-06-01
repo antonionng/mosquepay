@@ -24,7 +24,10 @@ import { getDefaultLodgeSlug } from "@/lib/tenant";
 import { createServiceClient } from "@/lib/supabase/server";
 import { callMooovConnect, MooovApiError } from "@/lib/mooov";
 import { duesSubscriptionEnabled } from "@/lib/dues/feature-flags";
-import { computeEnrolmentPlan } from "@/lib/dues/enrolment-plan";
+import {
+  computeEnrolmentPlan,
+  type EnrolmentPlan,
+} from "@/lib/dues/enrolment-plan";
 import type { DuesSplitStrategy, MemberDues } from "@/lib/db/types";
 
 export const runtime = "nodejs";
@@ -425,6 +428,15 @@ async function startDuesSubscriptionEnrolment(args: EnrolmentArgs) {
     );
   }
 
+  // Branch on the Mooov surface that fits this plan. Mooov 2026-06-01:
+  // open-ended Stripe Subscriptions live behind /v1/subscription_checkouts
+  // (fully Mooov-branded checkout at pay.mooov.money). Variable-amount
+  // strategies and auto-renew=off stay on the embedded payment-intent +
+  // saved-charge surface we already drive via lib/mooov-charges.ts.
+  if (plan.mooovFlow === "open_ended_subscription") {
+    return startOpenEndedSubscription({ args, plan });
+  }
+
   // Mint the schedule + instalment rows BEFORE talking to Mooov so the
   // webhook (which fires after the member completes hosted Checkout)
   // has somewhere to write the saved PM. Status=pending until the
@@ -443,6 +455,7 @@ async function startDuesSubscriptionEnrolment(args: EnrolmentArgs) {
       annual_amount: annualAmount,
       cycles_total: schedulePlan.cycleCount,
       year_label: currentYear.label,
+      mooov_flow: "saved_charge_fixed_term",
     },
   });
 
@@ -668,6 +681,247 @@ async function startDuesSubscriptionEnrolment(args: EnrolmentArgs) {
         code: "unexpected_error",
       },
       { status: 500 }
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Open-ended Mooov-branded subscription (POST /v1/subscription_checkouts)
+// ---------------------------------------------------------------------------
+//
+// Mooov 2026-06-01 reply: open-ended recurring subscriptions live behind
+// /v1/subscription_checkouts and stay fully Mooov-branded — members
+// never hit checkout.stripe.com. We pass a stable subscription_id (which
+// Mooov stamps on the Stripe Subscription + every invoice) and a
+// customer_ref (Mooov resolves/mints the Stripe Customer). Renewals
+// fire as subscription.invoice_paid webhooks, dual-emitted alongside
+// payment.captured. No cron of ours.
+//
+// Pre-creates instalment rows for the in-year cycles so /member/dues
+// can render the schedule progression locally — when subscription
+// invoices arrive we mark them paid in sequence. Cycles produced by
+// year-rollover (next masonic year) won't have pre-created instalments
+// yet; the webhook handler tolerates that by writing a fresh row.
+
+async function startOpenEndedSubscription({
+  args,
+  plan,
+}: {
+  args: EnrolmentArgs;
+  plan: EnrolmentPlan;
+}) {
+  const { lodgeId, lodgeSlug, duesRecord, memberEmail } = args;
+  const {
+    merchantId,
+    member,
+    masonicYear: currentYear,
+    strategy,
+    autoRenew,
+    customerRef,
+    schedule: schedulePlan,
+    annualAmount,
+    monthlyAmount,
+  } = plan;
+
+  if (monthlyAmount == null) {
+    console.error(
+      "dues/pay open-ended: plan.monthlyAmount unexpectedly null",
+      { dues_id: duesRecord.id, strategy },
+    );
+    return NextResponse.json(
+      {
+        error: "Could not work out a monthly amount for this plan.",
+        code: "monthly_amount_missing",
+      },
+      { status: 500 },
+    );
+  }
+
+  const monthlyMinor = Math.round(monthlyAmount * 100);
+  const currency = (duesRecord.currency ?? "GBP").toUpperCase();
+
+  // Mint the schedule first so its UUID can drive the deterministic
+  // subscription_id we hand to Mooov. Stripe Subscriptions are
+  // idempotent on this id — replays of the same enrolment intent
+  // resolve to the same subscription rather than creating duplicates.
+  const schedule = await db.createDuesSchedule(lodgeId, {
+    member_id: member.id,
+    member_dues_id: duesRecord.id,
+    member_email: memberEmail,
+    customer_ref: customerRef,
+    cadence: "monthly",
+    split_strategy: strategy,
+    auto_renew: autoRenew,
+    status: "pending",
+    next_charge_at: schedulePlan.rows[1]?.due_date ?? null,
+    metadata: {
+      annual_amount: annualAmount,
+      cycles_total: schedulePlan.cycleCount,
+      year_label: currentYear.label,
+      monthly_amount: monthlyAmount,
+      mooov_flow: "open_ended_subscription",
+    },
+  });
+  const mooovSubscriptionId = `sub_dues_${schedule.id}`;
+  await db.updateDuesSchedule(schedule.id, lodgeId, {
+    mooov_subscription_id: mooovSubscriptionId,
+  });
+
+  // Pre-create in-year instalment rows for the LP-side schedule view.
+  // The webhook marks them paid in sequence as subscription.invoice_paid
+  // events arrive. Open-ended cycles past year-end will be created
+  // ad-hoc by the webhook handler.
+  await db.createMemberDuesInstalments(
+    lodgeId,
+    schedulePlan.rows.map((row) => ({
+      member_dues_id: duesRecord.id,
+      sequence: row.sequence,
+      due_date: row.due_date,
+      amount: row.amount,
+      currency: duesRecord.currency,
+      status: "outstanding",
+      paid_at: null,
+      reminder_sent_at: null,
+      payment_reference: null,
+      schedule_id: schedule.id,
+    })),
+  );
+
+  const idempotencyKey = `lp:dues:sub:${schedule.id}`;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const lodgeQuery =
+    lodgeSlug === getDefaultLodgeSlug() ? "" : `&lodge=${encodeURIComponent(lodgeSlug)}`;
+  const successUrl = `${siteUrl}/events/rsvp/success?subscription_id=${encodeURIComponent(
+    mooovSubscriptionId,
+  )}&type=dues_subscription${lodgeQuery}`;
+  const cancelUrl = `${siteUrl}/dues/${duesRecord.id}?email=${encodeURIComponent(
+    memberEmail,
+  )}${lodgeQuery ? `&lodge=${encodeURIComponent(lodgeSlug)}` : ""}`;
+  const description = `Lodge dues — £${monthlyAmount.toFixed(2)} / month (${currentYear.label})`;
+
+  // Metadata gets stamped on the Stripe Subscription AND every invoice
+  // by Mooov, so our webhook can route subscription.invoice_paid back
+  // to the LP schedule even if the subscription_id ever diverged.
+  const subscriptionMetadata: Record<string, string> = {
+    intent: "dues_open_ended_subscription",
+    lp_schedule_id: schedule.id,
+    lp_dues_id: duesRecord.id,
+    lp_member_id: member.id,
+    lp_lodge_id: lodgeId,
+    lp_lodge_slug: lodgeSlug,
+    split_strategy: strategy,
+    masonic_year_label: currentYear.label,
+    customer_email: memberEmail,
+  };
+
+  try {
+    const result = await callMooovConnect<{
+      subscription_id: string;
+      status: string;
+      hosted_url?: string;
+      checkout_session_id?: string;
+    }>("POST", "/v1/subscription_checkouts", {
+      merchant: merchantId,
+      idempotencyKey,
+      body: {
+        subscription_id: mooovSubscriptionId,
+        customer_ref: customerRef,
+        amount: monthlyMinor,
+        currency,
+        interval: "month",
+        interval_count: 1,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        description,
+        metadata: subscriptionMetadata,
+        merchant_id: merchantId,
+      },
+    });
+
+    const hostedUrl = result.hosted_url ?? null;
+    if (!hostedUrl) {
+      console.error("dues/pay open-ended: Mooov returned no hosted_url", {
+        subscription_id: mooovSubscriptionId,
+        schedule_id: schedule.id,
+        merchant_id: merchantId,
+        status: result.status,
+      });
+      return NextResponse.json(
+        { error: "Payment processor did not return a checkout URL." },
+        { status: 502 },
+      );
+    }
+
+    return NextResponse.json({
+      url: hostedUrl,
+      subscription_id: mooovSubscriptionId,
+      schedule_id: schedule.id,
+      cycles_total: schedulePlan.cycleCount,
+      monthly_amount: monthlyAmount,
+      split_strategy: strategy,
+      mooov_flow: "open_ended_subscription",
+      checkout_session_id: result.checkout_session_id ?? null,
+    });
+  } catch (err) {
+    if (err instanceof MooovApiError) {
+      console.error("dues/pay open-ended: Mooov call failed", {
+        subscription_id: mooovSubscriptionId,
+        schedule_id: schedule.id,
+        category: err.category,
+        status: err.status,
+      });
+      // Roll the schedule back so the member can retry cleanly. We
+      // don't have a payment_attempts row to flag here (Mooov manages
+      // those server-side for the subscription path).
+      await db
+        .updateDuesSchedule(schedule.id, lodgeId, {
+          status: "cancelled",
+          cancelled_at: new Date().toISOString(),
+          cancelled_by_actor: "system_enrolment_failure",
+          last_failure_code: err.category,
+          last_failure_at: new Date().toISOString(),
+        })
+        .catch((rbErr) => {
+          console.error(
+            "dues/pay open-ended: rollback updateDuesSchedule failed",
+            {
+              schedule_id: schedule.id,
+              message: rbErr instanceof Error ? rbErr.message : String(rbErr),
+            },
+          );
+        });
+      if (err.category === "merchant_setup_required" && err.setupHint) {
+        return NextResponse.json(
+          {
+            error:
+              "This lodge has not finished setting up online payments yet. Please contact the lodge directly.",
+            code: "lodge_setup_incomplete",
+            setup_url: err.setupHint.setupUrl,
+          },
+          { status: 503 },
+        );
+      }
+      return NextResponse.json(
+        { error: "Could not create subscription session.", code: err.category },
+        { status: 502 },
+      );
+    }
+    console.error("dues/pay open-ended: unexpected error", err);
+    await db
+      .updateDuesSchedule(schedule.id, lodgeId, {
+        status: "cancelled",
+        cancelled_at: new Date().toISOString(),
+        cancelled_by_actor: "system_enrolment_failure",
+        last_failure_code: "unexpected_error",
+        last_failure_at: new Date().toISOString(),
+      })
+      .catch(() => undefined);
+    return NextResponse.json(
+      {
+        error: "Could not create subscription session.",
+        code: "unexpected_error",
+      },
+      { status: 500 },
     );
   }
 }

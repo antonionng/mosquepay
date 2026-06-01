@@ -44,6 +44,8 @@ interface SubscriptionPreview {
   firstCycleAmount: number;
   total: number;
   cycles: { sequence: number; dueDate: string; amount: number }[];
+  mooovFlow: "open_ended_subscription" | "saved_charge_fixed_term";
+  monthlyAmount: number | null;
 }
 
 interface AdvanceInfo {
@@ -845,6 +847,7 @@ function SubscriptionPreviewDialog({
   const finalCycle = plan?.cycles[plan.cycles.length - 1] ?? null;
   const tailCount = plan ? Math.max(0, plan.cycleCount - 1) : 0;
   const currencySymbol = plan?.currency === "GBP" ? "£" : (plan?.currency ?? "");
+  const isOpenEnded = plan?.mooovFlow === "open_ended_subscription";
 
   return (
     <Dialog
@@ -884,20 +887,22 @@ function SubscriptionPreviewDialog({
                 {plan.firstCycleAmount.toFixed(2)}
               </p>
               <p className="mt-1 text-sm text-slate-600">
-                {tailCount > 0
-                  ? `Then ${tailCount} more ${plan.cadence === "monthly" ? "monthly" : "quarterly"} payment${tailCount === 1 ? "" : "s"} on file.`
-                  : "Single cycle — your card stays on file in case auto-renew kicks in."}
-                {" "}
+                {isOpenEnded
+                  ? `Then ${currencySymbol}${(plan.monthlyAmount ?? plan.firstCycleAmount).toFixed(2)} every month — keeps running until you cancel.`
+                  : tailCount > 0
+                    ? `Then ${tailCount} more ${plan.cadence === "monthly" ? "monthly" : "quarterly"} payment${tailCount === 1 ? "" : "s"} on file.`
+                    : "Single cycle — your card stays on file in case auto-renew kicks in."}{" "}
                 <span className="text-slate-500">
-                  Total {currencySymbol}
-                  {plan.total.toFixed(2)} for {plan.yearLabel}.
+                  {isOpenEnded
+                    ? `${currencySymbol}${plan.total.toFixed(2)} covers ${plan.yearLabel} in full.`
+                    : `Total ${currencySymbol}${plan.total.toFixed(2)} for ${plan.yearLabel}.`}
                 </span>
               </p>
             </div>
 
             <div>
               <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
-                Schedule
+                Schedule for {plan.yearLabel}
               </p>
               <ul className="mt-2 divide-y divide-slate-100 rounded-xl border border-slate-200">
                 {plan.cycles.map((cycle, idx) => (
@@ -923,39 +928,52 @@ function SubscriptionPreviewDialog({
               </ul>
               {finalCycle ? (
                 <p className="mt-2 text-xs text-slate-500">
-                  Final charge {formatPlanDate(finalCycle.dueDate)} — covers{" "}
-                  {plan.yearLabel} in full.
+                  {isOpenEnded
+                    ? `After ${formatPlanDate(finalCycle.dueDate)} the same monthly charge keeps the next masonic year covered.`
+                    : `Final charge ${formatPlanDate(finalCycle.dueDate)} — covers ${plan.yearLabel} in full.`}
                 </p>
               ) : null}
             </div>
 
-            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-4 py-3">
-              <input
-                type="checkbox"
-                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
-                checked={showAutoRenew}
-                onChange={(event) =>
-                  onAutoRenewChange(event.target.checked)
-                }
-                disabled={loading}
-              />
-              <span className="text-sm">
-                <span className="block font-medium text-slate-900">
-                  Auto-renew next year
+            {isOpenEnded ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                <p className="font-medium text-slate-900">
+                  Open-ended monthly subscription
+                </p>
+                <p className="mt-0.5 text-slate-600">
+                  Charges run automatically. Cancel anytime from this page —
+                  any cycles already paid stay paid.
+                </p>
+              </div>
+            ) : (
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-4 py-3">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                  checked={showAutoRenew}
+                  onChange={(event) =>
+                    onAutoRenewChange(event.target.checked)
+                  }
+                  disabled={loading}
+                />
+                <span className="text-sm">
+                  <span className="block font-medium text-slate-900">
+                    Auto-renew next year
+                  </span>
+                  <span className="mt-0.5 block text-slate-600">
+                    Keep paying monthly when the next masonic year starts. You
+                    can cancel from this page anytime — including before the
+                    first renewal cycle.
+                  </span>
                 </span>
-                <span className="mt-0.5 block text-slate-600">
-                  Keep paying monthly when the next masonic year starts. You
-                  can cancel from this page anytime — including before the
-                  first renewal cycle.
-                </span>
-              </span>
-            </label>
+              </label>
+            )}
 
             <div className="flex items-start gap-2 text-xs text-slate-500">
               <Lock className="mt-0.5 h-3.5 w-3.5 flex-none" />
               <span>
-                You&apos;ll be redirected to a secure hosted card form to
-                authorise today&apos;s charge and save your card. Subsequent
+                You&apos;ll be redirected to a secure hosted card form on
+                pay.mooov.money to authorise today&apos;s charge. Subsequent
                 charges run automatically — no further action needed.
               </span>
             </div>

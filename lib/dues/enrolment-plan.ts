@@ -46,6 +46,26 @@ export type EnrolmentPlanArgs = {
   autoRenew?: boolean;
 };
 
+/**
+ * Which Mooov surface this enrolment should use.
+ *
+ * - `open_ended_subscription`: every cycle is the same amount AND the
+ *   member opted in to auto-renew. Maps to POST /v1/subscription_checkouts
+ *   (Stripe Subscription pass-through, fully Mooov-branded checkout at
+ *   pay.mooov.money). Mooov drives renewals, so we don't need our cron
+ *   for this schedule.
+ *
+ * - `saved_charge_fixed_term`: cycles vary in amount (catch-up lump,
+ *   balloon) OR auto-renew is off (one-shot fixed-term plan). Stays on
+ *   the embedded payment-intent + saved-charge flow we already run via
+ *   /v1/payment_intents + lib/mooov-charges.ts. Mooov 2026-06-01 reply:
+ *   "keep your existing embedded payment-intent + saved-charge flow for
+ *   fixed-term installment plans".
+ */
+export type DuesMooovFlow =
+  | "open_ended_subscription"
+  | "saved_charge_fixed_term";
+
 export type EnrolmentPlan = {
   merchantId: string;
   member: Member;
@@ -61,6 +81,15 @@ export type EnrolmentPlan = {
   schedule: ReturnType<typeof buildSchedule>;
   annualAmount: number;
   currency: string;
+  /** Which Mooov surface to use for this enrolment. See DuesMooovFlow. */
+  mooovFlow: DuesMooovFlow;
+  /**
+   * Per-cycle amount for an open-ended Stripe Subscription, in major units
+   * (£). Always equal to schedule.firstCycleAmount when set, but kept
+   * separate so callers can pass it directly to /v1/subscription_checkouts
+   * without re-deriving. Null on saved_charge_fixed_term.
+   */
+  monthlyAmount: number | null;
 };
 
 export type EnrolmentPlanError = {
@@ -250,6 +279,21 @@ export async function computeEnrolmentPlan(
   const autoRenew =
     args.autoRenew === undefined ? duesTemplate.auto_renew_default : args.autoRenew;
 
+  // Decide which Mooov surface fits this plan. Stripe Subscriptions bill
+  // the same amount every cycle, so they only fit when every row in our
+  // schedule has the same per-cycle amount AND the member wants
+  // auto-renew (an open-ended subscription is, by definition, perpetual
+  // until cancelled). Variable-amount strategies (catch-up lump, balloon)
+  // and fixed-term opt-outs stay on the saved-charge surface.
+  const firstCycleMinor = Math.round(schedule.firstCycleAmount * 100);
+  const allCyclesEqual = schedule.rows.every(
+    (row) => Math.round(row.amount * 100) === firstCycleMinor,
+  );
+  const mooovFlow: DuesMooovFlow =
+    autoRenew && allCyclesEqual
+      ? "open_ended_subscription"
+      : "saved_charge_fixed_term";
+
   return {
     ok: true,
     plan: {
@@ -265,6 +309,11 @@ export async function computeEnrolmentPlan(
       schedule,
       annualAmount,
       currency: (duesRecord.currency ?? "GBP").toUpperCase(),
+      mooovFlow,
+      monthlyAmount:
+        mooovFlow === "open_ended_subscription"
+          ? schedule.firstCycleAmount
+          : null,
     },
   };
 }

@@ -487,46 +487,17 @@ async function projectConnectEvent(
     case "subscription.canceled":
     case "subscription.invoice_paid":
     case "subscription.invoice_failed": {
-      // Mooov 2026-05-28 reply (post-lock): subscription pass-through
-      // Slices 1, 2, 3a, 4, 5 are live in prod; 3b (invoice.paid /
-      // invoice.payment_failed projection) is dispatcher-routed but
-      // stub. We are NOT migrating any live schedule to Stripe
-      // Subscription mode until 3b lands and we ship the migration
-      // script (app/api/admin/dues/migrate-to-stripe-subscriptions).
-      //
-      // Until then any subscription.* event we receive is either:
-      //   (a) a Mooov-side test fixture (merch_lodgepaytest_3f3a5w),
-      //   (b) a probe from operators, or
-      //   (c) noise from the dual-emit fan-out on a schedule we did
-      //       NOT migrate (shouldn't happen but is the dangerous case
-      //       to flag loudly if it ever does).
-      //
-      // Persist (already done by the parent insert) + log + ack 200.
-      // Per-cycle money projection comes from the paired payment.captured
-      // event on the payment lane, which our existing handler at the top
-      // of this function already covers.
-      const subscriptionId =
-        typeof event.data?.subscription_id === "string"
-          ? event.data.subscription_id
-          : null;
-      const subscriptionMetadata =
-        event.data?.subscription_metadata &&
-        typeof event.data.subscription_metadata === "object"
-          ? (event.data.subscription_metadata as Record<string, unknown>)
-          : null;
-      console.log("mooov webhook: subscription event ack-only (no projection)", {
-        event_id: event.id,
-        event_type: event.type,
-        merchant_id: event.merchant.id,
-        subscription_id: subscriptionId,
-        lp_schedule_id:
-          typeof subscriptionMetadata?.lp_schedule_id === "string"
-            ? subscriptionMetadata.lp_schedule_id
-            : null,
-        slice_3b_required:
-          event.type === "subscription.invoice_paid" ||
-          event.type === "subscription.invoice_failed",
-      });
+      // Mooov 2026-06-01 reply: open-ended subscription pass-through
+      // is GA. We project these events into the LP dues_schedules /
+      // member_dues_instalments / public.payments tables so the
+      // member portal and treasurer dashboard reflect cycle-by-cycle
+      // truth. The dual-emitted payment.captured event on the same
+      // money movement is intentionally a no-op (our payment.captured
+      // handler above only projects intents we set ourselves: dues,
+      // donation, dues_subscription_enrol, etc.). Subscription
+      // invoices are owned by Mooov server-side, so the linkage is
+      // here, on the subscription lane.
+      await handleSubscriptionEvent(lodgeId, event);
       return;
     }
   }
@@ -1465,4 +1436,407 @@ function computeCyclicalCharitable(
   const total = Number(fullYearCharitable ?? 0);
   if (total <= 0 || cycles <= 0) return 0;
   return Math.round((total / cycles) * 100) / 100;
+}
+
+// ---------------------------------------------------------------------------
+// subscription.* event handlers (Mooov 2026-06-01 GA)
+// ---------------------------------------------------------------------------
+//
+// Lifecycle:
+//   subscription.activated      first invoice paid; we flip status to
+//                               active_stripe and stamp customer + PM.
+//   subscription.invoice_paid   per-cycle charge succeeded; we mark the
+//                               next outstanding instalment paid, project
+//                               a public.payments row, attribute charitable
+//                               portion / Gift Aid for the cycle.
+//   subscription.invoice_failed cycle failed; bump dunning state to
+//                               past_due so /admin/dues/schedules and
+//                               the member portal can render a fix-card
+//                               banner.
+//   subscription.canceled       member or admin cancelled the Stripe
+//                               Subscription; flip schedule cancelled.
+//   subscription.updated        log only; we don't currently surface
+//                               mid-flight subscription edits.
+//
+// Idempotency:
+//   * Resolution prefers event.data.subscription_metadata.lp_schedule_id
+//     (verbatim from the Stripe Subscription metadata we set on
+//     /v1/subscription_checkouts) and falls back to subscription_id ->
+//     dues_schedules.mooov_subscription_id. Cross-tenant safe because
+//     the resolved schedule's lodge_id MUST match the webhook's lodge.
+//   * subscription.activated is idempotent on schedule.status (already
+//     active_stripe = noop). Redeliveries are common around the
+//     incomplete -> active transition.
+//   * subscription.invoice_paid is idempotent on the synthetic
+//     mooov_payment_id we form from the invoice id (sub_inv_<invoiceId>);
+//     getPaymentByMooovId() is the dedupe gate.
+
+type MooovSubscriptionEventData = {
+  subscriptionId: string | null;
+  stripeSubscriptionId: string | null;
+  subscriptionStatus: string | null;
+  invoiceId: string | null;
+  amount: number | null;
+  currency: string;
+  paymentMethodId: string | null;
+  stripeCustomerId: string | null;
+  metadata: Record<string, unknown>;
+  cancelReason: string | null;
+};
+
+function readSubscriptionEvent(event: MooovConnectEvent): MooovSubscriptionEventData {
+  const data = event.data ?? {};
+  const metadata =
+    data.subscription_metadata && typeof data.subscription_metadata === "object"
+      ? (data.subscription_metadata as Record<string, unknown>)
+      : {};
+  return {
+    subscriptionId:
+      typeof data.subscription_id === "string" ? data.subscription_id : null,
+    stripeSubscriptionId:
+      typeof data.stripe_subscription_id === "string"
+        ? data.stripe_subscription_id
+        : null,
+    subscriptionStatus:
+      typeof data.subscription_status === "string"
+        ? data.subscription_status
+        : null,
+    invoiceId:
+      typeof data.invoice_id === "string"
+        ? data.invoice_id
+        : typeof data.stripe_invoice_id === "string"
+          ? (data.stripe_invoice_id as string)
+          : null,
+    amount: typeof data.amount === "number" ? data.amount : null,
+    currency:
+      typeof data.currency === "string" ? data.currency.toUpperCase() : "GBP",
+    paymentMethodId:
+      typeof data.payment_method_id === "string" ? data.payment_method_id : null,
+    stripeCustomerId:
+      typeof data.stripe_customer_id === "string"
+        ? data.stripe_customer_id
+        : null,
+    metadata,
+    cancelReason:
+      typeof data.cancel_reason === "string" ? (data.cancel_reason as string) : null,
+  };
+}
+
+async function resolveSubscriptionSchedule(
+  lodgeId: string,
+  parsed: MooovSubscriptionEventData,
+  eventId: string,
+) {
+  const lpScheduleId =
+    typeof parsed.metadata.lp_schedule_id === "string"
+      ? parsed.metadata.lp_schedule_id
+      : null;
+
+  let schedule =
+    lpScheduleId != null
+      ? await db.getDuesSchedule(lpScheduleId, lodgeId).catch(() => null)
+      : null;
+
+  if (!schedule && parsed.subscriptionId) {
+    const bySubId = await db
+      .getDuesScheduleByMooovSubscriptionId(parsed.subscriptionId)
+      .catch(() => null);
+    if (bySubId && bySubId.lodge_id === lodgeId) {
+      schedule = bySubId;
+    } else if (bySubId && bySubId.lodge_id !== lodgeId) {
+      console.error(
+        "mooov webhook subscription: schedule lodge mismatch — refusing to project",
+        {
+          event_id: eventId,
+          subscription_id: parsed.subscriptionId,
+          schedule_lodge_id: bySubId.lodge_id,
+          webhook_lodge_id: lodgeId,
+        },
+      );
+      return null;
+    }
+  }
+
+  if (!schedule) {
+    console.warn("mooov webhook subscription: no LP schedule found", {
+      event_id: eventId,
+      subscription_id: parsed.subscriptionId,
+      lp_schedule_id: lpScheduleId,
+    });
+    return null;
+  }
+
+  return schedule;
+}
+
+async function handleSubscriptionEvent(
+  lodgeId: string,
+  event: MooovConnectEvent,
+): Promise<void> {
+  const parsed = readSubscriptionEvent(event);
+  const schedule = await resolveSubscriptionSchedule(lodgeId, parsed, event.id);
+  if (!schedule) return;
+
+  switch (event.type) {
+    case "subscription.activated":
+      await handleSubscriptionActivated(lodgeId, schedule, parsed, event.id);
+      return;
+    case "subscription.invoice_paid":
+      await handleSubscriptionInvoicePaid(lodgeId, schedule, parsed, event.id);
+      return;
+    case "subscription.invoice_failed":
+      await handleSubscriptionInvoiceFailed(lodgeId, schedule, parsed, event.id);
+      return;
+    case "subscription.canceled":
+      await handleSubscriptionCanceled(lodgeId, schedule, parsed, event.id);
+      return;
+    case "subscription.updated":
+      console.log("mooov webhook: subscription.updated (log-only)", {
+        event_id: event.id,
+        schedule_id: schedule.id,
+        subscription_status: parsed.subscriptionStatus,
+      });
+      return;
+  }
+}
+
+async function handleSubscriptionActivated(
+  lodgeId: string,
+  schedule: db.DuesSchedule,
+  parsed: MooovSubscriptionEventData,
+  eventId: string,
+): Promise<void> {
+  if (schedule.status === "active_stripe") {
+    console.log(
+      "mooov webhook: subscription.activated already projected (idempotent)",
+      { event_id: eventId, schedule_id: schedule.id },
+    );
+    return;
+  }
+
+  await db.updateDuesSchedule(schedule.id, lodgeId, {
+    status: "active_stripe",
+    mooov_payment_method_id:
+      parsed.paymentMethodId ?? schedule.mooov_payment_method_id,
+    stripe_customer_id:
+      parsed.stripeCustomerId ?? schedule.stripe_customer_id,
+    last_charged_at: new Date().toISOString(),
+    consecutive_failures: 0,
+    last_failure_code: null,
+    last_failure_category: null,
+    last_failure_at: null,
+  });
+}
+
+async function handleSubscriptionInvoicePaid(
+  lodgeId: string,
+  schedule: db.DuesSchedule,
+  parsed: MooovSubscriptionEventData,
+  eventId: string,
+): Promise<void> {
+  // Idempotent on a synthetic mooov_payment_id derived from the invoice
+  // id. Mooov dual-emits payment.captured + subscription.invoice_paid
+  // for the same money movement, but the payment.captured handler at
+  // the top of this file ignores intents we didn't set, so this is
+  // the only projection lane for subscription cycles.
+  const syntheticPaymentId = parsed.invoiceId
+    ? `sub_inv_${parsed.invoiceId}`
+    : `sub_evt_${eventId}`;
+
+  const existingPayment = await db
+    .getPaymentByMooovId(syntheticPaymentId)
+    .catch(() => null);
+  if (existingPayment) {
+    console.log(
+      "mooov webhook: subscription.invoice_paid already projected (idempotent)",
+      { event_id: eventId, schedule_id: schedule.id, mooov_payment_id: syntheticPaymentId },
+    );
+    return;
+  }
+
+  const duesRecord = await db.getMemberDuesById(schedule.member_dues_id, lodgeId);
+  if (!duesRecord) {
+    console.error(
+      "mooov webhook: subscription.invoice_paid dues record missing",
+      { event_id: eventId, dues_id: schedule.member_dues_id, schedule_id: schedule.id },
+    );
+    return;
+  }
+
+  const totalMajor = (parsed.amount ?? 0) / 100;
+  const currencyMajor = parsed.currency || "GBP";
+  const completedAt = new Date().toISOString();
+  const allInstalments = await db.getInstalmentsForDues(duesRecord.id, lodgeId);
+  const charitablePerCycle = computeCyclicalCharitable(
+    duesRecord.charitable_amount,
+    Math.max(allInstalments.length, 1),
+  );
+
+  const payment = await db.addPayment(lodgeId, {
+    rsvp_id: null,
+    event_id: null,
+    user_email: duesRecord.member_email,
+    user_name: duesRecord.member_name,
+    stripe_payment_intent_id: null,
+    stripe_charge_id: null,
+    stripe_customer_id:
+      parsed.stripeCustomerId ?? schedule.stripe_customer_id ?? null,
+    mooov_payment_id: syntheticPaymentId,
+    dining_amount: 0,
+    charity_amount: charitablePerCycle,
+    raffle_amount: 0,
+    meeting_fee_amount: 0,
+    guest_ticket_amount: 0,
+    total_amount: totalMajor,
+    currency: currencyMajor,
+    charity_name: charitablePerCycle > 0 ? "Dues charitable portion" : null,
+    status: "succeeded",
+    refund_amount: 0,
+    refund_reason: null,
+    completed_at: completedAt,
+  });
+
+  // Mark the next outstanding instalment paid by sequence. Open-ended
+  // schedules can outlive the pre-created in-year cycles; once we run
+  // out of outstanding rows we just leave the public.payments row as
+  // the per-cycle accounting record (dues_schedules.metadata.cycles_paid
+  // is the authoritative count for the UI). No new instalment is
+  // forged for renewal cycles -- those will be re-baselined when the
+  // next masonic year is configured by the lodge admin.
+  const nextOutstanding = allInstalments
+    .filter(
+      (i) =>
+        i.schedule_id === schedule.id &&
+        (i.status === "outstanding" || i.status === "overdue"),
+    )
+    .sort((a, b) => a.sequence - b.sequence)[0];
+
+  if (nextOutstanding) {
+    await db.updateInstalment(nextOutstanding.id, lodgeId, {
+      status: "paid",
+      paid_at: completedAt,
+      payment_reference: syntheticPaymentId,
+    });
+  }
+
+  const remainingAfter = allInstalments
+    .filter(
+      (i) =>
+        i.schedule_id === schedule.id &&
+        i.id !== (nextOutstanding?.id ?? "") &&
+        (i.status === "outstanding" || i.status === "overdue"),
+    )
+    .sort((a, b) => a.sequence - b.sequence);
+
+  // Increment cycles_paid in metadata. Open-ended schedules don't have
+  // a meaningful cycles_total beyond the in-year baseline, so the UI
+  // displays "ongoing" past that.
+  const metadata = (schedule.metadata ?? {}) as Record<string, unknown>;
+  const priorCyclesPaid =
+    typeof metadata.cycles_paid === "number" ? metadata.cycles_paid : 0;
+
+  await db.updateDuesSchedule(schedule.id, lodgeId, {
+    status: "active_stripe",
+    next_charge_at: remainingAfter[0]?.due_date ?? null,
+    last_charged_at: completedAt,
+    consecutive_failures: 0,
+    last_failure_code: null,
+    last_failure_category: null,
+    last_failure_at: null,
+    metadata: {
+      ...metadata,
+      cycles_paid: priorCyclesPaid + 1,
+      last_invoice_id: parsed.invoiceId,
+      last_invoice_amount: totalMajor,
+    },
+  });
+
+  // Flip the parent member_dues to paid once we've covered the in-year
+  // total. For open-ended subscriptions this is when the last
+  // pre-created instalment is consumed; subsequent invoices belong to
+  // the NEXT masonic year (a lodge admin will spin up the next year's
+  // member_dues row separately, or we'll auto-roll it later).
+  if (remainingAfter.length === 0) {
+    await db.updateMemberDuesStatus(duesRecord.id, lodgeId, {
+      status: "paid",
+      payment_id: payment.id,
+      paid_at: completedAt,
+    });
+  }
+
+  // Charitable / Gift Aid attribution for the cycle, mirroring the
+  // saved-charge cycle projector so the Gift Aid claim batcher sees a
+  // donation row dated to the charge.
+  if (charitablePerCycle > 0) {
+    const declaration = await db.getActiveGiftAidDeclarationByEmail(
+      lodgeId,
+      duesRecord.member_email,
+    );
+    await db.addDonation(lodgeId, {
+      event_id: null,
+      payment_id: payment.id,
+      donor_name: duesRecord.member_name,
+      donor_email: duesRecord.member_email,
+      amount: charitablePerCycle,
+      currency: currencyMajor,
+      source: "dues_charitable_portion",
+      status: "completed",
+      gift_aid_declaration_id: declaration?.id ?? null,
+      gift_aid_status: declaration ? "declared" : "eligible",
+      gift_aid_eligible_amount: declaration ? charitablePerCycle : 0,
+    });
+  }
+}
+
+async function handleSubscriptionInvoiceFailed(
+  lodgeId: string,
+  schedule: db.DuesSchedule,
+  parsed: MooovSubscriptionEventData,
+  eventId: string,
+): Promise<void> {
+  const failureCode =
+    typeof parsed.metadata.failure_code === "string"
+      ? (parsed.metadata.failure_code as string)
+      : "subscription_invoice_failed";
+  const failureCategory =
+    typeof parsed.metadata.failure_category === "string"
+      ? (parsed.metadata.failure_category as string)
+      : null;
+
+  await db.updateDuesSchedule(schedule.id, lodgeId, {
+    status: "past_due",
+    consecutive_failures: schedule.consecutive_failures + 1,
+    last_failure_code: failureCode,
+    last_failure_category: failureCategory,
+    last_failure_at: new Date().toISOString(),
+  });
+  console.warn("mooov webhook: subscription.invoice_failed projected", {
+    event_id: eventId,
+    schedule_id: schedule.id,
+    invoice_id: parsed.invoiceId,
+    failure_code: failureCode,
+    consecutive_failures: schedule.consecutive_failures + 1,
+  });
+}
+
+async function handleSubscriptionCanceled(
+  lodgeId: string,
+  schedule: db.DuesSchedule,
+  parsed: MooovSubscriptionEventData,
+  eventId: string,
+): Promise<void> {
+  if (schedule.status === "cancelled") {
+    console.log(
+      "mooov webhook: subscription.canceled already projected (idempotent)",
+      { event_id: eventId, schedule_id: schedule.id },
+    );
+    return;
+  }
+
+  await db.updateDuesSchedule(schedule.id, lodgeId, {
+    status: "cancelled",
+    cancelled_at: new Date().toISOString(),
+    cancelled_by_actor: parsed.cancelReason ?? "stripe_subscription_canceled",
+    next_charge_at: null,
+  });
 }

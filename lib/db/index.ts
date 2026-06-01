@@ -1921,6 +1921,13 @@ export type CreateDuesScheduleInput = {
   status?: DuesScheduleStatus;
   next_charge_at?: string | null;
   metadata?: Record<string, unknown>;
+  /**
+   * Pre-stamped Stripe Subscription identifier for the Mooov-branded
+   * subscription_checkouts flow. Set to `sub_dues_<schedule_uuid>` so
+   * the LP-side schedule and the Stripe Subscription share an idempotent
+   * key. Null on saved-charge schedules.
+   */
+  mooov_subscription_id?: string | null;
 };
 
 export async function createDuesSchedule(
@@ -1941,11 +1948,30 @@ export async function createDuesSchedule(
       status: input.status ?? "pending",
       next_charge_at: input.next_charge_at ?? null,
       metadata: input.metadata ?? {},
+      mooov_subscription_id: input.mooov_subscription_id ?? null,
     })
     .select("*")
     .single();
   if (error) throw error;
   return data as DuesSchedule;
+}
+
+/**
+ * Look up a dues schedule by its Mooov-side subscription_id (the one we
+ * stamp on /v1/subscription_checkouts). Used by the Mooov webhook to
+ * route subscription.* events back to the LP schedule. Cross-tenant by
+ * design — the subscription_id is unique platform-wide.
+ */
+export async function getDuesScheduleByMooovSubscriptionId(
+  mooovSubscriptionId: string
+): Promise<DuesSchedule | null> {
+  const { data, error } = await db()
+    .from("dues_schedules")
+    .select("*")
+    .eq("mooov_subscription_id", mooovSubscriptionId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as DuesSchedule | null) ?? null;
 }
 
 export async function getDuesSchedule(

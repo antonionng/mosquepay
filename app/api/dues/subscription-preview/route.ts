@@ -167,6 +167,12 @@ export async function POST(request: NextRequest) {
         dueDate: row.due_date,
         amount: row.amount,
       })),
+      // Which Mooov surface this enrolment will use. Drives the
+      // confirmation copy on /member/dues so members know whether
+      // their plan is fixed-term or renews indefinitely until they
+      // cancel.
+      mooovFlow: plan.mooovFlow,
+      monthlyAmount: plan.monthlyAmount,
     },
   });
 }
