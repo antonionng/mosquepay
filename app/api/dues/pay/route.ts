@@ -561,12 +561,22 @@ async function startDuesSubscriptionEnrolment(args: EnrolmentArgs) {
   // Compute the full plan first. Same helper backs the
   // /api/dues/subscription-preview endpoint so the dialog the member
   // confirms cannot disagree with what we actually charge.
+  // BUG FIX 2026-06-01: cadence was being parsed from the request body
+  // and stashed on EnrolmentArgs, but never forwarded to
+  // computeEnrolmentPlan here. The preview dialog (which DOES pass
+  // cadence to /api/dues/subscription-preview) would render "£24 /
+  // month" while this path silently fell back to the template default
+  // (quarterly) and posted a £60 / 3-month subscription to Mooov. The
+  // member's chosen cadence is the source of truth on this hop —
+  // computeEnrolmentPlan still validates it against the lodge's
+  // enabled cadenceOptions, so a stale / invalid value is harmless.
   const planResult = await computeEnrolmentPlan({
     lodgeId,
     duesRecord,
     memberEmail,
     strategy: args.strategy,
     autoRenew: args.autoRenew,
+    cadence: args.cadence,
   });
   if (!planResult.ok) {
     return NextResponse.json(
