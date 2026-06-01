@@ -31,6 +31,10 @@ import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { MemberSubscriptionPanel } from "@/components/admin/member-subscription-panel";
 import { MemberGiftAidPanel } from "@/components/admin/member-gift-aid-panel";
 import {
+  DuesMethodPanel,
+  type DuesMethodPanelProps,
+} from "@/components/admin/dues-method-panel";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -174,6 +178,10 @@ interface Props {
   /** Active (non-revoked) Gift Aid declaration if one is on file for this
    *  member. Drives the post-meeting paper-upload panel. */
   giftAidDeclaration?: import("@/lib/db/types").GiftAidDeclaration | null;
+  /** Initial state for the new Dues Method panel — current-year row,
+   *  current method tag, copyable subscription link. Server-computed in
+   *  page.tsx so the panel renders without a client roundtrip. */
+  duesMethod?: DuesMethodPanelProps["initial"] | null;
 }
 
 function buildEditForm(member: Member) {
@@ -241,6 +249,7 @@ export function MemberDetailClient({
   nextDues,
   subscription = null,
   giftAidDeclaration = null,
+  duesMethod = null,
 }: Props) {
   const router = useRouter();
   const [member, setMember] = useState(initialMember);
@@ -1239,6 +1248,15 @@ export function MemberDetailClient({
             schedule={subscription.schedule}
             instalments={subscription.instalments}
             memberName={member.full_name}
+          />
+        ) : null}
+
+        {duesMethod ? (
+          <DuesMethodPanel
+            memberId={member.id}
+            memberEmail={member.email}
+            memberName={member.full_name}
+            initial={duesMethod}
           />
         ) : null}
 

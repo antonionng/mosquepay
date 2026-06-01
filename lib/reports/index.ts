@@ -37,6 +37,22 @@ export type SecretaryReport = {
   }>;
 };
 
+export type DuesPaymentMethodBreakdown = {
+  online_subscription: number;
+  bacs: number;
+  paid_in_full: number;
+  fee_waived: number;
+  unset: number;
+  bacs_monthly_total: number;
+  /** Sum of `amount` of dues rows in each bucket (paid status not
+   *  considered — this is *expected* income by method).  */
+  bacs_annual_expected: number;
+  paid_in_full_total: number;
+  fee_waived_total: number;
+  online_subscription_expected: number;
+  unset_outstanding_total: number;
+};
+
 export type TreasurerReport = {
   totalPaid: number;
   totalRefunded: number;
@@ -48,12 +64,20 @@ export type TreasurerReport = {
   charityFromPayments: number;
   duesGiftAidEligible: number;
   duesGiftAidReclaimable: number;
+  duesPaymentMethodBreakdown: DuesPaymentMethodBreakdown;
   outstandingDues: Array<{
     member_email: string;
     member_name: string | null;
     amount: number;
     period_end: string;
     status: string;
+    dues_payment_method:
+      | "online_subscription"
+      | "bacs"
+      | "paid_in_full"
+      | "fee_waived"
+      | null;
+    bacs_monthly_amount: number | null;
   }>;
   reconciliation: Array<{
     id: string;
@@ -224,6 +248,48 @@ export function buildTreasurerReport({
     duesGiftAidReclaimable: memberDues
       .filter((d) => d.status === "paid" && d.gift_aid_status === "declared")
       .reduce((s, d) => s + d.gift_aid_eligible_amount * 0.25, 0),
+    duesPaymentMethodBreakdown: (() => {
+      const acc: DuesPaymentMethodBreakdown = {
+        online_subscription: 0,
+        bacs: 0,
+        paid_in_full: 0,
+        fee_waived: 0,
+        unset: 0,
+        bacs_monthly_total: 0,
+        bacs_annual_expected: 0,
+        paid_in_full_total: 0,
+        fee_waived_total: 0,
+        online_subscription_expected: 0,
+        unset_outstanding_total: 0,
+      };
+      for (const d of memberDues) {
+        // Skip advances so we don't double-count next-year rows.
+        if (d.is_advance) continue;
+        const method = d.dues_payment_method ?? null;
+        if (method === "online_subscription") {
+          acc.online_subscription += 1;
+          acc.online_subscription_expected += Number(d.amount) || 0;
+        } else if (method === "bacs") {
+          acc.bacs += 1;
+          acc.bacs_annual_expected += Number(d.amount) || 0;
+          if (d.bacs_monthly_amount != null) {
+            acc.bacs_monthly_total += Number(d.bacs_monthly_amount) || 0;
+          }
+        } else if (method === "paid_in_full") {
+          acc.paid_in_full += 1;
+          acc.paid_in_full_total += Number(d.amount) || 0;
+        } else if (method === "fee_waived") {
+          acc.fee_waived += 1;
+          acc.fee_waived_total += Number(d.amount) || 0;
+        } else {
+          acc.unset += 1;
+          if (d.status !== "paid" && d.status !== "waived") {
+            acc.unset_outstanding_total += Number(d.amount) || 0;
+          }
+        }
+      }
+      return acc;
+    })(),
     outstandingDues: memberDues
       .filter((d) => d.status !== "paid" && d.status !== "waived")
       .slice(0, 50)
@@ -233,6 +299,9 @@ export function buildTreasurerReport({
         amount: d.amount,
         period_end: d.period_end,
         status: d.status,
+        dues_payment_method: d.dues_payment_method ?? null,
+        bacs_monthly_amount:
+          d.bacs_monthly_amount != null ? Number(d.bacs_monthly_amount) : null,
       })),
     reconciliation: payments.slice(0, 50).map((p) => ({
       id: p.id,

@@ -1626,6 +1626,33 @@ async function handleSubscriptionActivated(
     last_failure_category: null,
     last_failure_at: null,
   });
+
+  // Auto-tag the underlying member_dues row as 'online_subscription'
+  // so the treasurer dashboard / member-list pill / reports breakdown
+  // all reflect reality without the admin having to manually mark it.
+  // Only overwrite NULL or already-online tags — never clobber an
+  // explicit BACS / paid_in_full / fee_waived tag the admin set.
+  try {
+    const memberDues = await db.getMemberDuesById(
+      schedule.member_dues_id,
+      lodgeId,
+    );
+    if (
+      memberDues &&
+      (memberDues.dues_payment_method == null ||
+        memberDues.dues_payment_method === "online_subscription")
+    ) {
+      await db.setMemberDuesPaymentMethod(memberDues.id, lodgeId, {
+        method: "online_subscription",
+        setBy: "mooov_webhook_subscription_activated",
+      });
+    }
+  } catch (err) {
+    console.error("mooov webhook: failed to auto-tag dues_payment_method", {
+      schedule_id: schedule.id,
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 async function handleSubscriptionInvoicePaid(

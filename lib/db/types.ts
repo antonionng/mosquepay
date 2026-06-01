@@ -740,9 +740,28 @@ export type MemberDues = {
   waiver_reason: string | null;
   is_advance: boolean;
   advance_for_year_id: string | null;
+  /**
+   * How this member is paying this year's dues. NULL = not yet tagged
+   * (treasurer dashboard counts these as "outstanding / unset"). See
+   * supabase/migrations/063_member_dues_payment_method.sql.
+   */
+  dues_payment_method: DuesPaymentMethod | null;
+  /** Standing-order amount when dues_payment_method='bacs'. */
+  bacs_monthly_amount: number | null;
+  /** Optional BACS reference (e.g. "BRO ANTONIO 25/26"). */
+  bacs_reference: string | null;
+  /** Admin email or 'system_backfill_063' for the migration backfill. */
+  payment_method_set_by: string | null;
+  payment_method_set_at: string | null;
   created_at: string;
   updated_at: string;
 };
+
+export type DuesPaymentMethod =
+  | "online_subscription"
+  | "bacs"
+  | "paid_in_full"
+  | "fee_waived";
 
 export type MemberDuesInstalment = {
   id: string;

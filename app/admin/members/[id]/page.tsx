@@ -3,12 +3,36 @@ import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
 import { computeNextDuesForMember } from "@/lib/dues/next-due";
+import { getDefaultLodgeSlug } from "@/lib/tenant";
 import type {
   DuesSchedule,
   GiftAidDeclaration,
+  MemberDues,
   MemberDuesInstalment,
 } from "@/lib/db/types";
 import { MemberDetailClient } from "./member-detail-client";
+
+function pickCurrentYearDues(
+  duesRecords: MemberDues[],
+  yearStartIso: string | null,
+  yearEndIso: string | null,
+): MemberDues | null {
+  const nonAdvance = duesRecords.filter((d) => !d.is_advance);
+  if (nonAdvance.length === 0) return null;
+  if (yearStartIso && yearEndIso) {
+    const ys = yearStartIso.slice(0, 10);
+    const ye = yearEndIso.slice(0, 10);
+    const inYear = nonAdvance.find(
+      (d) =>
+        d.period_start.slice(0, 10) <= ye &&
+        d.period_end.slice(0, 10) >= ys,
+    );
+    if (inYear) return inYear;
+  }
+  return [...nonAdvance].sort((a, b) =>
+    b.created_at.localeCompare(a.created_at),
+  )[0];
+}
 
 export default async function AdminMemberDetailPage({
   params,
@@ -36,6 +60,7 @@ export default async function AdminMemberDetailPage({
         nextDues={null}
         subscription={null}
         giftAidDeclaration={null}
+        duesMethod={null}
       />
     );
   }
@@ -114,6 +139,63 @@ export default async function AdminMemberDetailPage({
     subscription = { schedule: activeSchedule, instalments };
   }
 
+  // Pick the dues row that drives the new "Dues payment method" panel.
+  // Same row-resolution logic the API uses so the panel reflects what
+  // the POST handler will mutate.
+  const duesRowForMethod = pickCurrentYearDues(
+    duesRecords,
+    currentYear?.start_date ?? null,
+    currentYear?.end_date ?? null,
+  );
+
+  // Build the public subscription/pay link the admin can copy or
+  // mailto. Same shape as the initiation cron template:
+  // ${siteUrl}/dues/[duesId]?email=...&lodge=...
+  let subscriptionLink: string | null = null;
+  if (duesRowForMethod) {
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+    const lodgeSlug = ctx.mode === "database" ? ctx.lodgeSlug : null;
+    if (siteUrl) {
+      const u = new URL(`/dues/${duesRowForMethod.id}`, siteUrl);
+      u.searchParams.set("email", member.email);
+      if (lodgeSlug && lodgeSlug !== getDefaultLodgeSlug()) {
+        u.searchParams.set("lodge", lodgeSlug);
+      }
+      subscriptionLink = u.toString();
+    }
+  }
+
+  const duesMethod = duesRowForMethod
+    ? {
+        duesId: duesRowForMethod.id,
+        method: duesRowForMethod.dues_payment_method ?? null,
+        bacsMonthlyAmount: duesRowForMethod.bacs_monthly_amount ?? null,
+        bacsReference: duesRowForMethod.bacs_reference ?? null,
+        waiverReason: duesRowForMethod.waiver_reason ?? null,
+        paidAt: duesRowForMethod.paid_at ?? null,
+        setBy: duesRowForMethod.payment_method_set_by ?? null,
+        setAt: duesRowForMethod.payment_method_set_at ?? null,
+        annualAmount:
+          duesRowForMethod.full_year_amount ?? duesRowForMethod.amount,
+        yearLabel: currentYear?.label ?? null,
+        subscriptionLink,
+        hasActiveSubscription: subscription != null,
+      }
+    : {
+        duesId: null,
+        method: null,
+        bacsMonthlyAmount: null,
+        bacsReference: null,
+        waiverReason: null,
+        paidAt: null,
+        setBy: null,
+        setAt: null,
+        annualAmount: null,
+        yearLabel: currentYear?.label ?? null,
+        subscriptionLink: null,
+        hasActiveSubscription: subscription != null,
+      };
+
   return (
     <MemberDetailClient
       member={JSON.parse(JSON.stringify(member))}
@@ -132,6 +214,7 @@ export default async function AdminMemberDetailPage({
             ) as GiftAidDeclaration)
           : null
       }
+      duesMethod={JSON.parse(JSON.stringify(duesMethod))}
     />
   );
 }

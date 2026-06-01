@@ -1772,6 +1772,11 @@ export async function createMemberDues(
     | "waiver_reason"
     | "is_advance"
     | "advance_for_year_id"
+    | "dues_payment_method"
+    | "bacs_monthly_amount"
+    | "bacs_reference"
+    | "payment_method_set_by"
+    | "payment_method_set_at"
   > &
     Partial<
       Pick<
@@ -1787,6 +1792,11 @@ export async function createMemberDues(
         | "waiver_reason"
         | "is_advance"
         | "advance_for_year_id"
+        | "dues_payment_method"
+        | "bacs_monthly_amount"
+        | "bacs_reference"
+        | "payment_method_set_by"
+        | "payment_method_set_at"
       >
     >
 ): Promise<MemberDues> {
@@ -1815,6 +1825,11 @@ export async function updateMemberDuesStatus(
       | "gift_aid_status"
       | "gift_aid_eligible_amount"
       | "waiver_reason"
+      | "dues_payment_method"
+      | "bacs_monthly_amount"
+      | "bacs_reference"
+      | "payment_method_set_by"
+      | "payment_method_set_at"
     >
   >
 ): Promise<MemberDues | null> {
@@ -1827,6 +1842,128 @@ export async function updateMemberDuesStatus(
     .maybeSingle();
   if (error) throw error;
   return data as MemberDues | null;
+}
+
+// ---------------------------------------------------------------------------
+// Dues payment method (per-year admin tagging)
+// ---------------------------------------------------------------------------
+
+export type SetDuesPaymentMethodInput =
+  | { method: "online_subscription"; setBy: string }
+  | {
+      method: "bacs";
+      setBy: string;
+      bacsMonthlyAmount: number | null;
+      bacsReference?: string | null;
+    }
+  | { method: "paid_in_full"; setBy: string; note?: string | null }
+  | { method: "fee_waived"; setBy: string; waiverReason: string }
+  | { method: null; setBy: string };
+
+/**
+ * Apply an admin-driven payment-method change to a single member_dues
+ * row. Encapsulates the side-effects each method implies (e.g.
+ * paid_in_full also flips status + paid_at; fee_waived flips status +
+ * waiver_reason). The caller is responsible for audit logging.
+ *
+ * Designed to be the single mutation point for the new admin
+ * /api/admin/members/[id]/dues-method route, the treasurer dashboard's
+ * inline actions, and any future automation (e.g. webhook auto-tagging
+ * 'online_subscription' when a schedule activates).
+ */
+export async function setMemberDuesPaymentMethod(
+  memberDuesId: string,
+  lodgeId: string,
+  input: SetDuesPaymentMethodInput,
+): Promise<MemberDues | null> {
+  const now = new Date().toISOString();
+
+  type Updates = Parameters<typeof updateMemberDuesStatus>[2];
+  const updates: Updates = {
+    payment_method_set_by: input.setBy,
+    payment_method_set_at: now,
+  };
+
+  if (input.method === null) {
+    updates.dues_payment_method = null;
+    updates.bacs_monthly_amount = null;
+    updates.bacs_reference = null;
+    return updateMemberDuesStatus(memberDuesId, lodgeId, updates);
+  }
+
+  updates.dues_payment_method = input.method;
+
+  if (input.method === "bacs") {
+    updates.bacs_monthly_amount = input.bacsMonthlyAmount;
+    updates.bacs_reference = input.bacsReference ?? null;
+  } else {
+    updates.bacs_monthly_amount = null;
+    updates.bacs_reference = null;
+  }
+
+  if (input.method === "paid_in_full") {
+    updates.status = "paid";
+    updates.paid_at = now;
+  } else if (input.method === "fee_waived") {
+    updates.status = "waived";
+    updates.waiver_reason = input.waiverReason;
+    updates.paid_at = null;
+  }
+
+  return updateMemberDuesStatus(memberDuesId, lodgeId, updates);
+}
+
+/**
+ * Lodge-wide breakdown of dues payment methods for the dashboard tile.
+ * Counts ALL non-advance member_dues rows for the lodge by method,
+ * including a synthetic "unset" bucket for NULL.
+ *
+ * Optional yearId narrows to a specific masonic year when the caller
+ * has resolved one (treasurer dashboard scopes to current year).
+ */
+export async function countMemberDuesByPaymentMethod(
+  lodgeId: string,
+  opts: { yearStart?: string; yearEnd?: string } = {},
+): Promise<{
+  online_subscription: number;
+  bacs: number;
+  paid_in_full: number;
+  fee_waived: number;
+  unset: number;
+  bacs_monthly_total: number;
+}> {
+  let query = db()
+    .from("member_dues")
+    .select("dues_payment_method, bacs_monthly_amount, period_start, period_end, is_advance")
+    .eq("lodge_id", lodgeId)
+    .eq("is_advance", false);
+
+  if (opts.yearStart) query = query.gte("period_end", opts.yearStart);
+  if (opts.yearEnd) query = query.lte("period_start", opts.yearEnd);
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const counts = {
+    online_subscription: 0,
+    bacs: 0,
+    paid_in_full: 0,
+    fee_waived: 0,
+    unset: 0,
+    bacs_monthly_total: 0,
+  };
+  for (const row of (data as Array<Pick<MemberDues, "dues_payment_method" | "bacs_monthly_amount">>) ?? []) {
+    const method = row.dues_payment_method;
+    if (method == null) {
+      counts.unset += 1;
+    } else {
+      counts[method] += 1;
+      if (method === "bacs" && row.bacs_monthly_amount != null) {
+        counts.bacs_monthly_total += Number(row.bacs_monthly_amount);
+      }
+    }
+  }
+  return counts;
 }
 
 // ---------------------------------------------------------------------------

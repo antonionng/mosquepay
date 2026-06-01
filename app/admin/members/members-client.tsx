@@ -17,6 +17,11 @@ import {
   UtensilsCrossed,
   ArrowDownUp,
   HeartHandshake,
+  Repeat,
+  Banknote,
+  CheckCircle2,
+  Wallet,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,10 +74,23 @@ const STATUS_VARIANTS: Record<string, string> = {
   excluded: "bg-red-50 text-red-700 border-red-200",
 };
 
+type DuesMethodTag =
+  | "online_subscription"
+  | "bacs"
+  | "paid_in_full"
+  | "fee_waived"
+  | null;
+
+type DuesMethodInfo = {
+  method: DuesMethodTag;
+  bacsMonthlyAmount: number | null;
+};
+
 export function AdminMembersClient({
   members,
   offices = [],
   giftAidDeclaredMemberIds = [],
+  duesMethodByMemberId = {},
 }: {
   members: MemberRow[];
   offices?: OfficeRung[];
@@ -81,6 +99,11 @@ export function AdminMembersClient({
    *  and "has declaration" quick filters; computed server-side once so
    *  we avoid an N+1 against gift_aid_declarations. */
   giftAidDeclaredMemberIds?: string[];
+  /** Map of member.id -> dues payment method tag for the current
+   *  masonic year, including BACS monthly amount when applicable.
+   *  Drives the "Dues" column on the list. Empty map = column shows
+   *  "Not tagged" everywhere. */
+  duesMethodByMemberId?: Record<string, DuesMethodInfo>;
 }) {
   const giftAidDeclaredSet = new Set(giftAidDeclaredMemberIds);
   const router = useRouter();
@@ -532,6 +555,7 @@ export function AdminMembersClient({
                 <th className="px-4 py-3 hidden md:table-cell">Rank</th>
                 <th className="px-4 py-3 hidden lg:table-cell">Initiation</th>
                 <th className="px-4 py-3 hidden lg:table-cell">Dietary</th>
+                <th className="px-4 py-3 hidden md:table-cell">Dues</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 w-10" />
               </tr>
@@ -539,7 +563,7 @@ export function AdminMembersClient({
             <tbody className="divide-y divide-dash-border">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-dash-muted">
+                  <td colSpan={8} className="px-4 py-12 text-center text-dash-muted">
                     <Users className="mx-auto h-8 w-8 text-dash-faint mb-2" />
                     No members found
                   </td>
@@ -580,6 +604,11 @@ export function AdminMembersClient({
                     </td>
                     <td className="px-4 py-3.5 text-dash-muted hidden lg:table-cell">
                       {m.dietary_requirements ?? "Not recorded"}
+                    </td>
+                    <td className="px-4 py-3.5 hidden md:table-cell">
+                      <DuesMethodPill
+                        info={duesMethodByMemberId[m.id] ?? null}
+                      />
                     </td>
                     <td className="px-4 py-3.5">
                       <span
@@ -924,5 +953,62 @@ export function AdminMembersClient({
         </div>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DuesMethodPill
+// ---------------------------------------------------------------------------
+// Inline column pill showing how a member is paying this year's
+// dues. Mirrors the badges on the dues-method panel so admins see the
+// same vocabulary across screens. The "Not tagged" state is styled
+// with an amber outline so it nudges the treasurer without being
+// alarmist — every untagged member is a follow-up they should make.
+
+function DuesMethodPill({ info }: { info: DuesMethodInfo | null }) {
+  const method = info?.method ?? null;
+
+  if (method === "online_subscription") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-800">
+        <Repeat className="h-3 w-3" />
+        Online
+      </span>
+    );
+  }
+  if (method === "bacs") {
+    const amt =
+      info?.bacsMonthlyAmount != null
+        ? ` £${info.bacsMonthlyAmount.toFixed(2)}/mo`
+        : "";
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900">
+        <Banknote className="h-3 w-3" />
+        BACS
+        {amt}
+      </span>
+    );
+  }
+  if (method === "paid_in_full") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">
+        <CheckCircle2 className="h-3 w-3" />
+        Paid in full
+      </span>
+    );
+  }
+  if (method === "fee_waived") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-600">
+        <Wallet className="h-3 w-3" />
+        Waived
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-md border border-amber-100 bg-white px-2 py-0.5 text-xs font-medium text-amber-700">
+      <AlertCircle className="h-3 w-3" />
+      Not tagged
+    </span>
   );
 }

@@ -48,11 +48,105 @@ export default async function AdminMembersPage() {
     }
   }
 
+  // Build a member-id -> dues payment method map so the list can
+  // surface a per-row "Dues" pill. We pull the active masonic year and
+  // every member_dues row for the lodge once, match by member_id (or
+  // by email as fallback), and emit the most recent in-year row's
+  // dues_payment_method. Live subscription rows take precedence even
+  // when the dues_payment_method tag hasn't been set yet, so the
+  // dashboard never falsely shows "Not tagged" for someone we know is
+  // actively paying.
+  const duesMethodByMemberId: Record<
+    string,
+    {
+      method:
+        | "online_subscription"
+        | "bacs"
+        | "paid_in_full"
+        | "fee_waived"
+        | null;
+      bacsMonthlyAmount: number | null;
+    }
+  > = {};
+  if (lodgeId && members.length > 0) {
+    try {
+      const [allDues, currentYear, schedules] = await Promise.all([
+        db.getMemberDues(lodgeId),
+        db.getCurrentMasonicYear(lodgeId).catch(() => null),
+        db.listDuesSchedules(lodgeId).catch(() => []),
+      ]);
+      const ys = currentYear?.start_date.slice(0, 10) ?? null;
+      const ye = currentYear?.end_date.slice(0, 10) ?? null;
+      const inYear = allDues.filter((d) => {
+        if (d.is_advance) return false;
+        if (!ys || !ye) return true;
+        return (
+          d.period_start.slice(0, 10) <= ye &&
+          d.period_end.slice(0, 10) >= ys
+        );
+      });
+      const ACTIVE_SCHEDULE_STATUSES = new Set([
+        "active",
+        "active_stripe",
+        "action_required",
+        "past_due",
+        "paused",
+      ]);
+      const activeScheduleEmails = new Set(
+        schedules
+          .filter((s) => ACTIVE_SCHEDULE_STATUSES.has(s.status))
+          .map((s) => s.member_email.toLowerCase()),
+      );
+      const byMember = new Map<string, (typeof inYear)[number]>();
+      const byEmail = new Map<string, (typeof inYear)[number]>();
+      for (const row of inYear) {
+        if (row.member_id) {
+          const existing = byMember.get(row.member_id);
+          if (
+            !existing ||
+            row.created_at.localeCompare(existing.created_at) > 0
+          ) {
+            byMember.set(row.member_id, row);
+          }
+        }
+        if (row.member_email) {
+          const k = row.member_email.toLowerCase();
+          const existing = byEmail.get(k);
+          if (
+            !existing ||
+            row.created_at.localeCompare(existing.created_at) > 0
+          ) {
+            byEmail.set(k, row);
+          }
+        }
+      }
+      for (const m of members) {
+        const row =
+          byMember.get(m.id) ?? byEmail.get(m.email.toLowerCase()) ?? null;
+        const hasActiveSchedule = activeScheduleEmails.has(
+          m.email.toLowerCase(),
+        );
+        const tagged = row?.dues_payment_method ?? null;
+        const method = tagged ?? (hasActiveSchedule ? "online_subscription" : null);
+        duesMethodByMemberId[m.id] = {
+          method,
+          bacsMonthlyAmount:
+            tagged === "bacs" && row?.bacs_monthly_amount != null
+              ? Number(row.bacs_monthly_amount)
+              : null,
+        };
+      }
+    } catch {
+      // Non-fatal — the column will just render "Not tagged" for everyone.
+    }
+  }
+
   return (
     <AdminMembersClient
       members={JSON.parse(JSON.stringify(members))}
       offices={JSON.parse(JSON.stringify(offices))}
       giftAidDeclaredMemberIds={giftAidDeclaredIds}
+      duesMethodByMemberId={duesMethodByMemberId}
     />
   );
 }

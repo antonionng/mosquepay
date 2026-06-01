@@ -243,13 +243,23 @@ function TreasurerView({ r }: { r: TreasurerReport }) {
   function exportOutstanding() {
     downloadCsv(
       "treasurer-outstanding-dues.csv",
-      ["Member", "Email", "Amount", "Period end", "Status"],
+      [
+        "Member",
+        "Email",
+        "Amount",
+        "Period end",
+        "Status",
+        "Payment method",
+        "BACS monthly",
+      ],
       r.outstandingDues.map((d) => [
         d.member_name ?? "",
         d.member_email,
         d.amount,
         d.period_end,
         d.status,
+        methodLabelText(d.dues_payment_method),
+        d.bacs_monthly_amount ?? "",
       ])
     );
   }
@@ -269,6 +279,7 @@ function TreasurerView({ r }: { r: TreasurerReport }) {
     );
   }
 
+  const breakdown = r.duesPaymentMethodBreakdown;
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -277,6 +288,54 @@ function TreasurerView({ r }: { r: TreasurerReport }) {
         <Kpi label="Dues paid" value={`£${r.paidDuesTotal.toFixed(2)}`} />
         <Kpi label="Dues Gift Aid" value={`£${r.duesGiftAidReclaimable.toFixed(2)}`} hint={`£${r.duesGiftAidEligible.toFixed(2)} eligible`} />
       </div>
+
+      <Card variant="panel" className="overflow-hidden p-0">
+        <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
+          <div>
+            <h2 className="dash-panel-header-title">Dues by payment method</h2>
+            <p className="dash-panel-header-description">
+              How members are paying this year, with expected amounts per
+              bucket.
+            </p>
+          </div>
+        </div>
+        <CardContent className="border-t border-dash-border bg-dash-surface p-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+            <BreakdownTile
+              label="Online"
+              count={breakdown.online_subscription}
+              amount={breakdown.online_subscription_expected}
+            />
+            <BreakdownTile
+              label="BACS"
+              count={breakdown.bacs}
+              amount={breakdown.bacs_annual_expected}
+              footer={
+                breakdown.bacs > 0
+                  ? `£${breakdown.bacs_monthly_total.toFixed(2)} / mo`
+                  : undefined
+              }
+            />
+            <BreakdownTile
+              label="Paid in full"
+              count={breakdown.paid_in_full}
+              amount={breakdown.paid_in_full_total}
+            />
+            <BreakdownTile
+              label="Fee waived"
+              count={breakdown.fee_waived}
+              amount={breakdown.fee_waived_total}
+            />
+            <BreakdownTile
+              label="Not tagged"
+              count={breakdown.unset}
+              amount={breakdown.unset_outstanding_total}
+              tone="amber"
+              footer={breakdown.unset > 0 ? "Outstanding" : undefined}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card variant="panel" className="overflow-hidden p-0">
@@ -299,6 +358,7 @@ function TreasurerView({ r }: { r: TreasurerReport }) {
                     <th className="px-4 py-3">Member</th>
                     <th className="px-4 py-3 text-right">Amount</th>
                     <th className="px-4 py-3">Period end</th>
+                    <th className="px-4 py-3">Method</th>
                     <th className="px-4 py-3">Status</th>
                   </tr>
                 </thead>
@@ -316,6 +376,12 @@ function TreasurerView({ r }: { r: TreasurerReport }) {
                       </td>
                       <td className="px-4 py-3 text-right font-semibold tabular-nums">£{d.amount.toFixed(2)}</td>
                       <td className="px-4 py-3 text-dash-muted">{formatDate(d.period_end)}</td>
+                      <td className="px-4 py-3 text-xs">
+                        {methodLabelText(d.dues_payment_method)}
+                        {d.dues_payment_method === "bacs" && d.bacs_monthly_amount != null
+                          ? ` · £${d.bacs_monthly_amount.toFixed(2)}/mo`
+                          : ""}
+                      </td>
                       <td className="px-4 py-3 capitalize">{d.status}</td>
                     </tr>
                   ))}
@@ -760,6 +826,58 @@ function OperatorView({ r }: { r: OperatorReport }) {
           </table>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Helpers used by TreasurerView's payment-method breakdown
+// ---------------------------------------------------------------------------
+
+function methodLabelText(
+  m: "online_subscription" | "bacs" | "paid_in_full" | "fee_waived" | null,
+): string {
+  if (m === "online_subscription") return "Online";
+  if (m === "bacs") return "BACS";
+  if (m === "paid_in_full") return "Paid in full";
+  if (m === "fee_waived") return "Waived";
+  return "Not tagged";
+}
+
+function BreakdownTile({
+  label,
+  count,
+  amount,
+  footer,
+  tone = "default",
+}: {
+  label: string;
+  count: number;
+  amount: number;
+  footer?: string;
+  tone?: "default" | "amber";
+}) {
+  const ring =
+    tone === "amber"
+      ? "border-amber-200 bg-amber-50/50"
+      : "border-slate-200 bg-slate-50/40";
+  return (
+    <div className={`rounded-xl border p-3 ${ring}`}>
+      <p className="text-xs font-medium uppercase tracking-wider text-dash-muted">
+        {label}
+      </p>
+      <p className="mt-1 text-lg font-semibold text-dash-text">
+        {count}
+        <span className="ml-1 text-xs font-normal text-dash-muted">
+          {count === 1 ? "member" : "members"}
+        </span>
+      </p>
+      <p className="mt-0.5 text-sm font-medium tabular-nums text-dash-text">
+        £{amount.toFixed(2)}
+      </p>
+      {footer ? (
+        <p className="mt-0.5 text-[11px] text-dash-muted">{footer}</p>
+      ) : null}
     </div>
   );
 }

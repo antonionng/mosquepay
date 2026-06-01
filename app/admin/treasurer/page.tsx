@@ -29,18 +29,25 @@ export default async function TreasurerPage() {
   }
   const lodgeId = ctx.lodgeId;
 
+  const currentYear = await db.getCurrentMasonicYear(lodgeId).catch(() => null);
+
   const [
     ledger,
     lodgeDues,
     members,
     outstandingInstalments,
     scheduleCounts,
+    methodBreakdown,
   ] = await Promise.all([
     db.getTreasurerLedger(lodgeId),
     db.getLodgeDues(lodgeId),
     db.getMembers(lodgeId, { status: "active" }),
     db.getOutstandingInstalments(lodgeId),
     db.countDuesSchedulesByStatus(lodgeId),
+    db.countMemberDuesByPaymentMethod(lodgeId, {
+      yearStart: currentYear?.start_date,
+      yearEnd: currentYear?.end_date,
+    }),
   ]);
 
   return (
@@ -52,6 +59,8 @@ export default async function TreasurerPage() {
         JSON.stringify(outstandingInstalments)
       )}
       scheduleCounts={scheduleCounts}
+      methodBreakdown={methodBreakdown}
+      currentYearLabel={currentYear?.label ?? null}
     />
   );
 }
