@@ -688,7 +688,12 @@ async function startDuesSubscriptionEnrolment(args: EnrolmentArgs) {
         success_url: successUrl,
         cancel_url: cancelUrl,
         description,
-        customer_email: memberEmail,
+        // Mooov expands customer_ref into a Stripe `customer` on the
+        // connected account. Stripe then rejects the request if a
+        // bare customer_email is also present ("You may only specify
+        // one of these parameters: customer, customer_email."). The
+        // member's email is already attached to the customer record
+        // server-side via customer_ref, so omit customer_email here.
         customer_ref: customerRef,
         setup_future_usage: "off_session",
         metadata: {
@@ -700,6 +705,7 @@ async function startDuesSubscriptionEnrolment(args: EnrolmentArgs) {
           lodge_slug: lodgeSlug,
           dues_id: duesRecord.id,
           split_strategy: strategy,
+          customer_email: memberEmail,
         },
       },
     });
