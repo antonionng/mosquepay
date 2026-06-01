@@ -20,13 +20,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getDefaultLodgeSlug, getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getDefaultLodgeSlug } from "@/lib/tenant";
 import { createServiceClient } from "@/lib/supabase/server";
 import { callMooovConnect, MooovApiError } from "@/lib/mooov";
 import { computeYearPosition } from "@/lib/dues/year-position";
 import { buildSchedule, isStrategyEnabledForLodge } from "@/lib/dues/strategies";
 import { duesSubscriptionEnabled } from "@/lib/dues/feature-flags";
-import type { DuesSplitStrategy } from "@/lib/db/types";
+import type { DuesSplitStrategy, MemberDues } from "@/lib/db/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,12 +56,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const lodgeSlug = getLodgeSlugFromRequest(request);
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    if (!lodgeId) {
-      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
-    }
-
     const body = await request.json();
     const { dues_id, member_email, member_name, mode } = body;
 
@@ -72,14 +66,74 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const allDues = await db.getMemberDues(lodgeId, { memberEmail: member_email });
-    const duesRecord = allDues.find((d) => d.id === dues_id);
-    if (!duesRecord) {
-      return NextResponse.json({ error: "Dues record not found." }, { status: 404 });
+    // Resolve tenant from the dues row itself, not from URL/host/cookie.
+    //
+    // Why: a member of lodge A signed in on lodge B's host (or on the bare
+    // lodgepayments.co.uk host) used to land on this route with a
+    // URL-derived lodge_id that didn't match the dues row's lodge_id, so
+    // the getMemberDues(lodgeId, { memberEmail }) filter returned an empty
+    // list and we surfaced "Dues record not found." even though the row
+    // existed and the email matched. The dues_id UUID is unguessable, so
+    // we treat (dues_id, member_email) as the authorization tuple and
+    // derive lodgeId from the dues row.
+    let supa: ReturnType<typeof createServiceClient>;
+    try {
+      supa = createServiceClient();
+    } catch (err) {
+      console.error("dues/pay: supabase service client unavailable", {
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return NextResponse.json(
+        { error: "Payments are not configured." },
+        { status: 503 }
+      );
+    }
+
+    const { data: duesRecordRaw, error: duesErr } = await supa
+      .from("member_dues")
+      .select("*")
+      .eq("id", dues_id)
+      .maybeSingle();
+    if (duesErr) {
+      console.error("dues/pay: dues lookup failed", {
+        dues_id,
+        message: duesErr.message,
+      });
+      return NextResponse.json(
+        { error: "Could not look up dues record." },
+        { status: 500 }
+      );
+    }
+    if (!duesRecordRaw) {
+      return NextResponse.json(
+        { error: "Dues record not found." },
+        { status: 404 }
+      );
+    }
+    const duesRecord = duesRecordRaw as MemberDues;
+
+    if (
+      (duesRecord.member_email ?? "").trim().toLowerCase() !==
+      String(member_email).trim().toLowerCase()
+    ) {
+      // Email didn't match the dues row -- treat as not found rather than
+      // 403 to avoid leaking dues_id existence to a different member.
+      return NextResponse.json(
+        { error: "Dues record not found." },
+        { status: 404 }
+      );
     }
     if (duesRecord.status === "paid") {
       return NextResponse.json({ error: "Dues already paid." }, { status: 400 });
     }
+
+    const lodgeId = duesRecord.lodge_id;
+    const { data: lodgeRow } = await supa
+      .from("lodges")
+      .select("slug")
+      .eq("id", lodgeId)
+      .maybeSingle<{ slug: string | null }>();
+    const lodgeSlug = lodgeRow?.slug ?? getDefaultLodgeSlug();
 
     if (mode === "subscription") {
       // Feature-gated until Mooov's saved-charge subscription contract
@@ -115,19 +169,6 @@ export async function POST(request: NextRequest) {
         strategy: body.split_strategy as DuesSplitStrategy | undefined,
         autoRenew: typeof body.auto_renew === "boolean" ? body.auto_renew : undefined,
       });
-    }
-
-    let supa: ReturnType<typeof createServiceClient>;
-    try {
-      supa = createServiceClient();
-    } catch (err) {
-      console.error("dues/pay: supabase service client unavailable", {
-        message: err instanceof Error ? err.message : String(err),
-      });
-      return NextResponse.json(
-        { error: "Payments are not configured." },
-        { status: 503 }
-      );
     }
 
     let merchantId: string | null;

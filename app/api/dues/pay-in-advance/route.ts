@@ -15,7 +15,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
 import { writeAuditLog } from "@/lib/audit";
 import {
   checkAdvanceEligibility,
@@ -25,7 +24,7 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   if (!isSupabaseConfigured()) {
     return NextResponse.json(
       { error: "Database not configured." },
@@ -43,21 +42,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const lodgeSlug = getLodgeSlugFromRequest(request);
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    if (!lodgeId) {
-      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
-    }
-
+    // Resolve tenant from the authenticated member's home lodge, not from
+    // URL/host/cookie. A member of lodge A on lodge B's host (or on the
+    // bare lodgepayments.co.uk host) used to fail "Member not found for
+    // this lodge" because the URL-derived lodge_id didn't match the
+    // member row's lodge_id.
     const member =
       (await db.getMemberByAuthUserId(user.id)) ??
-      (await db.getMemberByEmail(lodgeId, user.email));
-    if (!member || member.lodge_id !== lodgeId) {
+      (await db.getMemberByEmailAcrossLodges(user.email));
+    if (!member) {
       return NextResponse.json(
-        { error: "Member not found for this lodge." },
+        { error: "Member not found." },
         { status: 403 }
       );
     }
+    const lodgeId = member.lodge_id;
 
     const eligibility = await checkAdvanceEligibility(lodgeId, member);
     if (!eligibility.ok) {
