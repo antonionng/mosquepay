@@ -1906,6 +1906,27 @@ export async function updateInstalment(
   return data as MemberDuesInstalment | null;
 }
 
+/**
+ * Hard-delete instalments that were pre-created for a schedule that
+ * never made it past pending. Used by the dues subscription enrolment
+ * code path when the previous attempt left orphan rows (Mooov call
+ * failed, hosted_url missing, member abandoned the redirect, etc.).
+ * Only callable while the parent schedule is still pending; we never
+ * delete instalments tied to a schedule that has captured money.
+ */
+export async function deleteInstalmentsForSchedule(
+  scheduleId: string,
+  lodgeId: string
+): Promise<number> {
+  const { error, count } = await db()
+    .from("member_dues_instalments")
+    .delete({ count: "exact" })
+    .eq("schedule_id", scheduleId)
+    .eq("lodge_id", lodgeId);
+  if (error) throw error;
+  return count ?? 0;
+}
+
 // ---------------------------------------------------------------------------
 // Dues schedules (saved-charge subscription state)
 // ---------------------------------------------------------------------------

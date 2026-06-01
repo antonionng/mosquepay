@@ -380,6 +380,58 @@ type EnrolmentArgs = {
   autoRenew: boolean | undefined;
 };
 
+/**
+ * Best-effort cleanup of any pending dues_schedules rows for this dues
+ * record. Called at the top of both enrolment branches so retries
+ * (member clicked "Set Up Instalments" again after a failed Mooov call,
+ * abandoned redirect, etc.) start from a clean slate. We mark the old
+ * schedule cancelled (audit trail) and hard-delete its pre-created
+ * instalments so the in-year cycle list isn't double-stamped.
+ *
+ * Only ever touches schedules in 'pending' state — schedules that
+ * captured money are protected by the status filter.
+ */
+async function abandonPendingSchedulesForDues(
+  lodgeId: string,
+  memberDuesId: string,
+): Promise<void> {
+  const existing = await db
+    .listDuesSchedules(lodgeId, { status: "pending" })
+    .catch(() => [] as Awaited<ReturnType<typeof db.listDuesSchedules>>);
+  // Only abandon truly inert rows. If a row has a payment method or a
+  // last_charged_at stamped, the activation webhook already fired (or is
+  // about to) and we'd race-condition the user out of a real
+  // subscription. Such rows are left alone; the webhook will promote
+  // them to active_stripe shortly.
+  const orphans = existing
+    .filter((s) => s.member_dues_id === memberDuesId)
+    .filter(
+      (s) => s.mooov_payment_method_id == null && s.last_charged_at == null,
+    );
+  for (const orphan of orphans) {
+    try {
+      await db.deleteInstalmentsForSchedule(orphan.id, lodgeId);
+    } catch (err) {
+      console.error("dues/pay: failed to delete orphan instalments", {
+        schedule_id: orphan.id,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+    try {
+      await db.updateDuesSchedule(orphan.id, lodgeId, {
+        status: "cancelled",
+        cancelled_at: new Date().toISOString(),
+        cancelled_by_actor: "system_enrolment_retry",
+      });
+    } catch (err) {
+      console.error("dues/pay: failed to cancel orphan schedule", {
+        schedule_id: orphan.id,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+}
+
 async function startDuesSubscriptionEnrolment(args: EnrolmentArgs) {
   const { lodgeId, lodgeSlug, duesRecord, memberEmail } = args;
 
@@ -436,6 +488,12 @@ async function startDuesSubscriptionEnrolment(args: EnrolmentArgs) {
   if (plan.mooovFlow === "open_ended_subscription") {
     return startOpenEndedSubscription({ args, plan });
   }
+
+  // Clean any orphan pending schedules from a previous failed attempt
+  // before creating a fresh one. Otherwise the member portal renders a
+  // phantom "Active subscription · 0 of 0 paid" while their balance is
+  // still outstanding.
+  await abandonPendingSchedulesForDues(lodgeId, duesRecord.id);
 
   // Mint the schedule + instalment rows BEFORE talking to Mooov so the
   // webhook (which fires after the member completes hosted Checkout)
@@ -740,6 +798,13 @@ async function startOpenEndedSubscription({
   const monthlyMinor = Math.round(monthlyAmount * 100);
   const currency = (duesRecord.currency ?? "GBP").toUpperCase();
 
+  // Clean any orphan pending schedules from a previous failed attempt
+  // (Mooov call 5xx, hosted_url missing, member abandoned redirect)
+  // before creating a fresh one. Without this the member portal would
+  // render a phantom "Active subscription" card on a dues row whose
+  // balance is still outstanding.
+  await abandonPendingSchedulesForDues(lodgeId, duesRecord.id);
+
   // Mint the schedule first so its UUID can drive the deterministic
   // subscription_id we hand to Mooov. Stripe Subscriptions are
   // idempotent on this id — replays of the same enrolment intent
@@ -763,29 +828,29 @@ async function startOpenEndedSubscription({
     },
   });
   const mooovSubscriptionId = `sub_dues_${schedule.id}`;
-  await db.updateDuesSchedule(schedule.id, lodgeId, {
-    mooov_subscription_id: mooovSubscriptionId,
-  });
 
-  // Pre-create in-year instalment rows for the LP-side schedule view.
-  // The webhook marks them paid in sequence as subscription.invoice_paid
-  // events arrive. Open-ended cycles past year-end will be created
-  // ad-hoc by the webhook handler.
-  await db.createMemberDuesInstalments(
-    lodgeId,
-    schedulePlan.rows.map((row) => ({
-      member_dues_id: duesRecord.id,
-      sequence: row.sequence,
-      due_date: row.due_date,
-      amount: row.amount,
-      currency: duesRecord.currency,
-      status: "outstanding",
-      paid_at: null,
-      reminder_sent_at: null,
-      payment_reference: null,
-      schedule_id: schedule.id,
-    })),
-  );
+  // Single rollback path for any failure between mint and Mooov ack.
+  // The schedule starts as pending; if the Mooov call, the instalment
+  // pre-creation, or the subscription_id stamp throws, we mark the
+  // schedule cancelled + delete instalments so the member portal
+  // doesn't show a phantom "Active subscription" card.
+  const rollback = async (
+    failureCode: string,
+    actor: string,
+  ): Promise<void> => {
+    await db
+      .deleteInstalmentsForSchedule(schedule.id, lodgeId)
+      .catch(() => undefined);
+    await db
+      .updateDuesSchedule(schedule.id, lodgeId, {
+        status: "cancelled",
+        cancelled_at: new Date().toISOString(),
+        cancelled_by_actor: actor,
+        last_failure_code: failureCode,
+        last_failure_at: new Date().toISOString(),
+      })
+      .catch(() => undefined);
+  };
 
   const idempotencyKey = `lp:dues:sub:${schedule.id}`;
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
@@ -815,6 +880,32 @@ async function startOpenEndedSubscription({
   };
 
   try {
+    // Stamp the subscription_id we'll pass to Mooov onto the schedule
+    // so the activation webhook can resolve back to this row.
+    await db.updateDuesSchedule(schedule.id, lodgeId, {
+      mooov_subscription_id: mooovSubscriptionId,
+    });
+
+    // Pre-create in-year instalment rows for the LP-side schedule view.
+    // The webhook marks them paid in sequence as subscription.invoice_paid
+    // events arrive. Open-ended cycles past year-end will be created
+    // ad-hoc by the webhook handler.
+    await db.createMemberDuesInstalments(
+      lodgeId,
+      schedulePlan.rows.map((row) => ({
+        member_dues_id: duesRecord.id,
+        sequence: row.sequence,
+        due_date: row.due_date,
+        amount: row.amount,
+        currency: duesRecord.currency,
+        status: "outstanding",
+        paid_at: null,
+        reminder_sent_at: null,
+        payment_reference: null,
+        schedule_id: schedule.id,
+      })),
+    );
+
     const result = await callMooovConnect<{
       subscription_id: string;
       status: string;
@@ -846,6 +937,7 @@ async function startOpenEndedSubscription({
         merchant_id: merchantId,
         status: result.status,
       });
+      await rollback("no_hosted_url", "system_enrolment_no_hosted_url");
       return NextResponse.json(
         { error: "Payment processor did not return a checkout URL." },
         { status: 502 },
@@ -873,23 +965,7 @@ async function startOpenEndedSubscription({
       // Roll the schedule back so the member can retry cleanly. We
       // don't have a payment_attempts row to flag here (Mooov manages
       // those server-side for the subscription path).
-      await db
-        .updateDuesSchedule(schedule.id, lodgeId, {
-          status: "cancelled",
-          cancelled_at: new Date().toISOString(),
-          cancelled_by_actor: "system_enrolment_failure",
-          last_failure_code: err.category,
-          last_failure_at: new Date().toISOString(),
-        })
-        .catch((rbErr) => {
-          console.error(
-            "dues/pay open-ended: rollback updateDuesSchedule failed",
-            {
-              schedule_id: schedule.id,
-              message: rbErr instanceof Error ? rbErr.message : String(rbErr),
-            },
-          );
-        });
+      await rollback(err.category, "system_enrolment_failure");
       if (err.category === "merchant_setup_required" && err.setupHint) {
         return NextResponse.json(
           {
@@ -906,16 +982,12 @@ async function startOpenEndedSubscription({
         { status: 502 },
       );
     }
-    console.error("dues/pay open-ended: unexpected error", err);
-    await db
-      .updateDuesSchedule(schedule.id, lodgeId, {
-        status: "cancelled",
-        cancelled_at: new Date().toISOString(),
-        cancelled_by_actor: "system_enrolment_failure",
-        last_failure_code: "unexpected_error",
-        last_failure_at: new Date().toISOString(),
-      })
-      .catch(() => undefined);
+    console.error("dues/pay open-ended: unexpected error", {
+      schedule_id: schedule.id,
+      message: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+    });
+    await rollback("unexpected_error", "system_enrolment_failure");
     return NextResponse.json(
       {
         error: "Could not create subscription session.",

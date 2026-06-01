@@ -173,18 +173,29 @@ export async function GET() {
           100
         : null;
 
-    // Active dues schedule (saved-charge subscription). Surfaced as a
-    // status card with a cancel button + an SCA resume CTA when the
-    // last cycle returned requires_action. We only consider schedules
-    // tied to the current-year dues record so a paused/cancelled
-    // last-year schedule doesn't pollute the dashboard.
+    // Active dues schedule (saved-charge subscription OR Mooov-branded
+    // subscription_checkout). Surfaced as a status card with a cancel
+    // button + an SCA resume CTA when the last cycle returned
+    // requires_action. We only consider schedules tied to the
+    // current-year dues record so a paused/cancelled last-year schedule
+    // doesn't pollute the dashboard.
+    //
+    // We also EXCLUDE 'pending' here. Pending = "schedule row written,
+    // member redirected to Mooov, but cycle 1 not yet captured by the
+    // activation webhook". If we surface those we end up showing
+    // "Active subscription · 0 of 0 paid" while the member's outstanding
+    // balance is still £full — which is what bug-fix
+    // post-2026-06-01-T19:30 was reverting. The "Set Up Instalments"
+    // CTA stays visible until Mooov confirms cycle 1, so members can
+    // retry cleanly.
     const activeSchedule =
       currentDues != null
         ? duesSchedules.find(
             (s) =>
               s.member_dues_id === currentDues.id &&
               s.status !== "cancelled" &&
-              s.status !== "completed"
+              s.status !== "completed" &&
+              s.status !== "pending"
           ) ?? null
         : null;
     let scheduleCard: {
