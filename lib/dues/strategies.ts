@@ -19,6 +19,8 @@ export type InstalmentRow = {
   amount: number;
 };
 
+export type DuesCadence = "monthly" | "quarterly";
+
 export type BuildScheduleInput = {
   /** Full annual amount. */
   annualAmount: number;
@@ -35,6 +37,12 @@ export type BuildScheduleInput = {
   monthsTotal: number;
   /** Strategy. Pre-year / at-year-start callers should pass "even_full_year". */
   strategy: DuesSplitStrategy;
+  /**
+   * Billing cadence. monthly = 1 month between cycles, quarterly = 3.
+   * Defaults to monthly for back-compat with callers that haven't been
+   * updated yet.
+   */
+  cadence?: DuesCadence;
 };
 
 export type BuildScheduleResult = {
@@ -74,14 +82,32 @@ function evenSplit(totalMinor: number, count: number): number[] {
 
 export function buildSchedule(input: BuildScheduleInput): BuildScheduleResult {
   const annualMinor = toMinor(input.annualAmount);
-  const monthlyStandardMinor = Math.round(annualMinor / input.monthsTotal);
+  const cadence: DuesCadence = input.cadence ?? "monthly";
+  // Months between consecutive cycles. monthly=1, quarterly=3.
+  const cycleStrideMonths = cadence === "quarterly" ? 3 : 1;
+  // Number of cycles in a full year given the cadence (12 monthly or 4 quarterly).
+  const cyclesPerYear = cadence === "quarterly"
+    ? Math.max(1, Math.round(input.monthsTotal / 3))
+    : input.monthsTotal;
+  // Number of cycles remaining from today (inclusive) to year-end given cadence.
+  // monthly = monthsRemaining, quarterly = ceil(monthsRemaining / 3) so a
+  // mid-year start still fits within the masonic year.
+  const cyclesRemaining = cadence === "quarterly"
+    ? Math.max(1, Math.ceil(input.monthsRemaining / 3))
+    : Math.max(1, input.monthsRemaining);
+  // Standard per-cycle amount when the year is fully populated.
+  const standardCycleMinor = Math.round(annualMinor / cyclesPerYear);
+  // Number of "elapsed" cycles for catch-up / balloon strategies.
+  const cyclesElapsed = cadence === "quarterly"
+    ? Math.floor(input.monthsElapsed / 3)
+    : input.monthsElapsed;
 
   switch (input.strategy) {
     case "even_full_year": {
-      const amounts = evenSplit(annualMinor, input.monthsTotal);
+      const amounts = evenSplit(annualMinor, cyclesPerYear);
       const rows = amounts.map((minor, idx) => ({
         sequence: idx + 1,
-        due_date: addMonthsIso(input.today, idx),
+        due_date: addMonthsIso(input.today, idx * cycleStrideMonths),
         amount: toMajor(minor),
       }));
       return {
@@ -99,12 +125,10 @@ export function buildSchedule(input: BuildScheduleInput): BuildScheduleResult {
         yearEndDate: input.yearEndDate,
         joinDate: input.today,
       });
-      // Spread the pro-rata bill evenly across remaining months.
-      const cycles = Math.max(1, input.monthsRemaining);
-      const amounts = evenSplit(toMinor(proRata.amount), cycles);
+      const amounts = evenSplit(toMinor(proRata.amount), cyclesRemaining);
       const rows = amounts.map((minor, idx) => ({
         sequence: idx + 1,
-        due_date: addMonthsIso(input.today, idx),
+        due_date: addMonthsIso(input.today, idx * cycleStrideMonths),
         amount: toMajor(minor),
       }));
       return {
@@ -117,11 +141,11 @@ export function buildSchedule(input: BuildScheduleInput): BuildScheduleResult {
 
     case "catch_up_lump_then_monthly": {
       // Today's enrolment intent collects the catch-up lump for prior
-      // months PLUS this month's standard cycle. Subsequent cycles run
-      // at the standard monthly amount until year-end.
-      const remainingExclTodayCycles = Math.max(0, input.monthsRemaining - 1);
-      const catchUpMinor = monthlyStandardMinor * input.monthsElapsed;
-      const firstCycleMinor = catchUpMinor + monthlyStandardMinor;
+      // cycles PLUS this cycle's standard amount. Subsequent cycles run
+      // at the standard rate until year-end.
+      const remainingExclTodayCycles = Math.max(0, cyclesRemaining - 1);
+      const catchUpMinor = standardCycleMinor * cyclesElapsed;
+      const firstCycleMinor = catchUpMinor + standardCycleMinor;
 
       const tailAmounts = evenSplit(
         annualMinor - firstCycleMinor,
@@ -135,7 +159,7 @@ export function buildSchedule(input: BuildScheduleInput): BuildScheduleResult {
         },
         ...tailAmounts.map((minor, idx) => ({
           sequence: idx + 2,
-          due_date: addMonthsIso(input.today, idx + 1),
+          due_date: addMonthsIso(input.today, (idx + 1) * cycleStrideMonths),
           amount: toMajor(minor),
         })),
       ];
@@ -150,34 +174,29 @@ export function buildSchedule(input: BuildScheduleInput): BuildScheduleResult {
     }
 
     case "monthly_then_balloon": {
-      // Today's intent collects this month's standard cycle. Subsequent
-      // cycles run at the standard amount; the final cycle carries the
-      // catch-up balloon for prior months on top.
-      const remainingExclTodayCycles = Math.max(0, input.monthsRemaining - 1);
+      const remainingExclTodayCycles = Math.max(0, cyclesRemaining - 1);
       const tailCount = Math.max(1, remainingExclTodayCycles);
-      // All tail rows except the last carry the standard amount; the last
-      // one carries the standard amount + the catch-up balloon.
       const standardTail = tailCount - 1;
       const balloonMinor =
-        annualMinor - monthlyStandardMinor - monthlyStandardMinor * standardTail;
+        annualMinor - standardCycleMinor - standardCycleMinor * standardTail;
       const rows: InstalmentRow[] = [
         {
           sequence: 1,
           due_date: input.today.slice(0, 10),
-          amount: toMajor(monthlyStandardMinor),
+          amount: toMajor(standardCycleMinor),
         },
       ];
       for (let i = 0; i < standardTail; i++) {
         rows.push({
           sequence: i + 2,
-          due_date: addMonthsIso(input.today, i + 1),
-          amount: toMajor(monthlyStandardMinor),
+          due_date: addMonthsIso(input.today, (i + 1) * cycleStrideMonths),
+          amount: toMajor(standardCycleMinor),
         });
       }
       if (tailCount >= 1) {
         rows.push({
           sequence: rows.length + 1,
-          due_date: addMonthsIso(input.today, tailCount),
+          due_date: addMonthsIso(input.today, tailCount * cycleStrideMonths),
           amount: toMajor(balloonMinor),
         });
       }
@@ -186,20 +205,16 @@ export function buildSchedule(input: BuildScheduleInput): BuildScheduleResult {
         total: toMajor(
           rows.reduce((sum, r) => sum + toMinor(r.amount), 0)
         ),
-        firstCycleAmount: toMajor(monthlyStandardMinor),
+        firstCycleAmount: toMajor(standardCycleMinor),
         cycleCount: rows.length,
       };
     }
 
     case "reslice_remaining": {
-      // No catch-up, no balloon: re-divide the full annual amount across
-      // the remaining months (including today's). Result is a higher
-      // flat monthly than the standard rate.
-      const cycles = Math.max(1, input.monthsRemaining);
-      const amounts = evenSplit(annualMinor, cycles);
+      const amounts = evenSplit(annualMinor, cyclesRemaining);
       const rows = amounts.map((minor, idx) => ({
         sequence: idx + 1,
-        due_date: addMonthsIso(input.today, idx),
+        due_date: addMonthsIso(input.today, idx * cycleStrideMonths),
         amount: toMajor(minor),
       }));
       return {

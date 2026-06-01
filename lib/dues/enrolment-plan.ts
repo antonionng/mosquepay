@@ -27,7 +27,11 @@
 import * as db from "@/lib/db";
 import { createServiceClient } from "@/lib/supabase/server";
 import { computeYearPosition, type YearPosition } from "@/lib/dues/year-position";
-import { buildSchedule, isStrategyEnabledForLodge } from "@/lib/dues/strategies";
+import {
+  buildSchedule,
+  isStrategyEnabledForLodge,
+  type DuesCadence,
+} from "@/lib/dues/strategies";
 import type {
   DuesSplitStrategy,
   LodgeDues,
@@ -44,6 +48,12 @@ export type EnrolmentPlanArgs = {
   strategy?: DuesSplitStrategy;
   /** Caller-chosen auto-renew. Falls back to the lodge default. */
   autoRenew?: boolean;
+  /**
+   * Caller-chosen cadence (monthly / quarterly). Falls back to the
+   * lodge dues template's instalment_frequency. The dues page surfaces
+   * any cadence options the lodge has enabled so the member can pick.
+   */
+  cadence?: DuesCadence;
 };
 
 /**
@@ -75,7 +85,14 @@ export type EnrolmentPlan = {
   /** Strategy actually used (after lodge enable + cap checks). */
   strategy: DuesSplitStrategy;
   autoRenew: boolean;
-  cadence: "monthly" | "quarterly";
+  cadence: DuesCadence;
+  /**
+   * All cadences enabled by the lodge for this dues template, in the
+   * order we want to surface them in the UI. Drives the cadence picker
+   * on /member/dues. If the template only allows one cadence, this is
+   * a single-element array.
+   */
+  cadenceOptions: DuesCadence[];
   customerRef: string;
   /** Schedule rows. cycle 1 is collected today by the enrolment intent. */
   schedule: ReturnType<typeof buildSchedule>;
@@ -88,8 +105,20 @@ export type EnrolmentPlan = {
    * (£). Always equal to schedule.firstCycleAmount when set, but kept
    * separate so callers can pass it directly to /v1/subscription_checkouts
    * without re-deriving. Null on saved_charge_fixed_term.
+   *
+   * Despite the historical name (the v1 release only supported monthly),
+   * this is the "per-cycle" amount and is interpreted in conjunction
+   * with subscriptionIntervalCount below.
    */
   monthlyAmount: number | null;
+  /**
+   * Stripe Subscription interval to hand to Mooov's
+   * /v1/subscription_checkouts. We always pass "month"; the cadence is
+   * encoded in interval_count (1 = monthly, 3 = quarterly). Null on
+   * saved_charge_fixed_term.
+   */
+  subscriptionInterval: "month" | null;
+  subscriptionIntervalCount: number | null;
 };
 
 export type EnrolmentPlanError = {
@@ -177,9 +206,18 @@ export async function computeEnrolmentPlan(
   }
   const customerRef = `mbr_${member.id}`;
 
-  // 3. Resolve the lodge dues template.
+  // 3. Resolve the lodge dues template that this member_dues row was
+  // created from. A lodge can have several active templates (e.g.
+  // "Annual Subscription" + "Festival Contribution"); duesRecord.dues_id
+  // points at the specific template to use. Picking lodgeDuesList[0]
+  // would silently apply the wrong template's cadence + amount, which
+  // is exactly the bug that drove the "60 quarterly vs 24 monthly"
+  // discrepancy on Covenant Lodge.
   const lodgeDuesList = await db.getLodgeDues(lodgeId);
-  const duesTemplate = lodgeDuesList[0] ?? null;
+  const duesTemplate =
+    lodgeDuesList.find((row) => row.id === duesRecord.dues_id) ??
+    lodgeDuesList[0] ??
+    null;
   if (!duesTemplate || duesTemplate.allow_instalments !== true) {
     return {
       ok: false,
@@ -250,6 +288,23 @@ export async function computeEnrolmentPlan(
     };
   }
 
+  // 5b. Pick cadence. The lodge template's instalment_frequency is the
+  // default; the member can override via the dues page picker, but only
+  // among cadences the lodge has enabled. v1 keeps the option set simple
+  // (monthly + quarterly) — the only two values instalment_frequency
+  // takes today.
+  const templateCadence: DuesCadence =
+    duesTemplate.instalment_frequency === "quarterly" ? "quarterly" : "monthly";
+  const cadenceOptions: DuesCadence[] =
+    templateCadence === "quarterly"
+      ? ["quarterly", "monthly"]
+      : ["monthly", "quarterly"];
+  const cadence: DuesCadence = args.cadence
+    ? cadenceOptions.includes(args.cadence)
+      ? args.cadence
+      : templateCadence
+    : templateCadence;
+
   // 6. Build the per-cycle plan.
   const annualAmount = duesRecord.full_year_amount ?? duesRecord.amount;
   const today = new Date().toISOString().slice(0, 10);
@@ -262,6 +317,7 @@ export async function computeEnrolmentPlan(
     monthsRemaining: yearPosition.monthsRemaining,
     monthsTotal: yearPosition.monthsTotal,
     strategy,
+    cadence,
   });
 
   if (schedule.cycleCount === 0 || schedule.firstCycleAmount <= 0) {
@@ -304,7 +360,8 @@ export async function computeEnrolmentPlan(
       yearPosition,
       strategy,
       autoRenew,
-      cadence: "monthly",
+      cadence,
+      cadenceOptions,
       customerRef,
       schedule,
       annualAmount,
@@ -313,6 +370,14 @@ export async function computeEnrolmentPlan(
       monthlyAmount:
         mooovFlow === "open_ended_subscription"
           ? schedule.firstCycleAmount
+          : null,
+      subscriptionInterval:
+        mooovFlow === "open_ended_subscription" ? "month" : null,
+      subscriptionIntervalCount:
+        mooovFlow === "open_ended_subscription"
+          ? cadence === "quarterly"
+            ? 3
+            : 1
           : null,
     },
   };

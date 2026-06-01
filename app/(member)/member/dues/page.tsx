@@ -28,12 +28,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+type Cadence = "monthly" | "quarterly";
+
 interface SubscriptionPreview {
   memberEmail: string;
   memberName: string | null;
   currency: string;
   annualAmount: number;
-  cadence: "monthly" | "quarterly";
+  cadence: Cadence;
+  cadenceOptions: Cadence[];
   strategy: string;
   strategyDescription: string;
   autoRenew: boolean;
@@ -133,6 +136,7 @@ export default function MemberDuesPage() {
   const [autoRenewOverride, setAutoRenewOverride] = useState<boolean | null>(
     null,
   );
+  const [cadenceOverride, setCadenceOverride] = useState<Cadence | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -176,6 +180,9 @@ export default function MemberDuesPage() {
           ...(mode === "subscription" && autoRenewOverride !== null
             ? { auto_renew: autoRenewOverride }
             : {}),
+          ...(mode === "subscription" && cadenceOverride !== null
+            ? { cadence: cadenceOverride }
+            : {}),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -197,7 +204,11 @@ export default function MemberDuesPage() {
   // /api/dues/subscription-preview endpoint so the member sees the full
   // schedule (cycles, dates, amounts, total) BEFORE we redirect them
   // to Mooov hosted Checkout — which only shows cycle 1.
-  async function openSubscriptionPreview() {
+  //
+  // When the member flips between cadences inside the dialog we pass
+  // the chosen cadence back through the same endpoint to recompute
+  // dates + amounts; the dialog re-renders against the fresh plan.
+  async function openSubscriptionPreview(cadence?: Cadence) {
     if (!dues?.duesId || !dues?.memberEmail) {
       setError(
         "We couldn't load your dues record. Please refresh the page, or contact your lodge secretary if this persists.",
@@ -213,6 +224,7 @@ export default function MemberDuesPage() {
         body: JSON.stringify({
           dues_id: dues.duesId,
           member_email: dues.memberEmail,
+          ...(cadence ? { cadence } : {}),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -222,6 +234,7 @@ export default function MemberDuesPage() {
       const plan = data.plan as SubscriptionPreview;
       setSubscriptionPreview(plan);
       setAutoRenewOverride(plan.autoRenew);
+      setCadenceOverride(plan.cadence);
       setSubscriptionPreviewOpen(true);
     } catch (previewError) {
       setError(
@@ -236,10 +249,6 @@ export default function MemberDuesPage() {
 
   const isPaid = dues?.status === "paid";
   const outstanding = dues ? dues.annualAmount - dues.paidAmount : 0;
-  const instalmentAmount =
-    dues?.allowInstalments && dues.instalmentCount > 0
-      ? (dues.annualAmount / dues.instalmentCount).toFixed(2)
-      : null;
   const advance = dues?.advance ?? null;
   const schedule = dues?.schedule ?? null;
   const [advanceLoading, setAdvanceLoading] = useState(false);
@@ -484,7 +493,7 @@ export default function MemberDuesPage() {
                 </div>
               </div>
 
-              {dues?.allowInstalments && instalmentAmount && (
+              {dues?.allowInstalments && (
                 <div className="rounded-2xl border border-purple-200 bg-purple-50/50 p-6 shadow-sm">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -494,9 +503,11 @@ export default function MemberDuesPage() {
                       <div>
                         <p className="font-semibold text-slate-900">Pay in instalments</p>
                         <p className="text-sm text-slate-600">
-                          £{instalmentAmount} per{" "}
-                          {dues.instalmentFrequency === "monthly" ? "month" : "quarter"}{" "}
-                          over {dues.instalmentCount} payments
+                          Spread £{outstanding.toFixed(2)} across the year
+                          {dues.instalmentFrequency === "quarterly"
+                            ? " — monthly or quarterly"
+                            : ""}
+                          . See your plan before anything is charged.
                         </p>
                       </div>
                     </div>
@@ -504,7 +515,7 @@ export default function MemberDuesPage() {
                       variant="secondary"
                       size="lg"
                       disabled={paying || subscriptionPreviewLoading}
-                      onClick={openSubscriptionPreview}
+                      onClick={() => openSubscriptionPreview()}
                     >
                       {subscriptionPreviewLoading ? (
                         <>
@@ -514,7 +525,7 @@ export default function MemberDuesPage() {
                       ) : (
                         <>
                           <Repeat className="h-4 w-4 mr-2" />
-                          Set Up Instalments
+                          See My Plan
                         </>
                       )}
                     </Button>
@@ -622,9 +633,14 @@ export default function MemberDuesPage() {
       <SubscriptionPreviewDialog
         open={subscriptionPreviewOpen}
         plan={subscriptionPreview}
-        loading={paying}
+        loading={paying || subscriptionPreviewLoading}
         autoRenewOverride={autoRenewOverride}
         onAutoRenewChange={setAutoRenewOverride}
+        cadenceOverride={cadenceOverride}
+        onCadenceChange={(next) => {
+          setCadenceOverride(next);
+          void openSubscriptionPreview(next);
+        }}
         onOpenChange={(open) => {
           if (!open && !paying) setSubscriptionPreviewOpen(false);
         }}
@@ -829,6 +845,8 @@ function SubscriptionPreviewDialog({
   loading,
   autoRenewOverride,
   onAutoRenewChange,
+  cadenceOverride,
+  onCadenceChange,
   onOpenChange,
   onConfirm,
 }: {
@@ -837,6 +855,8 @@ function SubscriptionPreviewDialog({
   loading: boolean;
   autoRenewOverride: boolean | null;
   onAutoRenewChange: (next: boolean) => void;
+  cadenceOverride: Cadence | null;
+  onCadenceChange: (next: Cadence) => void;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
 }) {
@@ -848,6 +868,12 @@ function SubscriptionPreviewDialog({
   const tailCount = plan ? Math.max(0, plan.cycleCount - 1) : 0;
   const currencySymbol = plan?.currency === "GBP" ? "£" : (plan?.currency ?? "");
   const isOpenEnded = plan?.mooovFlow === "open_ended_subscription";
+  const activeCadence: Cadence =
+    cadenceOverride ?? (plan?.cadence ?? "monthly");
+  const showCadencePicker =
+    plan != null && (plan.cadenceOptions?.length ?? 0) > 1;
+  const cadenceWord = (cadence: Cadence): string =>
+    cadence === "quarterly" ? "quarter" : "month";
 
   return (
     <Dialog
@@ -865,7 +891,9 @@ function SubscriptionPreviewDialog({
           <div>
             <DialogTitle className="text-lg font-semibold text-dash-text">
               {plan
-                ? `Your ${plan.cadence} dues plan`
+                ? plan.cadence === "quarterly"
+                  ? "Your quarterly dues plan"
+                  : "Your monthly dues plan"
                 : "Your dues plan"}
             </DialogTitle>
             <DialogDescription className="mt-1 text-sm leading-6 text-dash-muted">
@@ -878,6 +906,37 @@ function SubscriptionPreviewDialog({
 
         {plan ? (
           <div className="max-h-[55vh] space-y-5 overflow-y-auto px-6 py-5">
+            {showCadencePicker ? (
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
+                  Pay
+                </p>
+                <div className="mt-2 inline-flex rounded-xl border border-slate-200 bg-white p-1">
+                  {plan.cadenceOptions.map((option) => {
+                    const isActive = option === activeCadence;
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        disabled={loading || isActive}
+                        onClick={() => onCadenceChange(option)}
+                        className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                          isActive
+                            ? "bg-purple-600 text-white shadow-sm"
+                            : "text-slate-600 hover:text-slate-900 disabled:opacity-50"
+                        }`}
+                      >
+                        {option === "monthly" ? "Monthly" : "Quarterly"}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-1.5 text-xs text-slate-500">
+                  Switch any time before you confirm — totals stay the same.
+                </p>
+              </div>
+            ) : null}
+
             <div className="rounded-xl border border-purple-100 bg-purple-50/40 p-4">
               <p className="text-xs font-medium uppercase tracking-wider text-purple-700">
                 Today&apos;s charge
@@ -888,7 +947,7 @@ function SubscriptionPreviewDialog({
               </p>
               <p className="mt-1 text-sm text-slate-600">
                 {isOpenEnded
-                  ? `Then ${currencySymbol}${(plan.monthlyAmount ?? plan.firstCycleAmount).toFixed(2)} every month — keeps running until you cancel.`
+                  ? `Then ${currencySymbol}${(plan.monthlyAmount ?? plan.firstCycleAmount).toFixed(2)} every ${cadenceWord(plan.cadence)} — keeps running until you cancel.`
                   : tailCount > 0
                     ? `Then ${tailCount} more ${plan.cadence === "monthly" ? "monthly" : "quarterly"} payment${tailCount === 1 ? "" : "s"} on file.`
                     : "Single cycle — your card stays on file in case auto-renew kicks in."}{" "}
@@ -929,7 +988,7 @@ function SubscriptionPreviewDialog({
               {finalCycle ? (
                 <p className="mt-2 text-xs text-slate-500">
                   {isOpenEnded
-                    ? `After ${formatPlanDate(finalCycle.dueDate)} the same monthly charge keeps the next masonic year covered.`
+                    ? `After ${formatPlanDate(finalCycle.dueDate)} the same ${cadenceWord(plan.cadence)}ly charge keeps the next masonic year covered.`
                     : `Final charge ${formatPlanDate(finalCycle.dueDate)} — covers ${plan.yearLabel} in full.`}
                 </p>
               ) : null}
@@ -938,7 +997,9 @@ function SubscriptionPreviewDialog({
             {isOpenEnded ? (
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
                 <p className="font-medium text-slate-900">
-                  Open-ended monthly subscription
+                  {plan.cadence === "quarterly"
+                    ? "Open-ended quarterly subscription"
+                    : "Open-ended monthly subscription"}
                 </p>
                 <p className="mt-0.5 text-slate-600">
                   Charges run automatically. Cancel anytime from this page —

@@ -28,6 +28,7 @@ import {
   computeEnrolmentPlan,
   describeStrategy,
 } from "@/lib/dues/enrolment-plan";
+import type { DuesCadence } from "@/lib/dues/strategies";
 import { duesSubscriptionEnabled } from "@/lib/dues/feature-flags";
 import type { DuesSplitStrategy, MemberDues } from "@/lib/db/types";
 
@@ -58,6 +59,7 @@ export async function POST(request: NextRequest) {
     member_email?: string;
     split_strategy?: DuesSplitStrategy;
     auto_renew?: boolean;
+    cadence?: DuesCadence;
   };
   try {
     body = await request.json();
@@ -133,6 +135,10 @@ export async function POST(request: NextRequest) {
     memberEmail,
     strategy: body.split_strategy,
     autoRenew: body.auto_renew,
+    cadence:
+      body.cadence === "monthly" || body.cadence === "quarterly"
+        ? body.cadence
+        : undefined,
   });
   if (!planResult.ok) {
     return NextResponse.json(
@@ -153,6 +159,7 @@ export async function POST(request: NextRequest) {
       currency: plan.currency,
       annualAmount: plan.annualAmount,
       cadence: plan.cadence,
+      cadenceOptions: plan.cadenceOptions,
       strategy: plan.strategy,
       strategyDescription: describeStrategy(plan.strategy, plan.yearPosition),
       autoRenew: plan.autoRenew,

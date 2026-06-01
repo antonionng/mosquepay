@@ -1,10 +1,13 @@
 // POST /api/dues/schedules/[id]/cancel
 //
-// Cancel a saved-charge subscription. The cron treats `cancelled` as a
-// hard stop and skips it on every subsequent tick. Outstanding
-// instalments stay outstanding so the treasurer can still see what was
-// owed; the parent member_dues row stays open until paid by some other
-// means.
+// Cancel a saved-charge or open-ended dues subscription. The cron and
+// the Mooov subscription webhook both treat `cancelled` as a hard
+// stop. We also hard-delete any outstanding (unpaid) instalments tied
+// to this schedule — the treasurer view reads from dues_schedules
+// (status + cycles_paid metadata), so the unpaid rows weren't
+// load-bearing, and leaving them in place breaks the next enrolment's
+// pre-create with a unique-constraint violation on
+// (member_dues_id, sequence).
 //
 // Auth surface for v1: any caller with the schedule_id + matching
 // member_email cookie. The member portal (/member/dues) is the only
@@ -78,6 +81,26 @@ export async function POST(
       cancellation_reason: body.reason ?? null,
     },
   });
+
+  // Hard-delete unpaid pre-created instalments. Without this, retrying
+  // the enrolment for the same member_dues row trips the unique
+  // (member_dues_id, sequence) constraint and surfaces as
+  // "Could not create subscription session." in /member/dues.
+  const { error: deleteErr } = await supa
+    .from("member_dues_instalments")
+    .delete()
+    .eq("schedule_id", id)
+    .eq("lodge_id", lodgeId)
+    .is("paid_at", null);
+  if (deleteErr) {
+    console.error("dues/schedules/cancel: failed to delete unpaid instalments", {
+      schedule_id: id,
+      code: deleteErr.code,
+      message: deleteErr.message,
+    });
+    // Non-fatal: the schedule is still cancelled. The member can
+    // contact support if they hit the unique-constraint path on retry.
+  }
 
   return NextResponse.json({ ok: true, status: "cancelled" });
 }

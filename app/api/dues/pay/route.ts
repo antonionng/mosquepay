@@ -28,7 +28,42 @@ import {
   computeEnrolmentPlan,
   type EnrolmentPlan,
 } from "@/lib/dues/enrolment-plan";
+import type { DuesCadence } from "@/lib/dues/strategies";
 import type { DuesSplitStrategy, MemberDues } from "@/lib/db/types";
+
+/**
+ * Serialize an unknown thrown value into a JSON-safe shape for logs.
+ * Supabase rejects with PostgrestError-shaped objects (plain objects with
+ * code/message/details/hint, no Error prototype) which serialize to
+ * "[object Object]" through String() and have no stack. Pulling out the
+ * known fields means the production log actually tells us what failed.
+ */
+function describeError(err: unknown): {
+  name?: string;
+  code?: string | number;
+  message?: string;
+  details?: string;
+  hint?: string;
+  stack?: string;
+} {
+  if (err instanceof Error) {
+    return { name: err.name, message: err.message, stack: err.stack };
+  }
+  if (err && typeof err === "object") {
+    const e = err as Record<string, unknown>;
+    return {
+      name: typeof e.name === "string" ? e.name : undefined,
+      code:
+        typeof e.code === "string" || typeof e.code === "number"
+          ? (e.code as string | number)
+          : undefined,
+      message: typeof e.message === "string" ? e.message : undefined,
+      details: typeof e.details === "string" ? e.details : undefined,
+      hint: typeof e.hint === "string" ? e.hint : undefined,
+    };
+  }
+  return { message: String(err) };
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -170,6 +205,10 @@ export async function POST(request: NextRequest) {
         memberName: member_name,
         strategy: body.split_strategy as DuesSplitStrategy | undefined,
         autoRenew: typeof body.auto_renew === "boolean" ? body.auto_renew : undefined,
+        cadence:
+          body.cadence === "monthly" || body.cadence === "quarterly"
+            ? (body.cadence as DuesCadence)
+            : undefined,
       });
     }
 
@@ -378,32 +417,42 @@ type EnrolmentArgs = {
   memberName: string | null | undefined;
   strategy: DuesSplitStrategy | undefined;
   autoRenew: boolean | undefined;
+  cadence: DuesCadence | undefined;
 };
 
 /**
- * Best-effort cleanup of any pending dues_schedules rows for this dues
- * record. Called at the top of both enrolment branches so retries
- * (member clicked "Set Up Instalments" again after a failed Mooov call,
- * abandoned redirect, etc.) start from a clean slate. We mark the old
- * schedule cancelled (audit trail) and hard-delete its pre-created
- * instalments so the in-year cycle list isn't double-stamped.
+ * Best-effort cleanup of any non-active dues state left over from a
+ * previous enrolment attempt for this member_dues row. Called at the
+ * top of both enrolment branches so retries (member clicked "Set Up
+ * Instalments" again after a failed Mooov call, abandoned redirect,
+ * member cancelled and resubscribed, etc.) start from a clean slate.
  *
- * Only ever touches schedules in 'pending' state — schedules that
- * captured money are protected by the status filter.
+ * Two responsibilities:
+ *
+ *   1. Mark any pending schedules cancelled (audit trail).
+ *   2. Hard-delete any outstanding (unpaid) instalments tied to this
+ *      member_dues_id whose schedule isn't active. Without this, the
+ *      unique (member_dues_id, sequence) constraint on
+ *      member_dues_instalments rejects the next attempt's pre-create
+ *      with a Postgres error that bubbles up as "Could not create
+ *      subscription session." Was hitting prod on retries after the
+ *      member self-cancelled a schedule (cancel route doesn't delete
+ *      instalments by design — treasurer needs to see what was owed).
+ *
+ * Schedules that captured money (mooov_payment_method_id or
+ * last_charged_at set) are protected — we'd race-condition the member
+ * out of a real subscription if we cancelled one mid-activation.
  */
 async function abandonPendingSchedulesForDues(
   lodgeId: string,
   memberDuesId: string,
 ): Promise<void> {
-  const existing = await db
+  const supa = createServiceClient();
+
+  const pending = await db
     .listDuesSchedules(lodgeId, { status: "pending" })
     .catch(() => [] as Awaited<ReturnType<typeof db.listDuesSchedules>>);
-  // Only abandon truly inert rows. If a row has a payment method or a
-  // last_charged_at stamped, the activation webhook already fired (or is
-  // about to) and we'd race-condition the user out of a real
-  // subscription. Such rows are left alone; the webhook will promote
-  // them to active_stripe shortly.
-  const orphans = existing
+  const orphans = pending
     .filter((s) => s.member_dues_id === memberDuesId)
     .filter(
       (s) => s.mooov_payment_method_id == null && s.last_charged_at == null,
@@ -414,7 +463,7 @@ async function abandonPendingSchedulesForDues(
     } catch (err) {
       console.error("dues/pay: failed to delete orphan instalments", {
         schedule_id: orphan.id,
-        message: err instanceof Error ? err.message : String(err),
+        ...describeError(err),
       });
     }
     try {
@@ -426,10 +475,84 @@ async function abandonPendingSchedulesForDues(
     } catch (err) {
       console.error("dues/pay: failed to cancel orphan schedule", {
         schedule_id: orphan.id,
-        message: err instanceof Error ? err.message : String(err),
+        ...describeError(err),
       });
     }
   }
+
+  // Belt-and-braces: nuke any outstanding instalments still attached to
+  // this member_dues whose parent schedule is cancelled / completed.
+  // The cancel route used to leave these in place "so the treasurer
+  // could see what was owed", but that broke the next enrolment's
+  // pre-create. The treasurer's view comes off the dues_schedules row
+  // (status + cycles_paid metadata) anyway, so the unpaid instalments
+  // weren't load-bearing.
+  const { data: orphanRows, error: selectErr } = await supa
+    .from("member_dues_instalments")
+    .select("id, schedule_id, status, paid_at")
+    .eq("lodge_id", lodgeId)
+    .eq("member_dues_id", memberDuesId)
+    .is("paid_at", null);
+  if (selectErr) {
+    console.error("dues/pay: orphan instalment select failed", {
+      member_dues_id: memberDuesId,
+      ...describeError(selectErr),
+    });
+    return;
+  }
+  type OrphanRow = { id: string; schedule_id: string | null; status: string };
+  const candidates = (orphanRows as OrphanRow[] | null) ?? [];
+  if (candidates.length === 0) return;
+
+  // Pull the parent schedule statuses in one shot to decide which
+  // instalments are safe to drop. Instalments with a NULL schedule_id
+  // (orphaned via ON DELETE SET NULL) are always safe to drop.
+  const scheduleIds = Array.from(
+    new Set(
+      candidates
+        .map((r) => r.schedule_id)
+        .filter((id): id is string => typeof id === "string"),
+    ),
+  );
+  const scheduleStatuses = new Map<string, string>();
+  if (scheduleIds.length > 0) {
+    const { data: scheduleRows } = await supa
+      .from("dues_schedules")
+      .select("id, status")
+      .in("id", scheduleIds);
+    for (const row of (scheduleRows as { id: string; status: string }[] | null) ?? []) {
+      scheduleStatuses.set(row.id, row.status);
+    }
+  }
+
+  const SAFE_TO_NUKE = new Set(["cancelled", "completed"]);
+  const dropIds = candidates
+    .filter((row) => row.status === "outstanding")
+    .filter((row) => {
+      if (!row.schedule_id) return true;
+      const status = scheduleStatuses.get(row.schedule_id);
+      return status != null && SAFE_TO_NUKE.has(status);
+    })
+    .map((row) => row.id);
+
+  if (dropIds.length === 0) return;
+
+  const { error: deleteErr } = await supa
+    .from("member_dues_instalments")
+    .delete()
+    .in("id", dropIds);
+  if (deleteErr) {
+    console.error("dues/pay: orphan instalment delete failed", {
+      member_dues_id: memberDuesId,
+      drop_count: dropIds.length,
+      ...describeError(deleteErr),
+    });
+    return;
+  }
+  console.info("dues/pay: cleared orphan instalments", {
+    member_dues_id: memberDuesId,
+    drop_count: dropIds.length,
+  });
 }
 
 async function startDuesSubscriptionEnrolment(args: EnrolmentArgs) {
@@ -504,7 +627,7 @@ async function startDuesSubscriptionEnrolment(args: EnrolmentArgs) {
     member_dues_id: duesRecord.id,
     member_email: memberEmail,
     customer_ref: customerRef,
-    cadence: "monthly",
+    cadence: plan.cadence,
     split_strategy: strategy,
     auto_renew: autoRenew,
     status: "pending",
@@ -513,6 +636,7 @@ async function startDuesSubscriptionEnrolment(args: EnrolmentArgs) {
       annual_amount: annualAmount,
       cycles_total: schedulePlan.cycleCount,
       year_label: currentYear.label,
+      cadence: plan.cadence,
       mooov_flow: "saved_charge_fixed_term",
     },
   });
@@ -775,27 +899,41 @@ async function startOpenEndedSubscription({
     masonicYear: currentYear,
     strategy,
     autoRenew,
+    cadence,
     customerRef,
     schedule: schedulePlan,
     annualAmount,
     monthlyAmount,
+    subscriptionInterval,
+    subscriptionIntervalCount,
   } = plan;
 
-  if (monthlyAmount == null) {
+  if (
+    monthlyAmount == null ||
+    subscriptionInterval == null ||
+    subscriptionIntervalCount == null
+  ) {
     console.error(
-      "dues/pay open-ended: plan.monthlyAmount unexpectedly null",
-      { dues_id: duesRecord.id, strategy },
+      "dues/pay open-ended: subscription cycle params unexpectedly null",
+      {
+        dues_id: duesRecord.id,
+        strategy,
+        cadence,
+        monthlyAmount,
+        subscriptionInterval,
+        subscriptionIntervalCount,
+      },
     );
     return NextResponse.json(
       {
-        error: "Could not work out a monthly amount for this plan.",
-        code: "monthly_amount_missing",
+        error: "Could not work out a per-cycle amount for this plan.",
+        code: "cycle_amount_missing",
       },
       { status: 500 },
     );
   }
 
-  const monthlyMinor = Math.round(monthlyAmount * 100);
+  const cycleAmountMinor = Math.round(monthlyAmount * 100);
   const currency = (duesRecord.currency ?? "GBP").toUpperCase();
 
   // Clean any orphan pending schedules from a previous failed attempt
@@ -814,7 +952,7 @@ async function startOpenEndedSubscription({
     member_dues_id: duesRecord.id,
     member_email: memberEmail,
     customer_ref: customerRef,
-    cadence: "monthly",
+    cadence,
     split_strategy: strategy,
     auto_renew: autoRenew,
     status: "pending",
@@ -823,7 +961,10 @@ async function startOpenEndedSubscription({
       annual_amount: annualAmount,
       cycles_total: schedulePlan.cycleCount,
       year_label: currentYear.label,
-      monthly_amount: monthlyAmount,
+      cycle_amount: monthlyAmount,
+      cadence,
+      subscription_interval: subscriptionInterval,
+      subscription_interval_count: subscriptionIntervalCount,
       mooov_flow: "open_ended_subscription",
     },
   });
@@ -862,7 +1003,8 @@ async function startOpenEndedSubscription({
   const cancelUrl = `${siteUrl}/dues/${duesRecord.id}?email=${encodeURIComponent(
     memberEmail,
   )}${lodgeQuery ? `&lodge=${encodeURIComponent(lodgeSlug)}` : ""}`;
-  const description = `Lodge dues — £${monthlyAmount.toFixed(2)} / month (${currentYear.label})`;
+  const cadenceLabel = cadence === "quarterly" ? "quarter" : "month";
+  const description = `Lodge dues — £${monthlyAmount.toFixed(2)} / ${cadenceLabel} (${currentYear.label})`;
 
   // Metadata gets stamped on the Stripe Subscription AND every invoice
   // by Mooov, so our webhook can route subscription.invoice_paid back
@@ -917,10 +1059,10 @@ async function startOpenEndedSubscription({
       body: {
         subscription_id: mooovSubscriptionId,
         customer_ref: customerRef,
-        amount: monthlyMinor,
+        amount: cycleAmountMinor,
         currency,
-        interval: "month",
-        interval_count: 1,
+        interval: subscriptionInterval,
+        interval_count: subscriptionIntervalCount,
         success_url: successUrl,
         cancel_url: cancelUrl,
         description,
@@ -950,6 +1092,8 @@ async function startOpenEndedSubscription({
       schedule_id: schedule.id,
       cycles_total: schedulePlan.cycleCount,
       monthly_amount: monthlyAmount,
+      cycle_amount: monthlyAmount,
+      cadence,
       split_strategy: strategy,
       mooov_flow: "open_ended_subscription",
       checkout_session_id: result.checkout_session_id ?? null,
@@ -984,8 +1128,7 @@ async function startOpenEndedSubscription({
     }
     console.error("dues/pay open-ended: unexpected error", {
       schedule_id: schedule.id,
-      message: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack : undefined,
+      ...describeError(err),
     });
     await rollback("unexpected_error", "system_enrolment_failure");
     return NextResponse.json(
