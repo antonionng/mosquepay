@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, useMemo, type ReactNode } from "react";
+import { Fragment, useState, useMemo, useCallback, useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { formatDate, cn } from "@/lib/utils";
 import { DASH_TABLE } from "@/lib/admin-dash-table";
@@ -39,6 +39,7 @@ import {
   Wallet,
   Coins,
   Ticket,
+  CalendarDays,
   UtensilsCrossed,
 } from "lucide-react";
 
@@ -148,6 +149,49 @@ function categoryAmounts(p: Payment): Record<CategoryKey, number> {
   };
 }
 
+// Date scope for the whole page so the treasurer can isolate a single
+// evening's takings (KPIs, the cash/card ratio, category breakdown, the
+// ledger, and the exports all respect it). Computed in the browser's local
+// timezone against created_at.
+type DateScope = "all" | "today" | "yesterday" | "7d" | "month";
+
+const DATE_SCOPE_LABEL: Record<DateScope, string> = {
+  all: "All time",
+  today: "Today",
+  yesterday: "Yesterday",
+  "7d": "Last 7 days",
+  month: "This month",
+};
+
+function scopeRange(scope: DateScope): {
+  start: number | null;
+  end: number | null;
+} {
+  if (scope === "all") return { start: null, end: null };
+  const now = new Date();
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  ).getTime();
+  const DAY = 24 * 60 * 60 * 1000;
+  switch (scope) {
+    case "today":
+      return { start: startOfToday, end: null };
+    case "yesterday":
+      return { start: startOfToday - DAY, end: startOfToday };
+    case "7d":
+      return { start: startOfToday - 6 * DAY, end: null };
+    case "month":
+      return {
+        start: new Date(now.getFullYear(), now.getMonth(), 1).getTime(),
+        end: null,
+      };
+    default:
+      return { start: null, end: null };
+  }
+}
+
 function MethodBadge({ pm }: { pm: string | null | undefined }) {
   const m = methodMeta(pm);
   const Icon = m.icon;
@@ -241,6 +285,13 @@ function paymentStatusBadge(status: string) {
   );
 }
 
+// Money that actually landed in the tin / on the card machine. Excludes
+// pending, failed, voided/cancelled, and refunded (incl. partial) so they
+// never inflate reconciliation totals.
+function isCollected(status: string): boolean {
+  return status === "succeeded" || status === "completed" || status === "paid";
+}
+
 function giftAidStatusBadge(status: string) {
   if (status === "active")
     return (
@@ -286,12 +337,57 @@ export function AdminPaymentsClient({
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [dateScope, setDateScope] = useState<DateScope>("all");
+  // Price of one raffle strip, so a £10 payment counts as 2 strips, not 1.
+  // Remembered across visits/meetings via localStorage.
+  const [rafflePrice, setRafflePrice] = useState(5);
+  useEffect(() => {
+    const saved = window.localStorage.getItem("c0v.rafflePricePerStrip");
+    const n = saved ? Number(saved) : NaN;
+    if (Number.isFinite(n) && n > 0) setRafflePrice(n);
+  }, []);
+  const updateRafflePrice = useCallback((value: number) => {
+    setRafflePrice(value);
+    if (Number.isFinite(value) && value > 0)
+      window.localStorage.setItem("c0v.rafflePricePerStrip", String(value));
+  }, []);
+  const stripsFor = useCallback(
+    (amount: number) =>
+      rafflePrice > 0 ? Math.round((amount ?? 0) / rafflePrice) : 0,
+    [rafflePrice],
+  );
 
-  const succeeded = payments.filter(
+  const { start: scopeStart, end: scopeEnd } = useMemo(
+    () => scopeRange(dateScope),
+    [dateScope],
+  );
+  const inScope = useCallback(
+    (iso: string) => {
+      if (scopeStart == null && scopeEnd == null) return true;
+      const t = new Date(iso).getTime();
+      if (Number.isNaN(t)) return true;
+      if (scopeStart != null && t < scopeStart) return false;
+      if (scopeEnd != null && t >= scopeEnd) return false;
+      return true;
+    },
+    [scopeStart, scopeEnd],
+  );
+  // Everything below works off the date-scoped sets so a chosen evening
+  // flows through the KPIs, ratio, breakdown, ledger, and exports alike.
+  const scopedPayments = useMemo(
+    () => payments.filter((p) => inScope(p.created_at)),
+    [payments, inScope],
+  );
+  const scopedDonations = useMemo(
+    () => donations.filter((d) => inScope(d.created_at)),
+    [donations, inScope],
+  );
+
+  const succeeded = scopedPayments.filter(
     (p) => p.status === "succeeded" || p.status === "completed" || p.status === "paid"
   );
-  const pending = payments.filter((p) => p.status === "pending");
-  const refunded = payments.filter(
+  const pending = scopedPayments.filter((p) => p.status === "pending");
+  const refunded = scopedPayments.filter(
     (p) => p.status === "refunded" || p.status === "partially_refunded"
   );
   const totalRevenue = succeeded.reduce((s, p) => s + p.total_amount, 0);
@@ -300,6 +396,11 @@ export function AdminPaymentsClient({
   const diningIncome = succeeded.reduce((s, p) => s + (p.dining_amount ?? 0), 0);
   const charityIncome = succeeded.reduce((s, p) => s + (p.charity_amount ?? 0), 0);
   const raffleIncome = succeeded.reduce((s, p) => s + (p.raffle_amount ?? 0), 0);
+  const raffleStrips = succeeded.reduce(
+    (s, p) => s + (p.raffle_amount > 0 ? stripsFor(p.raffle_amount) : 0),
+    0,
+  );
+  const raffleBuyers = succeeded.filter((p) => p.raffle_amount > 0).length;
   const duesOutstanding = duesRecords
     .filter((d) => d.status === "outstanding")
     .reduce((s, d) => s + d.amount, 0);
@@ -341,6 +442,7 @@ export function AdminPaymentsClient({
     icon: typeof Banknote;
     accent: KpiAccent;
     categoryKey?: CategoryKey;
+    countLabel?: string;
   }> = [
     {
       label: "Dining",
@@ -365,6 +467,7 @@ export function AdminPaymentsClient({
       icon: Ticket,
       accent: "amber",
       categoryKey: "raffle",
+      countLabel: `${raffleStrips} strip${raffleStrips !== 1 ? "s" : ""} · ${raffleBuyers} ${raffleBuyers === 1 ? "buyer" : "buyers"}`,
     },
     {
       label: "Dues",
@@ -494,7 +597,7 @@ export function AdminPaymentsClient({
   ];
 
   const matchedPayments = useMemo(() => {
-    let list = [...payments];
+    let list = [...scopedPayments];
     if (statusFilter !== "all")
       list = list.filter((p) => p.status === statusFilter);
     if (methodFilter !== "all")
@@ -512,20 +615,26 @@ export function AdminPaymentsClient({
       );
     }
     return list;
-  }, [payments, statusFilter, methodFilter, categoryFilter, searchQuery]);
+  }, [scopedPayments, statusFilter, methodFilter, categoryFilter, searchQuery]);
 
   // Total of the matched rows — for the category filter this is that
   // category's gross (so "Cash + Raffle" gives the raffle cash takings); for
   // everything else it's the row total. Doubles as the cash count at the
-  // bottom of the table when filtered to Method = Cash.
+  // bottom of the table when filtered to Method = Cash. Only counts collected
+  // money so refunded/cancelled/pending rows can't inflate the figure (they
+  // still show in the table, just not in this total).
+  const matchedCollected = useMemo(
+    () => matchedPayments.filter((p) => isCollected(p.status)),
+    [matchedPayments],
+  );
   const matchedTotal = useMemo(
     () =>
-      matchedPayments.reduce((s, p) => {
+      matchedCollected.reduce((s, p) => {
         if (categoryFilter !== "all")
           return s + categoryAmounts(p)[categoryFilter];
         return s + p.total_amount;
       }, 0),
-    [matchedPayments, categoryFilter],
+    [matchedCollected, categoryFilter],
   );
 
   const ROW_CAP = 200;
@@ -591,8 +700,8 @@ export function AdminPaymentsClient({
       downloadCsv(
         "dining-income.csv",
         ["Date", "Name", "Email", "Dining amount", "Method", "Status", "Mooov reference"],
-        payments
-          .filter((p) => p.dining_amount > 0)
+        scopedPayments
+          .filter((p) => p.dining_amount > 0 && isCollected(p.status))
           .map((p) => [
             p.created_at,
             p.user_name,
@@ -610,18 +719,14 @@ export function AdminPaymentsClient({
       // a ticket for a reversed payment.
       downloadCsv(
         "raffle-tickets.csv",
-        ["Date", "Name", "Email", "Raffle amount", "Method", "Status", "Reference"],
-        payments
-          .filter(
-            (p) =>
-              p.raffle_amount > 0 &&
-              p.status !== "refunded" &&
-              p.status !== "partially_refunded",
-          )
+        ["Date", "Name", "Email", "Strips", "Raffle amount", "Method", "Status", "Reference"],
+        scopedPayments
+          .filter((p) => p.raffle_amount > 0 && isCollected(p.status))
           .map((p) => [
             p.created_at,
             p.user_name,
             p.user_email,
+            stripsFor(p.raffle_amount),
             p.raffle_amount,
             methodMeta(p.payment_method).label,
             p.status,
@@ -634,8 +739,11 @@ export function AdminPaymentsClient({
       downloadCsv(
         "cash-collected.csv",
         ["Date", "Name", "Email", "Amount", "Charity", "Raffle", "Dining", "Recorded by", "Status"],
-        payments
-          .filter((p) => methodGroup(p.payment_method) === "cash")
+        scopedPayments
+          .filter(
+            (p) =>
+              methodGroup(p.payment_method) === "cash" && isCollected(p.status),
+          )
           .map((p) => [
             p.created_at,
             p.user_name,
@@ -653,7 +761,7 @@ export function AdminPaymentsClient({
       downloadCsv(
         "charity-totals.csv",
         ["Date", "Name", "Email", "Amount", "Source", "Gift Aid", "Status"],
-        donations.map((d) => [
+        scopedDonations.map((d) => [
           d.created_at,
           d.donor_name,
           d.donor_email,
@@ -668,7 +776,7 @@ export function AdminPaymentsClient({
       downloadCsv(
         "refunds.csv",
         ["Date", "Name", "Email", "Refund amount", "Status", "Mooov reference"],
-        payments
+        scopedPayments
           .filter((p) => p.refund_amount > 0 || p.status === "refunded")
           .map((p) => [
             p.created_at,
@@ -699,7 +807,7 @@ export function AdminPaymentsClient({
       downloadCsv(
         "payment-reconciliation.csv",
         ["Date", "Name", "Email", "Method", "Gross", "Dining", "Charity", "Raffle", "Meeting fee", "Guest ticket", "Refund", "Status", "Mooov reference"],
-        payments.map((p) => [
+        scopedPayments.map((p) => [
           p.created_at,
           p.user_name,
           p.user_email,
@@ -726,6 +834,30 @@ export function AdminPaymentsClient({
           <p className="admin-page-copy">
             Payment history, Gift Aid declarations, and donation tracking.
           </p>
+        </div>
+        <div className="flex flex-col items-start gap-1 sm:items-end">
+          <Select
+            value={dateScope}
+            onValueChange={(v) => setDateScope(v as DateScope)}
+          >
+            <SelectTrigger variant="dashboard" className="h-10 w-full sm:w-[180px]">
+              <CalendarDays className="h-4 w-4 text-dash-muted" aria-hidden />
+              <SelectValue placeholder="Period" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All time</SelectItem>
+              <SelectItem value="today">Today (this meeting)</SelectItem>
+              <SelectItem value="yesterday">Yesterday</SelectItem>
+              <SelectItem value="7d">Last 7 days</SelectItem>
+              <SelectItem value="month">This month</SelectItem>
+            </SelectContent>
+          </Select>
+          {dateScope !== "all" && (
+            <p className="text-xs text-dash-muted">
+              Showing {DATE_SCOPE_LABEL[dateScope].toLowerCase()} — every figure,
+              ratio, and export below is scoped to this period.
+            </p>
+          )}
         </div>
       </div>
 
@@ -815,7 +947,9 @@ export function AdminPaymentsClient({
                   £{cat.value.toFixed(2)}
                 </p>
                 <p className="mt-0.5 text-xs text-dash-muted">
-                  {cat.count} {cat.count === 1 ? "payment" : "payments"} · {pct}%
+                  {cat.countLabel ??
+                    `${cat.count} ${cat.count === 1 ? "payment" : "payments"}`}{" "}
+                  · {pct}%
                   {clickable ? (
                     <span className="text-dash-ring">
                       {isActive ? " · filtering" : " · filter"}
@@ -932,6 +1066,34 @@ export function AdminPaymentsClient({
             <p className="mt-2 text-xs text-dash-faint">
               Outstanding dues £{duesOutstanding.toFixed(2)} · Dining £{diningIncome.toFixed(2)} · Charity £{charityIncome.toFixed(2)}
             </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <label
+                htmlFor="raffle-price"
+                className="flex items-center gap-1 text-xs font-medium text-dash-muted"
+              >
+                <Ticket className="h-3.5 w-3.5" aria-hidden />
+                Raffle £/strip
+              </label>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-dash-faint">
+                  £
+                </span>
+                <input
+                  id="raffle-price"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step={0.5}
+                  value={Number.isFinite(rafflePrice) ? rafflePrice : ""}
+                  onChange={(e) => updateRafflePrice(Number(e.target.value))}
+                  className="h-8 w-20 rounded-lg border border-dash-border bg-dash-surface pl-5 pr-2 text-sm tabular-nums text-dash-text outline-none focus:border-dash-border-strong"
+                />
+              </div>
+              <span className="text-xs text-dash-faint">
+                {raffleStrips} strip{raffleStrips !== 1 ? "s" : ""} sold to{" "}
+                {raffleBuyers} {raffleBuyers === 1 ? "person" : "people"}
+              </span>
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {[
@@ -1057,9 +1219,9 @@ export function AdminPaymentsClient({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-dash-muted">
                 <span className="font-semibold text-dash-text tabular-nums">
-                  {matchedPayments.length}
+                  {matchedCollected.length}
                 </span>{" "}
-                {matchedPayments.length === 1 ? "payment" : "payments"}
+                {matchedCollected.length === 1 ? "payment" : "payments"}
                 {" · "}
                 <span className="font-semibold text-dash-text tabular-nums">
                   £{matchedTotal.toFixed(2)}
@@ -1068,6 +1230,9 @@ export function AdminPaymentsClient({
                   ? ` ${CATEGORY_LABEL[categoryFilter].toLowerCase()}`
                   : ""}
                 {methodFilter === "cash" ? " in cash" : ""}
+                {matchedPayments.length > matchedCollected.length
+                  ? ` · ${matchedPayments.length - matchedCollected.length} excluded (refunded/pending)`
+                  : ""}
               </p>
               {anyFilterActive ? (
                 <Button
@@ -1143,18 +1308,25 @@ export function AdminPaymentsClient({
                                   —
                                 </span>
                               );
-                            return present.map((k) => (
-                              <Badge
-                                key={k}
-                                variant="outline"
-                                className="border-dash-border text-[11px]"
-                              >
-                                {CATEGORY_LABEL[k]}
-                                {present.length > 1
-                                  ? ` £${amounts[k].toFixed(2)}`
-                                  : ""}
-                              </Badge>
-                            ));
+                            return present.map((k) => {
+                              const strips =
+                                k === "raffle" ? stripsFor(amounts[k]) : 0;
+                              return (
+                                <Badge
+                                  key={k}
+                                  variant="outline"
+                                  className="border-dash-border text-[11px]"
+                                >
+                                  {CATEGORY_LABEL[k]}
+                                  {k === "raffle"
+                                    ? ` · ${strips} strip${strips !== 1 ? "s" : ""}`
+                                    : ""}
+                                  {present.length > 1
+                                    ? ` £${amounts[k].toFixed(2)}`
+                                    : ""}
+                                </Badge>
+                              );
+                            });
                           })()}
                         </div>
                       </TableCell>
@@ -1222,6 +1394,10 @@ export function AdminPaymentsClient({
                                   label: "Raffle",
                                   icon: <Gift className="h-3.5 w-3.5" />,
                                   amount: raffle,
+                                  note:
+                                    raffle > 0
+                                      ? `${stripsFor(raffle)} strip${stripsFor(raffle) !== 1 ? "s" : ""}`
+                                      : null,
                                 },
                                 {
                                   key: "general",
@@ -1392,10 +1568,10 @@ export function AdminPaymentsClient({
           </div>
           <div className="border-b border-dash-border bg-dash-surface px-4 py-3">
             <p className="text-sm text-dash-text-muted">
-              {donations.length} donation{donations.length !== 1 ? "s" : ""} recorded
+              {scopedDonations.length} donation{scopedDonations.length !== 1 ? "s" : ""} recorded
             </p>
           </div>
-          {donations.length === 0 ? (
+          {scopedDonations.length === 0 ? (
             <div className="admin-empty bg-dash-surface text-dash-text-muted">
               No donations recorded yet.
             </div>
@@ -1412,7 +1588,7 @@ export function AdminPaymentsClient({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {donations.slice(0, 20).map((d) => (
+                {scopedDonations.slice(0, 20).map((d) => (
                   <TableRow key={d.id} className={DASH_TABLE.row}>
                     <TableCell className={DASH_TABLE.cell}>
                       <div>
