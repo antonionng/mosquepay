@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash, randomBytes } from "crypto";
-import { Resend } from "resend";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
@@ -12,10 +11,8 @@ import {
 } from "@/lib/guest-tokens";
 import { buildPublicUrl, lodgeScopedGuestPath } from "@/lib/public-links";
 import { sendGuestInviteEmail } from "@/lib/email/guest";
-import {
-  lodgePayFromEmail,
-  renderSummonsEmail,
-} from "@/lib/email/templates";
+import { renderSummonsEmail } from "@/lib/email/templates";
+import { sendWithLog } from "@/lib/email/send-with-log";
 import { defaultAgendaItems, renderDefaultSummonsOpening } from "@/lib/summons/defaults";
 
 type Params = { params: Promise<{ eventId: string }> };
@@ -33,8 +30,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Database not configured." }, { status: 503 });
   }
 
-  const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) {
+  if (!process.env.RESEND_API_KEY) {
     return NextResponse.json({ error: "RESEND_API_KEY is not configured." }, { status: 503 });
   }
 
@@ -96,12 +92,6 @@ export async function POST(request: NextRequest, { params }: Params) {
           email: member.email,
           full_name: member.full_name,
         }));
-    const fromEmail = lodgePayFromEmail(
-      process.env.RESEND_FROM_EMAIL ??
-      process.env.EMAIL_FROM ??
-      "LodgePay <noreply@lodgepayments.co.uk>"
-    );
-    const resend = new Resend(resendKey);
     const venue = [event.location, event.temple_room].filter(Boolean).join(", ");
     const agendaItems = summons?.agenda_items?.length
       ? summons.agenda_items
@@ -135,9 +125,17 @@ export async function POST(request: NextRequest, { params }: Params) {
           expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
         });
 
-        const result = await resend.emails.send({
-          from: fromEmail,
-          to: member.email,
+        const result = await sendWithLog({
+          lodgeId,
+          toEmail: member.email,
+          toName: member.full_name,
+          emailType: "summons_member",
+          entityType: "event",
+          entityId: event.id,
+          // Summons sends are admin-triggered; per-event re-sends are
+          // legitimate. We do NOT dedupe on event_id alone or a re-
+          // send after a typo would silently no-op.
+          dedupeKey: null,
           subject: `${testRecipientEmail ? "[Test] " : ""}Summons: ${event.title}`,
           html: renderSummonsEmail({
             memberName: member.full_name,
@@ -160,10 +158,15 @@ export async function POST(request: NextRequest, { params }: Params) {
             nextMeetingDate: summons?.next_meeting_date ?? null,
             nextMeetingNote: summons?.next_meeting_note ?? null,
           }),
+          metadata: {
+            event_title: event.title,
+            event_date: event.event_date,
+            is_test: Boolean(testRecipientEmail),
+          },
         });
 
-        if (result.error) {
-          throw new Error(result.error.message);
+        if (!result.ok) {
+          throw new Error(result.error);
         }
         sentCount++;
       } catch (emailError) {

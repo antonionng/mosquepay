@@ -9,12 +9,9 @@
 // the payment detail page later; this one is the "thanks, you paid" SMS
 // equivalent over email.
 
-import { Resend } from "resend";
 import * as db from "@/lib/db";
-import {
-  lodgePayFromEmail,
-  renderSimpleMessageEmail,
-} from "@/lib/email/templates";
+import { renderSimpleMessageEmail } from "@/lib/email/templates";
+import { sendWithLog } from "@/lib/email/send-with-log";
 
 export type TakePaymentReceiptArgs = {
   toEmail: string;
@@ -30,6 +27,8 @@ export type TakePaymentReceiptArgs = {
   // Pass the lodge id so we can pull the display name into the receipt
   // header. Falls back to "your lodge" if the lookup fails.
   lodgeId?: string | null;
+  /** Optional dedupe key (payment_id) so re-fires don't duplicate. */
+  paymentId?: string | null;
 };
 
 function methodLabel(method: TakePaymentReceiptArgs["paymentMethod"]) {
@@ -46,21 +45,7 @@ function categoryLabel(category: string | null) {
 }
 
 export async function sendTakePaymentReceipt(args: TakePaymentReceiptArgs) {
-  const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) {
-    console.warn(
-      "RESEND_API_KEY not set; skipping take-payment receipt to",
-      args.toEmail,
-    );
-    return { sent: false };
-  }
   if (!args.toEmail) return { sent: false };
-
-  const from = lodgePayFromEmail(
-    process.env.RESEND_FROM_EMAIL ??
-      process.env.EMAIL_FROM ??
-      "LodgePay <noreply@lodgepayments.co.uk>",
-  );
 
   let lodgeName = "your lodge";
   if (args.lodgeId) {
@@ -103,17 +88,25 @@ export async function sendTakePaymentReceipt(args: TakePaymentReceiptArgs) {
       "If anything looks wrong on this receipt, please reply to this email or contact your lodge treasurer.",
   });
 
-  const resend = new Resend(resendKey);
-  const { error } = await resend.emails.send({
-    from,
-    to: args.toEmail,
+  const result = await sendWithLog({
+    lodgeId: args.lodgeId ?? null,
+    toEmail: args.toEmail,
+    toName: args.toName,
+    emailType: "payment_receipt_take_payment",
+    entityType: "payment",
+    entityId: args.paymentId ?? null,
+    dedupeKey: args.paymentId,
     subject: `Receipt: ${amountString} to ${lodgeName}`,
     html,
     text: `${paragraphs.join("\n\n")}\n`,
+    metadata: {
+      amount_major: args.amountMajor,
+      currency: args.currency,
+      category: args.category,
+      method: args.paymentMethod,
+      gift_aid_eligible: args.giftAidEligible,
+    },
   });
-  if (error) {
-    console.error("Take-payment receipt error:", error);
-    return { sent: false };
-  }
-  return { sent: true };
+
+  return { sent: result.ok };
 }

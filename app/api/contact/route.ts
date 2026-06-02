@@ -3,8 +3,9 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getLodgeSlugFromRequest } from "@/lib/tenant";
-import { lodgePayFromEmail, renderSimpleMessageEmail } from "@/lib/email/templates";
+import { renderSimpleMessageEmail } from "@/lib/email/templates";
 import { sendWebsiteNotification } from "@/lib/email/website-notifications";
+import { sendWithLog } from "@/lib/email/send-with-log";
 import { getLodgeAdminNotificationRecipients } from "@/lib/email/website-recipients";
 import type { LodgeSiteSectionStyle } from "@/lib/db/types";
 import {
@@ -109,22 +110,26 @@ export async function POST(request: NextRequest) {
       recipients,
     });
 
-    const resendKey = process.env.RESEND_API_KEY;
-    if (resendKey) {
-      const { Resend } = await import("resend");
-      const resend = new Resend(resendKey);
-      const from = lodgePayFromEmail(process.env.EMAIL_FROM);
-
-      await resend.emails.send({
-        from,
-        to: email,
+    if (process.env.RESEND_API_KEY) {
+      await sendWithLog({
+        lodgeId: null,
+        toEmail: email,
+        toName: name,
+        emailType: "contact_form_autoresponder",
+        entityType: "contact_form",
+        entityId: null,
+        dedupeKey: null,
         replyTo: CONTACT_NOTIFICATION_EMAIL,
-        subject: formStyle?.form_autoresponder_subject || (isTenantMode
-          ? `We have received your enquiry for ${responderName}`
-          : "We have received your LodgePay enquiry"),
+        subject:
+          formStyle?.form_autoresponder_subject ||
+          (isTenantMode
+            ? `We have received your enquiry for ${responderName}`
+            : "We have received your LodgePay enquiry"),
         html: renderSimpleMessageEmail({
           eyebrow: "Enquiry received",
-          title: isTenantMode ? "Thanks for getting in touch" : "Thanks for contacting LodgePay",
+          title: isTenantMode
+            ? "Thanks for getting in touch"
+            : "Thanks for contacting LodgePay",
           preview: isTenantMode
             ? "Your message has reached the lodge."
             : "Your message has reached the LodgePay team.",
@@ -132,8 +137,8 @@ export async function POST(request: NextRequest) {
           paragraphs: [
             formStyle?.form_autoresponder_body ||
               (isTenantMode
-              ? `Thank you for getting in touch. Your message has reached ${responderName} and we will reply as soon as we can.`
-              : "Thank you for getting in touch. Your message has reached the LodgePay team and we will reply as soon as we can."),
+                ? `Thank you for getting in touch. Your message has reached ${responderName} and we will reply as soon as we can.`
+                : "Thank you for getting in touch. Your message has reached the LodgePay team and we will reply as soon as we can."),
             isTenantMode
               ? "If your enquiry is about visiting or membership, please include any dates or context that would help the lodge respond."
               : "If your enquiry is about a product walkthrough, we will come back with a practical next step based on your lodge or group.",

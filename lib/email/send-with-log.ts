@@ -18,6 +18,7 @@
 import { Resend } from "resend";
 import * as db from "@/lib/db";
 import { lodgePayFromEmail } from "@/lib/email/templates";
+import { memberWantsEmail } from "@/lib/email/preferences";
 
 export type SendWithLogArgs = {
   /** Lodge owning this send (NULL for platform-wide messages). */
@@ -51,6 +52,12 @@ export type SendWithLogArgs = {
 
   /** Anything you'd like searchable on the email_log row. */
   metadata?: Record<string, unknown>;
+
+  /** Optional reply-to (e.g. lodge.email when present). */
+  replyTo?: string | null;
+
+  /** Extra BCC addresses on top of the platform debug BCC. */
+  bcc?: string | string[] | null;
 };
 
 export type SendWithLogResult =
@@ -63,8 +70,34 @@ const FROM_ENV =
   process.env.EMAIL_FROM ??
   "LodgePay <noreply@lodgepayments.co.uk>";
 
+/**
+ * Comma-separated list of BCC addresses applied to every send.
+ * Defaults to the LodgePay QA inbox so we always have an audit
+ * mirror; set EMAIL_DEBUG_BCC="" in env to disable.
+ */
+const DEBUG_BCC =
+  process.env.EMAIL_DEBUG_BCC ?? "ag@experrt.com";
+
 function buildFrom() {
   return lodgePayFromEmail(FROM_ENV);
+}
+
+function buildBcc(extraBcc: string | string[] | null | undefined): string[] {
+  const out = new Set<string>();
+  if (DEBUG_BCC) {
+    for (const part of DEBUG_BCC.split(",")) {
+      const trimmed = part.trim();
+      if (trimmed) out.add(trimmed);
+    }
+  }
+  if (extraBcc) {
+    const list = Array.isArray(extraBcc) ? extraBcc : [extraBcc];
+    for (const part of list) {
+      const trimmed = (part ?? "").trim();
+      if (trimmed) out.add(trimmed);
+    }
+  }
+  return Array.from(out);
 }
 
 export async function sendWithLog(args: SendWithLogArgs): Promise<SendWithLogResult> {
@@ -110,9 +143,39 @@ export async function sendWithLog(args: SendWithLogArgs): Promise<SendWithLogRes
     }
   }
 
+  // Per-member opt-out. Critical alerts always pass through;
+  // optional sends are suppressed when the member has explicitly
+  // turned them off in their preferences.
+  if (args.memberId) {
+    const wantsIt = await memberWantsEmail(args.memberId, args.emailType);
+    if (!wantsIt) {
+      // Persist a "skipped" row so the audit trail still shows we
+      // would have sent and consciously didn't.
+      await db
+        .recordEmailLog({
+          lodge_id: args.lodgeId,
+          to_email: args.toEmail,
+          member_id: args.memberId,
+          admin_user_id: args.adminUserId ?? null,
+          email_type: args.emailType,
+          entity_type: args.entityType ?? null,
+          entity_id: args.entityId ?? null,
+          dedupe_key: args.dedupeKey ?? null,
+          subject: args.subject,
+          resend_message_id: null,
+          status: "skipped_optout",
+          error: null,
+          metadata: { ...(args.metadata ?? {}), to_name: args.toName ?? null },
+        })
+        .catch(() => null);
+      return { ok: true, deduped: true };
+    }
+  }
+
   const resend = new Resend(apiKey);
   let resendId: string | null = null;
   let sendError: string | null = null;
+  const bccList = buildBcc(args.bcc ?? null);
   try {
     const { data, error } = await resend.emails.send({
       from: buildFrom(),
@@ -120,6 +183,8 @@ export async function sendWithLog(args: SendWithLogArgs): Promise<SendWithLogRes
       subject: args.subject,
       html: args.html,
       ...(args.text ? { text: args.text } : {}),
+      ...(args.replyTo ? { replyTo: args.replyTo } : {}),
+      ...(bccList.length > 0 ? { bcc: bccList } : {}),
     });
     if (error) {
       sendError = error.message ?? String(error);

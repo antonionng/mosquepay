@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  lodgePayFromEmail,
   renderNotificationEmail,
   renderSimpleMessageEmail,
 } from "@/lib/email/templates";
+import { sendWithLog } from "@/lib/email/send-with-log";
 
 const CONTACT_NOTIFICATION_EMAIL = "ag@experrt.com";
 
@@ -24,17 +24,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const resendKey = process.env.RESEND_API_KEY;
-    if (resendKey) {
-      const { Resend } = await import("resend");
-      const resend = new Resend(resendKey);
-      const from = lodgePayFromEmail(process.env.EMAIL_FROM);
+    if (process.env.RESEND_API_KEY) {
       const safeLodgeCount = String(Number.isFinite(lodge_count) ? lodge_count : 1);
 
       await Promise.all([
-        resend.emails.send({
-          from,
-          to: CONTACT_NOTIFICATION_EMAIL,
+        sendWithLog({
+          lodgeId: null,
+          toEmail: CONTACT_NOTIFICATION_EMAIL,
+          emailType: "demo_request_team",
+          entityType: "demo_request",
+          entityId: null,
+          dedupeKey: null,
           replyTo: work_email,
           subject: `[LodgePay demo request] ${lodge_name}`,
           html: renderNotificationEmail({
@@ -47,10 +47,7 @@ export async function POST(request: NextRequest) {
               { label: "Email", value: work_email },
               { label: "Lodge", value: lodge_name },
               { label: "Role", value: role },
-              {
-                label: "Lodges managed",
-                value: safeLodgeCount,
-              },
+              { label: "Lodges managed", value: safeLodgeCount },
             ],
             message: priorities || "No priorities provided.",
           }),
@@ -64,10 +61,20 @@ export async function POST(request: NextRequest) {
             "Priorities:",
             priorities || "Not provided",
           ].join("\n"),
+          metadata: {
+            lodge_name,
+            role,
+            lodge_count: safeLodgeCount,
+          },
         }),
-        resend.emails.send({
-          from,
-          to: work_email,
+        sendWithLog({
+          lodgeId: null,
+          toEmail: work_email,
+          toName: full_name,
+          emailType: "demo_request_autoresponder",
+          entityType: "demo_request",
+          entityId: null,
+          dedupeKey: null,
           replyTo: CONTACT_NOTIFICATION_EMAIL,
           subject: "We have received your LodgePay demo request",
           html: renderSimpleMessageEmail({
@@ -98,4 +105,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Something went wrong." }, { status: 500 });
   }
 }
-

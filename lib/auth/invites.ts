@@ -1,14 +1,13 @@
 import { NextRequest } from "next/server";
-import { Resend } from "resend";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import * as db from "@/lib/db";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
-  lodgePayFromEmail,
   renderMemberInviteEmail,
   renderPasswordResetEmail,
   renderStaffInviteEmail,
 } from "@/lib/email/templates";
+import { sendWithLog } from "@/lib/email/send-with-log";
 
 const PRODUCTION_SITE_URL = "https://lodgepayments.co.uk";
 
@@ -117,16 +116,6 @@ export async function sendStaffInvite({
   staff: db.AdminUser;
   lodgeName: string;
 }): Promise<{ sent: boolean; error: string | null }> {
-  const resendKey = process.env.RESEND_API_KEY;
-  const from = lodgePayFromEmail(
-    process.env.RESEND_FROM_EMAIL ??
-    process.env.EMAIL_FROM ??
-    "LodgePay <noreply@lodgepayments.co.uk>"
-  );
-  if (!resendKey) {
-    return { sent: false, error: "Resend is not configured." };
-  }
-
   const baseUrl = getBaseUrl(request);
   const redirectTo = `${baseUrl}/admin/accept-invite`;
   const supabase = createServiceClient();
@@ -162,12 +151,17 @@ export async function sendStaffInvite({
     };
   }
 
-  const resend = new Resend(resendKey);
   const roleLabel = staff.role.replaceAll("_", " ");
   const actionLabel = isFirstInvite ? "Accept invite" : "Reset password";
-  const { error: resendError } = await resend.emails.send({
-    from,
-    to: staff.email,
+  const result = await sendWithLog({
+    lodgeId: staff.lodge_id ?? null,
+    toEmail: staff.email,
+    toName: staff.full_name,
+    adminUserId: staff.id,
+    emailType: "staff_invite",
+    entityType: "admin_user",
+    entityId: staff.id,
+    dedupeKey: null,
     subject: "You have been invited to LodgePay",
     html: renderStaffInviteEmail({
       name: staff.full_name,
@@ -177,21 +171,13 @@ export async function sendStaffInvite({
       actionLabel,
     }),
     text: `Hello ${staff.full_name},\n\nYou have been invited to LodgePay with ${roleLabel} access for ${lodgeName}.\n\nSet your password here: ${data.properties.action_link}\n`,
+    metadata: { is_first_invite: isFirstInvite, role: staff.role },
   });
 
-  if (resendError) {
-    return { sent: false, error: resendError.message };
+  if (!result.ok) {
+    return { sent: false, error: result.error };
   }
-
   return { sent: true, error: null };
-}
-
-function resendFromAddress() {
-  return lodgePayFromEmail(
-    process.env.RESEND_FROM_EMAIL ??
-    process.env.EMAIL_FROM ??
-    "LodgePay <noreply@lodgepayments.co.uk>"
-  );
 }
 
 /**
@@ -218,11 +204,6 @@ async function sendPasswordResetEmail({
   redirectTo: string;
   lodgeName: string | null;
 }): Promise<{ sent: boolean; error: string | null }> {
-  const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) {
-    return { sent: false, error: "Resend is not configured." };
-  }
-
   const supabase = createServiceClient();
   const { data, error } = await supabase.auth.admin.generateLink({
     type: "recovery",
@@ -236,14 +217,19 @@ async function sendPasswordResetEmail({
     };
   }
 
-  const resend = new Resend(resendKey);
   const subject =
     audience === "admin"
       ? "Reset your LodgePay admin password"
       : "Reset your LodgePay member portal password";
-  const { error: resendError } = await resend.emails.send({
-    from: resendFromAddress(),
-    to: email,
+  const result = await sendWithLog({
+    lodgeId: null,
+    toEmail: email,
+    toName: recipientName,
+    emailType:
+      audience === "admin" ? "staff_password_reset" : "member_password_reset",
+    entityType: "auth_user",
+    entityId: email.toLowerCase(),
+    dedupeKey: null,
     subject,
     html: renderPasswordResetEmail({
       name: recipientName,
@@ -252,10 +238,11 @@ async function sendPasswordResetEmail({
       lodgeName,
     }),
     text: `Hello ${recipientName},\n\nReset your LodgePay ${audience === "admin" ? "admin" : "member portal"} password here: ${data.properties.action_link}\n\nIf you did not request this, you can ignore this email.\n`,
+    metadata: { audience, lodge_name: lodgeName },
   });
 
-  if (resendError) {
-    return { sent: false, error: resendError.message };
+  if (!result.ok) {
+    return { sent: false, error: result.error };
   }
   return { sent: true, error: null };
 }
@@ -399,16 +386,6 @@ export async function sendMemberInvite({
   member: db.Member;
   lodgeName: string;
 }): Promise<{ sent: boolean; error: string | null }> {
-  const resendKey = process.env.RESEND_API_KEY;
-  const from = lodgePayFromEmail(
-    process.env.RESEND_FROM_EMAIL ??
-    process.env.EMAIL_FROM ??
-    "LodgePay <noreply@lodgepayments.co.uk>"
-  );
-  if (!resendKey) {
-    return { sent: false, error: "Resend is not configured." };
-  }
-
   const baseUrl = getBaseUrl(request);
   const redirectTo = `${baseUrl}/member/accept-invite`;
   const supabase = createServiceClient();
@@ -446,13 +423,18 @@ export async function sendMemberInvite({
     };
   }
 
-  const resend = new Resend(resendKey);
   const actionLabel = isFirstInvite
     ? "Activate member portal"
     : "Reset portal access";
-  const { error: resendError } = await resend.emails.send({
-    from,
-    to: member.email,
+  const result = await sendWithLog({
+    lodgeId: member.lodge_id,
+    toEmail: member.email,
+    toName: member.full_name,
+    memberId: member.id,
+    emailType: "member_invite",
+    entityType: "member",
+    entityId: member.id,
+    dedupeKey: null,
     subject: "Your LodgePay member portal invite",
     html: renderMemberInviteEmail({
       name: member.full_name,
@@ -461,11 +443,11 @@ export async function sendMemberInvite({
       actionLabel,
     }),
     text: `Hello ${member.full_name},\n\nYou have been invited to access the LodgePay member portal for ${lodgeName}.\n\nSet your password here: ${data.properties.action_link}\n`,
+    metadata: { is_first_invite: isFirstInvite },
   });
 
-  if (resendError) {
-    return { sent: false, error: resendError.message };
+  if (!result.ok) {
+    return { sent: false, error: result.error };
   }
-
   return { sent: true, error: null };
 }

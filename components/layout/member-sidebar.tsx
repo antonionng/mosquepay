@@ -17,6 +17,7 @@ import {
   X,
   IdCard,
   UserPlus,
+  Bell,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -28,6 +29,7 @@ const nav = [
   { href: "/member/dues", label: "Dues", icon: Wallet },
   { href: "/member/donations", label: "Donations", icon: Heart },
   { href: "/member/card", label: "My card", icon: IdCard },
+  { href: "/member/notifications", label: "Notifications", icon: Bell },
   { href: "/member/profile", label: "Profile", icon: User },
 ];
 

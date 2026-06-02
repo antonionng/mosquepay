@@ -1,5 +1,6 @@
 import type { Lodge } from "@/lib/db/types";
-import { lodgePayFromEmail, renderNotificationEmail } from "@/lib/email/templates";
+import { renderNotificationEmail } from "@/lib/email/templates";
+import { sendWithLog } from "@/lib/email/send-with-log";
 
 const CONTACT_NOTIFICATION_EMAIL = "ag@experrt.com";
 
@@ -43,38 +44,47 @@ export async function sendWebsiteNotification({
   message,
   recipients,
 }: WebsiteNotificationInput) {
-  const resendKey = process.env.RESEND_API_KEY;
   const to = notificationRecipients(lodge, recipients);
-  if (!resendKey) {
-    return { sent: false, to, reason: "Resend not configured." };
-  }
-
-  const { Resend } = await import("resend");
-  const resend = new Resend(resendKey);
   const safeRows = rows
     .filter((row) => row.value)
     .map((row) => ({ label: row.label, value: String(row.value) }));
 
-  await resend.emails.send({
-    from: lodgePayFromEmail(process.env.EMAIL_FROM),
-    to,
-    replyTo: replyTo?.trim() || undefined,
-    subject,
-    html: renderNotificationEmail({
-      eyebrow,
-      title,
-      preview,
-      intro,
-      rows: [
-        { label: "Lodge", value: lodge?.name ?? "Selected lodge" },
-        ...safeRows,
-      ],
-      message: message?.trim() || undefined,
-    }),
-    text: `${title}\n\nLodge: ${lodge?.name ?? "Selected lodge"}\n${plainRows(rows)}${
-      message ? `\n\n${message}` : ""
-    }`,
+  const html = renderNotificationEmail({
+    eyebrow,
+    title,
+    preview,
+    intro,
+    rows: [
+      { label: "Lodge", value: lodge?.name ?? "Selected lodge" },
+      ...safeRows,
+    ],
+    message: message?.trim() || undefined,
   });
+  const text = `${title}\n\nLodge: ${lodge?.name ?? "Selected lodge"}\n${plainRows(rows)}${
+    message ? `\n\n${message}` : ""
+  }`;
 
-  return { sent: true, to };
+  // sendWithLog only takes a single primary recipient. For multi-
+  // recipient notifications we send one email per recipient so each
+  // gets its own audit row and BCC mirror.
+  const results = await Promise.all(
+    to.map((addr) =>
+      sendWithLog({
+        lodgeId: null,
+        toEmail: addr,
+        emailType: "website_notification",
+        entityType: "lodge",
+        entityId: null,
+        dedupeKey: null,
+        subject,
+        html,
+        text,
+        replyTo: replyTo?.trim() || null,
+        metadata: { lodge_name: lodge?.name ?? null, eyebrow },
+      }),
+    ),
+  );
+
+  const sentAll = results.every((r) => r.ok);
+  return { sent: sentAll, to };
 }

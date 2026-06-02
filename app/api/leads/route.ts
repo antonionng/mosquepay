@@ -6,7 +6,8 @@ import * as mockDb from "@/lib/mock-db";
 import { getLodgeSlugFromRequest } from "@/lib/tenant";
 import { sendWebsiteNotification } from "@/lib/email/website-notifications";
 import { getLodgeAdminNotificationRecipients } from "@/lib/email/website-recipients";
-import { lodgePayFromEmail, renderSimpleMessageEmail } from "@/lib/email/templates";
+import { renderSimpleMessageEmail } from "@/lib/email/templates";
+import { sendWithLog } from "@/lib/email/send-with-log";
 import type { LodgeSiteSectionStyle } from "@/lib/db/types";
 import {
   parseRecipientList,
@@ -64,26 +65,32 @@ async function sendLeadAutoReply({
   lodgeName,
   replyTo,
   style,
+  lodgeId,
 }: {
   to: string;
   name: string;
   lodgeName: string;
   replyTo?: string | null;
   style: LodgeSiteSectionStyle | null;
+  lodgeId: string | null;
 }) {
-  const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) return;
-  const { Resend } = await import("resend");
-  const resend = new Resend(resendKey);
+  if (!process.env.RESEND_API_KEY) return;
   const body =
     style?.form_autoresponder_body ||
     `Thank you for your enquiry. Your details have reached ${lodgeName} and the lodge will be in touch.`;
 
-  await resend.emails.send({
-    from: lodgePayFromEmail(process.env.EMAIL_FROM),
-    to,
-    replyTo: replyTo || undefined,
-    subject: style?.form_autoresponder_subject || `We received your enquiry for ${lodgeName}`,
+  await sendWithLog({
+    lodgeId,
+    toEmail: to,
+    toName: name,
+    emailType: "lead_autoresponder",
+    entityType: "lead",
+    entityId: null,
+    dedupeKey: null,
+    replyTo: replyTo || null,
+    subject:
+      style?.form_autoresponder_subject ||
+      `We received your enquiry for ${lodgeName}`,
     html: renderSimpleMessageEmail({
       eyebrow: "Enquiry received",
       title: "Thanks for your interest",
@@ -92,6 +99,7 @@ async function sendLeadAutoReply({
       paragraphs: [body],
     }),
     text: `Hello ${name},\n\n${body}`,
+    metadata: { lodge_name: lodgeName },
   });
 }
 
@@ -200,6 +208,7 @@ export async function POST(request: NextRequest) {
         lodgeName: lodge.name,
         replyTo: lodge.support_email,
         style: formStyle,
+        lodgeId: lodge.id,
       });
       return NextResponse.json({ id: lead.id, success: true });
     }
@@ -267,6 +276,7 @@ export async function POST(request: NextRequest) {
       lodgeName: lodge.name,
       replyTo: lodge.support_email,
       style: formStyle,
+      lodgeId: null,
     });
 
     return NextResponse.json({ id: lead.id, success: true });

@@ -18,9 +18,7 @@
 // captures every send and the dedupe index protects against Mooov
 // redelivers.
 
-import * as db from "@/lib/db";
 import {
-  escapeEmailHtml,
   renderSimpleMessageEmail,
   renderNotificationEmail,
 } from "@/lib/email/templates";
@@ -31,7 +29,6 @@ import type {
   Lodge,
   Member,
   MemberDues,
-  MemberDuesInstalment,
 } from "@/lib/db/types";
 
 function formatGbp(amountMajor: number, currency = "GBP") {
@@ -58,19 +55,6 @@ function siteUrl() {
 
 function memberPortalUrl() {
   return `${siteUrl()}/member/dues`;
-}
-
-function adminScheduleUrl(scheduleId: string) {
-  return `${siteUrl()}/admin/dues/schedules#${scheduleId}`;
-}
-
-function adminMemberUrl(memberId: string) {
-  return `${siteUrl()}/admin/members/${memberId}`;
-}
-
-function cadenceLabel(cadence: string | null | undefined): string {
-  if (cadence === "quarterly") return "quarter";
-  return "month";
 }
 
 function cadenceAdverb(cadence: string | null | undefined): string {
@@ -102,7 +86,6 @@ export async function notifyDuesSubscriptionActivated({
 }) {
   const lodgeName = lodge?.name ?? "your lodge";
   const currency = (duesRecord.currency || "GBP").toUpperCase();
-  const cycle = cadenceLabel(schedule.cadence);
   const cycleAdverb = cadenceAdverb(schedule.cadence);
   const cycleAmountStr = formatGbp(cycleAmount, currency);
   const annualStr = formatGbp(duesRecord.amount, currency);
@@ -569,10 +552,5 @@ export async function notifyDuesMethodChanged({
 export const __email_helpers_for_test__ = {
   formatGbp,
   formatDate,
-  cadenceLabel,
   cadenceAdverb,
 };
-
-// Suppress unused-import warning for escapeEmailHtml; reserved for
-// future templates that paste user-controlled content.
-void escapeEmailHtml;

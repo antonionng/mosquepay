@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import {
-  lodgePayFromEmail,
-  renderInitiationDuesEmail,
-} from "@/lib/email/templates";
+import { renderInitiationDuesEmail } from "@/lib/email/templates";
+import { sendWithLog } from "@/lib/email/send-with-log";
 
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
@@ -24,11 +22,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: "No database configured, skipping." });
   }
 
-  const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) {
-    return NextResponse.json({ message: "Resend not configured, skipping." });
-  }
-
   try {
     const today = new Date().toISOString().split("T")[0];
     const membersToNotify = await db.getMembersForInitiation(today);
@@ -37,10 +30,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: "No initiations today.", sent: 0 });
     }
 
-    const { Resend } = await import("resend");
-    const resend = new Resend(resendKey);
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-    const fromEmail = lodgePayFromEmail(process.env.EMAIL_FROM);
     let sent = 0;
 
     for (const member of membersToNotify) {
@@ -58,24 +48,35 @@ export async function GET(request: NextRequest) {
           ? `${siteUrl}/dues/${dues[0].id}?email=${encodeURIComponent(member.email)}&lodge=${encodeURIComponent(lodgeSlug)}`
           : `${siteUrl}/member/dues?lodge=${encodeURIComponent(lodgeSlug)}`;
 
-      try {
-        await resend.emails.send({
-          from: fromEmail,
-          to: member.email,
-          subject: "Welcome: Your Membership Fees Payment",
-          html: renderInitiationDuesEmail({
-            memberName: member.full_name,
-            duesAmount,
-            paymentUrl,
-          }),
-        });
+      const result = await sendWithLog({
+        lodgeId,
+        toEmail: member.email,
+        toName: member.full_name,
+        memberId: member.id,
+        emailType: "initiation_dues_member",
+        entityType: "member",
+        entityId: member.id,
+        // Idempotent on member.id so a retry doesn't send a second
+        // welcome — initiation_email_sent flips to true on success.
+        dedupeKey: `initiation_${member.id}`,
+        subject: "Welcome: Your Membership Fees Payment",
+        html: renderInitiationDuesEmail({
+          memberName: member.full_name,
+          duesAmount,
+          paymentUrl,
+        }),
+        metadata: { lodge_slug: lodgeSlug, dues_id: dues[0]?.id ?? null },
+      });
 
+      if (result.ok) {
         await db.updateMember(member.id, lodgeId, {
           initiation_email_sent: true,
         });
         sent++;
-      } catch (emailErr) {
-        console.error(`Failed to send initiation email to ${member.email}:`, emailErr);
+      } else {
+        console.error(
+          `Failed to send initiation email to ${member.email}: ${result.error}`,
+        );
       }
     }
 

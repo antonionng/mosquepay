@@ -1,9 +1,6 @@
-import { Resend } from "resend";
 import { formatDate } from "@/lib/utils";
-import {
-  lodgePayFromEmail,
-  renderSimpleMessageEmail,
-} from "@/lib/email/templates";
+import { renderSimpleMessageEmail } from "@/lib/email/templates";
+import { sendWithLog } from "@/lib/email/send-with-log";
 
 type WinePledgeConfirmationArgs = {
   toEmail: string;
@@ -15,6 +12,9 @@ type WinePledgeConfirmationArgs = {
   location: string | null;
   bottles: number;
   note: string | null;
+  lodgeId?: string | null;
+  eventId?: string | null;
+  memberId?: string | null;
 };
 
 /**
@@ -26,22 +26,8 @@ type WinePledgeConfirmationArgs = {
 export async function sendWinePledgeConfirmationEmail(
   args: WinePledgeConfirmationArgs
 ) {
-  const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) {
-    console.warn(
-      "RESEND_API_KEY not set; skipping wine pledge email to",
-      args.toEmail
-    );
-    return { sent: false };
-  }
   if (!args.toEmail) return { sent: false };
   if (args.bottles < 1) return { sent: false };
-
-  const from = lodgePayFromEmail(
-    process.env.RESEND_FROM_EMAIL ??
-      process.env.EMAIL_FROM ??
-      "LodgePay <noreply@lodgepayments.co.uk>"
-  );
 
   const bottleLabel = args.bottles === 1 ? "1 bottle" : `${args.bottles} bottles`;
 
@@ -75,17 +61,26 @@ export async function sendWinePledgeConfirmationEmail(
 
   const text = `${paragraphs.join("\n\n")}\n`;
 
-  const resend = new Resend(resendKey);
-  const { error } = await resend.emails.send({
-    from,
-    to: args.toEmail,
+  const result = await sendWithLog({
+    lodgeId: args.lodgeId ?? null,
+    toEmail: args.toEmail,
+    toName: args.toName,
+    memberId: args.memberId ?? null,
+    emailType: "wine_pledge_thanks_member",
+    entityType: "event",
+    entityId: args.eventId ?? null,
+    dedupeKey: args.eventId
+      ? `wine_${args.eventId}_${args.toEmail.toLowerCase()}`
+      : null,
     subject: `Wine pledge confirmed: ${args.eventTitle}`,
     html,
     text,
+    metadata: {
+      lodge_name: args.lodgeName,
+      event_title: args.eventTitle,
+      bottles: args.bottles,
+    },
   });
-  if (error) {
-    console.error("Wine pledge email error:", error);
-    return { sent: false };
-  }
-  return { sent: true };
+
+  return { sent: result.ok };
 }
