@@ -20,10 +20,26 @@ export type TreasurerRecipient = {
   adminUserId: string | null;
 };
 
+/**
+ * Every admin role that can be considered for finance / membership
+ * notifications. Treasurer + secretary are the obvious ones; we also
+ * include master and the wider officer ladder so a lodge that has
+ * delegated visibility (e.g. an almoner who tracks subscriptions for
+ * pastoral context, or the charity steward when charitable Gift Aid
+ * is involved) doesn't have to chase a treasurer for an update.
+ *
+ * This is the broad "could be notified" gate; per-event muting is
+ * handled in lodge_notification_settings via the admin Settings UI.
+ */
 const ADMIN_NOTIFY_ROLES = new Set<string>([
   "treasurer",
   "secretary",
+  "master",
+  "charity_steward",
+  "membership_officer",
+  "almoner",
   "super_admin",
+  "operator",
   "platform_owner",
 ]);
 

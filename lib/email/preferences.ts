@@ -222,7 +222,7 @@ export const ADMIN_NOTIFICATION_EVENTS: Array<{
     eventType: "dues_subscription_activated",
     label: "New dues subscription",
     description:
-      "When a member sets up a new subscription. Useful for treasurer awareness.",
+      "When a member sets up a new subscription. Useful for treasurer / secretary awareness.",
   },
   {
     eventType: "dues_subscription_invoice_failed",
@@ -236,14 +236,42 @@ export const ADMIN_NOTIFICATION_EVENTS: Array<{
     description:
       "When a member or system cancels a subscription. Useful for follow-up.",
   },
+  {
+    eventType: "dues_method_changed_bacs",
+    label: "Member marked as BACS payer",
+    description:
+      "When a treasurer records that a member is paying dues by BACS standing order. Other officers see who set the tag and the agreed monthly amount.",
+  },
+  {
+    eventType: "dues_method_changed_paid_in_full",
+    label: "Member dues paid in full",
+    description:
+      "When a treasurer marks dues paid in full off-platform (cash / cheque). Keeps the rest of the admin team in sync.",
+  },
+  {
+    eventType: "dues_method_changed_fee_waived",
+    label: "Member fee waived",
+    description:
+      "When an admin waives this year's dues for a member. Sensitive — secretaries / almoners typically want to know.",
+  },
 ];
 
+/**
+ * Roles offered in the admin notifications settings UI. Mirrors
+ * ADMIN_NOTIFY_ROLES in lib/email/recipients.ts. The 'platform_owner'
+ * scope is intentionally excluded — that's the LodgePay vendor and
+ * we don't expose them as a per-lodge toggle.
+ */
 export const ADMIN_NOTIFICATION_ROLES: Array<{
   role: string;
   label: string;
 }> = [
   { role: "treasurer", label: "Treasurer" },
   { role: "secretary", label: "Secretary" },
+  { role: "master", label: "Master" },
+  { role: "charity_steward", label: "Charity steward" },
+  { role: "membership_officer", label: "Membership officer" },
+  { role: "almoner", label: "Almoner" },
   { role: "super_admin", label: "Super admin" },
 ];
 

@@ -546,6 +546,82 @@ export async function notifyDuesMethodChanged({
       set_by: setBy,
     },
   });
+
+  // Fan-out to the admin team so other officers see when one
+  // treasurer / secretary tags a member off-platform. The receiving
+  // role can mute the specific event in the Settings -> Notifications
+  // tab if it's too chatty for them.
+  const treasurers = await resolveTreasurerRecipients(
+    lodgeId,
+    `dues_method_changed_${method}`,
+  );
+  // Don't email the admin who just performed the action -- they
+  // already know.
+  const setByEmail = (setBy ?? "").toLowerCase();
+  const adminRecipients = treasurers.filter(
+    (t) => t.email.toLowerCase() !== setByEmail,
+  );
+  if (adminRecipients.length === 0) return;
+
+  const adminTitle =
+    method === "bacs"
+      ? `${member.full_name} marked as BACS payer`
+      : method === "paid_in_full"
+        ? `${member.full_name} marked paid in full`
+        : `${member.full_name}'s dues waived`;
+  const adminRows: Array<{ label: string; value: string }> = [
+    { label: "Member", value: `${member.full_name} (${member.email})` },
+    {
+      label: "Annual amount",
+      value: annualStr + (yearLabel ? ` (${yearLabel})` : ""),
+    },
+  ];
+  if (method === "bacs" && bacsMonthlyAmount != null) {
+    adminRows.push({
+      label: "Monthly amount",
+      value: formatGbp(bacsMonthlyAmount, "GBP"),
+    });
+  }
+  if (method === "bacs" && bacsReference) {
+    adminRows.push({ label: "Reference", value: bacsReference });
+  }
+  if (method === "fee_waived" && waiverReason) {
+    adminRows.push({ label: "Reason", value: waiverReason });
+  }
+  adminRows.push({ label: "Set by", value: setBy ?? "—" });
+
+  const adminHtml = renderNotificationEmail({
+    eyebrow: "Dues update",
+    title: adminTitle,
+    preview: adminTitle,
+    intro: `Recorded against ${lodgeName} — keeping the admin team in sync.`,
+    rows: adminRows,
+    message:
+      "Manage this member's dues method or undo from the admin members page.",
+  });
+
+  for (const t of adminRecipients) {
+    await sendWithLog({
+      lodgeId,
+      toEmail: t.email,
+      toName: t.fullName,
+      adminUserId: t.adminUserId,
+      emailType: `dues_method_changed_${method}_admin`,
+      entityType: "member_dues",
+      entityId: duesRecord.id,
+      dedupeKey: null,
+      subject: adminTitle,
+      html: adminHtml,
+      metadata: {
+        method,
+        member_id: member.id,
+        bacs_monthly_amount: bacsMonthlyAmount,
+        bacs_reference: bacsReference,
+        waiver_reason: waiverReason,
+        set_by: setBy,
+      },
+    });
+  }
 }
 
 // Used by the receipts module too.
