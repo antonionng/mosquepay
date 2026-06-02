@@ -28,6 +28,7 @@ export function getLodgeSlugFromHost(host?: string | null): string | null {
   if (!host) return null;
   const hostname = host.split(":")[0]?.toLowerCase();
   if (!hostname || hostname === "localhost") return null;
+  if (hostname === "vercel.app" || hostname.endsWith(".vercel.app")) return null;
   const parts = hostname.split(".");
   if (parts.length < 3) return null;
   const subdomain = parts[0];

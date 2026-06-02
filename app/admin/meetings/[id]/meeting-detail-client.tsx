@@ -1628,12 +1628,27 @@ function MoneyRaisedCard({
   const { meeting, lodgeAllTime, currency } = finance;
   const hasMeetingActivity =
     meeting.succeededCount > 0 || meeting.pendingCount > 0;
+  // Money taken against this meeting that wasn't tagged to a specific
+  // bucket (take-payment / cash logged under "general" or any category the
+  // meeting doesn't have switched on) lives only in total_amount. Surface
+  // it as its own row so the treasurer can see where the rest of the
+  // headline total went instead of it silently disappearing.
+  const categorisedTotal =
+    meeting.meetingFee +
+    meeting.dining +
+    meeting.guestTicket +
+    meeting.charity +
+    meeting.raffle;
+  // succeededTotal is already net of refunds; the per-bucket figures are
+  // gross, so clamp at zero to stay safe when a refund has been applied.
+  const uncategorised = Math.max(0, meeting.succeededTotal - categorisedTotal);
   const breakdownAll: Array<[string, number, boolean]> = [
     ["Meeting fee", meeting.meetingFee, enabled.meetingFee],
     ["Dining", meeting.dining, enabled.dining],
     ["Guest tickets", meeting.guestTicket, enabled.guestTicket],
     ["Charity", meeting.charity, enabled.charity],
     ["Raffle", meeting.raffle, enabled.raffle],
+    ["General", uncategorised, uncategorised > 0],
   ];
   // Show every bucket that is either enabled on the event OR has money
   // sitting against it (defensive against legacy data). This way the

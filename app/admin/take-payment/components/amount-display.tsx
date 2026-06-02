@@ -14,11 +14,15 @@ export function AmountDisplay({
   setAmount,
   label,
   ariaLabel,
+  readOnly,
 }: {
   amount: string;
   setAmount: React.Dispatch<React.SetStateAction<string>>;
   label: string;
   ariaLabel?: string;
+  /** Itemised mode: the amount is the computed basket total, so we hide the
+   *  +/- adjusters and Clear and show the figure as read-only. */
+  readOnly?: boolean;
 }) {
   const displayAmount = useMemo(() => {
     if (!amount) return "0.00";
@@ -68,6 +72,11 @@ export function AmountDisplay({
           {displayAmount}
         </span>
       </div>
+      {readOnly ? (
+        <p className="mt-2 text-center text-[11px] font-medium uppercase tracking-wide text-slate-400">
+          Itemised total
+        </p>
+      ) : (
       <div className="mt-3 flex items-center justify-center gap-1.5 sm:mt-4 sm:gap-2">
         <button
           type="button"
@@ -103,6 +112,7 @@ export function AmountDisplay({
           </button>
         ) : null}
       </div>
+      )}
     </div>
   );
 }

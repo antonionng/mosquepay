@@ -35,7 +35,7 @@ import type {
   StatusPhase,
   StatusResponse,
 } from "./types";
-import { CATEGORY_BY_ID } from "./types";
+import { CATEGORY_BY_ID, selectionIsGiftAidable } from "./types";
 import { GiftAidCaptureDialog } from "./gift-aid-capture-dialog";
 
 // QR / awaiting-payment view for the Charge tab. Same behaviour as before
@@ -62,6 +62,13 @@ export type ActiveSessionState = {
   payerEmail: string | null;
   memberId: string | null;
   category: CategoryId;
+  /**
+   * Itemised basket, when the payment was split across categories. Drives the
+   * Gift-Aid nudge (a charity line makes the whole payment GA-relevant) and
+   * the breakdown shown on the QR + success cards. Absent for single-category
+   * payments.
+   */
+  lineItems?: ReadonlyArray<{ category: CategoryId; amount: number }>;
 };
 
 export function ActiveSession({
@@ -231,15 +238,25 @@ export function ActiveSession({
 
   if (phase === "succeeded") {
     const completedAt = status?.projected?.completed_at;
-    // Eligibility check mirrors the Cash tab's success screen so the same
-    // amber "capture Gift Aid" nudge appears here: charity-categorised,
-    // payer not anonymous, no declaration on file already (status fetched
-    // post-projection by the poller).
+    const giftAidable = selectionIsGiftAidable(
+      session.category,
+      session.lineItems,
+    );
+    // A payer with an active declaration is resolved at mint time
+    // (session.giftAidEligible) so we can show "auto-logged" immediately,
+    // before the webhook projects the donation row. status.gift_aid_eligible
+    // confirms it post-projection. Either one means Gift Aid is handled.
+    const giftAidHandled =
+      giftAidCaptured ||
+      Boolean(status?.gift_aid_eligible) ||
+      (giftAidable && session.giftAidEligible);
+    // Only nudge the treasurer to capture a paper slip when this is a
+    // Gift-Aidable category, the payer isn't anonymous, and we have NOT
+    // already matched a declaration. This avoids the false "No Gift Aid
+    // declaration on file" flash during the projection gap for a donor who
+    // already has one on file.
     const showGiftAidNudge =
-      Boolean(CATEGORY_BY_ID[session.category]?.giftAidable) &&
-      session.payerKind !== "anonymous" &&
-      !status?.gift_aid_eligible &&
-      !giftAidCaptured;
+      giftAidable && session.payerKind !== "anonymous" && !giftAidHandled;
     // LP payments.id is required by /gift-aid-attach. Comes from the
     // status projection (only after the webhook has projected).
     const lpPaymentId = status?.projected?.id ?? null;
@@ -259,7 +276,7 @@ export function ActiveSession({
               Payment captured. Receipt sent by Mooov.
             </p>
           )}
-          {status?.gift_aid_eligible || giftAidCaptured ? (
+          {giftAidHandled ? (
             <div className="mt-2 flex justify-center">
               <Badge variant="success" className="gap-1">
                 <HeartHandshake className="h-3 w-3" />
@@ -371,7 +388,24 @@ export function ActiveSession({
               {session.description || session.reference}
             </p>
           )}
-          {(session.memberName || session.giftAidEligible) && (
+          {session.lineItems && session.lineItems.length > 0 ? (
+            <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground">
+              {session.lineItems.map((li, i) => (
+                <li key={i} className="flex items-center justify-center gap-2 sm:justify-start">
+                  <span className="capitalize">
+                    {CATEGORY_BY_ID[li.category]?.label ??
+                      li.category.replace(/_/g, " ")}
+                  </span>
+                  <span className="tabular-nums">
+                    {formatMoney(Math.round(li.amount * 100), session.currency)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {(session.memberName ||
+            (session.giftAidEligible &&
+              selectionIsGiftAidable(session.category, session.lineItems))) && (
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               {session.memberName ? (
                 <Badge variant="outline" className="gap-1 border-slate-300">
@@ -379,7 +413,8 @@ export function ActiveSession({
                   {session.memberName}
                 </Badge>
               ) : null}
-              {session.giftAidEligible ? (
+              {session.giftAidEligible &&
+              selectionIsGiftAidable(session.category, session.lineItems) ? (
                 <Badge variant="success" className="gap-1">
                   <HeartHandshake className="h-3 w-3" />
                   Gift Aid auto-logged

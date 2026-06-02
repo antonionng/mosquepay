@@ -90,18 +90,159 @@ function extensionFromMimeOrPath(mime: string | null, path: string): string {
   return "bin";
 }
 
+/**
+ * Filesystem-safe, human-readable stub for an evidence filename. We lead
+ * with the donor's surname so a treasurer or UGLE clerk scanning the
+ * folder can find a person at a glance, then append a short id fragment to
+ * guarantee uniqueness when two Brothers share a surname.
+ */
+function safeNameStub(name: string | null | undefined): string {
+  const cleaned = (name ?? "")
+    .normalize("NFKD")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  return cleaned || "donor";
+}
+
+/**
+ * Build a declarations subfolder (evidence files + an INDEX.csv) inside the
+ * pack. Used twice: once for the genuinely-new declarations and once for
+ * the previously-supplied ones. Each evidence file is downloaded from the
+ * private bucket and re-hashed; a drift from the row's persisted SHA-256
+ * renames the file `*.HASH-MISMATCH.*` so it screams rather than hides.
+ */
+async function addDeclarationsFolder(opts: {
+  zip: JSZip;
+  supabase: ReturnType<typeof createServiceClient>;
+  declarations: GiftAidDeclaration[];
+  folderName: string;
+  /** When true, adds a "Status" column noting the evidence was sent before. */
+  previouslySupplied: boolean;
+}): Promise<{ count: number; missingEvidence: number }> {
+  const { zip, supabase, declarations, folderName, previouslySupplied } = opts;
+  const folder = zip.folder(folderName);
+  const header = [
+    "Declaration ID",
+    "Donor name",
+    "Donor email",
+    "Address line 1",
+    "Address line 2",
+    "City",
+    "Postcode",
+    "Country",
+    "Evidence source",
+    "Declaration date (UTC)",
+    "Paper received date",
+    "Paper filing reference",
+    "Signed-by IP (digital)",
+    "Revoked at",
+    "Evidence SHA-256",
+    "Evidence file",
+    ...(previouslySupplied ? ["Status"] : []),
+  ];
+  const lines = [csvRow(header)];
+  let missingEvidence = 0;
+
+  for (const decl of declarations) {
+    let storedFilename = "";
+    if (decl.evidence_storage_bucket && decl.evidence_storage_path) {
+      try {
+        const { data, error } = await supabase.storage
+          .from(decl.evidence_storage_bucket)
+          .download(decl.evidence_storage_path);
+        if (error) throw error;
+        const bytes = Buffer.from(await data.arrayBuffer());
+        const reHash = sha256Hex(bytes);
+        const matches = decl.evidence_sha256
+          ? reHash === decl.evidence_sha256
+          : true;
+        const ext = extensionFromMimeOrPath(
+          decl.evidence_mime_type,
+          decl.evidence_storage_path,
+        );
+        const stub = safeNameStub(
+          splitName(decl.donor_name).last || decl.donor_name,
+        );
+        storedFilename = `${stub}__${decl.id.slice(0, 8)}${
+          matches ? "" : ".HASH-MISMATCH"
+        }.${ext}`;
+        folder?.file(storedFilename, bytes);
+      } catch (err) {
+        console.warn("claim-pack: evidence download failed", {
+          declaration_id: decl.id,
+          message: err instanceof Error ? err.message : String(err),
+        });
+        missingEvidence += 1;
+        storedFilename = "<MISSING>";
+      }
+    } else {
+      missingEvidence += 1;
+      storedFilename = "<NO EVIDENCE ON FILE>";
+    }
+
+    lines.push(
+      csvRow([
+        decl.id,
+        decl.donor_name,
+        decl.donor_email,
+        decl.donor_address_line_1,
+        decl.donor_address_line_2,
+        decl.donor_city,
+        decl.donor_postcode,
+        decl.donor_country,
+        decl.evidence_source,
+        decl.created_at,
+        decl.paper_received_date,
+        decl.paper_filing_reference,
+        decl.digital_signature_ip,
+        decl.revoked_at,
+        decl.evidence_sha256,
+        storedFilename,
+        ...(previouslySupplied
+          ? ["Evidence previously supplied to UGLE in an earlier pack"]
+          : []),
+      ]),
+    );
+  }
+
+  folder?.file("INDEX.csv", lines.join("\n") + "\n");
+  return { count: declarations.length, missingEvidence };
+}
+
 export type ClaimPackInput = {
   lodge: Lodge;
   batch: GiftAidClaimBatch;
   items: GiftAidClaimItem[];
-  declarations: GiftAidDeclaration[];
+  /**
+   * Genuinely-new declarations (inclusion_reason = 'new_in_window').
+   * These get their evidence + an INDEX row in the `new-declarations/`
+   * folder -- the ones UGLE must retain this cycle.
+   */
+  newDeclarations: GiftAidDeclaration[];
+  /**
+   * Declarations that back a donation in this batch but were already
+   * shipped in an earlier pack (inclusion_reason = 'donor_in_batch').
+   * Evidence is re-attached under `previously-supplied-declarations/` so
+   * the pack stays self-contained, but clearly labelled so UGLE knows
+   * they already hold these. Empty array -> folder omitted.
+   */
+  previouslySupplied?: GiftAidDeclaration[];
+  /**
+   * Address-lookup set covering every declaration referenced by any
+   * claim item, used to populate postcode + house number in the ChR1
+   * donations CSV. Always supply for production packs so donations whose
+   * declaration was filed in an earlier batch still get their address.
+   */
+  declarationAddressLookup?: GiftAidDeclaration[];
   previousBatchCreatedAt: string | null;
 };
 
 export type ClaimPackResult = {
   zip: Buffer;
   filename: string;
-  declarationsIncluded: number;
+  newDeclarationsIncluded: number;
+  previouslySuppliedIncluded: number;
   declarationsWithMissingEvidence: number;
 };
 
@@ -112,10 +253,19 @@ export type ClaimPackResult = {
 export async function buildClaimPack(
   input: ClaimPackInput,
 ): Promise<ClaimPackResult> {
-  const { lodge, batch, items, declarations, previousBatchCreatedAt } = input;
+  const {
+    lodge,
+    batch,
+    items,
+    newDeclarations,
+    previouslySupplied = [],
+    declarationAddressLookup,
+    previousBatchCreatedAt,
+  } = input;
   const zip = new JSZip();
+  const supabase = createServiceClient();
 
-  // ---- 1. HMRC donation CSV --------------------------------------------
+  // ---- 1. HMRC donation CSV (root) -------------------------------------
   const donationHeader = [
     "Title",
     "First name",
@@ -130,11 +280,19 @@ export async function buildClaimPack(
     "Donor email",
     "Declaration on file",
   ];
-  const declarationsById = new Map(declarations.map((d) => [d.id, d]));
+  // Address lookup spans every declaration referenced by any item in this
+  // batch (so the ChR1 CSV gets the donor's address even when their
+  // declaration was filed and exported in an earlier batch). Falls back to
+  // the new + previously-supplied union.
+  const addressLookupById = new Map(
+    (declarationAddressLookup ?? [...newDeclarations, ...previouslySupplied]).map(
+      (d) => [d.id, d],
+    ),
+  );
   const donationLines = [csvRow(donationHeader)];
   for (const item of items) {
     const decl = item.gift_aid_declaration_id
-      ? declarationsById.get(item.gift_aid_declaration_id)
+      ? addressLookupById.get(item.gift_aid_declaration_id)
       : undefined;
     const { first, last } = splitName(item.donor_name);
     donationLines.push(
@@ -156,96 +314,45 @@ export async function buildClaimPack(
   }
   zip.file("claim-pack.csv", donationLines.join("\n") + "\n");
 
-  // ---- 2. New declarations index CSV -----------------------------------
-  const declarationsHeader = [
-    "Declaration ID",
-    "Donor name",
-    "Donor email",
-    "Address line 1",
-    "Address line 2",
-    "City",
-    "Postcode",
-    "Country",
-    "Evidence source",
-    "Declaration date (UTC)",
-    "Paper received date",
-    "Paper filing reference",
-    "Signed-by IP (digital)",
-    "Revoked at",
-    "Evidence SHA-256",
-    "Evidence file",
-  ];
-  const declLines = [csvRow(declarationsHeader)];
+  // ---- 2. New declarations folder (evidence UGLE must retain) ----------
+  const newResult = await addDeclarationsFolder({
+    zip,
+    supabase,
+    declarations: newDeclarations,
+    folderName: "new-declarations",
+    previouslySupplied: false,
+  });
 
-  // ---- 3. Inline evidence files + verification -------------------------
-  const supabase = createServiceClient();
-  let missingEvidenceCount = 0;
-  const evidenceFolder = zip.folder("declarations");
-  for (const decl of declarations) {
-    let storedFilename = "";
-    if (decl.evidence_storage_bucket && decl.evidence_storage_path) {
-      try {
-        const { data, error } = await supabase.storage
-          .from(decl.evidence_storage_bucket)
-          .download(decl.evidence_storage_path);
-        if (error) throw error;
-        const arrayBuffer = await data.arrayBuffer();
-        const bytes = Buffer.from(arrayBuffer);
-        const reHash = sha256Hex(bytes);
-        // Sanity check: in-flight verification. Annotate the row CSV if the
-        // stored bytes no longer match the row's persisted hash so the
-        // treasurer (and the Relief Chest) can see immediately that
-        // something's wrong rather than discovering it years later.
-        const matches = decl.evidence_sha256
-          ? reHash === decl.evidence_sha256
-          : true;
-        const ext = extensionFromMimeOrPath(
-          decl.evidence_mime_type,
-          decl.evidence_storage_path,
-        );
-        storedFilename = matches
-          ? `${decl.id}.${ext}`
-          : `${decl.id}.HASH-MISMATCH.${ext}`;
-        evidenceFolder?.file(storedFilename, bytes);
-      } catch (err) {
-        console.warn("claim-pack: evidence download failed", {
-          declaration_id: decl.id,
-          message: err instanceof Error ? err.message : String(err),
-        });
-        missingEvidenceCount += 1;
-        storedFilename = "<MISSING>";
-      }
-    } else {
-      missingEvidenceCount += 1;
-      storedFilename = "<NO EVIDENCE ON FILE>";
-    }
-
-    declLines.push(
-      csvRow([
-        decl.id,
-        decl.donor_name,
-        decl.donor_email,
-        decl.donor_address_line_1,
-        decl.donor_address_line_2,
-        decl.donor_city,
-        decl.donor_postcode,
-        decl.donor_country,
-        decl.evidence_source,
-        decl.created_at,
-        decl.paper_received_date,
-        decl.paper_filing_reference,
-        decl.digital_signature_ip,
-        decl.revoked_at,
-        decl.evidence_sha256,
-        storedFilename,
-      ]),
-    );
+  // ---- 3. Previously-supplied folder (only if any) ---------------------
+  let prevResult = { count: 0, missingEvidence: 0 };
+  if (previouslySupplied.length > 0) {
+    prevResult = await addDeclarationsFolder({
+      zip,
+      supabase,
+      declarations: previouslySupplied,
+      folderName: "previously-supplied-declarations",
+      previouslySupplied: true,
+    });
   }
-  zip.file("new-declarations.csv", declLines.join("\n") + "\n");
+
+  const missingEvidenceCount =
+    newResult.missingEvidence + prevResult.missingEvidence;
 
   // ---- 4. Manifest ------------------------------------------------------
+  const prevFolderLine =
+    prevResult.count > 0
+      ? `Previously-supplied declarations: ${prevResult.count}  (folder: previously-supplied-declarations/)`
+      : `Previously-supplied declarations: 0  (none -- folder omitted)`;
   const manifest = [
     `LodgePay Gift Aid claim pack`,
+    `============================`,
+    ``,
+    `WHAT THIS IS`,
+    `Everything the UGLE Relief Chest needs for one Gift Aid claim from`,
+    `this lodge: a ChR1-shaped list of donations, plus copies of the`,
+    `signed declarations that back them. Forward the whole ZIP to the`,
+    `Relief Chest -- nothing else needs assembling by hand.`,
+    ``,
     `Generated: ${new Date().toISOString()}`,
     `Lodge: ${lodge.name}${lodge.lodge_number ? ` No. ${lodge.lodge_number}` : ""}`,
     `HMRC reference: ${lodge.hmrc_charity_reference ?? "(not set)"}`,
@@ -253,33 +360,48 @@ export async function buildClaimPack(
     ``,
     `Batch reference: ${batch.claim_reference ?? batch.id}`,
     `Period: ${batch.period_start} -- ${batch.period_end}`,
-    `Donations: ${items.length}`,
+    `Donations in claim: ${items.length}`,
     `Eligible amount: £${batch.eligible_amount.toFixed(2)}`,
-    `Reclaimable amount: £${batch.reclaimable_amount.toFixed(2)}`,
-    `Declarations bundled: ${declarations.length}`,
+    `Reclaimable (25%): £${batch.reclaimable_amount.toFixed(2)}`,
+    ``,
+    `New declarations in this pack: ${newResult.count}  (folder: new-declarations/)`,
+    prevFolderLine,
     `Declarations missing evidence: ${missingEvidenceCount}`,
     `Window covered: ${previousBatchCreatedAt ?? "first-ever batch"} -- ${batch.created_at}`,
     ``,
-    `--- How to verify ---`,
-    `Every declaration evidence file has a SHA-256 listed in`,
-    `new-declarations.csv. To verify any file:`,
-    `    shasum -a 256 declarations/<filename>`,
-    `The result must match the "Evidence SHA-256" column in`,
-    `new-declarations.csv. If a file is named *.HASH-MISMATCH.* the`,
-    `stored bytes no longer match the hash recorded when the declaration`,
-    `was filed -- please contact the LodgePay treasurer immediately.`,
+    `WHAT'S IN EACH FILE`,
+    `- claim-pack.csv`,
+    `    One row per donation in this claim, in HMRC ChR1 column order.`,
+    `    This is the figure list the Relief Chest works from.`,
+    `- new-declarations/INDEX.csv + evidence files`,
+    `    Declarations signed since your last claim. THESE are the ones`,
+    `    UGLE needs to retain for this cycle. Paper declarations are the`,
+    `    scanned slip; digital ones are a printable HTML snapshot of what`,
+    `    the member signed (IP, timestamp, exact wording).`,
+    prevResult.count > 0
+      ? `- previously-supplied-declarations/INDEX.csv + evidence files\n    Donors who gave in this period whose declaration was already sent\n    in an earlier pack. Included so the pack is self-contained; no\n    action needed if you already hold them.`
+      : `- previously-supplied-declarations/  (not present in this pack)`,
     ``,
-    `--- HMRC declaration text ---`,
+    `HOW TO VERIFY (tamper-evidence)`,
+    `Every evidence file has a SHA-256 listed in its folder's INDEX.csv.`,
+    `To verify any file:`,
+    `    shasum -a 256 new-declarations/<filename>`,
+    `The result must match the "Evidence SHA-256" column. If a file is`,
+    `named *.HASH-MISMATCH.* the stored bytes no longer match the hash`,
+    `recorded when the declaration was filed -- contact the lodge`,
+    `treasurer before relying on it.`,
+    ``,
+    `HMRC DECLARATION WORDING`,
     `Every declaration in this pack was made under the following wording`,
-    `(or earlier-snapshot equivalent visible in the declaration's HTML`,
+    `(or an earlier-snapshot equivalent visible in the declaration's HTML`,
     `evidence file):`,
     ``,
-    `I want to Gift Aid this donation and any donations I make in the`,
+    `"I want to Gift Aid this donation and any donations I make in the`,
     `future or have made in the past 4 years to the named charity. I am a`,
     `UK taxpayer and understand that if I pay less Income Tax and/or`,
     `Capital Gains Tax than the amount of Gift Aid claimed on all my`,
     `donations in that tax year it is my responsibility to pay any`,
-    `difference.`,
+    `difference."`,
     ``,
   ].join("\n");
   zip.file("MANIFEST.txt", manifest);
@@ -296,7 +418,8 @@ export async function buildClaimPack(
   return {
     zip: buffer,
     filename: `gift-aid-claim-pack-${slug}.zip`,
-    declarationsIncluded: declarations.length,
+    newDeclarationsIncluded: newResult.count,
+    previouslySuppliedIncluded: prevResult.count,
     declarationsWithMissingEvidence: missingEvidenceCount,
   };
 }

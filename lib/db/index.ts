@@ -1360,14 +1360,42 @@ export async function getDonationsByGiftAidDeclaration(
   declarationId: string,
   lodgeId: string
 ): Promise<Donation[]> {
-  const { data, error } = await db()
+  // Donations linked to this declaration explicitly.
+  const { data: linked, error } = await db()
     .from("donations")
     .select("*")
     .eq("gift_aid_declaration_id", declarationId)
     .eq("lodge_id", lodgeId)
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return data as Donation[];
+
+  // Also surface donations that aren't explicitly linked but match this
+  // declaration's email. Charity taken via take-payment / QR / cash (and
+  // rows backfilled from historical charity payments) carry only the donor
+  // email; the declaration is matched at claim time. Including them here
+  // keeps the declaration's "linked donations" + reclaim figure consistent
+  // with what the claim batcher will actually pick up.
+  const { data: decl } = await db()
+    .from("gift_aid_declarations")
+    .select("donor_email")
+    .eq("id", declarationId)
+    .eq("lodge_id", lodgeId)
+    .maybeSingle<{ donor_email: string | null }>();
+  const email = decl?.donor_email?.trim().toLowerCase() ?? null;
+  if (!email) return linked as Donation[];
+
+  const { data: unlinked, error: unlinkedError } = await db()
+    .from("donations")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .is("gift_aid_declaration_id", null)
+    .order("created_at", { ascending: false });
+  if (unlinkedError) throw unlinkedError;
+
+  const emailMatched = ((unlinked ?? []) as Donation[]).filter(
+    (d) => (d.donor_email ?? "").trim().toLowerCase() === email
+  );
+  return [...(linked as Donation[]), ...emailMatched];
 }
 
 export async function listAuditLogsByEntity(

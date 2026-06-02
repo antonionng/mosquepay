@@ -20,6 +20,7 @@ import type {
   CategoryId,
   EventOption,
   HistoryItem,
+  LineItemDraft,
   MemberOption,
   PayerSelection,
   StatusResponse,
@@ -111,6 +112,10 @@ export function TakePaymentClient({
   const [category, setCategory] = useState<CategoryId>(initialCategory);
   const [reference, setReference] = useState("");
   const [description, setDescription] = useState("");
+  // Optional itemised basket (split a single payment across raffle / charity /
+  // dining). Lifted here so it survives switching between the Charge and Cash
+  // tabs, like the rest of the form state. Empty array == single-amount mode.
+  const [lineItems, setLineItems] = useState<LineItemDraft[]>([]);
   // Optional event linkage shared across tabs so switching Charge/Cash
   // doesn't lose the picked meeting. Driven by deep-link params on mount.
   const [eventId, setEventId] = useState<string | null>(initialEventId);
@@ -366,6 +371,8 @@ export function TakePaymentClient({
           setEventId={setEventId}
           payer={payer}
           setPayer={setPayer}
+          lineItems={lineItems}
+          setLineItems={setLineItems}
           session={session}
           setSession={setSession}
           status={status}
@@ -389,6 +396,8 @@ export function TakePaymentClient({
           setEventId={setEventId}
           payer={payer}
           setPayer={setPayer}
+          lineItems={lineItems}
+          setLineItems={setLineItems}
           onLogged={loadHistory}
           onJumpToHistory={(paymentId) =>
             setTab("history", { focus: paymentId })

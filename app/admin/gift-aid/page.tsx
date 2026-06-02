@@ -26,23 +26,37 @@ export default async function GiftAidPage() {
       .filter((d) => !("donor_address" in d))
       .map((d) => [d.donor_email.toLowerCase(), d as GiftAidDeclaration])
   );
+  const declarationById = new Map(
+    declarations
+      .filter((d) => !("donor_address" in d))
+      .map((d) => [d.id, d as GiftAidDeclaration])
+  );
+  // Roll donations up to a declaration by its explicit link OR by an email
+  // match. Charity taken via take-payment / QR / cash (and rows backfilled
+  // from historical charity payments) carry only the donor email -- the
+  // declaration is matched at claim time -- so an id-only join would show
+  // £0 against a donor who has in fact given. This mirrors the email match
+  // the claim batcher and per-meeting close use, so the per-donor totals
+  // agree with what is actually reclaimable.
   const donationsByDeclaration = new Map<
     string,
     { total: number; reclaimable: number }
   >();
   for (const donation of donations) {
-    if (!donation.gift_aid_declaration_id) continue;
     if (!isSuccessfulPaymentStatus(donation.status)) continue;
-    const current =
-      donationsByDeclaration.get(donation.gift_aid_declaration_id) ?? {
-        total: 0,
-        reclaimable: 0,
-      };
+    const declaration = donation.gift_aid_declaration_id
+      ? declarationById.get(donation.gift_aid_declaration_id)
+      : declarationsByEmail.get(donation.donor_email.toLowerCase());
+    if (!declaration) continue;
+    const current = donationsByDeclaration.get(declaration.id) ?? {
+      total: 0,
+      reclaimable: 0,
+    };
     current.total += donation.amount;
     if (donation.gift_aid_status !== "declined") {
       current.reclaimable += donation.amount * 0.25;
     }
-    donationsByDeclaration.set(donation.gift_aid_declaration_id, current);
+    donationsByDeclaration.set(declaration.id, current);
   }
 
   const serialized = declarations.map((d) => {

@@ -40,6 +40,24 @@ export function buildPayerPayload(payer: PayerSelection): PayerPayload {
   }
 }
 
+// A payer is "selected" when it's attributable: an existing member, an
+// existing guest, or an inline guest with at least a name typed in. Anonymous
+// (and a blank inline draft) is rejected so every take-payment row lands with
+// a name attached instead of showing up as "Not recorded" in the ledger.
+export function isPayerSelected(payer: PayerSelection): boolean {
+  switch (payer.kind) {
+    case "member":
+      return true;
+    case "guest":
+      return true;
+    case "guest_inline":
+      return payer.draft.full_name.trim().length > 0;
+    case "anonymous":
+    default:
+      return false;
+  }
+}
+
 export function displayPayerName(payer: PayerSelection): string | null {
   switch (payer.kind) {
     case "member":

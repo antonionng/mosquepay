@@ -4,6 +4,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { reopenCookieConsent } from "@/lib/cookie-consent";
+import { COMPANY_NAME } from "@/lib/legal";
 import { resolveLodgeSlug } from "@/lib/tenant";
 import type { LodgeSiteFooterSettings } from "@/lib/db/types";
 import { defaultFooterSettings } from "@/lib/site-section-style";
@@ -17,6 +19,7 @@ const marketingLinks = {
     { href: "/faq", label: "FAQs" },
     { href: "/contact#contact-form", label: "Technical support" },
     { href: "/contact", label: "Contact" },
+    { href: "/cookies", label: "Cookies" },
   ],
 };
 
@@ -257,8 +260,11 @@ export function PublicFooter({
         >
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <p className={isTenantMode ? "text-xs text-slate-500" : "text-xs text-dash-faint"}>
-              © {new Date().getFullYear()} {isTenantMode ? branding?.name ?? "Covenant Lodge No. 4344" : "LodgePay"}.
-              {" "}All rights reserved.
+              © {new Date().getFullYear()}{" "}
+              {isTenantMode
+                ? `${branding?.name ?? "Covenant Lodge No. 4344"}.`
+                : `LodgePay, operated by ${COMPANY_NAME}.`}{" "}
+              All rights reserved.
             </p>
             <div className={isTenantMode ? "flex flex-wrap gap-5 text-xs text-slate-500" : "flex flex-wrap gap-5 text-xs text-dash-faint"}>
               {isTenantMode ? (
@@ -281,6 +287,16 @@ export function PublicFooter({
                   <Link href="/gdpr" className="transition-colors hover:text-dash-muted">
                     GDPR
                   </Link>
+                  <Link href="/cookies" className="transition-colors hover:text-dash-muted">
+                    Cookies
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={reopenCookieConsent}
+                    className="border-0 bg-transparent p-0 text-left text-inherit transition-colors [font:inherit] hover:text-dash-muted"
+                  >
+                    Cookie settings
+                  </button>
                 </>
               )}
             </div>

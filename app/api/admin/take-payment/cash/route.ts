@@ -10,9 +10,11 @@
 //      status='captured', captured_at=now(). Idempotency keyed on the
 //      client_token the form generates so a double-tap is a no-op.
 //   2. Insert public.payments via the shared projector. Sets
-//      payment_method='cash', recorded_by_email=adminEmail, and runs the
-//      same Gift Aid auto-logging when category=charity and the attributed
-//      member has an active declaration.
+//      payment_method='cash', recorded_by_email=adminEmail, and records an
+//      event-linked donation row for any category=charity entry (status
+//      'declared' when the payer has an active declaration, 'eligible' when
+//      they have an email but no declaration yet, 'unknown' for anonymous
+//      cash) so the per-meeting Gift Aid close can reclaim it later.
 //
 // Auth: admin with payments:write on the active lodge.
 
@@ -28,6 +30,13 @@ import {
   type GuestInlineInput,
 } from "@/lib/take-payment/resolve-attribution";
 import { projectTakePaymentCaptured } from "@/lib/take-payment/project-captured";
+import {
+  parseLineItems,
+  lineItemsTotal,
+  deriveLineItemsCategory,
+  toProjectorLineItems,
+  type ParsedLineItem,
+} from "@/lib/take-payment/line-items";
 import { sendTakePaymentReceipt } from "@/lib/email/take-payment-receipt";
 
 export const runtime = "nodejs";
@@ -71,13 +80,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
   }
 
-  const amount = Number(body.amount);
+  // Optional itemised basket (raffle + charity + dining recorded as one cash
+  // entry). When present the total is the sum of the line items and the ledger
+  // row splits accordingly; the charity line still logs a donation.
+  const parsedLineItems = parseLineItems(body.line_items);
+  if (parsedLineItems.error) {
+    return NextResponse.json({ error: parsedLineItems.error }, { status: 400 });
+  }
+  const lineItems: ParsedLineItem[] | null = parsedLineItems.items ?? null;
+  const itemised = Array.isArray(lineItems) && lineItems.length > 0;
+
+  const amount = itemised
+    ? lineItemsTotal(lineItems as ParsedLineItem[])
+    : Number(body.amount);
   const description =
     typeof body.description === "string" ? body.description.trim() : "";
   const reference =
     typeof body.reference === "string" ? body.reference.trim() : "";
-  const category =
-    typeof body.category === "string" ? body.category.trim() : "general";
+  const category = itemised
+    ? deriveLineItemsCategory(lineItems as ParsedLineItem[])
+    : typeof body.category === "string"
+      ? body.category.trim()
+      : "general";
   const memberId =
     typeof body.member_id === "string" && body.member_id.trim()
       ? body.member_id.trim()
@@ -243,6 +267,7 @@ export async function POST(request: NextRequest) {
     lodge_id: lodgeId,
     intent: "take_payment_cash",
     category,
+    line_items: itemised ? lineItems : null,
     reference: reference || null,
     description: intentDescription,
     note: note || null,
@@ -281,6 +306,7 @@ export async function POST(request: NextRequest) {
         lodge_slug: lodgeSlug,
         reference: reference || null,
         category,
+        line_items: itemised ? lineItems : null,
         member_id: resolvedMemberId,
         guest_id: resolvedGuestId,
         event_id: resolvedEventId,
@@ -338,6 +364,9 @@ export async function POST(request: NextRequest) {
       amountMajor: amount,
       currency,
       category,
+      lineItems: itemised
+        ? toProjectorLineItems(lineItems as ParsedLineItem[])
+        : null,
       reference: reference || null,
       eventId: resolvedEventId,
       charityName: null,
@@ -372,6 +401,8 @@ export async function POST(request: NextRequest) {
           recordedByEmail: createdByEmail,
           giftAidEligible,
           lodgeId,
+          paymentId,
+          lineItems: itemised ? lineItems : null,
         });
       } catch (err) {
         console.warn("Cash payment POST: receipt email failed (non-fatal)", {

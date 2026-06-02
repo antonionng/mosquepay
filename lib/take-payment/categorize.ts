@@ -68,3 +68,41 @@ export function isCharityCategory(
 ): boolean {
   return category === "charity";
 }
+
+// A single line on an itemised take-payment (e.g. "raffle £5", "charity £10").
+// amount is in major units (pounds) to match splitAmountByCategory.
+export type LineItemInput = {
+  category: string | null | undefined;
+  amount: number;
+};
+
+// Aggregate a basket of line items into the public.payments sub-amount split.
+// Each item is classified independently via splitAmountByCategory and summed,
+// so one payment can credit raffle + charity + dining at once. Items with a
+// non-positive or non-finite amount are skipped. This is the multi-line
+// equivalent of splitAmountByCategory and the single source of truth for how
+// an itemised payment lands on the ledger.
+export function splitAmountByLineItems(items: LineItemInput[]): Splits {
+  const out: Splits = { ...ZERO };
+  for (const item of items) {
+    const part = splitAmountByCategory(item.amount, item.category);
+    out.dining_amount += part.dining_amount;
+    out.charity_amount += part.charity_amount;
+    out.raffle_amount += part.raffle_amount;
+    out.meeting_fee_amount += part.meeting_fee_amount;
+    out.guest_ticket_amount += part.guest_ticket_amount;
+  }
+  // Guard against floating point drift from repeated addition (e.g.
+  // 0.1 + 0.2) so the projected sub-totals stay clean to the penny.
+  return {
+    dining_amount: round2(out.dining_amount),
+    charity_amount: round2(out.charity_amount),
+    raffle_amount: round2(out.raffle_amount),
+    meeting_fee_amount: round2(out.meeting_fee_amount),
+    guest_ticket_amount: round2(out.guest_ticket_amount),
+  };
+}
+
+function round2(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}

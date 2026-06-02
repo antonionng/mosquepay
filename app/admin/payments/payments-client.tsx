@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, useMemo } from "react";
+import { Fragment, useState, useMemo, type ReactNode } from "react";
 import Link from "next/link";
 import { formatDate, cn } from "@/lib/utils";
 import { DASH_TABLE } from "@/lib/admin-dash-table";
@@ -36,6 +36,10 @@ import {
   Search,
   Shield,
   Download,
+  Wallet,
+  Coins,
+  Ticket,
+  UtensilsCrossed,
 } from "lucide-react";
 
 type Payment = {
@@ -46,8 +50,11 @@ type Payment = {
   dining_amount: number;
   charity_amount: number;
   raffle_amount: number;
+  meeting_fee_amount: number;
+  guest_ticket_amount: number;
   refund_amount: number;
   status: string;
+  category?: string | null;
   charity_name: string | null;
   mooov_payment_id?: string | null;
   stripe_payment_intent_id: string | null;
@@ -179,9 +186,86 @@ export function AdminPaymentsClient({
   const refundedAmount = refunded.reduce((s, p) => s + p.refund_amount, 0);
   const diningIncome = succeeded.reduce((s, p) => s + (p.dining_amount ?? 0), 0);
   const charityIncome = succeeded.reduce((s, p) => s + (p.charity_amount ?? 0), 0);
+  const raffleIncome = succeeded.reduce((s, p) => s + (p.raffle_amount ?? 0), 0);
   const duesOutstanding = duesRecords
     .filter((d) => d.status === "outstanding")
     .reduce((s, d) => s + d.amount, 0);
+  const duesCollected = duesRecords
+    .filter((d) => d.status === "paid" || d.status === "succeeded" || d.status === "completed")
+    .reduce((s, d) => s + d.amount, 0);
+
+  const countWith = (selector: (p: Payment) => number) =>
+    succeeded.filter((p) => (selector(p) ?? 0) > 0).length;
+
+  const otherIncome = Math.max(
+    0,
+    succeeded.reduce(
+      (s, p) =>
+        s +
+        (p.total_amount -
+          (p.dining_amount ?? 0) -
+          (p.charity_amount ?? 0) -
+          (p.raffle_amount ?? 0)),
+      0
+    )
+  );
+  const otherCount = succeeded.filter(
+    (p) =>
+      p.total_amount -
+        (p.dining_amount ?? 0) -
+        (p.charity_amount ?? 0) -
+        (p.raffle_amount ?? 0) >
+      0
+  ).length;
+
+  const breakdownTotal =
+    diningIncome + charityIncome + raffleIncome + otherIncome + duesCollected;
+
+  const breakdownCategories: Array<{
+    label: string;
+    value: number;
+    count: number;
+    icon: typeof Banknote;
+    accent: KpiAccent;
+  }> = [
+    {
+      label: "Dining",
+      value: diningIncome,
+      count: countWith((p) => p.dining_amount),
+      icon: UtensilsCrossed,
+      accent: "blue",
+    },
+    {
+      label: "Charity",
+      value: charityIncome,
+      count: countWith((p) => p.charity_amount),
+      icon: Heart,
+      accent: "rose",
+    },
+    {
+      label: "Raffle",
+      value: raffleIncome,
+      count: countWith((p) => p.raffle_amount),
+      icon: Ticket,
+      accent: "amber",
+    },
+    {
+      label: "Dues",
+      value: duesCollected,
+      count: duesRecords.filter(
+        (d) => d.status === "paid" || d.status === "succeeded" || d.status === "completed"
+      ).length,
+      icon: Wallet,
+      accent: "emerald",
+    },
+    {
+      label: "Other",
+      value: otherIncome,
+      count: otherCount,
+      icon: Coins,
+      accent: "blue",
+    },
+  ];
 
   const totalGiftAidReclaimable = giftAidDeclarations
     .filter((g) => g.status === "active")
@@ -411,6 +495,63 @@ export function AdminPaymentsClient({
       </div>
 
       <Card variant="panel" className="p-5">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-base font-semibold text-dash-text">Revenue by type</h2>
+          <p className="text-sm text-dash-muted">
+            Completed income split across dining, charity, raffle, dues, and other.
+          </p>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+          {breakdownCategories.map((cat) => {
+            const Icon = cat.icon;
+            const ac = kpiAccentIcon[cat.accent];
+            const pct =
+              breakdownTotal > 0 ? Math.round((cat.value / breakdownTotal) * 100) : 0;
+            return (
+              <div
+                key={cat.label}
+                className="rounded-xl border border-dash-border bg-dash-surface p-4"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-dash-muted">
+                    {cat.label}
+                  </span>
+                  <div
+                    className={cn(
+                      "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
+                      ac.wrap
+                    )}
+                  >
+                    <Icon className={cn("h-3.5 w-3.5", ac.icon)} aria-hidden />
+                  </div>
+                </div>
+                <p className="mt-2 text-lg font-semibold tracking-tight text-dash-text">
+                  £{cat.value.toFixed(2)}
+                </p>
+                <p className="mt-0.5 text-xs text-dash-muted">
+                  {cat.count} {cat.count === 1 ? "payment" : "payments"} · {pct}%
+                </p>
+              </div>
+            );
+          })}
+          <div className="rounded-xl border border-dash-border bg-dash-surface-subtle p-4">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-dash-muted">
+                Total
+              </span>
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10">
+                <Banknote className="h-3.5 w-3.5 text-emerald-600" aria-hidden />
+              </div>
+            </div>
+            <p className="mt-2 text-lg font-semibold tracking-tight text-dash-text">
+              £{breakdownTotal.toFixed(2)}
+            </p>
+            <p className="mt-0.5 text-xs text-dash-muted">all categories</p>
+          </div>
+        </div>
+      </Card>
+
+      <Card variant="panel" className="p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-base font-semibold text-dash-text">Treasurer Exports</h2>
@@ -556,35 +697,108 @@ export function AdminPaymentsClient({
                       <TableRow className={DASH_TABLE.row}>
                         <TableCell colSpan={6} className="!p-0">
                           <div className="border-t border-dash-border bg-dash-surface-subtle/80 px-6 py-4">
-                            <div className="grid gap-4 sm:grid-cols-3">
-                              <div className="rounded-xl border border-dash-border bg-dash-surface p-4">
-                                <div className="mb-2 flex items-center gap-2 text-xs text-dash-text-muted">
-                                  <CreditCard className="h-3.5 w-3.5" /> Dining
-                                </div>
-                                <p className="text-lg font-semibold text-dash-text">
-                                  £{Number(p.dining_amount).toFixed(2)}
-                                </p>
-                              </div>
-                              <div className="rounded-xl border border-dash-border bg-dash-surface p-4">
-                                <div className="mb-2 flex items-center gap-2 text-xs text-dash-text-muted">
-                                  <Heart className="h-3.5 w-3.5" /> Charity
-                                </div>
-                                <p className="text-lg font-semibold text-dash-text">
-                                  £{Number(p.charity_amount).toFixed(2)}
-                                </p>
-                                {p.charity_name && (
-                                  <p className="mt-1 text-xs text-dash-text-muted">{p.charity_name}</p>
-                                )}
-                              </div>
-                              <div className="rounded-xl border border-dash-border bg-dash-surface p-4">
-                                <div className="mb-2 flex items-center gap-2 text-xs text-dash-text-muted">
-                                  <Gift className="h-3.5 w-3.5" /> Raffle
-                                </div>
-                                <p className="text-lg font-semibold text-dash-text">
-                                  £{Number(p.raffle_amount).toFixed(2)}
-                                </p>
-                              </div>
-                            </div>
+                            {(() => {
+                              const meetingFee = Number(p.meeting_fee_amount ?? 0);
+                              const guestTicket = Number(p.guest_ticket_amount ?? 0);
+                              const dining = Number(p.dining_amount ?? 0);
+                              const charity = Number(p.charity_amount ?? 0);
+                              const raffle = Number(p.raffle_amount ?? 0);
+                              // Anything not tagged to a specific bucket is
+                              // general/uncategorised income. total_amount is net
+                              // of refunds, the buckets are gross, so clamp at 0.
+                              const general = Math.max(
+                                0,
+                                Number(p.total_amount ?? 0) -
+                                  meetingFee -
+                                  guestTicket -
+                                  dining -
+                                  charity -
+                                  raffle,
+                              );
+                              const buckets: Array<{
+                                key: string;
+                                label: string;
+                                icon: ReactNode;
+                                amount: number;
+                                note?: string | null;
+                              }> = [
+                                {
+                                  key: "meeting_fee",
+                                  label: "Meeting fee",
+                                  icon: <Coins className="h-3.5 w-3.5" />,
+                                  amount: meetingFee,
+                                },
+                                {
+                                  key: "guest_ticket",
+                                  label: "Guest ticket",
+                                  icon: <Ticket className="h-3.5 w-3.5" />,
+                                  amount: guestTicket,
+                                },
+                                {
+                                  key: "dining",
+                                  label: "Dining",
+                                  icon: <UtensilsCrossed className="h-3.5 w-3.5" />,
+                                  amount: dining,
+                                },
+                                {
+                                  key: "charity",
+                                  label: "Charity",
+                                  icon: <Heart className="h-3.5 w-3.5" />,
+                                  amount: charity,
+                                  note: p.charity_name,
+                                },
+                                {
+                                  key: "raffle",
+                                  label: "Raffle",
+                                  icon: <Gift className="h-3.5 w-3.5" />,
+                                  amount: raffle,
+                                },
+                                {
+                                  key: "general",
+                                  label: "General / Other",
+                                  icon: <CreditCard className="h-3.5 w-3.5" />,
+                                  amount: general,
+                                },
+                              ];
+                              const categoryLabel = p.category
+                                ? buckets.find((b) => b.key === p.category)?.label ??
+                                  p.category
+                                    .replace(/_/g, " ")
+                                    .replace(/^\w/, (c) => c.toUpperCase())
+                                : null;
+                              return (
+                                <>
+                                  {categoryLabel && (
+                                    <p className="mb-3 text-xs text-dash-text-muted">
+                                      Recorded under{" "}
+                                      <span className="font-medium text-dash-text">
+                                        {categoryLabel}
+                                      </span>
+                                    </p>
+                                  )}
+                                  <div className="grid gap-4 sm:grid-cols-3">
+                                    {buckets.map((b) => (
+                                      <div
+                                        key={b.key}
+                                        className="rounded-xl border border-dash-border bg-dash-surface p-4"
+                                      >
+                                        <div className="mb-2 flex items-center gap-2 text-xs text-dash-text-muted">
+                                          {b.icon} {b.label}
+                                        </div>
+                                        <p className="text-lg font-semibold text-dash-text">
+                                          £{b.amount.toFixed(2)}
+                                        </p>
+                                        {b.note && (
+                                          <p className="mt-1 text-xs text-dash-text-muted">
+                                            {b.note}
+                                          </p>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </>
+                              );
+                            })()}
                             {(p.mooov_payment_id ?? p.stripe_payment_intent_id) && (
                               <p className="mt-3 text-xs text-dash-text-muted">
                                 Payment reference: {p.mooov_payment_id ?? p.stripe_payment_intent_id}

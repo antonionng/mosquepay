@@ -221,7 +221,9 @@ export async function POST(
       .map((row) => row.gift_aid_declaration_id)
       .filter((id): id is string => Boolean(id)),
   });
-  const willShipDeclarations = probe.links.length > 0;
+  const willShipDeclarations = probe.links.some(
+    (link) => link.inclusion_reason === "new_in_window"
+  );
 
   if (eligibleForBatch.length > 0 || willShipDeclarations) {
     try {
@@ -279,12 +281,14 @@ export async function POST(
             batch.id,
             resolved.links
           );
-          await db.setClaimBatchDeclarationsCount(
-            batch.id,
-            lodgeId,
-            resolved.links.length
-          );
-          attachedDeclarationsCount = resolved.links.length;
+          // Headline count = NEW declarations only (what UGLE retains).
+          // donor_in_batch links are still stored for the pack's
+          // previously-supplied folder.
+          const newCount = resolved.links.filter(
+            (link) => link.inclusion_reason === "new_in_window"
+          ).length;
+          await db.setClaimBatchDeclarationsCount(batch.id, lodgeId, newCount);
+          attachedDeclarationsCount = newCount;
         }
       } catch (err) {
         console.error("meeting close: declaration linkage failed", {

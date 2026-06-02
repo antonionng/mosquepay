@@ -132,12 +132,14 @@ export async function POST(request: NextRequest) {
     });
     if (resolved.links.length > 0) {
       await db.linkDeclarationsToClaimBatch(lodgeId, batch.id, resolved.links);
-      await db.setClaimBatchDeclarationsCount(
-        batch.id,
-        lodgeId,
-        resolved.links.length
-      );
-      newDeclarationsCount = resolved.links.length;
+      // declarations_count = NEW declarations only (what UGLE retains this
+      // cycle). donor_in_batch links are still persisted for the pack's
+      // previously-supplied folder, but don't inflate the headline count.
+      const newCount = resolved.links.filter(
+        (link) => link.inclusion_reason === "new_in_window"
+      ).length;
+      await db.setClaimBatchDeclarationsCount(batch.id, lodgeId, newCount);
+      newDeclarationsCount = newCount;
     }
   } catch (err) {
     console.error("gift-aid claims POST: declaration linkage failed", {

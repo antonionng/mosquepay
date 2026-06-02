@@ -39,6 +39,7 @@ export function ExtrasSection({
   note,
   setNote,
   showNote,
+  hideCategory,
   defaultOpen,
 }: {
   category: CategoryId;
@@ -53,6 +54,9 @@ export function ExtrasSection({
   note?: string;
   setNote?: (v: string) => void;
   showNote?: boolean;
+  /** Hidden when the form is in itemised mode — each line carries its own
+   *  category, so the single-category picker would be misleading. */
+  hideCategory?: boolean;
   /** Initial collapsed/open state. Pages that deep-link with a preset
    *  event_id or non-default category pass true so the operator sees the
    *  inherited selections without having to expand the section first. */
@@ -61,7 +65,11 @@ export function ExtrasSection({
   const [open, setOpen] = useState(Boolean(defaultOpen));
 
   const filled =
-    category !== "general" || reference || description || note || eventId;
+    (!hideCategory && category !== "general") ||
+    reference ||
+    description ||
+    note ||
+    eventId;
 
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50/60">
@@ -106,6 +114,7 @@ export function ExtrasSection({
               </p>
             </div>
           ) : null}
+          {hideCategory ? null : (
           <div className="space-y-2">
             <Label htmlFor="tp-category">Category</Label>
             <Select
@@ -144,6 +153,7 @@ export function ExtrasSection({
               {CATEGORY_BY_ID[category]?.explainer}
             </p>
           </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="tp-reference">Reference (optional)</Label>
             <Input

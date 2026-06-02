@@ -82,6 +82,8 @@ export type MintResponse =
       payment_id: string;
       amount: number;
       currency: string;
+      gift_aid_eligible?: boolean;
+      gift_aid_declaration_id?: string | null;
     }
   | { error: string; code?: string };
 
@@ -206,6 +208,62 @@ export const CATEGORIES = [
 ] as const;
 
 export type CategoryId = (typeof CATEGORIES)[number]["id"];
+
+// One row in the optional "split across categories" basket. `amount` is held
+// as the raw string the operator typed (pounds) so the input stays controlled
+// and we don't fight the keyboard; it's coerced to a number at submit time.
+export type LineItemDraft = {
+  id: string;
+  category: CategoryId;
+  amount: string;
+};
+
+// Sum of the valid (amount > 0) line items, in pounds.
+export function lineItemsTotalMajor(items: LineItemDraft[]): number {
+  const total = items.reduce((sum, it) => {
+    const n = Number(it.amount);
+    return Number.isFinite(n) && n > 0 ? sum + n : sum;
+  }, 0);
+  return Math.round((total + Number.EPSILON) * 100) / 100;
+}
+
+// Items that carry a usable amount. Used for validation + payload building so
+// a half-typed blank row never blocks the submit or reaches the server.
+export function validLineItems(items: LineItemDraft[]): LineItemDraft[] {
+  return items.filter((it) => {
+    const n = Number(it.amount);
+    return Number.isFinite(n) && n > 0;
+  });
+}
+
+// Serialise the basket for the take-payment / cash endpoints.
+export function buildLineItemsPayload(
+  items: LineItemDraft[],
+): { category: CategoryId; amount: number }[] {
+  return validLineItems(items).map((it) => ({
+    category: it.category,
+    amount: Math.round(Number(it.amount) * 100) / 100,
+  }));
+}
+
+// Whether a payment should be treated as Gift-Aidable for the on-screen nudge:
+// either the single category is giftAidable, or the basket has a charity line.
+export function selectionIsGiftAidable(
+  category: CategoryId | "mixed",
+  lineItems?: ReadonlyArray<{ category: string }> | null,
+): boolean {
+  if (lineItems && lineItems.length > 0) {
+    return lineItems.some((li) => li.category === "charity");
+  }
+  return Boolean(CATEGORY_BY_ID[category as CategoryId]?.giftAidable);
+}
+
+export function newLineItemId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
+}
 
 export const CATEGORY_BY_ID: Record<
   CategoryId,

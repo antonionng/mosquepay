@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Inter, DM_Sans } from "next/font/google";
 import "./globals.css";
+import { CookieConsent } from "@/components/legal/cookie-consent";
 import { PageViewTracker } from "@/components/telemetry/page-view-tracker";
 import {
   lodgePayStructuredData,
@@ -105,6 +106,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(lodgePayStructuredData) }}
         />
         {children}
+        <CookieConsent />
       </body>
     </html>
   );

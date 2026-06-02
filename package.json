@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "bootstrap:platform-owner": "node scripts/bootstrap-platform-owner.mjs",
     "seed:installation-2026-06-02": "node scripts/seed-2026-06-02-installation.mjs",
+    "seed:gift-aid-demo": "node scripts/seed-gift-aid-demo.mjs",
     "audit:crud": "node scripts/audit-crud.mjs",
     "audit:crud:strict": "node scripts/audit-crud.mjs --strict"
   },

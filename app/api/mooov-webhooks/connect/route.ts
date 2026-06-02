@@ -4,6 +4,7 @@ import { verifyMooovWebhook } from "@/lib/mooov";
 import * as db from "@/lib/db";
 import { sendGuestWelcomeEmail } from "@/lib/email/guest";
 import { projectTakePaymentCaptured } from "@/lib/take-payment/project-captured";
+import { sendTakePaymentReceipt } from "@/lib/email/take-payment-receipt";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -758,15 +759,14 @@ async function projectEventCaptured(
   }
 
   // If the event RSVP form opted into Gift Aid for the charity portion,
-  // record the declaration the same way the legacy Stripe webhook did. We
-  // don't add a separate donations row -- the charity portion is already
-  // captured on payments.charity_amount and the gift-aid claim batcher
-  // joins on (lodge_id, donor_email).
+  // record the declaration the same way the legacy Stripe webhook did and
+  // capture its id so we can link the donation row below.
   const giftAid =
     (attempt.guest_descriptor ?? ({} as Record<string, unknown>)).gift_aid;
+  let giftAidDeclarationId: string | null = null;
   if (giftAid === true || giftAid === "true") {
     const g = attempt.guest_descriptor as Record<string, unknown>;
-    await db.addGiftAidDeclaration(lodgeId, {
+    const declaration = await db.addGiftAidDeclaration(lodgeId, {
       donor_name:
         typeof g.gift_aid_donor_name === "string"
           ? g.gift_aid_donor_name
@@ -794,6 +794,42 @@ async function projectEventCaptured(
       confirmation_method: "online_checkout",
       hmrc_eligible: true,
     });
+    giftAidDeclarationId = declaration.id;
+  }
+
+  // Record the charity portion as an event-linked donation so the
+  // per-meeting Gift Aid panel + close batch pick it up. Written for every
+  // charity contribution, not just GA opt-ins: the claim batcher matches
+  // donation -> declaration by email at close time, so a declaration
+  // uploaded later (paper form, profile import) makes this gift reclaimable
+  // without re-tagging. Idempotent via the getPaymentByMooovId() guard at
+  // the top of this projector -- a redelivery short-circuits before here.
+  if (charityAmount > 0) {
+    const giftAidStatus = giftAidDeclarationId
+      ? "declared"
+      : donorEmail
+        ? "eligible"
+        : "unknown";
+    try {
+      await db.addDonation(lodgeId, {
+        event_id: eventId,
+        payment_id: payment.id,
+        donor_name: donorName,
+        donor_email: donorEmail,
+        amount: charityAmount,
+        currency: currencyMajor.toLowerCase(),
+        source: "event_charity",
+        status: "completed",
+        gift_aid_declaration_id: giftAidDeclarationId,
+        gift_aid_status: giftAidStatus,
+        gift_aid_eligible_amount: giftAidDeclarationId ? charityAmount : 0,
+      });
+    } catch (err) {
+      console.error("mooov webhook: event charity donation insert failed", {
+        payment_id: attempt.payment_id,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 }
 
@@ -959,6 +995,27 @@ async function projectDuesCaptured(
 // in those cases; the Treasurer reconciles by reference / time-of-day.
 //
 // Idempotent on payments.mooov_payment_id, like the other projections.
+//
+// Coerce a stored line_items value (off guest_descriptor / metadata JSON)
+// back into the projector's LineItemInput[]. Defensive: anything that isn't a
+// well-formed array of { category, amount>0 } returns null so the caller
+// falls back to the single-category split.
+function readLineItems(
+  value: unknown,
+): { category: string; amount: number }[] | null {
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const items: { category: string; amount: number }[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object") continue;
+    const v = raw as Record<string, unknown>;
+    const category = typeof v.category === "string" ? v.category : null;
+    const amount = Number(v.amount);
+    if (!category || !Number.isFinite(amount) || amount <= 0) continue;
+    items.push({ category, amount });
+  }
+  return items.length > 0 ? items : null;
+}
+
 async function projectStandingOrTakePaymentCaptured(
   lodgeId: string,
   attempt: {
@@ -1013,6 +1070,12 @@ async function projectStandingOrTakePaymentCaptured(
   let category: string | null =
     typeof metadata.category === "string" ? (metadata.category as string) : null;
   let charityName: string | null = null;
+
+  // Itemised take-payment basket (raffle + charity + dining on one QR). The
+  // mint route stashes the validated line items on both the guest_descriptor
+  // and metadata; we read either so older in-flight QR codes (single amount)
+  // simply find nothing here and fall back to the category split below.
+  const lineItems = readLineItems(guest.line_items ?? metadata.line_items);
   switch (attempt.intent) {
     case "charity_donation_standing_qr":
       category = "charity";
@@ -1042,6 +1105,7 @@ async function projectStandingOrTakePaymentCaptured(
     amountMajor,
     currency: attempt.currency ?? "GBP",
     category,
+    lineItems,
     reference,
     eventId,
     charityName,
@@ -1062,6 +1126,46 @@ async function projectStandingOrTakePaymentCaptured(
         intent: attempt.intent,
       },
     );
+    return;
+  }
+
+  // Card/QR receipt parity with the cash flow: once the in-person take-payment
+  // captures, email the attributed member/guest a confirmation. Scoped to the
+  // take-payment terminal (standing-QR intents have their own flows). Sends to
+  // the email we recorded for the payer; anonymous QRs have none, so they're
+  // skipped. Best-effort + deduped on the mooov payment_id so a webhook
+  // redelivery never double-sends. Failures never affect the 200 we owe Mooov.
+  if (attempt.intent === "take_payment" && payerEmail) {
+    const description =
+      typeof metadata.description === "string"
+        ? (metadata.description as string)
+        : null;
+    const recordedByEmail =
+      typeof metadata.created_by_email === "string"
+        ? (metadata.created_by_email as string)
+        : null;
+    try {
+      await sendTakePaymentReceipt({
+        toEmail: payerEmail,
+        toName: payerName ?? "Friend of the lodge",
+        amountMajor,
+        currency: attempt.currency ?? "GBP",
+        category,
+        reference,
+        description,
+        paymentMethod: "card_qr",
+        recordedByEmail,
+        giftAidEligible,
+        lodgeId,
+        paymentId: attempt.payment_id,
+        lineItems,
+      });
+    } catch (err) {
+      console.warn("mooov webhook: take-payment receipt failed (non-fatal)", {
+        payment_id: attempt.payment_id,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 }
 

@@ -133,6 +133,13 @@ export default async function AdminMeetingDetailPage({
     (sum, d) => sum + Number(d.amount ?? 0),
     0,
   );
+  // "Donor-linked" counts only charity donations that carry a donor email,
+  // i.e. the ones that can be Gift Aid reclaimed once a declaration is on
+  // file. Anonymous cash still adds to the income figure above but isn't a
+  // donor-linked gift.
+  const charityDonorCount = eventDonations.filter(
+    (d) => typeof d.donor_email === "string" && d.donor_email.trim().length > 0,
+  ).length;
 
   // Compute "new declarations since previous batch" for the preview UI.
   // We use the same lib that the close endpoint will use at submit time
@@ -156,7 +163,9 @@ export default async function AdminMeetingDetailPage({
           .map((d) => d.gift_aid_declaration_id)
           .filter((id): id is string => Boolean(id)),
       });
-      newDeclarationsPreview = preview.links.length;
+      newDeclarationsPreview = preview.links.filter(
+        (link) => link.inclusion_reason === "new_in_window"
+      ).length;
     } catch {
       /* non-fatal: panel still renders without preview */
     }
@@ -199,7 +208,7 @@ export default async function AdminMeetingDetailPage({
             .meeting_closed_by_email ?? null)
         : null,
     charity_amount: charityDonorAmount,
-    charity_count: eventDonations.length,
+    charity_count: charityDonorCount,
     new_declarations_preview: newDeclarationsPreview,
     closed_batch_id: closedBatchId,
     closed_batch_declarations_count: closedBatchDeclarationsCount,

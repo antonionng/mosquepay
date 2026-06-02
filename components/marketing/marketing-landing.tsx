@@ -214,15 +214,50 @@ export function MarketingLanding() {
                 </Link>
               </div>
             </div>
-            <div className="relative aspect-[16/10] w-full max-lg:max-w-md overflow-hidden border border-dash-border bg-dash-surface-subtle shadow-dash">
-              <Image
-                src="/marketing/hero-main.png"
-                alt="Two lodge leaders in formal attire in a wood-paneled temple room"
-                fill
-                className="object-cover object-center"
-                sizes="(max-width: 1024px) 100vw, 42vw"
-                priority
+            <div className="relative max-lg:mx-auto max-lg:max-w-md">
+              {/* Brand glow behind the card */}
+              <div
+                aria-hidden
+                className="pointer-events-none absolute -inset-6 -z-10 rounded-[2rem] bg-[radial-gradient(60%_60%_at_70%_30%,hsl(var(--dash-ring)/0.18),transparent_70%)] blur-2xl"
               />
+              <div className="group relative aspect-[16/10] w-full overflow-hidden rounded-2xl bg-dash-surface-subtle shadow-[0_1px_2px_rgba(15,23,42,0.04),0_18px_40px_-12px_rgba(15,23,42,0.28)] ring-1 ring-dash-border">
+                <Image
+                  src="/marketing/hero-leaders.png"
+                  alt="Four lodge leaders in formal attire in a wood-paneled temple room"
+                  fill
+                  className="object-cover object-[center_20%] transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+                  sizes="(max-width: 1024px) 100vw, 42vw"
+                  priority
+                />
+                {/* Cinematic vignette tying into brand navy */}
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[hsl(222_47%_11%/0.55)] via-transparent to-[hsl(222_47%_11%/0.08)]"
+                />
+                {/* Crisp inner edge highlight */}
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/10"
+                />
+                {/* Floating "one record" caption */}
+                <div className="absolute bottom-4 left-4 right-4 flex items-center gap-3 rounded-xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur-md sm:left-5 sm:right-auto sm:bottom-5">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/90 text-dash-ring shadow-sm">
+                    <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5" aria-hidden>
+                      <path
+                        fillRule="evenodd"
+                        d="M16.704 5.29a1 1 0 0 1 .006 1.414l-7.25 7.32a1 1 0 0 1-1.42.005l-3.75-3.75a1 1 0 1 1 1.414-1.414l3.04 3.04 6.543-6.608a1 1 0 0 1 1.417-.006Z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </span>
+                  <div className="leading-tight">
+                    <p className="font-heading text-sm font-semibold text-white">One shared record</p>
+                    <p className="text-xs font-medium text-white/80">
+                      Secretary &middot; Treasurer &middot; Almoner
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>

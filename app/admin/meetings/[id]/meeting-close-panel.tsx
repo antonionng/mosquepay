@@ -19,6 +19,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { GiftAidHelpDrawer } from "@/components/admin/gift-aid-help-drawer";
 import {
   AlertCircle,
   CheckCircle2,
@@ -104,6 +105,9 @@ export function MeetingClosePanel({
             All claims and packs are listed in{" "}
             <Link href="/admin/gift-aid" className="underline">Gift Aid batches</Link>.
           </p>
+          <div className="mt-3">
+            <GiftAidHelpDrawer variant="link" label="What's in the pack?" />
+          </div>
         </CardContent>
       </Card>
     );
@@ -180,6 +184,9 @@ export function MeetingClosePanel({
           copies of any declarations signed since the last close, ready
           to forward to the Relief Chest at UGLE.
         </p>
+        <div className="mt-2">
+          <GiftAidHelpDrawer variant="link" label="How does this work?" />
+        </div>
 
         {error ? (
           <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">

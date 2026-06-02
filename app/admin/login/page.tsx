@@ -115,9 +115,14 @@ function LoginForm() {
         </form>
       </div>
 
-      <p className="mt-5 text-center sm:mt-6">
-        <Link href="/" className="text-sm text-dash-muted transition-colors hover:text-brand">
-          &larr; Back to site
+      <p className="mt-5 text-center text-sm text-dash-muted sm:mt-6">
+        Need member access?{" "}
+        <Link href="/member/login" className="font-medium text-brand transition-colors hover:text-brand-dark">
+          Member login
+        </Link>
+        <span className="mx-2 text-dash-faint">/</span>
+        <Link href="/" className="font-medium text-dash-muted transition-colors hover:text-brand">
+          Back to site
         </Link>
       </p>
     </div>

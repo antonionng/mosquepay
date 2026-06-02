@@ -29,6 +29,10 @@ export type TakePaymentReceiptArgs = {
   lodgeId?: string | null;
   /** Optional dedupe key (payment_id) so re-fires don't duplicate. */
   paymentId?: string | null;
+  /** Itemised breakdown for a split payment (raffle + charity + dining on one
+   *  entry). When present the receipt lists each line; otherwise it falls back
+   *  to the single Category line. */
+  lineItems?: ReadonlyArray<{ category: string; amount: number }> | null;
 };
 
 function methodLabel(method: TakePaymentReceiptArgs["paymentMethod"]) {
@@ -57,13 +61,20 @@ export async function sendTakePaymentReceipt(args: TakePaymentReceiptArgs) {
     }
   }
 
-  const amountString = `${(args.currency || "GBP").toUpperCase()} ${args.amountMajor.toFixed(2)}`;
+  const currencyCode = (args.currency || "GBP").toUpperCase();
+  const amountString = `${currencyCode} ${args.amountMajor.toFixed(2)}`;
+  const hasLineItems = Array.isArray(args.lineItems) && args.lineItems.length > 0;
+
   const facts: string[] = [
     `Amount: ${amountString}`,
     `Method: ${methodLabel(args.paymentMethod)}`,
   ];
-  const cat = categoryLabel(args.category);
-  if (cat) facts.push(`Category: ${cat}`);
+  // For a split payment the per-line breakdown carries the categories, so we
+  // skip the single Category fact and add a breakdown block below instead.
+  if (!hasLineItems) {
+    const cat = categoryLabel(args.category);
+    if (cat) facts.push(`Category: ${cat}`);
+  }
   if (args.reference) facts.push(`Reference: ${args.reference}`);
   if (args.description) facts.push(`For: ${args.description}`);
   if (args.recordedByEmail) facts.push(`Recorded by: ${args.recordedByEmail}`);
@@ -72,7 +83,20 @@ export async function sendTakePaymentReceipt(args: TakePaymentReceiptArgs) {
     `We've recorded your payment to ${lodgeName}. This email confirms the entry; please keep it for your records.`,
     facts.join(" · "),
   ];
-  if (args.giftAidEligible && args.category === "charity") {
+  if (hasLineItems) {
+    const lines = (args.lineItems ?? []).map(
+      (li) =>
+        `• ${categoryLabel(li.category) ?? li.category} — ${currencyCode} ${li.amount.toFixed(2)}`,
+    );
+    paragraphs.push(["Breakdown:", ...lines].join("\n"));
+  }
+  // Gift Aid note fires when the payer has an active declaration AND there's
+  // charity money on the entry — either a single charity payment or a charity
+  // line inside a split basket.
+  const hasCharity = hasLineItems
+    ? (args.lineItems ?? []).some((li) => li.category === "charity")
+    : args.category === "charity";
+  if (args.giftAidEligible && hasCharity) {
     paragraphs.push(
       "Because you have an active Gift Aid declaration with this lodge, we've logged this donation against your reclaim batch automatically.",
     );

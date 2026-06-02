@@ -17,17 +17,28 @@ import { AmountDisplay } from "./amount-display";
 import { AmountKeypad } from "./amount-keypad";
 import { PayerRow } from "./payer-row";
 import { ExtrasSection } from "./extras-section";
+import { LineItemsSection } from "./line-items-section";
 import { formatMoney, newClientToken } from "./helpers";
 import type {
   CashResponse,
   CategoryId,
   EventOption,
+  LineItemDraft,
   MemberOption,
   PayerSelection,
 } from "./types";
-import { buildPayerPayload, displayPayerName } from "./payer-payload";
+import {
+  buildPayerPayload,
+  displayPayerName,
+  isPayerSelected,
+} from "./payer-payload";
 import { GiftAidCaptureDialog } from "./gift-aid-capture-dialog";
-import { CATEGORY_BY_ID } from "./types";
+import {
+  buildLineItemsPayload,
+  lineItemsTotalMajor,
+  selectionIsGiftAidable,
+  validLineItems,
+} from "./types";
 
 // Cash tab — treasurer-recorded cash entry.
 //
@@ -54,6 +65,7 @@ type ConfirmationState = {
   giftAidEligible: boolean;
   loggedAt: number;
   category: CategoryId;
+  lineItems?: ReadonlyArray<{ category: CategoryId; amount: number }>;
 };
 
 export function CashTab({
@@ -71,6 +83,8 @@ export function CashTab({
   setEventId,
   payer,
   setPayer,
+  lineItems,
+  setLineItems,
   onLogged,
   onJumpToHistory,
 }: {
@@ -88,6 +102,8 @@ export function CashTab({
   setEventId: (v: string | null) => void;
   payer: PayerSelection;
   setPayer: (v: PayerSelection) => void;
+  lineItems: LineItemDraft[];
+  setLineItems: React.Dispatch<React.SetStateAction<LineItemDraft[]>>;
   onLogged: () => void;
   // Lets the parent navigate to the History tab and highlight a specific row.
   onJumpToHistory: (paymentId: string) => void;
@@ -124,6 +140,9 @@ export function CashTab({
   // the dependency declaration explicit-by-intent.
   void tick;
 
+  const itemised = lineItems.length > 0;
+  const itemsTotal = lineItemsTotalMajor(lineItems);
+
   const reset = useCallback(() => {
     setAmount("");
     setReference("");
@@ -134,23 +153,37 @@ export function CashTab({
     setPendingHighValueConfirm(false);
     setGiftAidCaptured(false);
     setGiftAidCaptureOpen(false);
+    setLineItems([]);
     clientTokenRef.current = newClientToken();
     // Keep category sticky — treasurers logging a row of cash payments
     // usually want the same category (e.g. raffle, dining) without
     // re-selecting each time.
-  }, [setAmount, setReference, setDescription]);
+  }, [setAmount, setReference, setDescription, setLineItems]);
 
   const submit = useCallback(async () => {
     setError(null);
-    const numericAmount = Number(amount);
+    const lineItemsPayload = itemised ? buildLineItemsPayload(lineItems) : null;
+    if (itemised && (!lineItemsPayload || lineItemsPayload.length === 0)) {
+      setError("Add an amount to at least one line item.");
+      return;
+    }
+    const numericAmount = itemised ? itemsTotal : Number(amount);
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-      setError("Enter an amount in pounds (e.g. 45 or 12.50).");
+      setError(
+        itemised
+          ? "Add an amount to at least one line item."
+          : "Enter an amount in pounds (e.g. 45 or 12.50).",
+      );
       return;
     }
     if (numericAmount > 5000) {
       setError(
         "Amounts above £5,000 cannot be recorded on the in-person flow.",
       );
+      return;
+    }
+    if (!isPayerSelected(payer)) {
+      setError("Select a member or guest before logging the payment.");
       return;
     }
     if (numericAmount >= 200 && !pendingHighValueConfirm) {
@@ -169,6 +202,7 @@ export function CashTab({
           description,
           note,
           event_id: eventId,
+          line_items: lineItemsPayload ?? undefined,
           client_token: clientTokenRef.current,
           ...buildPayerPayload(payer),
         }),
@@ -193,6 +227,7 @@ export function CashTab({
         giftAidEligible: body.gift_aid_eligible,
         loggedAt: Date.now(),
         category,
+        lineItems: lineItemsPayload ?? undefined,
       });
       setPendingHighValueConfirm(false);
       // Tiny haptic on success when supported. iOS Safari ignores this but
@@ -217,6 +252,9 @@ export function CashTab({
     eventId,
     payer,
     note,
+    itemised,
+    itemsTotal,
+    lineItems,
     pendingHighValueConfirm,
     onLogged,
   ]);
@@ -263,10 +301,24 @@ export function CashTab({
             {confirmation.payerName
               ? `From ${confirmation.payerName}`
               : "Guest payment"}
-            {confirmation.category !== "general"
-              ? ` · ${confirmation.category}`
-              : ""}
+            {confirmation.lineItems && confirmation.lineItems.length > 0
+              ? ` · ${confirmation.lineItems.length} items`
+              : confirmation.category !== "general"
+                ? ` · ${confirmation.category}`
+                : ""}
           </p>
+          {confirmation.lineItems && confirmation.lineItems.length > 0 ? (
+            <ul className="mx-auto max-w-xs space-y-0.5 text-xs text-emerald-800">
+              {confirmation.lineItems.map((li, i) => (
+                <li key={i} className="flex items-center justify-between gap-3">
+                  <span className="capitalize">
+                    {li.category.replace(/_/g, " ")}
+                  </span>
+                  <span className="tabular-nums">£{li.amount.toFixed(2)}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <div className="flex flex-wrap items-center justify-center gap-1.5">
             <Badge variant="outline" className="gap-1 border-slate-300">
               <Banknote className="h-3 w-3" />
@@ -290,7 +342,7 @@ export function CashTab({
           </p>
         </div>
 
-        {CATEGORY_BY_ID[confirmation.category]?.giftAidable &&
+        {selectionIsGiftAidable(confirmation.category, confirmation.lineItems) &&
         confirmation.payerKind !== "anonymous" &&
         !confirmation.giftAidEligible &&
         !giftAidCaptured ? (
@@ -371,12 +423,19 @@ export function CashTab({
         className="flex flex-col gap-3.5 p-3 sm:gap-5 sm:p-6"
       >
         <AmountDisplay
-          amount={amount}
+          amount={itemised ? String(itemsTotal) : amount}
           setAmount={setAmount}
           label="Cash received"
           ariaLabel="Cash received"
+          readOnly={itemised}
         />
-        <AmountKeypad setAmount={setAmount} />
+        {itemised ? null : <AmountKeypad setAmount={setAmount} />}
+        <LineItemsSection
+          items={lineItems}
+          setItems={setLineItems}
+          seedAmount={amount}
+          seedCategory={category}
+        />
         <PayerRow
           members={members}
           payer={payer}
@@ -396,7 +455,8 @@ export function CashTab({
           note={note}
           setNote={setNote}
           showNote
-          defaultOpen={Boolean(eventId) || category !== "general"}
+          hideCategory={itemised}
+          defaultOpen={Boolean(eventId) || (!itemised && category !== "general")}
         />
         {error ? (
           <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -407,19 +467,25 @@ export function CashTab({
         {pendingHighValueConfirm ? (
           <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
             <p className="font-medium">
-              Confirm £{Number(amount).toFixed(2)} cash entry
+              Confirm £{(itemised ? itemsTotal : Number(amount)).toFixed(2)} cash
+              entry
             </p>
             <p className="mt-1 text-xs">
               Amounts of £200 or more ask for an extra tap to avoid typos.
-              Tap “Log £{Number(amount).toFixed(2)} cash” again to confirm,
-              or change the amount above.
+              Tap “Log £{(itemised ? itemsTotal : Number(amount)).toFixed(2)}
+              cash” again to confirm, or change the amount above.
             </p>
           </div>
         ) : null}
         <Button
           type="submit"
           size="xl"
-          disabled={submitting || !amount || Number(amount) <= 0}
+          disabled={
+            submitting ||
+            (itemised ? itemsTotal <= 0 : !amount || Number(amount) <= 0) ||
+            (itemised && validLineItems(lineItems).length === 0) ||
+            !isPayerSelected(payer)
+          }
           className="w-full bg-emerald-700 text-base text-white hover:bg-emerald-800"
         >
           {submitting ? (
@@ -430,14 +496,22 @@ export function CashTab({
           ) : (
             <>
               <Banknote className="mr-2 h-5 w-5" />
-              {pendingHighValueConfirm
-                ? `Confirm £${Number(amount || 0).toFixed(2)} cash`
-                : amount
-                  ? `Log £${Number(amount).toFixed(2)} cash`
-                  : "Log cash payment"}
+              {(() => {
+                const shown = itemised ? itemsTotal : Number(amount || 0);
+                if (pendingHighValueConfirm)
+                  return `Confirm £${shown.toFixed(2)} cash`;
+                if (itemised || amount)
+                  return `Log £${shown.toFixed(2)} cash`;
+                return "Log cash payment";
+              })()}
             </>
           )}
         </Button>
+        {!isPayerSelected(payer) ? (
+          <p className="text-center text-xs text-amber-700">
+            Select a member or guest above to record who this payment is for.
+          </p>
+        ) : null}
         <p
           className="hidden text-center text-xs text-muted-foreground sm:block"
           title="Cash payments are recorded on the lodge ledger immediately. You can undo within 5 minutes here, or void any time from the Recent tab."

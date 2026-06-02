@@ -150,12 +150,15 @@ function MemberLoginContent() {
         </div>
 
         <p className="mt-5 text-center text-sm text-dash-muted sm:mt-6">
-          Don&apos;t have an account?{" "}
+          Need access? Ask your lodge Secretary or admin to send a member invite.
+        </p>
+        <p className="mt-3 text-center text-sm text-dash-muted">
+          Are you an officer or admin?{" "}
           <Link
-            href="/member/signup"
+            href="/admin/login"
             className="font-medium text-brand transition-colors hover:text-brand-dark"
           >
-            Create one
+            Admin login
           </Link>
         </p>
       </div>

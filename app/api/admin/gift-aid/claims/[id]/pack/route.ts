@@ -62,24 +62,43 @@ export async function GET(
     db.listClaimBatchDeclarations(lodgeId, batchId),
     db.getMostRecentClaimBatchBefore(lodgeId, batch.created_at),
   ]);
-  const declarationIds = declarationLinks.map(
-    (link) => link.gift_aid_declaration_id
-  );
-  // Also include declarations linked indirectly through donations in the
-  // batch (in case a future migration adds donations whose declaration
-  // wasn't explicitly attached). De-duplicate.
+
+  // Three sets of declarations the pack needs, driven by inclusion_reason:
+  //
+  //   1. `newDeclarationIds` (new_in_window) -- declarations signed since
+  //      the previous batch. These get evidence + an index row in the
+  //      pack's new-declarations/ folder. UGLE retains these.
+  //
+  //   2. `previouslySuppliedIds` (donor_in_batch) -- declarations that
+  //      back a donation in this batch but were already shipped in an
+  //      earlier pack. Evidence goes in previously-supplied-declarations/
+  //      so the pack stays self-contained, clearly flagged so UGLE knows
+  //      they already hold them.
+  //
+  //   3. `addressLookupIds` -- every declaration any item references,
+  //      regardless of when filed. Used only to populate postcode + house
+  //      number on the ChR1 donations CSV.
+  const newDeclarationIds = declarationLinks
+    .filter((link) => link.inclusion_reason === "new_in_window")
+    .map((link) => link.gift_aid_declaration_id);
+  const previouslySuppliedIds = declarationLinks
+    .filter((link) => link.inclusion_reason === "donor_in_batch")
+    .map((link) => link.gift_aid_declaration_id);
+  const addressLookupIds = new Set<string>([
+    ...newDeclarationIds,
+    ...previouslySuppliedIds,
+  ]);
   for (const item of items) {
-    if (
-      item.gift_aid_declaration_id &&
-      !declarationIds.includes(item.gift_aid_declaration_id)
-    ) {
-      declarationIds.push(item.gift_aid_declaration_id);
+    if (item.gift_aid_declaration_id) {
+      addressLookupIds.add(item.gift_aid_declaration_id);
     }
   }
-  const declarations = await db.getGiftAidDeclarationsByIds(
-    lodgeId,
-    declarationIds
-  );
+  const [newDeclarations, previouslySupplied, declarationAddressLookup] =
+    await Promise.all([
+      db.getGiftAidDeclarationsByIds(lodgeId, newDeclarationIds),
+      db.getGiftAidDeclarationsByIds(lodgeId, previouslySuppliedIds),
+      db.getGiftAidDeclarationsByIds(lodgeId, Array.from(addressLookupIds)),
+    ]);
 
   let pack;
   try {
@@ -87,7 +106,9 @@ export async function GET(
       lodge,
       batch,
       items,
-      declarations,
+      newDeclarations,
+      previouslySupplied,
+      declarationAddressLookup,
       previousBatchCreatedAt: previous?.created_at ?? null,
     });
   } catch (err) {
@@ -122,9 +143,10 @@ export async function GET(
     action: "gift_aid_claim_pack_downloaded",
     entityType: "gift_aid_claim_batch",
     entityId: batchId,
-    summary: `Generated Gift Aid claim pack for ${batch.claim_reference ?? batchId} (${pack.declarationsIncluded} declarations).`,
+    summary: `Generated Gift Aid claim pack for ${batch.claim_reference ?? batchId} (${pack.newDeclarationsIncluded} new declaration${pack.newDeclarationsIncluded === 1 ? "" : "s"}).`,
     metadata: {
-      declarations_included: pack.declarationsIncluded,
+      new_declarations_included: pack.newDeclarationsIncluded,
+      previously_supplied_included: pack.previouslySuppliedIncluded,
       declarations_missing_evidence: pack.declarationsWithMissingEvidence,
       donations: items.length,
     },

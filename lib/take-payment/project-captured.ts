@@ -11,7 +11,11 @@
 // consistent regardless of how the money arrived.
 
 import * as db from "@/lib/db";
-import { splitAmountByCategory, isCharityCategory } from "./categorize";
+import {
+  splitAmountByCategory,
+  splitAmountByLineItems,
+  type LineItemInput,
+} from "./categorize";
 
 export type ProjectCapturedInput = {
   lodgeId: string;
@@ -19,6 +23,11 @@ export type ProjectCapturedInput = {
   amountMajor: number;
   currency: string;
   category: string | null;
+  // Optional itemised basket. When present and non-empty, the ledger sub-
+  // amount split is computed per line item (raffle + charity + dining on one
+  // payment) instead of dumping the whole total into `category`. The full
+  // total still lands in total_amount; charity lines still log a donation.
+  lineItems?: LineItemInput[] | null;
   reference: string | null;
   eventId: string | null;
   charityName: string | null;
@@ -62,7 +71,10 @@ export async function projectTakePaymentCaptured(
 
   const completedAt = input.completedAt ?? new Date().toISOString();
   const currency = (input.currency || "GBP").toUpperCase();
-  const splits = splitAmountByCategory(input.amountMajor, input.category);
+  const hasLineItems = Array.isArray(input.lineItems) && input.lineItems.length > 0;
+  const splits = hasLineItems
+    ? splitAmountByLineItems(input.lineItems as LineItemInput[])
+    : splitAmountByCategory(input.amountMajor, input.category);
 
   const payment = await db.addPayment(input.lodgeId, {
     rsvp_id: null,
@@ -90,25 +102,39 @@ export async function projectTakePaymentCaptured(
     completed_at: completedAt,
   });
 
-  // Auto-log Gift Aid for charity entries when the attributed member has an
-  // active declaration on this lodge. Mirrors the QR path exactly so cash
-  // donors don't fall off the GA reclaim batch just because they happened
-  // to bring notes instead of a card.
+  // Record charity income as a donation row so the per-meeting Gift Aid
+  // panel + close batch can see it. We do this for EVERY charity entry,
+  // not just payers who already have a declaration on file: many lodges
+  // collect on the night and upload signed declarations (or import donor
+  // profiles) later. The claim batcher matches donation -> declaration by
+  // email at close time (lib/gift-aid/eligible.ts), so an email-bearing
+  // donation recorded now becomes reclaimable the moment a matching
+  // declaration is added -- no re-tagging required.
+  //
+  // The row is linked to input.eventId so it rolls up to the meeting's
+  // "Charity income on file" figure and is swept into the per-meeting Gift
+  // Aid batch on close. Anonymous cash (no payer email) is still recorded
+  // as charity income with gift_aid_status='unknown' so it shows on the
+  // collection (and counts toward GASDS), it just can't be GA-reclaimed.
+  // Log a donation whenever any charity money is present. For a single-
+  // category payment this is exactly the old "category === charity" rule
+  // (charity_amount is only > 0 then); for an itemised basket it picks up
+  // the charity line even when the basket also contains raffle/dining.
   let donationId: string | null = null;
-  if (
-    isCharityCategory(input.category) &&
-    input.giftAidEligible &&
-    input.giftAidDeclarationId &&
-    input.payerEmail &&
-    input.amountMajor > 0
-  ) {
+  if (splits.charity_amount > 0) {
+    const hasDeclaration = Boolean(input.giftAidDeclarationId);
+    const giftAidStatus = hasDeclaration
+      ? "declared"
+      : input.payerEmail
+        ? "eligible"
+        : "unknown";
     try {
       const donation = await db.addDonation(input.lodgeId, {
-        event_id: null,
+        event_id: input.eventId,
         payment_id: payment.id,
         donor_name: input.payerName,
-        donor_email: input.payerEmail,
-        amount: input.amountMajor,
+        donor_email: input.payerEmail ?? "",
+        amount: splits.charity_amount,
         currency: currency.toLowerCase(),
         source:
           input.paymentMethod === "cash"
@@ -116,11 +142,13 @@ export async function projectTakePaymentCaptured(
             : "in_person_take_payment",
         status: "completed",
         gift_aid_declaration_id: input.giftAidDeclarationId,
+        gift_aid_status: giftAidStatus,
+        gift_aid_eligible_amount: hasDeclaration ? splits.charity_amount : 0,
       });
       donationId = donation?.id ?? null;
     } catch (err) {
       console.error(
-        "project-captured: gift aid donation insert failed (non-fatal)",
+        "project-captured: charity donation insert failed (non-fatal)",
         {
           payment_id: payment.id,
           mooov_payment_id: input.mooovPaymentId,

@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { marketingMetadata } from "@/lib/seo";
+import {
+  COMPANY_DETAILS,
+  COMPANY_NAME,
+  CONTACT_PATH,
+  LEGAL_LAST_UPDATED,
+  PRODUCT_NAME,
+} from "@/lib/legal";
 
 export const metadata: Metadata = marketingMetadata({
   title: "Terms of Service | LodgePay",
@@ -14,8 +21,8 @@ const sections = [
   {
     title: "Using LodgePay",
     body: [
-      "LodgePay provides software for lodge websites, member portals, meetings, summons, RSVPs, dues, donations, Gift Aid, candidate management, welfare workflows, communications, reporting, and multi-lodge administration.",
-      "Customers are responsible for making sure their officers, staff, members, and invited users use the platform lawfully, accurately, and with appropriate authority.",
+      `${PRODUCT_NAME} provides software for lodge websites, member portals, meetings, summons, RSVPs, dues, donations, Gift Aid, candidate management, welfare workflows, communications, reporting, and multi-lodge administration.`,
+      `The service is operated by ${COMPANY_NAME}. Customers are responsible for making sure their officers, staff, members, and invited users use the platform lawfully, accurately, and with appropriate authority.`,
     ],
   },
   {
@@ -28,7 +35,7 @@ const sections = [
   {
     title: "Payments and financial records",
     body: [
-      "LodgePay supports payment and donation workflows through Mooov, our payments partner. Payment availability, settlement, refunds, chargebacks, and card processing are subject to Mooov's own terms and the terms of any underlying payment processor Mooov uses.",
+      "LodgePay supports payment and donation workflows through payment partners. Payment availability, settlement, refunds, chargebacks, and card processing may be subject to partner terms and processor rules.",
       "Treasurer tools, ledgers, reports, bank imports, and reconciliation views are operational aids. Customers remain responsible for reviewing their accounts, tax position, Gift Aid records, and statutory obligations.",
     ],
   },
@@ -42,7 +49,7 @@ const sections = [
   {
     title: "Availability and support",
     body: [
-      "We aim to provide a reliable platform, but service availability may be affected by maintenance, hosting providers, payment providers, email providers, network issues, or events outside our control.",
+      "We aim to provide a reliable platform, but service availability may be affected by maintenance, hosting providers, payment providers, email providers, network issues, security events, or events outside our control.",
       "Technical support requests should be sent through the contact form. We may need enough detail to identify the lodge, user, browser, page, and affected workflow.",
     ],
   },
@@ -51,6 +58,19 @@ const sections = [
     body: [
       "Users must not misuse the platform, attempt unauthorised access, bypass tenant boundaries, upload malicious content, spam recipients, publish unlawful content, or interfere with the security or operation of the service.",
       "We may suspend access where needed to protect the platform, customers, members, payment flows, or data security.",
+    ],
+  },
+  {
+    title: "Liability",
+    body: [
+      "Nothing in these terms excludes liability where it would be unlawful to do so, including liability for fraud or fraudulent misrepresentation.",
+      "To the extent permitted by law, LodgePay is provided as an operational software service and customers remain responsible for their own governance, accounts, tax decisions, lodge records, and published content.",
+    ],
+  },
+  {
+    title: "Governing law",
+    body: [
+      "These terms are governed by the laws of England and Wales. The courts of England and Wales will have jurisdiction, except where mandatory law gives a user a different right.",
     ],
   },
 ];
@@ -65,14 +85,26 @@ export default function TermsPage() {
             Terms for using LodgePay.
           </h1>
           <p className="mt-6 max-w-2xl text-base leading-relaxed text-dash-muted sm:text-lg">
-            Last updated 7 May 2026. These terms describe how LodgePay should be used by lodges, Provinces,
-            officers, members, administrators, and public visitors.
+            Last updated {LEGAL_LAST_UPDATED}. These terms describe how {PRODUCT_NAME} should be
+            used by lodges, Provinces, officers, members, administrators, and public visitors.
           </p>
         </div>
       </section>
 
       <section className="border-b border-dash-border bg-dash-surface py-20 lg:py-24">
         <div className="mx-auto grid max-w-6xl gap-6 px-5 lg:px-8">
+          <article className="rounded-[1.25rem] border border-dash-border bg-dash-surface-subtle p-8 shadow-dash">
+            <h2 className="font-heading text-2xl font-semibold text-dash-text">Who we are</h2>
+            <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2">
+              {COMPANY_DETAILS.map((item) => (
+                <div key={item.label}>
+                  <dt className="font-semibold text-dash-text">{item.label}</dt>
+                  <dd className="mt-1 text-dash-muted">{item.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </article>
+
           {sections.map((section) => (
             <article key={section.title} className="rounded-[1.25rem] border border-dash-border bg-dash-surface p-8 shadow-dash">
               <h2 className="font-heading text-2xl font-semibold text-dash-text">{section.title}</h2>
@@ -85,7 +117,7 @@ export default function TermsPage() {
           ))}
           <div className="rounded-[1.25rem] border border-dash-border bg-dash-surface-subtle p-8 text-base leading-relaxed text-dash-muted">
             For support, billing, access, or account questions, use the{" "}
-            <Link href="/contact#contact-form" className="font-semibold text-dash-ring hover:underline">
+            <Link href={CONTACT_PATH} className="font-semibold text-dash-ring hover:underline">
               contact form
             </Link>
             .

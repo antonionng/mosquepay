@@ -21,6 +21,12 @@ import {
   resolveTakePaymentAttribution,
   type GuestInlineInput,
 } from "@/lib/take-payment/resolve-attribution";
+import {
+  parseLineItems,
+  lineItemsTotal,
+  deriveLineItemsCategory,
+  type ParsedLineItem,
+} from "@/lib/take-payment/line-items";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -90,13 +96,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
   }
 
-  const amount = Number(body.amount);
+  // Optional itemised basket. When present, the total to charge is the sum of
+  // the line items (the top-level `amount` is ignored) and the QR splits into
+  // raffle/charity/dining sub-totals once captured. See lib/take-payment.
+  const parsedLineItems = parseLineItems(body.line_items);
+  if (parsedLineItems.error) {
+    return NextResponse.json({ error: parsedLineItems.error }, { status: 400 });
+  }
+  const lineItems: ParsedLineItem[] | null = parsedLineItems.items ?? null;
+  const itemised = Array.isArray(lineItems) && lineItems.length > 0;
+
+  const amount = itemised
+    ? lineItemsTotal(lineItems as ParsedLineItem[])
+    : Number(body.amount);
   const description =
     typeof body.description === "string" ? body.description.trim() : "";
   const reference =
     typeof body.reference === "string" ? body.reference.trim() : "";
-  const category =
-    typeof body.category === "string" ? body.category.trim() : "general";
+  const category = itemised
+    ? deriveLineItemsCategory(lineItems as ParsedLineItem[])
+    : typeof body.category === "string"
+      ? body.category.trim()
+      : "general";
   const memberId =
     typeof body.member_id === "string" && body.member_id.trim()
       ? body.member_id.trim()
@@ -263,6 +284,7 @@ export async function POST(request: NextRequest) {
     lodge_id: lodgeId,
     intent: "take_payment",
     category,
+    line_items: itemised ? lineItems : null,
     reference: reference || null,
     description: intentDescription,
     created_by_email: createdByEmail,
@@ -299,6 +321,7 @@ export async function POST(request: NextRequest) {
         lodge_slug: lodgeSlug,
         reference: reference || null,
         category,
+        line_items: itemised ? lineItems : null,
         member_id: resolvedMemberId,
         guest_id: resolvedGuestId,
         event_id: resolvedEventId,
@@ -394,6 +417,12 @@ export async function POST(request: NextRequest) {
       payment_id: paymentId,
       amount: amountMinor,
       currency,
+      // Surface the resolved Gift Aid attribution so the client's success
+      // screen knows immediately (at mint time) that this payer has an
+      // active declaration, instead of waiting for the webhook projection
+      // and falsely flashing "No Gift Aid declaration on file".
+      gift_aid_eligible: giftAidEligible,
+      gift_aid_declaration_id: giftAidDeclarationId,
     });
   } catch (err) {
     if (err instanceof MooovApiError) {
