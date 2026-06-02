@@ -262,6 +262,8 @@ export function MemberDetailClient({
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [inviteSending, setInviteSending] = useState(false);
+  const [teamSending, setTeamSending] = useState(false);
+  const [confirmTeamOpen, setConfirmTeamOpen] = useState(false);
   const [feedback, setFeedback] = useState<{
     type: "success" | "error";
     message: string;
@@ -517,6 +519,36 @@ export function MemberDetailClient({
     }
   }
 
+  async function handleMakeTeamMember() {
+    setTeamSending(true);
+    setFeedback(null);
+    try {
+      const res = await fetch(`/api/members/${member.id}/make-team-member`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error ?? "Could not grant payment access.");
+      }
+      setConfirmTeamOpen(false);
+      setFeedback({
+        type: "success",
+        message: `${member.full_name} can now take payments. A confirmation email was sent to ${member.email}.`,
+      });
+      router.refresh();
+    } catch (teamError) {
+      setFeedback({
+        type: "error",
+        message:
+          teamError instanceof Error
+            ? teamError.message
+            : "Could not grant payment access.",
+      });
+    } finally {
+      setTeamSending(false);
+    }
+  }
+
   async function handleDuesAction(
     duesId: string,
     action: "waive" | "mark_paid" | "mark_outstanding"
@@ -645,6 +677,17 @@ export function MemberDetailClient({
                   : member.auth_user_id
                     ? "Resend portal invite"
                     : "Send portal invite"}
+              </Button>
+            )}
+            {!editing && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setConfirmTeamOpen(true)}
+                disabled={teamSending}
+              >
+                <Wallet className="h-3.5 w-3.5 mr-1" />
+                {teamSending ? "Sending..." : "Make payment team member"}
               </Button>
             )}
             {!editing ? (
@@ -1632,6 +1675,18 @@ export function MemberDetailClient({
           </DialogContent>
         </Dialog>
       )}
+
+      <ConfirmActionDialog
+        open={confirmTeamOpen}
+        onOpenChange={(open) => {
+          if (!teamSending) setConfirmTeamOpen(open);
+        }}
+        title={`Let ${member.full_name} take payments?`}
+        description={`This gives ${member.full_name} treasurer-level admin access (payments, dues, and the in-person Take payment screen) for this lodge and emails ${member.email} a link to set their password and sign in. They can take payments once they accept.`}
+        confirmLabel="Grant access & email"
+        loading={teamSending}
+        onConfirm={handleMakeTeamMember}
+      />
 
       <ConfirmActionDialog
         open={confirmRemoveOpen}
