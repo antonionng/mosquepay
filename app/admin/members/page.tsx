@@ -1,6 +1,7 @@
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
+import { sweepAbandonedPendingSchedules } from "@/lib/dues/abandoned-pending-sweep";
 import { AdminMembersClient } from "./members-client";
 
 export const dynamic = "force-dynamic";
@@ -70,6 +71,12 @@ export default async function AdminMembersPage() {
   > = {};
   if (lodgeId && members.length > 0) {
     try {
+      // Self-heal: cancel any `pending` schedules left over from
+      // abandoned Mooov checkouts before we read. This guarantees the
+      // members-list view never shows a phantom "Online" pill from a
+      // stale pending row even if the per-checkout abandon path didn't
+      // fire (e.g. the member never came back to retry).
+      await sweepAbandonedPendingSchedules(lodgeId).catch(() => 0);
       const [allDues, currentYear, schedules] = await Promise.all([
         db.getMemberDues(lodgeId),
         db.getCurrentMasonicYear(lodgeId).catch(() => null),
@@ -92,9 +99,18 @@ export default async function AdminMembersPage() {
         "past_due",
         "paused",
       ]);
+      // `cancelled_at` is the source of truth for "this schedule is
+      // dead". A late Mooov webhook used to be able to clobber a
+      // cancelled row's `status` back to `past_due`, which lit the
+      // members-list "Online" pill back up. We now ignore status if
+      // cancelled_at is set (defence-in-depth alongside the webhook
+      // terminal-state guard).
       const activeScheduleEmails = new Set(
         schedules
-          .filter((s) => ACTIVE_SCHEDULE_STATUSES.has(s.status))
+          .filter(
+            (s) =>
+              s.cancelled_at == null && ACTIVE_SCHEDULE_STATUSES.has(s.status),
+          )
           .map((s) => s.member_email.toLowerCase()),
       );
       const byMember = new Map<string, (typeof inYear)[number]>();

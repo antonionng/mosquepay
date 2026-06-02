@@ -1637,6 +1637,31 @@ async function handleSubscriptionEvent(
   const schedule = await resolveSubscriptionSchedule(lodgeId, parsed, event.id);
   if (!schedule) return;
 
+  // Terminal-state guard. Once a schedule has been cancelled (by member,
+  // admin, or system) or completed, late webhooks from Mooov MUST NOT
+  // mutate it. Without this, a `subscription.invoice_failed` arriving
+  // after a member self-cancel resurrects the row to `past_due` (and
+  // the members-list "Online" pill lights up again). The
+  // `subscription.canceled` event still flows through so its own
+  // idempotency log fires — that handler short-circuits on
+  // already-cancelled rows of its own accord.
+  if (
+    (schedule.status === "cancelled" || schedule.status === "completed") &&
+    event.type !== "subscription.canceled"
+  ) {
+    console.warn(
+      "mooov webhook: ignoring event for terminal schedule (idempotent)",
+      {
+        event_id: event.id,
+        event_type: event.type,
+        schedule_id: schedule.id,
+        schedule_status: schedule.status,
+        cancelled_at: schedule.cancelled_at,
+      },
+    );
+    return;
+  }
+
   switch (event.type) {
     case "subscription.activated":
       await handleSubscriptionActivated(lodgeId, schedule, parsed, event.id);

@@ -2276,10 +2276,13 @@ export async function getDuesSchedulesDue(
   onOrBefore: string,
   limit = 100
 ): Promise<DuesSchedule[]> {
+  // The cron retry path must never re-pick a cancelled schedule, even
+  // if a late Mooov webhook clobbered its status back to `past_due`.
   const { data, error } = await db()
     .from("dues_schedules")
     .select("*")
     .in("status", ["active", "past_due"])
+    .is("cancelled_at", null)
     .lte("next_charge_at", onOrBefore)
     .order("next_charge_at", { ascending: true })
     .limit(limit);
@@ -2326,7 +2329,7 @@ export async function countDuesSchedulesByStatus(
 ): Promise<Record<DuesScheduleStatus, number>> {
   const { data, error } = await db()
     .from("dues_schedules")
-    .select("status")
+    .select("status, cancelled_at")
     .eq("lodge_id", lodgeId);
   if (error) throw error;
 
@@ -2340,9 +2343,18 @@ export async function countDuesSchedulesByStatus(
     completed: 0,
     active_stripe: 0,
   };
-  for (const row of (data ?? []) as { status: DuesScheduleStatus }[]) {
-    if (row.status in counts) {
-      counts[row.status] += 1;
+  // Defence-in-depth: any row with `cancelled_at` set is treated as
+  // cancelled regardless of its `status` column. Late webhooks used
+  // to be able to clobber a cancelled row's status back to past_due
+  // and skew the treasurer dashboard counts.
+  for (const row of (data ?? []) as {
+    status: DuesScheduleStatus;
+    cancelled_at: string | null;
+  }[]) {
+    const effective: DuesScheduleStatus =
+      row.cancelled_at != null ? "cancelled" : row.status;
+    if (effective in counts) {
+      counts[effective] += 1;
     }
   }
   return counts;

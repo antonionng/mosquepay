@@ -133,11 +133,12 @@ export async function GET(request: NextRequest, { params }: Ctx) {
   const schedules = await db.getDuesSchedulesForMember(lodgeId, member.email);
   const activeSchedule = schedules.find(
     (s) =>
-      s.status === "active" ||
-      s.status === "active_stripe" ||
-      s.status === "action_required" ||
-      s.status === "past_due" ||
-      s.status === "paused",
+      s.cancelled_at == null &&
+      (s.status === "active" ||
+        s.status === "active_stripe" ||
+        s.status === "action_required" ||
+        s.status === "past_due" ||
+        s.status === "paused"),
   );
 
   return NextResponse.json({

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import * as db from "@/lib/db";
 import { computeYearPosition } from "@/lib/dues/year-position";
 import { duesSubscriptionEnabled } from "@/lib/dues/feature-flags";
+import { sweepAbandonedPendingSchedules } from "@/lib/dues/abandoned-pending-sweep";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,12 @@ export async function GET() {
     } catch {
       // non-fatal
     }
+
+    // Self-heal stale pending schedules from abandoned Mooov checkouts
+    // before we read. Cheap and best-effort: if the sweep fails, the
+    // dashboard still renders correctly because the read-side filters
+    // also exclude pending rows from the "active subscription" card.
+    await sweepAbandonedPendingSchedules(member.lodge_id).catch(() => 0);
 
     const [upcomingEventRows, allEvents, payments, donations, duesRecords, lodgeDues, rsvps, summonsLinks, activeGiftAidDeclaration, currentMasonicYear, allMasonicYears, duesSchedules] = await Promise.all([
       db.getEvents(member.lodge_id, { published: true, upcoming: true }),
@@ -193,6 +200,7 @@ export async function GET() {
         ? duesSchedules.find(
             (s) =>
               s.member_dues_id === currentDues.id &&
+              s.cancelled_at == null &&
               s.status !== "cancelled" &&
               s.status !== "completed" &&
               s.status !== "pending"

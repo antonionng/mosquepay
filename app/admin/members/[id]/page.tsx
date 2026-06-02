@@ -3,6 +3,7 @@ import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
 import { computeNextDuesForMember } from "@/lib/dues/next-due";
+import { sweepAbandonedPendingSchedules } from "@/lib/dues/abandoned-pending-sweep";
 import { getDefaultLodgeSlug } from "@/lib/tenant";
 import type {
   DuesSchedule,
@@ -70,6 +71,10 @@ export default async function AdminMemberDetailPage({
   const member = await db.getMemberById(id, lodgeId);
   if (!member) notFound();
 
+  // Self-heal stale pending schedules from abandoned Mooov checkouts
+  // before we read this member's subscription history.
+  await sweepAbandonedPendingSchedules(lodgeId).catch(() => 0);
+
   const [
     dietaryHistory,
     paymentHistory,
@@ -124,7 +129,14 @@ export default async function AdminMemberDetailPage({
     completed: 6,
     cancelled: 7,
   };
-  const activeSchedule = [...schedules].sort(
+  // `cancelled_at` is the source of truth — late webhooks could
+  // historically clobber a cancelled row's status, so treat any row
+  // with cancelled_at set as cancelled when prioritising.
+  const effectiveSchedules = schedules.map((s) => ({
+    ...s,
+    status: s.cancelled_at != null ? "cancelled" : s.status,
+  }));
+  const activeSchedule = [...effectiveSchedules].sort(
     (a, b) =>
       (subscriptionPriority[a.status] ?? 99) -
       (subscriptionPriority[b.status] ?? 99)
@@ -136,7 +148,15 @@ export default async function AdminMemberDetailPage({
         instalments: MemberDuesInstalment[];
       }
     | null = null;
-  if (activeSchedule) {
+  // Only render the subscription panel for genuinely live schedules.
+  // Cancelled/completed history is still visible elsewhere; this panel
+  // is for "is the member currently on an active subscription?".
+  const hasLiveSchedule =
+    activeSchedule != null &&
+    activeSchedule.cancelled_at == null &&
+    activeSchedule.status !== "cancelled" &&
+    activeSchedule.status !== "completed";
+  if (activeSchedule && hasLiveSchedule) {
     const instalments = await db.getInstalmentsForDues(
       activeSchedule.member_dues_id,
       lodgeId
