@@ -56,10 +56,119 @@ type Payment = {
   status: string;
   category?: string | null;
   charity_name: string | null;
+  payment_method?: string | null;
+  payment_method_note?: string | null;
+  recorded_by_email?: string | null;
   mooov_payment_id?: string | null;
   stripe_payment_intent_id: string | null;
   created_at: string;
 };
+
+// How the money arrived, grouped for the treasurer's mental model:
+//   * cash  — physically handed over, counted into the tin.
+//   * card  — LodgePay digital (QR / online card). null/legacy online rows
+//             fall here too since they were card payments before we tracked
+//             the method explicitly.
+//   * other — cheque / BACS / manual "other".
+type MethodGroup = "cash" | "card" | "other";
+
+function methodGroup(pm: string | null | undefined): MethodGroup {
+  if (pm === "cash") return "cash";
+  if (pm === "cheque" || pm === "bacs" || pm === "other") return "other";
+  return "card";
+}
+
+function methodMeta(pm: string | null | undefined): {
+  label: string;
+  icon: typeof Banknote;
+  group: MethodGroup;
+} {
+  switch (pm) {
+    case "cash":
+      return { label: "Cash", icon: Banknote, group: "cash" };
+    case "cheque":
+      return { label: "Cheque", icon: Wallet, group: "other" };
+    case "bacs":
+      return { label: "BACS", icon: Wallet, group: "other" };
+    case "other":
+      return { label: "Other", icon: Coins, group: "other" };
+    case "card_online":
+      return { label: "LodgePay", icon: CreditCard, group: "card" };
+    case "card_qr":
+    default:
+      return { label: "LodgePay", icon: CreditCard, group: "card" };
+  }
+}
+
+// Per-category gross split for a payment row. The sub-amount columns are the
+// source of truth (not the metadata `category` tag, which is "mixed" for an
+// itemised basket), so a single payment can land in several buckets. Anything
+// not tagged to a bucket is general/other income.
+const CATEGORY_KEYS = [
+  "dining",
+  "charity",
+  "raffle",
+  "meeting_fee",
+  "guest_ticket",
+  "general",
+] as const;
+type CategoryKey = (typeof CATEGORY_KEYS)[number];
+
+const CATEGORY_LABEL: Record<CategoryKey, string> = {
+  dining: "Dining",
+  charity: "Charity",
+  raffle: "Raffle",
+  meeting_fee: "Meeting fee",
+  guest_ticket: "Guest ticket",
+  general: "General / Other",
+};
+
+function categoryAmounts(p: Payment): Record<CategoryKey, number> {
+  const dining = Number(p.dining_amount ?? 0);
+  const charity = Number(p.charity_amount ?? 0);
+  const raffle = Number(p.raffle_amount ?? 0);
+  const meetingFee = Number(p.meeting_fee_amount ?? 0);
+  const guestTicket = Number(p.guest_ticket_amount ?? 0);
+  const general = Math.max(
+    0,
+    Number(p.total_amount ?? 0) -
+      dining -
+      charity -
+      raffle -
+      meetingFee -
+      guestTicket,
+  );
+  return {
+    dining,
+    charity,
+    raffle,
+    meeting_fee: meetingFee,
+    guest_ticket: guestTicket,
+    general,
+  };
+}
+
+function MethodBadge({ pm }: { pm: string | null | undefined }) {
+  const m = methodMeta(pm);
+  const Icon = m.icon;
+  const tone =
+    m.group === "cash"
+      ? "border-amber-200 bg-amber-50 text-amber-800"
+      : m.group === "card"
+        ? "border-blue-200 bg-blue-50 text-blue-700"
+        : "border-slate-200 bg-slate-50 text-slate-600";
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-medium",
+        tone,
+      )}
+    >
+      <Icon className="h-3 w-3" />
+      {m.label}
+    </span>
+  );
+}
 
 type Donation = {
   id: string;
@@ -171,6 +280,10 @@ export function AdminPaymentsClient({
 }) {
   const [activeTab, setActiveTab] = useState<Tab>("payments");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [methodFilter, setMethodFilter] = useState<"all" | MethodGroup>("all");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | CategoryKey>(
+    "all",
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
@@ -227,6 +340,7 @@ export function AdminPaymentsClient({
     count: number;
     icon: typeof Banknote;
     accent: KpiAccent;
+    categoryKey?: CategoryKey;
   }> = [
     {
       label: "Dining",
@@ -234,6 +348,7 @@ export function AdminPaymentsClient({
       count: countWith((p) => p.dining_amount),
       icon: UtensilsCrossed,
       accent: "blue",
+      categoryKey: "dining",
     },
     {
       label: "Charity",
@@ -241,6 +356,7 @@ export function AdminPaymentsClient({
       count: countWith((p) => p.charity_amount),
       icon: Heart,
       accent: "rose",
+      categoryKey: "charity",
     },
     {
       label: "Raffle",
@@ -248,6 +364,7 @@ export function AdminPaymentsClient({
       count: countWith((p) => p.raffle_amount),
       icon: Ticket,
       accent: "amber",
+      categoryKey: "raffle",
     },
     {
       label: "Dues",
@@ -264,8 +381,76 @@ export function AdminPaymentsClient({
       count: otherCount,
       icon: Coins,
       accent: "blue",
+      categoryKey: "general",
     },
   ];
+
+  // Cash vs LodgePay (digital) split over completed income, for the
+  // "How they paid" ratio panel. `other` (cheque/BACS) only shows if present.
+  const methodTotals = succeeded.reduce(
+    (acc, p) => {
+      const g = methodGroup(p.payment_method);
+      acc[g].amount += p.total_amount;
+      acc[g].count += 1;
+      return acc;
+    },
+    {
+      cash: { amount: 0, count: 0 },
+      card: { amount: 0, count: 0 },
+      other: { amount: 0, count: 0 },
+    } as Record<MethodGroup, { amount: number; count: number }>,
+  );
+  const methodGrandTotal =
+    methodTotals.cash.amount +
+    methodTotals.card.amount +
+    methodTotals.other.amount;
+  const pctOf = (n: number) =>
+    methodGrandTotal > 0 ? Math.round((n / methodGrandTotal) * 100) : 0;
+
+  const methodRatioAll: Array<{
+    key: MethodGroup;
+    label: string;
+    amount: number;
+    count: number;
+    pct: number;
+    icon: typeof Banknote;
+    bar: string;
+    accent: KpiAccent;
+  }> = [
+    {
+      key: "card",
+      label: "LodgePay digital",
+      amount: methodTotals.card.amount,
+      count: methodTotals.card.count,
+      pct: pctOf(methodTotals.card.amount),
+      icon: CreditCard,
+      bar: "bg-blue-500",
+      accent: "blue",
+    },
+    {
+      key: "cash",
+      label: "Cash",
+      amount: methodTotals.cash.amount,
+      count: methodTotals.cash.count,
+      pct: pctOf(methodTotals.cash.amount),
+      icon: Banknote,
+      bar: "bg-amber-500",
+      accent: "amber",
+    },
+    {
+      key: "other",
+      label: "Cheque / BACS",
+      amount: methodTotals.other.amount,
+      count: methodTotals.other.count,
+      pct: pctOf(methodTotals.other.amount),
+      icon: Wallet,
+      bar: "bg-slate-400",
+      accent: "blue",
+    },
+  ];
+  const methodRatio = methodRatioAll.filter(
+    (m) => m.key !== "other" || m.amount > 0,
+  );
 
   const totalGiftAidReclaimable = giftAidDeclarations
     .filter((g) => g.status === "active")
@@ -308,9 +493,16 @@ export function AdminPaymentsClient({
     },
   ];
 
-  const filteredPayments = useMemo(() => {
+  const matchedPayments = useMemo(() => {
     let list = [...payments];
-    if (statusFilter !== "all") list = list.filter((p) => p.status === statusFilter);
+    if (statusFilter !== "all")
+      list = list.filter((p) => p.status === statusFilter);
+    if (methodFilter !== "all")
+      list = list.filter((p) => methodGroup(p.payment_method) === methodFilter);
+    if (categoryFilter !== "all")
+      list = list.filter(
+        (p) => categoryAmounts(p)[categoryFilter] > 0,
+      );
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       list = list.filter(
@@ -319,8 +511,35 @@ export function AdminPaymentsClient({
           (p.user_name ?? "").toLowerCase().includes(q)
       );
     }
-    return list.slice(0, 50);
-  }, [payments, statusFilter, searchQuery]);
+    return list;
+  }, [payments, statusFilter, methodFilter, categoryFilter, searchQuery]);
+
+  // Total of the matched rows — for the category filter this is that
+  // category's gross (so "Cash + Raffle" gives the raffle cash takings); for
+  // everything else it's the row total. Doubles as the cash count at the
+  // bottom of the table when filtered to Method = Cash.
+  const matchedTotal = useMemo(
+    () =>
+      matchedPayments.reduce((s, p) => {
+        if (categoryFilter !== "all")
+          return s + categoryAmounts(p)[categoryFilter];
+        return s + p.total_amount;
+      }, 0),
+    [matchedPayments, categoryFilter],
+  );
+
+  const ROW_CAP = 200;
+  const filteredPayments = matchedPayments.slice(0, ROW_CAP);
+  const anyFilterActive =
+    statusFilter !== "all" ||
+    methodFilter !== "all" ||
+    categoryFilter !== "all" ||
+    searchQuery.trim().length > 0;
+
+  const focusCategory = (key: CategoryKey) => {
+    setActiveTab("payments");
+    setCategoryFilter((prev) => (prev === key ? "all" : key));
+  };
 
   const tabs: { key: Tab; label: string; icon: typeof CreditCard }[] = [
     { key: "payments", label: "Payments", icon: CreditCard },
@@ -356,12 +575,13 @@ export function AdminPaymentsClient({
     if (kind === "payments") {
       downloadCsv(
         "payments-received.csv",
-        ["Date", "Name", "Email", "Amount", "Status", "Mooov reference"],
+        ["Date", "Name", "Email", "Amount", "Method", "Status", "Mooov reference"],
         succeeded.map((p) => [
           p.created_at,
           p.user_name,
           p.user_email,
           p.total_amount,
+          methodMeta(p.payment_method).label,
           p.status,
           p.mooov_payment_id ?? p.stripe_payment_intent_id,
         ])
@@ -370,7 +590,7 @@ export function AdminPaymentsClient({
     if (kind === "dining") {
       downloadCsv(
         "dining-income.csv",
-        ["Date", "Name", "Email", "Dining amount", "Status", "Mooov reference"],
+        ["Date", "Name", "Email", "Dining amount", "Method", "Status", "Mooov reference"],
         payments
           .filter((p) => p.dining_amount > 0)
           .map((p) => [
@@ -378,8 +598,54 @@ export function AdminPaymentsClient({
             p.user_name,
             p.user_email,
             p.dining_amount,
+            methodMeta(p.payment_method).label,
             p.status,
             p.mooov_payment_id ?? p.stripe_payment_intent_id,
+          ])
+      );
+    }
+    if (kind === "raffle") {
+      // Raffle handout list. Driven by raffle_amount > 0 (works for itemised
+      // baskets too) and excludes refunded/voided rows so you never hand out
+      // a ticket for a reversed payment.
+      downloadCsv(
+        "raffle-tickets.csv",
+        ["Date", "Name", "Email", "Raffle amount", "Method", "Status", "Reference"],
+        payments
+          .filter(
+            (p) =>
+              p.raffle_amount > 0 &&
+              p.status !== "refunded" &&
+              p.status !== "partially_refunded",
+          )
+          .map((p) => [
+            p.created_at,
+            p.user_name,
+            p.user_email,
+            p.raffle_amount,
+            methodMeta(p.payment_method).label,
+            p.status,
+            p.mooov_payment_id ?? p.stripe_payment_intent_id,
+          ])
+      );
+    }
+    if (kind === "cash") {
+      // Cash collection sheet for counting the tin at the end of the night.
+      downloadCsv(
+        "cash-collected.csv",
+        ["Date", "Name", "Email", "Amount", "Charity", "Raffle", "Dining", "Recorded by", "Status"],
+        payments
+          .filter((p) => methodGroup(p.payment_method) === "cash")
+          .map((p) => [
+            p.created_at,
+            p.user_name,
+            p.user_email,
+            p.total_amount,
+            p.charity_amount,
+            p.raffle_amount,
+            p.dining_amount,
+            p.recorded_by_email ?? "",
+            p.status,
           ])
       );
     }
@@ -432,15 +698,18 @@ export function AdminPaymentsClient({
     if (kind === "reconciliation") {
       downloadCsv(
         "payment-reconciliation.csv",
-        ["Date", "Name", "Email", "Gross", "Dining", "Charity", "Raffle", "Refund", "Status", "Mooov reference"],
+        ["Date", "Name", "Email", "Method", "Gross", "Dining", "Charity", "Raffle", "Meeting fee", "Guest ticket", "Refund", "Status", "Mooov reference"],
         payments.map((p) => [
           p.created_at,
           p.user_name,
           p.user_email,
+          methodMeta(p.payment_method).label,
           p.total_amount,
           p.dining_amount,
           p.charity_amount,
           p.raffle_amount,
+          p.meeting_fee_amount,
+          p.guest_ticket_amount,
           p.refund_amount,
           p.status,
           p.mooov_payment_id ?? p.stripe_payment_intent_id,
@@ -507,10 +776,27 @@ export function AdminPaymentsClient({
             const ac = kpiAccentIcon[cat.accent];
             const pct =
               breakdownTotal > 0 ? Math.round((cat.value / breakdownTotal) * 100) : 0;
+            const clickable = Boolean(cat.categoryKey);
+            const isActive =
+              cat.categoryKey != null && categoryFilter === cat.categoryKey;
+            const Wrapper = clickable ? "button" : "div";
             return (
-              <div
+              <Wrapper
                 key={cat.label}
-                className="rounded-xl border border-dash-border bg-dash-surface p-4"
+                {...(clickable
+                  ? {
+                      type: "button" as const,
+                      onClick: () => focusCategory(cat.categoryKey as CategoryKey),
+                      "aria-pressed": isActive,
+                    }
+                  : {})}
+                className={cn(
+                  "rounded-xl border bg-dash-surface p-4 text-left transition-colors",
+                  isActive
+                    ? "border-dash-ring ring-2 ring-dash-ring/20"
+                    : "border-dash-border",
+                  clickable && "hover:border-dash-border-strong",
+                )}
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-dash-muted">
@@ -530,8 +816,13 @@ export function AdminPaymentsClient({
                 </p>
                 <p className="mt-0.5 text-xs text-dash-muted">
                   {cat.count} {cat.count === 1 ? "payment" : "payments"} · {pct}%
+                  {clickable ? (
+                    <span className="text-dash-ring">
+                      {isActive ? " · filtering" : " · filter"}
+                    </span>
+                  ) : null}
                 </p>
-              </div>
+              </Wrapper>
             );
           })}
           <div className="rounded-xl border border-dash-border bg-dash-surface-subtle p-4">
@@ -552,6 +843,86 @@ export function AdminPaymentsClient({
       </Card>
 
       <Card variant="panel" className="p-5">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-base font-semibold text-dash-text">How they paid</h2>
+          <p className="text-sm text-dash-muted">
+            Completed income split between LodgePay digital and cash — counts and percentages for end-of-night reconciliation.
+          </p>
+        </div>
+
+        {methodGrandTotal === 0 ? (
+          <p className="mt-4 text-sm text-dash-muted">No completed payments yet.</p>
+        ) : (
+          <>
+            <div className="mt-4 flex h-3 w-full overflow-hidden rounded-full bg-dash-surface-subtle">
+              {methodRatio
+                .filter((m) => m.amount > 0)
+                .map((m) => (
+                  <div
+                    key={m.key}
+                    className={cn("h-full", m.bar)}
+                    style={{ width: `${Math.max(2, m.pct)}%` }}
+                    title={`${m.label}: £${m.amount.toFixed(2)} (${m.pct}%)`}
+                  />
+                ))}
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {methodRatio.map((m) => {
+                const Icon = m.icon;
+                const ac = kpiAccentIcon[m.accent];
+                const isActive = methodFilter === m.key;
+                return (
+                  <button
+                    key={m.key}
+                    type="button"
+                    onClick={() => {
+                      setActiveTab("payments");
+                      setMethodFilter((prev) => (prev === m.key ? "all" : m.key));
+                    }}
+                    aria-pressed={isActive}
+                    className={cn(
+                      "flex items-center justify-between gap-3 rounded-xl border bg-dash-surface p-4 text-left transition-colors hover:border-dash-border-strong",
+                      isActive
+                        ? "border-dash-ring ring-2 ring-dash-ring/20"
+                        : "border-dash-border",
+                    )}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
+                            ac.wrap,
+                          )}
+                        >
+                          <Icon className={cn("h-3.5 w-3.5", ac.icon)} aria-hidden />
+                        </span>
+                        <span className="text-sm font-medium text-dash-text">
+                          {m.label}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xl font-semibold tracking-tight text-dash-text">
+                        £{m.amount.toFixed(2)}
+                      </p>
+                      <p className="mt-0.5 text-xs text-dash-muted">
+                        {m.count} {m.count === 1 ? "payment" : "payments"}
+                        <span className="text-dash-ring">
+                          {isActive ? " · filtering" : " · filter"}
+                        </span>
+                      </p>
+                    </div>
+                    <span className="text-2xl font-bold tabular-nums text-dash-text">
+                      {m.pct}%
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </Card>
+
+      <Card variant="panel" className="p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-base font-semibold text-dash-text">Treasurer Exports</h2>
@@ -564,6 +935,8 @@ export function AdminPaymentsClient({
           </div>
           <div className="flex flex-wrap gap-2">
             {[
+              ["raffle", "Raffle Tickets"],
+              ["cash", "Cash Collected"],
               ["dues", "Dues Outstanding"],
               ["payments", "Payments Received"],
               ["dining", "Dining Income"],
@@ -622,33 +995,97 @@ export function AdminPaymentsClient({
             <div>
               <h2 className="dash-panel-header-title">Ledger</h2>
               <p className="dash-panel-header-description">
-                Search and expand rows for dining, charity, and raffle splits.
+                Filter by method and category, then expand any row for its full split.
               </p>
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 border-b border-dash-border bg-dash-surface px-4 py-4 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-dash-text-faint" />
-              <input
-                type="text"
-                placeholder="Search by name or email…"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-xl border border-dash-border bg-dash-surface-subtle py-2.5 pl-10 pr-4 text-sm text-dash-text placeholder:text-dash-faint focus:border-dash-ring focus:outline-none focus:ring-2 focus:ring-dash-ring/20"
-              />
+          <div className="flex flex-col gap-3 border-b border-dash-border bg-dash-surface px-4 py-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-dash-text-faint" />
+                <input
+                  type="text"
+                  placeholder="Search by name or email…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-xl border border-dash-border bg-dash-surface-subtle py-2.5 pl-10 pr-4 text-sm text-dash-text placeholder:text-dash-faint focus:border-dash-ring focus:outline-none focus:ring-2 focus:ring-dash-ring/20"
+                />
+              </div>
+              <Select
+                value={methodFilter}
+                onValueChange={(v) => setMethodFilter(v as "all" | MethodGroup)}
+              >
+                <SelectTrigger variant="dashboard" className="h-10 w-full sm:w-[150px]">
+                  <SelectValue placeholder="Method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All methods</SelectItem>
+                  <SelectItem value="card">LodgePay digital</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="other">Cheque / BACS</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                value={categoryFilter}
+                onValueChange={(v) => setCategoryFilter(v as "all" | CategoryKey)}
+              >
+                <SelectTrigger variant="dashboard" className="h-10 w-full sm:w-[160px]">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All categories</SelectItem>
+                  {CATEGORY_KEYS.map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {CATEGORY_LABEL[key]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger variant="dashboard" className="h-10 w-full sm:w-[140px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="succeeded">Succeeded</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="refunded">Refunded</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger variant="dashboard" className="h-10 w-full sm:w-[180px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="succeeded">Succeeded</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="refunded">Refunded</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm text-dash-muted">
+                <span className="font-semibold text-dash-text tabular-nums">
+                  {matchedPayments.length}
+                </span>{" "}
+                {matchedPayments.length === 1 ? "payment" : "payments"}
+                {" · "}
+                <span className="font-semibold text-dash-text tabular-nums">
+                  £{matchedTotal.toFixed(2)}
+                </span>
+                {categoryFilter !== "all"
+                  ? ` ${CATEGORY_LABEL[categoryFilter].toLowerCase()}`
+                  : ""}
+                {methodFilter === "cash" ? " in cash" : ""}
+              </p>
+              {anyFilterActive ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-dash-muted hover:text-dash-text"
+                  onClick={() => {
+                    setStatusFilter("all");
+                    setMethodFilter("all");
+                    setCategoryFilter("all");
+                    setSearchQuery("");
+                  }}
+                >
+                  Clear filters
+                </Button>
+              ) : null}
+            </div>
           </div>
 
           {filteredPayments.length === 0 ? (
@@ -662,7 +1099,9 @@ export function AdminPaymentsClient({
                   <TableHead className={cn(DASH_TABLE.head, "w-10")} />
                   <TableHead className={DASH_TABLE.head}>Date</TableHead>
                   <TableHead className={DASH_TABLE.head}>Name</TableHead>
-                  <TableHead className={DASH_TABLE.head}>Email</TableHead>
+                  <TableHead className={cn(DASH_TABLE.head, "hidden md:table-cell")}>Email</TableHead>
+                  <TableHead className={DASH_TABLE.head}>Method</TableHead>
+                  <TableHead className={cn(DASH_TABLE.head, "hidden sm:table-cell")}>Categories</TableHead>
                   <TableHead className={cn(DASH_TABLE.head, "text-right")}>Amount</TableHead>
                   <TableHead className={DASH_TABLE.head}>Status</TableHead>
                 </TableRow>
@@ -687,7 +1126,38 @@ export function AdminPaymentsClient({
                       <TableCell className={cn(DASH_TABLE.cell, "font-medium")}>
                         {p.user_name ?? "Not recorded"}
                       </TableCell>
-                      <TableCell className={DASH_TABLE.cellMuted}>{p.user_email}</TableCell>
+                      <TableCell className={cn(DASH_TABLE.cellMuted, "hidden md:table-cell")}>{p.user_email}</TableCell>
+                      <TableCell className={DASH_TABLE.cell}>
+                        <MethodBadge pm={p.payment_method} />
+                      </TableCell>
+                      <TableCell className={cn(DASH_TABLE.cell, "hidden sm:table-cell")}>
+                        <div className="flex flex-wrap gap-1">
+                          {(() => {
+                            const amounts = categoryAmounts(p);
+                            const present = CATEGORY_KEYS.filter(
+                              (k) => amounts[k] > 0,
+                            );
+                            if (present.length === 0)
+                              return (
+                                <span className="text-xs text-dash-text-faint">
+                                  —
+                                </span>
+                              );
+                            return present.map((k) => (
+                              <Badge
+                                key={k}
+                                variant="outline"
+                                className="border-dash-border text-[11px]"
+                              >
+                                {CATEGORY_LABEL[k]}
+                                {present.length > 1
+                                  ? ` £${amounts[k].toFixed(2)}`
+                                  : ""}
+                              </Badge>
+                            ));
+                          })()}
+                        </div>
+                      </TableCell>
                       <TableCell className={cn(DASH_TABLE.cell, "text-right font-medium tabular-nums")}>
                         £{Number(p.total_amount).toFixed(2)}
                       </TableCell>
@@ -695,7 +1165,7 @@ export function AdminPaymentsClient({
                     </TableRow>
                     {expandedRow === p.id && (
                       <TableRow className={DASH_TABLE.row}>
-                        <TableCell colSpan={6} className="!p-0">
+                        <TableCell colSpan={8} className="!p-0">
                           <div className="border-t border-dash-border bg-dash-surface-subtle/80 px-6 py-4">
                             {(() => {
                               const meetingFee = Number(p.meeting_fee_amount ?? 0);
@@ -821,6 +1291,13 @@ export function AdminPaymentsClient({
               </TableBody>
             </Table>
           )}
+          {matchedPayments.length > ROW_CAP ? (
+            <div className="border-t border-dash-border bg-dash-surface px-4 py-3 text-center text-xs text-dash-muted">
+              Showing the first {ROW_CAP} of {matchedPayments.length} matching
+              payments. Narrow with filters, or use the exports above for the
+              full list.
+            </div>
+          ) : null}
         </Card>
       )}
 
