@@ -292,6 +292,19 @@ function isCollected(status: string): boolean {
   return status === "succeeded" || status === "completed" || status === "paid";
 }
 
+// Money that left again or never landed: refunds and reversals. Hidden from
+// the ledger by default so they don't clutter reconciliation; still reachable
+// via the Refunded status filter.
+function isReversed(status: string): boolean {
+  return (
+    status === "refunded" ||
+    status === "partially_refunded" ||
+    status === "voided" ||
+    status === "cancelled" ||
+    status === "canceled"
+  );
+}
+
 function giftAidStatusBadge(status: string) {
   if (status === "active")
     return (
@@ -598,8 +611,14 @@ export function AdminPaymentsClient({
 
   const matchedPayments = useMemo(() => {
     let list = [...scopedPayments];
-    if (statusFilter !== "all")
+    if (statusFilter === "all") {
+      // Default view hides refunds/reversals so they never read as income.
+      list = list.filter((p) => !isReversed(p.status));
+    } else if (statusFilter === "refunded") {
+      list = list.filter((p) => isReversed(p.status));
+    } else {
       list = list.filter((p) => p.status === statusFilter);
+    }
     if (methodFilter !== "all")
       list = list.filter((p) => methodGroup(p.payment_method) === methodFilter);
     if (categoryFilter !== "all")
@@ -1217,23 +1236,42 @@ export function AdminPaymentsClient({
               </Select>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm text-dash-muted">
-                <span className="font-semibold text-dash-text tabular-nums">
-                  {matchedCollected.length}
-                </span>{" "}
-                {matchedCollected.length === 1 ? "payment" : "payments"}
-                {" · "}
-                <span className="font-semibold text-dash-text tabular-nums">
-                  £{matchedTotal.toFixed(2)}
-                </span>
-                {categoryFilter !== "all"
-                  ? ` ${CATEGORY_LABEL[categoryFilter].toLowerCase()}`
-                  : ""}
-                {methodFilter === "cash" ? " in cash" : ""}
-                {matchedPayments.length > matchedCollected.length
-                  ? ` · ${matchedPayments.length - matchedCollected.length} excluded (refunded/pending)`
-                  : ""}
-              </p>
+              {statusFilter === "refunded" ? (
+                <p className="text-sm text-dash-muted">
+                  <span className="font-semibold text-dash-text tabular-nums">
+                    {matchedPayments.length}
+                  </span>{" "}
+                  refunded / reversed ·{" "}
+                  <span className="font-semibold text-dash-text tabular-nums">
+                    £
+                    {matchedPayments
+                      .reduce(
+                        (s, p) => s + (p.refund_amount || p.total_amount || 0),
+                        0,
+                      )
+                      .toFixed(2)}
+                  </span>{" "}
+                  returned · not counted as income
+                </p>
+              ) : (
+                <p className="text-sm text-dash-muted">
+                  <span className="font-semibold text-dash-text tabular-nums">
+                    {matchedCollected.length}
+                  </span>{" "}
+                  {matchedCollected.length === 1 ? "payment" : "payments"}
+                  {" · "}
+                  <span className="font-semibold text-dash-text tabular-nums">
+                    £{matchedTotal.toFixed(2)}
+                  </span>
+                  {categoryFilter !== "all"
+                    ? ` ${CATEGORY_LABEL[categoryFilter].toLowerCase()}`
+                    : ""}
+                  {methodFilter === "cash" ? " in cash" : ""}
+                  {matchedPayments.length > matchedCollected.length
+                    ? ` · ${matchedPayments.length - matchedCollected.length} pending (not counted)`
+                    : ""}
+                </p>
+              )}
               {anyFilterActive ? (
                 <Button
                   type="button"
