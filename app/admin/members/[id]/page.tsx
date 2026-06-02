@@ -79,6 +79,7 @@ export default async function AdminMemberDetailPage({
     lodgeDues,
     schedules,
     giftAidDeclaration,
+    recentEmails,
   ] = await Promise.all([
     db.getRsvpDietaryByEmail(member.email, lodgeId),
     db.getPaymentsByEmail(member.email, lodgeId),
@@ -94,6 +95,10 @@ export default async function AdminMemberDetailPage({
       id: member.id,
       email: member.email,
     }),
+    // The "Recent emails" panel reads append-only sends from
+    // public.email_log (migration 064). Empty list = no sends yet,
+    // not an error.
+    db.listEmailLogForMember(lodgeId, member.email, 10).catch(() => []),
   ]);
 
   const nextDues = computeNextDuesForMember({
@@ -215,6 +220,7 @@ export default async function AdminMemberDetailPage({
           : null
       }
       duesMethod={JSON.parse(JSON.stringify(duesMethod))}
+      recentEmails={JSON.parse(JSON.stringify(recentEmails))}
     />
   );
 }

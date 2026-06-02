@@ -349,6 +349,47 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     },
   });
 
+  // Email the member so they know what we've recorded. Skipped for
+  // method=null (clearing the tag) and method=online_subscription
+  // (the subscription.activated webhook already covers that case).
+  if (method === "bacs" || method === "paid_in_full" || method === "fee_waived") {
+    try {
+      const lodge = await db.getLodgeById(lodgeId).catch(() => null);
+      const currentYear = await db
+        .getCurrentMasonicYear(lodgeId)
+        .catch(() => null);
+      const { notifyDuesMethodChanged } = await import(
+        "@/lib/email/dues-notifications"
+      );
+      await notifyDuesMethodChanged({
+        lodgeId,
+        lodge,
+        member: {
+          id: member.id,
+          email: member.email,
+          full_name: member.full_name,
+        },
+        duesRecord: {
+          id: updated.id,
+          amount: updated.amount,
+          currency: updated.currency,
+        },
+        method,
+        bacsMonthlyAmount: updated.bacs_monthly_amount ?? null,
+        bacsReference: updated.bacs_reference ?? null,
+        waiverReason: updated.waiver_reason ?? null,
+        setBy,
+        yearLabel: currentYear?.label ?? null,
+      });
+    } catch (err) {
+      console.error("admin dues-method: notification email failed", {
+        member_id: member.id,
+        method,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   return NextResponse.json({
     dues: {
       id: updated.id,

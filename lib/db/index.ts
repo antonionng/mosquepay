@@ -66,6 +66,8 @@ import type {
   IntegrationCredentials,
   IntegrationProvider,
   LodgeFeatureFlag,
+  EmailLog,
+  LodgeNotificationSetting,
 } from "./types";
 
 export * from "./types";
@@ -302,6 +304,116 @@ export async function createAuditLog(
     .single();
   if (error) throw error;
   return row as AuditLog;
+}
+
+// ---------------------------------------------------------------------------
+// email_log
+// ---------------------------------------------------------------------------
+
+/**
+ * Append a row to the email_log. Returns the persisted row (or null
+ * if Postgres rejected the insert because the dedupe constraint
+ * matched, which the caller treats as "already sent — bail").
+ *
+ * Callers should NOT throw on conflict — the unique-on-dedupe index
+ * is doing exactly the job we want it to do (skip the second send of
+ * a redelivered Mooov event). We surface that as null and let the
+ * sender skip cleanly.
+ */
+export async function recordEmailLog(
+  data: Omit<EmailLog, "id" | "created_at">,
+): Promise<EmailLog | null> {
+  const { data: row, error } = await db()
+    .from("email_log")
+    .insert({
+      ...data,
+      to_email: data.to_email.trim().toLowerCase(),
+    })
+    .select("*")
+    .maybeSingle();
+  if (error) {
+    // 23505 = unique_violation (dedupe hit). Caller treats as no-op.
+    if ((error as { code?: string }).code === "23505") return null;
+    throw error;
+  }
+  return row as EmailLog | null;
+}
+
+/**
+ * Returns true when a row already exists for (lodge_id, email_type,
+ * dedupe_key). Used by webhook senders as a pre-check so we don't
+ * even render the email when Mooov redelivers an event.
+ */
+export async function emailAlreadySent(
+  lodgeId: string | null,
+  emailType: string,
+  dedupeKey: string,
+): Promise<boolean> {
+  let query = db()
+    .from("email_log")
+    .select("id", { count: "exact", head: true })
+    .eq("email_type", emailType)
+    .eq("dedupe_key", dedupeKey);
+  query = lodgeId ? query.eq("lodge_id", lodgeId) : query.is("lodge_id", null);
+  const { count, error } = await query;
+  if (error) {
+    // Conservative: failing open lets the email try; the unique index
+    // is the hard guard.
+    console.error("emailAlreadySent: query failed", error);
+    return false;
+  }
+  return (count ?? 0) > 0;
+}
+
+/**
+ * Recent email log rows for a member. Drives the "Recent emails"
+ * panel on /admin/members/[id].
+ */
+export async function listEmailLogForMember(
+  lodgeId: string,
+  memberEmail: string,
+  limit = 10,
+): Promise<EmailLog[]> {
+  const { data, error } = await db()
+    .from("email_log")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .eq("to_email", memberEmail.trim().toLowerCase())
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []) as EmailLog[];
+}
+
+// ---------------------------------------------------------------------------
+// lodge_notification_settings
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true when this (lodge, role, event_type) is allowed to
+ * send. Default is "send" — only an explicit row with enabled=false
+ * suppresses. Also honours the lodge-wide kill-switch row stored
+ * with role='__all__'.
+ */
+export async function notificationEnabled(
+  lodgeId: string,
+  role: string,
+  eventType: string,
+): Promise<boolean> {
+  const { data, error } = await db()
+    .from("lodge_notification_settings")
+    .select("role, enabled")
+    .eq("lodge_id", lodgeId)
+    .in("role", [role, "__all__"])
+    .eq("event_type", eventType);
+  if (error) {
+    console.error("notificationEnabled: query failed", error);
+    return true;
+  }
+  for (const row of (data ?? []) as Array<Pick<LodgeNotificationSetting, "role" | "enabled">>) {
+    if (row.enabled === false) return false;
+  }
+  return true;
 }
 
 export async function upsertLodge(

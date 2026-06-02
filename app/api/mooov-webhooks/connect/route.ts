@@ -604,6 +604,37 @@ async function projectDonationCaptured(
     status: "completed",
     gift_aid_declaration_id: giftAidDeclarationId,
   });
+
+  // Donation receipt to the donor. Best-effort; idempotent on the
+  // Mooov payment_id.
+  if (donorEmail) {
+    try {
+      const lodge = await db.getLodgeById(lodgeId).catch(() => null);
+      const { sendOnlinePaymentReceipt } = await import(
+        "@/lib/email/payment-receipts"
+      );
+      await sendOnlinePaymentReceipt({
+        lodgeId,
+        lodge,
+        toEmail: donorEmail,
+        toName: donorName,
+        memberId: null,
+        amountMajor,
+        currency: currencyMajor,
+        kind: "donation",
+        description: giftAid
+          ? "Thank you for your donation. We've recorded a Gift Aid declaration alongside it so your gift can stretch a little further."
+          : "Thank you for your donation.",
+        mooovPaymentId: attempt.payment_id,
+        metadata: { gift_aid: giftAid },
+      });
+    } catch (err) {
+      console.error("mooov webhook: donation receipt email failed", {
+        payment_id: attempt.payment_id,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
 }
 
 // Project a captured Mooov event-guest payment into LP public.payments +
@@ -883,6 +914,35 @@ async function projectDuesCaptured(
       gift_aid_declaration_id: declaration?.id ?? null,
       gift_aid_status: giftAidStatus,
       gift_aid_eligible_amount: declaration ? charitableAmount : 0,
+    });
+  }
+
+  // Receipt to the payer. Best-effort; idempotent on Mooov payment_id.
+  try {
+    const lodge = await db.getLodgeById(lodgeId).catch(() => null);
+    const member = duesRecord.member_id
+      ? await db.getMemberById(duesRecord.member_id, lodgeId).catch(() => null)
+      : null;
+    const { sendOnlinePaymentReceipt } = await import(
+      "@/lib/email/payment-receipts"
+    );
+    await sendOnlinePaymentReceipt({
+      lodgeId,
+      lodge,
+      toEmail: donorEmail,
+      toName: donorName,
+      memberId: member?.id ?? null,
+      amountMajor: totalMajor,
+      currency: currencyMajor,
+      kind: "dues_full",
+      description: `This receipt covers your full annual dues for the ${lodge?.name ?? "lodge"}.`,
+      mooovPaymentId: attempt.payment_id,
+      metadata: { dues_id: duesId },
+    });
+  } catch (err) {
+    console.error("mooov webhook: dues receipt email failed", {
+      payment_id: attempt.payment_id,
+      message: err instanceof Error ? err.message : String(err),
     });
   }
 }
@@ -1632,23 +1692,79 @@ async function handleSubscriptionActivated(
   // all reflect reality without the admin having to manually mark it.
   // Only overwrite NULL or already-online tags — never clobber an
   // explicit BACS / paid_in_full / fee_waived tag the admin set.
+  let duesRecord: db.MemberDues | null = null;
   try {
-    const memberDues = await db.getMemberDuesById(
+    duesRecord = await db.getMemberDuesById(
       schedule.member_dues_id,
       lodgeId,
     );
     if (
-      memberDues &&
-      (memberDues.dues_payment_method == null ||
-        memberDues.dues_payment_method === "online_subscription")
+      duesRecord &&
+      (duesRecord.dues_payment_method == null ||
+        duesRecord.dues_payment_method === "online_subscription")
     ) {
-      await db.setMemberDuesPaymentMethod(memberDues.id, lodgeId, {
+      await db.setMemberDuesPaymentMethod(duesRecord.id, lodgeId, {
         method: "online_subscription",
         setBy: "mooov_webhook_subscription_activated",
       });
     }
   } catch (err) {
     console.error("mooov webhook: failed to auto-tag dues_payment_method", {
+      schedule_id: schedule.id,
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  // Member receipt + treasurer alert. Best-effort — never block the
+  // webhook on email infra. Idempotent via the email_log dedupe
+  // index keyed off the Mooov subscription_id.
+  try {
+    const member =
+      duesRecord?.member_id != null
+        ? await db.getMemberById(duesRecord.member_id, lodgeId).catch(() => null)
+        : await db
+            .getMemberByEmail(schedule.member_email, lodgeId)
+            .catch(() => null);
+    const lodge = await db.getLodgeById(lodgeId).catch(() => null);
+    if (member && duesRecord) {
+      const cycleAmount =
+        typeof parsed.amount === "number" && parsed.amount > 0
+          ? parsed.amount / 100
+          : (() => {
+              const meta = (schedule.metadata ?? {}) as Record<string, unknown>;
+              const fromMeta =
+                typeof meta.cycle_amount === "number"
+                  ? (meta.cycle_amount as number)
+                  : null;
+              return fromMeta ?? 0;
+            })();
+      const { notifyDuesSubscriptionActivated } = await import(
+        "@/lib/email/dues-notifications"
+      );
+      await notifyDuesSubscriptionActivated({
+        lodgeId,
+        lodge,
+        member: {
+          id: member.id,
+          email: member.email,
+          full_name: member.full_name,
+        },
+        schedule: {
+          id: schedule.id,
+          cadence: schedule.cadence,
+          mooov_subscription_id: schedule.mooov_subscription_id,
+          next_charge_at: schedule.next_charge_at,
+        },
+        duesRecord: {
+          id: duesRecord.id,
+          amount: duesRecord.amount,
+          currency: duesRecord.currency,
+        },
+        cycleAmount,
+      });
+    }
+  } catch (err) {
+    console.error("mooov webhook: subscription.activated email failed", {
       schedule_id: schedule.id,
       message: err instanceof Error ? err.message : String(err),
     });
@@ -1813,6 +1929,53 @@ async function handleSubscriptionInvoicePaid(
       gift_aid_eligible_amount: declaration ? charitablePerCycle : 0,
     });
   }
+
+  // Per-cycle receipt to the member. Dedupe on the synthetic
+  // mooov_payment_id so a Mooov redeliver of the same invoice can't
+  // spam them. Best-effort — book-keeping above is the source of
+  // truth.
+  try {
+    const member =
+      duesRecord.member_id != null
+        ? await db.getMemberById(duesRecord.member_id, lodgeId).catch(() => null)
+        : await db
+            .getMemberByEmail(duesRecord.member_email, lodgeId)
+            .catch(() => null);
+    const lodge = await db.getLodgeById(lodgeId).catch(() => null);
+    if (member) {
+      const meta = (schedule.metadata ?? {}) as Record<string, unknown>;
+      const cyclesTotal =
+        typeof meta.cycles_total === "number"
+          ? (meta.cycles_total as number)
+          : null;
+      const cyclePaidNumber =
+        (typeof meta.cycles_paid === "number" ? (meta.cycles_paid as number) : 0) + 1;
+      const { notifyDuesCyclePaid } = await import(
+        "@/lib/email/dues-notifications"
+      );
+      await notifyDuesCyclePaid({
+        lodgeId,
+        lodge,
+        member: {
+          id: member.id,
+          email: member.email,
+          full_name: member.full_name,
+        },
+        schedule: { id: schedule.id, cadence: schedule.cadence },
+        amountMajor: totalMajor,
+        currency: currencyMajor,
+        invoiceDedupeKey: syntheticPaymentId,
+        cyclePaidNumber,
+        cyclesTotal,
+        nextChargeAt: remainingAfter[0]?.due_date ?? null,
+      });
+    }
+  } catch (err) {
+    console.error("mooov webhook: subscription.invoice_paid email failed", {
+      schedule_id: schedule.id,
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 async function handleSubscriptionInvoiceFailed(
@@ -1830,9 +1993,10 @@ async function handleSubscriptionInvoiceFailed(
       ? (parsed.metadata.failure_category as string)
       : null;
 
+  const nextFailures = schedule.consecutive_failures + 1;
   await db.updateDuesSchedule(schedule.id, lodgeId, {
     status: "past_due",
-    consecutive_failures: schedule.consecutive_failures + 1,
+    consecutive_failures: nextFailures,
     last_failure_code: failureCode,
     last_failure_category: failureCategory,
     last_failure_at: new Date().toISOString(),
@@ -1842,8 +2006,52 @@ async function handleSubscriptionInvoiceFailed(
     schedule_id: schedule.id,
     invoice_id: parsed.invoiceId,
     failure_code: failureCode,
-    consecutive_failures: schedule.consecutive_failures + 1,
+    consecutive_failures: nextFailures,
   });
+
+  // Member nudge on every fail; treasurer escalation at 1, 3, 5.
+  try {
+    const duesRecord = await db
+      .getMemberDuesById(schedule.member_dues_id, lodgeId)
+      .catch(() => null);
+    const member =
+      duesRecord?.member_id != null
+        ? await db.getMemberById(duesRecord.member_id, lodgeId).catch(() => null)
+        : await db
+            .getMemberByEmail(schedule.member_email, lodgeId)
+            .catch(() => null);
+    const lodge = await db.getLodgeById(lodgeId).catch(() => null);
+    if (member) {
+      const invoiceDedupeKey =
+        parsed.invoiceId ?? `sub_evt_${eventId}_failed`;
+      const { notifyDuesCycleFailed } = await import(
+        "@/lib/email/dues-notifications"
+      );
+      await notifyDuesCycleFailed({
+        lodgeId,
+        lodge,
+        member: {
+          id: member.id,
+          email: member.email,
+          full_name: member.full_name,
+        },
+        schedule: {
+          id: schedule.id,
+          cadence: schedule.cadence,
+          mooov_subscription_id: schedule.mooov_subscription_id,
+        },
+        consecutiveFailures: nextFailures,
+        failureCode,
+        failureCategory,
+        invoiceDedupeKey,
+      });
+    }
+  } catch (err) {
+    console.error("mooov webhook: subscription.invoice_failed email failed", {
+      schedule_id: schedule.id,
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 async function handleSubscriptionCanceled(
@@ -1866,4 +2074,35 @@ async function handleSubscriptionCanceled(
     cancelled_by_actor: parsed.cancelReason ?? "stripe_subscription_canceled",
     next_charge_at: null,
   });
+
+  try {
+    const member = await db
+      .getMemberByEmail(schedule.member_email, lodgeId)
+      .catch(() => null);
+    const lodge = await db.getLodgeById(lodgeId).catch(() => null);
+    if (member) {
+      const { notifyDuesSubscriptionCanceled } = await import(
+        "@/lib/email/dues-notifications"
+      );
+      await notifyDuesSubscriptionCanceled({
+        lodgeId,
+        lodge,
+        member: {
+          id: member.id,
+          email: member.email,
+          full_name: member.full_name,
+        },
+        schedule: {
+          id: schedule.id,
+          mooov_subscription_id: schedule.mooov_subscription_id,
+        },
+        cancelReason: parsed.cancelReason ?? null,
+      });
+    }
+  } catch (err) {
+    console.error("mooov webhook: subscription.canceled email failed", {
+      schedule_id: schedule.id,
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
 }

@@ -182,6 +182,10 @@ interface Props {
    *  current method tag, copyable subscription link. Server-computed in
    *  page.tsx so the panel renders without a client roundtrip. */
   duesMethod?: DuesMethodPanelProps["initial"] | null;
+  /** Last 10 emails LP sent to this member. Drives the "Recent emails"
+   *  panel — best-effort log so admins can verify a notification went
+   *  out without leaving the page. */
+  recentEmails?: import("@/lib/db/types").EmailLog[] | null;
 }
 
 function buildEditForm(member: Member) {
@@ -250,6 +254,7 @@ export function MemberDetailClient({
   subscription = null,
   giftAidDeclaration = null,
   duesMethod = null,
+  recentEmails = [],
 }: Props) {
   const router = useRouter();
   const [member, setMember] = useState(initialMember);
@@ -1260,6 +1265,8 @@ export function MemberDetailClient({
           />
         ) : null}
 
+        <RecentEmailsPanel emails={recentEmails ?? []} />
+
         <MemberGiftAidPanel
           member={{
             id: member.id,
@@ -1656,6 +1663,115 @@ export function MemberDetailClient({
         tone="danger"
         onConfirm={() => performSave({ includeEmail: true })}
       />
+    </div>
+  );
+}
+
+function emailTypeLabel(type: string): string {
+  switch (type) {
+    case "dues_subscription_activated_member":
+      return "Subscription activated";
+    case "dues_subscription_invoice_paid_member":
+      return "Subscription cycle receipt";
+    case "dues_subscription_invoice_failed_member":
+      return "Subscription cycle failed";
+    case "dues_subscription_canceled_member":
+      return "Subscription cancelled";
+    case "dues_method_changed_bacs_member":
+      return "BACS recorded";
+    case "dues_method_changed_paid_in_full_member":
+      return "Paid in full";
+    case "dues_method_changed_fee_waived_member":
+      return "Fee waived";
+    case "payment_receipt_dues_full":
+      return "Dues receipt";
+    case "payment_receipt_donation":
+      return "Donation receipt";
+    case "payment_receipt_event":
+      return "Event receipt";
+    default:
+      return type.replaceAll("_", " ");
+  }
+}
+
+function RecentEmailsPanel({
+  emails,
+}: {
+  emails: import("@/lib/db/types").EmailLog[];
+}) {
+  return (
+    <div className="rounded-2xl border border-dash-border bg-dash-surface shadow-sm">
+      <div className="border-b border-dash-border px-6 py-4">
+        <h3 className="text-base font-semibold text-dash-text flex items-center gap-2">
+          <Mail className="h-4 w-4 text-dash-muted" />
+          Recent emails
+        </h3>
+        <p className="mt-1 text-xs text-dash-muted">
+          The last 10 emails LP sent to this member. Failed sends are
+          flagged so the treasurer can intervene.
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        {emails.length === 0 ? (
+          <div className="flex flex-col items-center py-12 text-center">
+            <Mail className="h-8 w-8 text-dash-faint mb-2" />
+            <p className="text-sm text-dash-muted">No emails sent yet</p>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-dash-border bg-dash-surface-subtle text-left text-xs font-medium uppercase tracking-wider text-dash-muted">
+                <th className="px-4 py-3">Sent</th>
+                <th className="px-4 py-3">Type</th>
+                <th className="px-4 py-3 hidden md:table-cell">Subject</th>
+                <th className="px-4 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-dash-border">
+              {emails.map((e) => (
+                <tr
+                  key={e.id}
+                  className="hover:bg-dash-surface-subtle transition-colors"
+                >
+                  <td className="px-4 py-3.5 text-dash-muted whitespace-nowrap">
+                    {new Date(e.created_at).toLocaleString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </td>
+                  <td className="px-4 py-3.5 text-dash-text">
+                    {emailTypeLabel(e.email_type)}
+                  </td>
+                  <td className="px-4 py-3.5 text-dash-muted hidden md:table-cell">
+                    {e.subject}
+                  </td>
+                  <td className="px-4 py-3.5">
+                    {e.status === "sent" ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                        <CheckCircle2 className="h-3 w-3" /> Sent
+                      </span>
+                    ) : e.status === "failed" ? (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700"
+                        title={e.error ?? undefined}
+                      >
+                        <AlertCircle className="h-3 w-3" /> Failed
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                        <AlertTriangle className="h-3 w-3" /> Skipped
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }

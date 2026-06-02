@@ -234,6 +234,43 @@ export type AuditLog = {
   created_at: string;
 };
 
+/**
+ * Append-only record of an email send. See
+ * supabase/migrations/064_email_log_and_notification_settings.sql.
+ *
+ * The dedupe_key is set when a webhook redeliver could legitimately
+ * fire the same send twice (Mooov dual-emits subscription.activated +
+ * payment.captured for the same money, etc.). Senders MUST consult
+ * countEmailLogByDedupe before delivering, otherwise members get
+ * duplicate receipts.
+ */
+export type EmailLog = {
+  id: string;
+  lodge_id: string | null;
+  to_email: string;
+  member_id: string | null;
+  admin_user_id: string | null;
+  email_type: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  dedupe_key: string | null;
+  subject: string;
+  resend_message_id: string | null;
+  status: "sent" | "failed" | "skipped_optout";
+  error: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
+
+export type LodgeNotificationSetting = {
+  lodge_id: string;
+  /** admin_users.role or the sentinel '__all__' for a lodge-wide rule. */
+  role: string;
+  event_type: string;
+  enabled: boolean;
+  updated_at: string;
+};
+
 export type Lead = {
   id: string;
   lodge_id: string | null;
