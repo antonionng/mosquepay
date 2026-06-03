@@ -822,6 +822,41 @@ export function AdminPaymentsClient({
         ])
       );
     }
+    if (kind === "settlement") {
+      // LodgePay (Mooov card) expected settlement, grouped by day. Net = gross
+      // collected minus refunds for card payments only. Reconcile each day's
+      // net against the matching Mooov payout / bank credit. Cash and
+      // cheque/BACS are excluded (they don't settle via LodgePay).
+      const byDay = new Map<
+        string,
+        { gross: number; refund: number; count: number }
+      >();
+      for (const p of scopedPayments) {
+        if (methodGroup(p.payment_method) !== "card") continue;
+        if (!isCollected(p.status) && p.status !== "partially_refunded")
+          continue;
+        const day = p.created_at.slice(0, 10);
+        const row = byDay.get(day) ?? { gross: 0, refund: 0, count: 0 };
+        row.gross += p.total_amount;
+        row.refund += p.refund_amount ?? 0;
+        row.count += 1;
+        byDay.set(day, row);
+      }
+      const rows = Array.from(byDay.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([day, v]) => [
+          day,
+          v.count,
+          v.gross.toFixed(2),
+          v.refund.toFixed(2),
+          (v.gross - v.refund).toFixed(2),
+        ]);
+      downloadCsv(
+        "lodgepay-settlement.csv",
+        ["Date", "Card payments", "Gross", "Refunds", "Net expected to settle"],
+        rows,
+      );
+    }
     if (kind === "reconciliation") {
       downloadCsv(
         "payment-reconciliation.csv",
@@ -1124,6 +1159,7 @@ export function AdminPaymentsClient({
               ["charity", "Charity Totals"],
               ["refunds", "Refunds"],
               ["gift-aid", "Gift Aid"],
+              ["settlement", "LodgePay Settlement"],
               ["reconciliation", "Mooov Reconciliation"],
             ].map(([kind, label]) => (
               <Button
