@@ -435,6 +435,18 @@ function PaymentEditForm({
               {Number(payment.total_amount).toFixed(2)} into it.
             </p>
           )}
+          {category === "charity" && currentCategory !== "charity" && (
+            <p className="mt-1 text-xs text-emerald-700">
+              Creates a matching charity donation for Gift Aid (auto-linked if
+              the payer has a declaration on file).
+            </p>
+          )}
+          {currentCategory === "charity" && category !== "charity" && category !== "" && (
+            <p className="mt-1 text-xs text-amber-700">
+              Removes the linked charity donation (blocked if it&rsquo;s already
+              in a Gift Aid claim).
+            </p>
+          )}
         </div>
         <div>
           <label className="mb-1 block text-xs text-dash-text-muted">

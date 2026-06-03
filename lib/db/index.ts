@@ -1063,6 +1063,32 @@ export async function updateDonation(
   return data as Donation | null;
 }
 
+export async function getDonationsByPaymentId(
+  paymentId: string,
+  lodgeId: string
+): Promise<Donation[]> {
+  const { data, error } = await db()
+    .from("donations")
+    .select("*")
+    .eq("lodge_id", lodgeId)
+    .eq("payment_id", paymentId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as Donation[];
+}
+
+export async function deleteDonation(
+  id: string,
+  lodgeId: string
+): Promise<void> {
+  const { error } = await db()
+    .from("donations")
+    .delete()
+    .eq("id", id)
+    .eq("lodge_id", lodgeId);
+  if (error) throw error;
+}
+
 export async function getGiftAidClaimBatches(
   lodgeId: string
 ): Promise<GiftAidClaimBatch[]> {

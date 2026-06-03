@@ -111,6 +111,43 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     );
   }
 
+  // Work out the post-edit charity figure and meeting link so we can keep
+  // the donations/Gift Aid ledger in step with a recategorise. The charity
+  // sub-amount drives whether this payment should have a matching donation
+  // row; the event link keeps the donation rolling up to the right meeting.
+  const newCharity =
+    "charity_amount" in updates
+      ? Number(updates.charity_amount)
+      : Number(payment.charity_amount ?? 0);
+  const newEventId = (
+    "event_id" in updates ? updates.event_id : payment.event_id ?? null
+  ) as string | null;
+
+  const linkedDonations = await db
+    .getDonationsByPaymentId(id, lodgeId)
+    .catch(() => []);
+  const existingDonation = linkedDonations[0] ?? null;
+
+  // Guard: never silently disturb a donation that's already been swept into
+  // a Gift Aid claim batch (or marked claimed). The treasurer must resolve
+  // that from the Gift Aid screen first, otherwise we'd risk diverging from
+  // what was filed with HMRC / the Relief Chest.
+  const removingCharity = newCharity <= 0 && Number(payment.charity_amount ?? 0) > 0;
+  const reducingClaimed =
+    existingDonation &&
+    (existingDonation.gift_aid_claim_batch_id ||
+      existingDonation.gift_aid_claimed_at) &&
+    (removingCharity || newCharity < Number(existingDonation.amount ?? 0));
+  if (reducingClaimed) {
+    return NextResponse.json(
+      {
+        error:
+          "This payment's charity donation is already in a Gift Aid claim batch. Adjust it from the Gift Aid screen before recategorising.",
+      },
+      { status: 409 },
+    );
+  }
+
   const updated = await db.updatePayment(id, lodgeId, updates);
   if (!updated) {
     return NextResponse.json(
@@ -119,19 +156,83 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     );
   }
 
+  // Reconcile the charity donation ledger with the new payment shape.
+  let donationAction: "created" | "updated" | "deleted" | "none" = "none";
+  try {
+    if (newCharity > 0) {
+      if (existingDonation) {
+        // Keep amount + meeting link in sync; preserve any declaration link
+        // and refresh the eligible amount when one is on file.
+        await db.updateDonation(existingDonation.id, lodgeId, {
+          amount: newCharity,
+          event_id: newEventId,
+          gift_aid_eligible_amount: existingDonation.gift_aid_declaration_id
+            ? newCharity
+            : 0,
+        });
+        donationAction = "updated";
+      } else {
+        // Newly charity: mint a donation mirroring the take-payment projector
+        // so the per-meeting Gift Aid panel + close batch pick it up.
+        const email = payment.user_email ?? "";
+        const declaration = email
+          ? await db
+              .getActiveGiftAidDeclarationByEmail(lodgeId, email)
+              .catch(() => null)
+          : null;
+        const giftAidStatus = declaration
+          ? "declared"
+          : email
+            ? "eligible"
+            : "unknown";
+        await db.addDonation(lodgeId, {
+          event_id: newEventId,
+          payment_id: id,
+          donor_name: payment.user_name ?? null,
+          donor_email: email,
+          amount: newCharity,
+          currency: (payment.currency || "GBP").toLowerCase(),
+          source:
+            payment.payment_method === "cash"
+              ? "in_person_take_payment_cash"
+              : "in_person_take_payment",
+          status: "completed",
+          gift_aid_declaration_id: declaration?.id ?? null,
+          gift_aid_status: giftAidStatus,
+          gift_aid_eligible_amount: declaration ? newCharity : 0,
+        });
+        donationAction = "created";
+      }
+    } else if (existingDonation) {
+      // No longer charity: remove the auto-created donation (guarded above so
+      // we only reach here when it isn't batched/claimed).
+      await db.deleteDonation(existingDonation.id, lodgeId);
+      donationAction = "deleted";
+    }
+  } catch (err) {
+    console.error("payment recategorise: donation sync failed (non-fatal)", {
+      payment_id: id,
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   await writeAuditLog({
     lodgeId,
     action: "updated",
     entityType: "payment",
     entityId: id,
     summary:
-      "event_id" in updates
+      "event_id" in updates && !("charity_amount" in updates)
         ? updates.event_id
           ? `Linked payment to event ${updates.event_id as string}`
           : "Detached payment from meeting"
         : "Re-categorised payment",
-    metadata: { fields: Object.keys(updates) },
+    metadata: { fields: Object.keys(updates), donation: donationAction },
   });
 
-  return NextResponse.json({ success: true, payment: updated });
+  return NextResponse.json({
+    success: true,
+    payment: updated,
+    donation: donationAction,
+  });
 }
