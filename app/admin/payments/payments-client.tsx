@@ -2,6 +2,7 @@
 
 import { Fragment, useState, useMemo, useCallback, useEffect, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { formatDate, cn } from "@/lib/utils";
 import { DASH_TABLE } from "@/lib/admin-dash-table";
 import { Card } from "@/components/ui/card";
@@ -57,6 +58,7 @@ type Payment = {
   status: string;
   category?: string | null;
   charity_name: string | null;
+  event_id?: string | null;
   payment_method?: string | null;
   payment_method_note?: string | null;
   recorded_by_email?: string | null;
@@ -64,6 +66,8 @@ type Payment = {
   stripe_payment_intent_id: string | null;
   created_at: string;
 };
+
+type EventOption = { id: string; title: string; event_date: string };
 
 // How the money arrived, grouped for the treasurer's mental model:
 //   * cash  — physically handed over, counted into the tin.
@@ -331,16 +335,156 @@ function giftAidStatusBadge(status: string) {
   );
 }
 
+const EDIT_CATEGORIES: { value: string; label: string }[] = [
+  { value: "meeting_fee", label: "Meeting fee" },
+  { value: "guest_ticket", label: "Guest ticket" },
+  { value: "dining", label: "Dining" },
+  { value: "charity", label: "Charity" },
+  { value: "raffle", label: "Raffle" },
+  { value: "general", label: "General / Other" },
+];
+
+// Inline editor for a single payment's categorisation and meeting link.
+// Edits the record only — never the amount. Posts to PATCH
+// /api/admin/payments/[id], which re-splits total_amount into the chosen
+// category and (re)attaches/detaches the event. Refunds and totals are
+// left untouched.
+function PaymentEditForm({
+  payment,
+  events,
+}: {
+  payment: Payment;
+  events: EventOption[];
+}) {
+  const router = useRouter();
+  const buckets = [
+    "meeting_fee",
+    "guest_ticket",
+    "dining",
+    "charity",
+    "raffle",
+  ] as const;
+  const present = buckets.filter(
+    (k) => Number(payment[`${k}_amount` as keyof Payment] ?? 0) > 0,
+  );
+  const isMixed = present.length > 1;
+  const currentCategory = isMixed ? "" : (present[0] ?? "general");
+  const currentEvent = payment.event_id ?? "none";
+
+  const [category, setCategory] = useState<string>(currentCategory);
+  const [eventId, setEventId] = useState<string>(currentEvent);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  const categoryDirty = category !== "" && category !== currentCategory;
+  const eventDirty = eventId !== currentEvent;
+  const dirty = categoryDirty || eventDirty;
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    setDone(false);
+    const payload: Record<string, unknown> = {};
+    if (categoryDirty) payload.category = category;
+    if (eventDirty) payload.event_id = eventId === "none" ? null : eventId;
+    try {
+      const res = await fetch(`/api/admin/payments/${payment.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? "Could not save changes.");
+      setDone(true);
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 rounded-xl border border-dash-border bg-dash-surface p-4">
+      <p className="mb-3 text-xs font-medium uppercase tracking-wide text-dash-muted">
+        Edit categorisation &amp; meeting
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-xs text-dash-text-muted">
+            Category
+          </label>
+          <Select value={category} onValueChange={setCategory}>
+            <SelectTrigger variant="dashboard" className="h-10 w-full">
+              <SelectValue
+                placeholder={isMixed ? "Split — pick to merge" : "Category"}
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {EDIT_CATEGORIES.map((c) => (
+                <SelectItem key={c.value} value={c.value}>
+                  {c.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {isMixed && (
+            <p className="mt-1 text-xs text-amber-700">
+              Split across categories. Choosing one moves the whole £
+              {Number(payment.total_amount).toFixed(2)} into it.
+            </p>
+          )}
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-dash-text-muted">
+            Meeting
+          </label>
+          <Select value={eventId} onValueChange={setEventId}>
+            <SelectTrigger variant="dashboard" className="h-10 w-full">
+              <SelectValue placeholder="Meeting" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No meeting</SelectItem>
+              {events.map((e) => (
+                <SelectItem key={e.id} value={e.id}>
+                  {e.title} · {formatDate(e.event_date)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      {error && <p className="mt-2 text-xs text-rose-600">{error}</p>}
+      <div className="mt-3 flex items-center gap-3">
+        <Button
+          size="sm"
+          variant="primary"
+          onClick={save}
+          disabled={!dirty || saving}
+        >
+          {saving ? "Saving…" : done && !dirty ? "Saved ✓" : "Save changes"}
+        </Button>
+        <span className="text-xs text-dash-faint">
+          Amount unchanged · £{Number(payment.total_amount).toFixed(2)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function AdminPaymentsClient({
   payments,
   donations,
   giftAidDeclarations,
   duesRecords,
+  events = [],
 }: {
   payments: Payment[];
   donations: Donation[];
   giftAidDeclarations: GiftAidDeclaration[];
   duesRecords: DuesRecord[];
+  events?: EventOption[];
 }) {
   const [activeTab, setActiveTab] = useState<Tab>("payments");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -1524,6 +1668,7 @@ export function AdminPaymentsClient({
                                 Payment reference: {p.mooov_payment_id ?? p.stripe_payment_intent_id}
                               </p>
                             )}
+                            <PaymentEditForm payment={p} events={events} />
                             <div className="mt-3">
                               <Link
                                 href={`/admin/payments/${p.id}`}

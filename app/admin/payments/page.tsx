@@ -31,12 +31,24 @@ export default async function AdminPaymentsPage() {
       ? await db.getMemberDues(lodgeId)
       : [];
 
+  // Meetings list for the inline "associate to meeting" picker on each
+  // payment row. Slimmed to what the dropdown needs.
+  const events = useMock
+    ? []
+    : lodgeId
+      ? await db.getEvents(lodgeId)
+      : [];
+  const eventOptions = events
+    .map((e) => ({ id: e.id, title: e.title, event_date: e.event_date }))
+    .sort((a, b) => b.event_date.localeCompare(a.event_date));
+
   return (
     <AdminPaymentsClient
       payments={JSON.parse(JSON.stringify(payments))}
       donations={JSON.parse(JSON.stringify(donations))}
       giftAidDeclarations={JSON.parse(JSON.stringify(giftAidDeclarations))}
       duesRecords={JSON.parse(JSON.stringify(duesRecords))}
+      events={JSON.parse(JSON.stringify(eventOptions))}
     />
   );
 }
