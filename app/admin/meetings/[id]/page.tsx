@@ -123,6 +123,27 @@ export default async function AdminMeetingDetailPage({
   const lodgeAllTimeTotal =
     lodgeFinance.succeededTotal + lodgeFinance.pendingTotal;
 
+  // Heads-up for reconciliation: collected payments taken on the meeting date
+  // that are NOT attributed to any meeting. These are the takings most likely
+  // meant for this evening that someone forgot to tag, so the treasurer can
+  // re-attribute them before closing.
+  const collectedStatuses = new Set(["succeeded", "completed", "paid"]);
+  const meetingDay = event.event_date.slice(0, 10);
+  const unattributedSameDay = lodgePaymentsAll.filter(
+    (p) =>
+      !p.event_id &&
+      collectedStatuses.has(p.status) &&
+      typeof p.created_at === "string" &&
+      p.created_at.slice(0, 10) === meetingDay,
+  );
+  const unattributed = {
+    count: unattributedSameDay.length,
+    total: unattributedSameDay.reduce(
+      (s, p) => s + Math.max(0, p.total_amount - (p.refund_amount ?? 0)),
+      0,
+    ),
+  };
+
   // Per-meeting Gift Aid close state (migration 059). Donor-linked donations
   // for this event are what the per-meeting batch will sweep. Treasurer sees
   // the totals before they hit Close. Migration 060 adds a preview of how
@@ -317,6 +338,7 @@ export default async function AdminMeetingDetailPage({
         currency: "GBP",
       }}
       closeState={closeState}
+      unattributed={unattributed}
     />
   );
 }

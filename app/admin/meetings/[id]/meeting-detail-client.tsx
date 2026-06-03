@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import {
   ArrowLeft,
   ArrowUpRight,
+  Calculator,
   Calendar,
   CheckCircle2,
   CircleDot,
@@ -15,6 +16,7 @@ import {
   Download,
   Eye,
   ExternalLink,
+  FileText,
   Globe,
   Lock,
   Link as LinkIcon,
@@ -45,6 +47,11 @@ import {
 } from "../meeting-form";
 import type { LodgeFeeDefaults } from "@/lib/fees/resolve";
 import { MeetingClosePanel } from "./meeting-close-panel";
+import {
+  reconcileMeeting,
+  METHOD_GROUP_LABEL,
+  type PaymentMethodGroup,
+} from "@/lib/meetings/reconcile";
 
 type MeetingEvent = MeetingFormMeeting;
 
@@ -92,6 +99,18 @@ type PaymentEntry = {
   currency: string;
   status: string;
   refund_amount: number;
+  payment_method?:
+    | "card_qr"
+    | "card_online"
+    | "cash"
+    | "cheque"
+    | "bacs"
+    | "other"
+    | null;
+  mooov_payment_id?: string | null;
+  stripe_payment_intent_id?: string | null;
+  recorded_by_email?: string | null;
+  created_at: string;
   completed_at: string | null;
 };
 
@@ -194,6 +213,7 @@ export function MeetingDetailClient({
   lodgeDefaults,
   finance,
   closeState,
+  unattributed,
 }: {
   meeting: MeetingEvent;
   rsvps: RsvpEntry[];
@@ -229,6 +249,8 @@ export function MeetingDetailClient({
     closed_batch_declarations_count: number;
     currency: string;
   };
+  /** Collected payments taken on the meeting date but not tagged to any meeting. */
+  unattributed?: { count: number; total: number };
 }) {
   const router = useRouter();
   const [formOpen, setFormOpen] = useState(false);
@@ -1269,6 +1291,13 @@ export function MeetingDetailClient({
             />
           ) : null}
 
+          <ReconcileCard
+            eventId={meeting.id}
+            payments={payments}
+            unattributed={unattributed}
+            currency={finance?.currency ?? "GBP"}
+          />
+
           {closeState ? (
             <MeetingClosePanel
               eventId={meeting.id}
@@ -1571,6 +1600,190 @@ function ConfigRow({
         <p className="mt-0.5 text-xs text-dash-text-muted">{hint}</p>
       )}
     </div>
+  );
+}
+
+function ReconcileCard({
+  eventId,
+  payments,
+  unattributed,
+  currency,
+}: {
+  eventId: string;
+  payments: PaymentEntry[];
+  unattributed?: { count: number; total: number };
+  currency: string;
+}) {
+  const [rafflePrice, setRafflePrice] = useState(5);
+  const [counted, setCounted] = useState("");
+
+  useEffect(() => {
+    const savedPrice = window.localStorage.getItem("c0v.rafflePricePerStrip");
+    const n = savedPrice ? Number(savedPrice) : NaN;
+    if (Number.isFinite(n) && n > 0) setRafflePrice(n);
+    const savedCounted = window.localStorage.getItem(
+      `c0v.cashCounted.${eventId}`,
+    );
+    if (savedCounted != null) setCounted(savedCounted);
+  }, [eventId]);
+
+  const updateCounted = (value: string) => {
+    setCounted(value);
+    window.localStorage.setItem(`c0v.cashCounted.${eventId}`, value);
+  };
+
+  const recon = useMemo(
+    () => reconcileMeeting(payments, { rafflePrice }),
+    [payments, rafflePrice],
+  );
+
+  const countedNum = counted.trim() === "" ? null : Number(counted);
+  const variance =
+    countedNum != null && Number.isFinite(countedNum)
+      ? countedNum - recon.byMethod.cash.amount
+      : null;
+
+  const methodOrder: PaymentMethodGroup[] = ["cash", "lodgepay", "other"];
+  const activeMethods = methodOrder.filter(
+    (m) => recon.byMethod[m].amount > 0 || recon.byMethod[m].count > 0,
+  );
+
+  const reportHref = `/admin/meetings/${eventId}/report?strip=${encodeURIComponent(
+    String(rafflePrice),
+  )}${countedNum != null && Number.isFinite(countedNum) ? `&counted=${encodeURIComponent(String(countedNum))}` : ""}`;
+
+  return (
+    <Card variant="panel" className="overflow-hidden p-0">
+      <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
+        <div className="flex items-center gap-2">
+          <Calculator className="h-4 w-4 text-slate-700" />
+          <h3 className="dash-panel-header-title">Reconcile &amp; report</h3>
+        </div>
+      </div>
+      <CardContent className="space-y-4 border-t border-dash-border bg-dash-surface p-5">
+        {recon.collectedCount === 0 ? (
+          <p className="rounded-md border border-dashed border-dash-border bg-dash-surface-subtle/40 px-3 py-2 text-xs text-dash-text-muted">
+            No settled payments yet. Once cash and LodgePay takings are in,
+            you&rsquo;ll see the cash-vs-card split and a variance check here.
+          </p>
+        ) : (
+          <>
+            <div className="space-y-1.5">
+              {activeMethods.map((m) => {
+                const t = recon.byMethod[m];
+                const pct =
+                  recon.collectedTotal > 0
+                    ? Math.round((t.amount / recon.collectedTotal) * 100)
+                    : 0;
+                return (
+                  <div
+                    key={m}
+                    className="flex items-center justify-between text-sm"
+                  >
+                    <span className="text-dash-text-muted">
+                      {METHOD_GROUP_LABEL[m]}{" "}
+                      <span className="text-dash-faint">({t.count})</span>
+                    </span>
+                    <span className="font-medium tabular-nums text-dash-text">
+                      {formatMoney(t.amount, currency)}{" "}
+                      <span className="text-dash-faint">· {pct}%</span>
+                    </span>
+                  </div>
+                );
+              })}
+              <div className="flex items-center justify-between border-t border-dash-border pt-1.5 text-sm font-semibold">
+                <span>Collected</span>
+                <span className="tabular-nums">
+                  {formatMoney(recon.collectedTotal, currency)}
+                </span>
+              </div>
+            </div>
+
+            {recon.raffleStrips > 0 ? (
+              <p className="text-xs text-dash-text-muted">
+                Raffle: {recon.raffleStrips} strip
+                {recon.raffleStrips === 1 ? "" : "s"} to {recon.raffleBuyers}{" "}
+                {recon.raffleBuyers === 1 ? "buyer" : "buyers"} (at{" "}
+                {formatMoney(rafflePrice, currency)}/strip)
+              </p>
+            ) : null}
+
+            <div className="rounded-lg border border-dash-border bg-dash-surface-subtle/40 p-3">
+              <label
+                htmlFor="cash-counted"
+                className="text-xs font-medium text-dash-text"
+              >
+                Count the tin
+              </label>
+              <div className="mt-1.5 flex items-center gap-2">
+                <div className="relative flex-1">
+                  <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-sm text-dash-faint">
+                    £
+                  </span>
+                  <input
+                    id="cash-counted"
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step={0.01}
+                    placeholder="Counted cash"
+                    value={counted}
+                    onChange={(e) => updateCounted(e.target.value)}
+                    className="h-9 w-full rounded-lg border border-dash-border bg-dash-surface pl-5 pr-2 text-sm tabular-nums text-dash-text outline-none focus:border-dash-ring"
+                  />
+                </div>
+                <div className="text-right text-xs">
+                  <p className="text-dash-faint">Recorded</p>
+                  <p className="font-medium tabular-nums text-dash-text">
+                    {formatMoney(recon.byMethod.cash.amount, currency)}
+                  </p>
+                </div>
+              </div>
+              {variance != null ? (
+                <p
+                  className={cn(
+                    "mt-2 text-sm font-medium tabular-nums",
+                    Math.abs(variance) < 0.005
+                      ? "text-emerald-700"
+                      : "text-rose-700",
+                  )}
+                >
+                  {Math.abs(variance) < 0.005
+                    ? "Balances ✓"
+                    : `${variance > 0 ? "Over" : "Short"} by ${formatMoney(Math.abs(variance), currency)}`}
+                </p>
+              ) : null}
+            </div>
+          </>
+        )}
+
+        {unattributed && unattributed.count > 0 ? (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              {unattributed.count} payment
+              {unattributed.count === 1 ? "" : "s"} (
+              {formatMoney(unattributed.total, currency)}) taken today
+              aren&rsquo;t tagged to a meeting. Open{" "}
+              <Link
+                href="/admin/payments"
+                className="font-medium underline underline-offset-2"
+              >
+                Payments
+              </Link>{" "}
+              to check they belong to this evening.
+            </span>
+          </div>
+        ) : null}
+
+        <Button asChild variant="outline" size="sm" className="w-full">
+          <Link href={reportHref} target="_blank">
+            <FileText className="mr-1.5 h-3.5 w-3.5" />
+            Open treasurer&rsquo;s report
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
