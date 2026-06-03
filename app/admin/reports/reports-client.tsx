@@ -20,6 +20,7 @@ import type {
   CharityReport,
   RecruitmentReport,
   OperatorReport,
+  AnnualReturn,
 } from "@/lib/reports";
 
 type Tab = "secretary" | "treasurer" | "charity" | "recruitment" | "operator";
@@ -79,6 +80,7 @@ export function ReportsClient({
   treasurer,
   charity,
   recruitment,
+  annualReturn,
   operator,
 }: {
   lodgeName: string;
@@ -86,6 +88,7 @@ export function ReportsClient({
   treasurer: TreasurerReport;
   charity: CharityReport;
   recruitment: RecruitmentReport;
+  annualReturn: AnnualReturn;
   operator: OperatorReport | null;
 }) {
   const [tab, setTab] = useState<Tab>("secretary");
@@ -127,7 +130,9 @@ export function ReportsClient({
       {tab === "secretary" && <SecretaryView r={secretary} />}
       {tab === "treasurer" && <TreasurerView r={treasurer} />}
       {tab === "charity" && <CharityView r={charity} />}
-      {tab === "recruitment" && <RecruitmentView r={recruitment} />}
+      {tab === "recruitment" && (
+        <RecruitmentView r={recruitment} annualReturn={annualReturn} />
+      )}
       {tab === "operator" && operator && <OperatorView r={operator} />}
     </div>
   );
@@ -601,7 +606,44 @@ function CharityView({ r }: { r: CharityReport }) {
   );
 }
 
-function RecruitmentView({ r }: { r: RecruitmentReport }) {
+function RecruitmentView({
+  r,
+  annualReturn,
+}: {
+  r: RecruitmentReport;
+  annualReturn: AnnualReturn;
+}) {
+  function exportAnnualReturn() {
+    downloadCsv(
+      `membership-annual-return-${annualReturn.periodStart}.csv`,
+      [
+        "Name",
+        "Email",
+        "Rank",
+        "Office",
+        "Status",
+        "Royal Arch",
+        "Honorary",
+        "Initiated",
+        "Passed",
+        "Raised",
+        "Age",
+      ],
+      annualReturn.members.map((m) => [
+        m.name,
+        m.email,
+        m.rank ?? "",
+        m.office ?? "",
+        m.status,
+        m.royalArch ? "yes" : "no",
+        m.honorary ? "yes" : "no",
+        m.dateOfInitiation ?? "",
+        m.dateOfPassing ?? "",
+        m.dateOfRaising ?? "",
+        m.age ?? "",
+      ]),
+    );
+  }
   function exportSources() {
     downloadCsv(
       "recruitment-sources.csv",
@@ -626,6 +668,59 @@ function RecruitmentView({ r }: { r: RecruitmentReport }) {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      <Card variant="panel" className="overflow-hidden p-0">
+        <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
+          <div>
+            <h2 className="dash-panel-header-title">Membership annual return</h2>
+            <p className="dash-panel-header-description">
+              Return year {annualReturn.periodLabel} · roll of{" "}
+              {annualReturn.totalMembers} member
+              {annualReturn.totalMembers === 1 ? "" : "s"} for the UGLE /
+              Provincial annual return.
+            </p>
+          </div>
+          <Button
+            variant="dashboard"
+            size="sm"
+            onClick={exportAnnualReturn}
+            disabled={annualReturn.totalMembers === 0}
+          >
+            <Download className="mr-1.5 h-4 w-4" /> Annual return CSV
+          </Button>
+        </div>
+        <CardContent className="border-t border-dash-border bg-dash-surface p-5">
+          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
+            <Kpi label="Active" value={`${annualReturn.active}`} />
+            <Kpi label="Suspended" value={`${annualReturn.suspended}`} />
+            <Kpi label="Resigned" value={`${annualReturn.resigned}`} />
+            <Kpi label="Excluded" value={`${annualReturn.excluded}`} />
+            <Kpi label="Royal Arch" value={`${annualReturn.royalArch}`} />
+            <Kpi
+              label="Average age"
+              value={
+                annualReturn.averageAge != null
+                  ? `${annualReturn.averageAge}`
+                  : "—"
+              }
+            />
+          </div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <Kpi
+              label="Initiations this year"
+              value={`${annualReturn.initiationsInYear}`}
+            />
+            <Kpi
+              label="Passings this year"
+              value={`${annualReturn.passingsInYear}`}
+            />
+            <Kpi
+              label="Raisings this year"
+              value={`${annualReturn.raisingsInYear}`}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi label="Total leads" value={`${r.totalLeads}`} />
         <Kpi label="New this month" value={`${r.newThisMonth}`} />

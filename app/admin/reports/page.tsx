@@ -6,6 +6,7 @@ import {
   buildCharityReport,
   buildRecruitmentReport,
   buildOperatorReport,
+  buildAnnualReturn,
   isSuccessfulPaymentStatus,
 } from "@/lib/reports";
 import { ReportsClient } from "./reports-client";
@@ -82,6 +83,7 @@ export default async function ReportsPage() {
     meetingCollections,
   });
   const recruitment = buildRecruitmentReport({ leads });
+  const annualReturn = buildAnnualReturn({ members });
 
   let operator: ReturnType<typeof buildOperatorReport> | null = null;
   if (isSupabaseConfigured()) {
@@ -131,6 +133,7 @@ export default async function ReportsPage() {
       treasurer={JSON.parse(JSON.stringify(treasurer))}
       charity={JSON.parse(JSON.stringify(charity))}
       recruitment={JSON.parse(JSON.stringify(recruitment))}
+      annualReturn={JSON.parse(JSON.stringify(annualReturn))}
       operator={operator ? JSON.parse(JSON.stringify(operator)) : null}
     />
   );

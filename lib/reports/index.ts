@@ -530,3 +530,129 @@ export function buildOperatorReport({
     lodgeRows: lodgeRows.sort((a, b) => b.healthScore - a.healthScore),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Membership Annual Return
+// ---------------------------------------------------------------------------
+//
+// A lodge-level membership return in the shape a Secretary needs for the
+// UGLE / Provincial annual return: a roll of every member with their craft
+// progression dates and current standing, plus the movements (initiations,
+// passings, raisings, resignations, exclusions) inside the reporting year.
+//
+// The reporting year is the masonic/return year, configurable via
+// `yearStartMonth` (1-12, default September = 9), so figures align with the
+// lodge's return cadence rather than the calendar year.
+
+export type AnnualReturnMemberRow = {
+  id: string;
+  name: string;
+  email: string;
+  rank: string | null;
+  office: string | null;
+  status: Member["membership_status"];
+  royalArch: boolean;
+  honorary: boolean;
+  dateOfInitiation: string | null;
+  dateOfPassing: string | null;
+  dateOfRaising: string | null;
+  age: number | null;
+};
+
+export type AnnualReturn = {
+  periodLabel: string;
+  periodStart: string;
+  periodEnd: string;
+  totalMembers: number;
+  active: number;
+  suspended: number;
+  resigned: number;
+  excluded: number;
+  royalArch: number;
+  honorary: number;
+  averageAge: number | null;
+  initiationsInYear: number;
+  passingsInYear: number;
+  raisingsInYear: number;
+  members: AnnualReturnMemberRow[];
+};
+
+function ageFromDob(dob: string | null, asOf: Date): number | null {
+  if (!dob) return null;
+  const d = new Date(dob);
+  if (Number.isNaN(d.getTime())) return null;
+  let age = asOf.getFullYear() - d.getFullYear();
+  const m = asOf.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && asOf.getDate() < d.getDate())) age -= 1;
+  return age >= 0 && age < 130 ? age : null;
+}
+
+export function buildAnnualReturn({
+  members,
+  now = new Date(),
+  yearStartMonth = 9,
+}: {
+  members: Member[];
+  now?: Date;
+  yearStartMonth?: number;
+}): AnnualReturn {
+  // Determine the current return year window. If we're before the start
+  // month, the year began last calendar year.
+  const startMonthIdx = Math.min(12, Math.max(1, yearStartMonth)) - 1;
+  const startYear =
+    now.getMonth() >= startMonthIdx
+      ? now.getFullYear()
+      : now.getFullYear() - 1;
+  const periodStart = new Date(startYear, startMonthIdx, 1);
+  const periodEnd = new Date(startYear + 1, startMonthIdx, 1);
+  const inYear = (value: string | null): boolean => {
+    if (!value) return false;
+    const t = new Date(value).getTime();
+    if (Number.isNaN(t)) return false;
+    return t >= periodStart.getTime() && t < periodEnd.getTime();
+  };
+
+  const rows: AnnualReturnMemberRow[] = members.map((m) => ({
+    id: m.id,
+    name: m.full_name,
+    email: m.email,
+    rank: m.rank,
+    office: m.office_title,
+    status: m.membership_status,
+    royalArch: Boolean(m.royal_arch),
+    honorary: Boolean(m.honorary),
+    dateOfInitiation: m.date_of_initiation,
+    dateOfPassing: m.date_of_passing,
+    dateOfRaising: m.date_of_raising,
+    age: ageFromDob(m.date_of_birth, now),
+  }));
+
+  const ages = rows
+    .map((r) => r.age)
+    .filter((a): a is number => typeof a === "number");
+  const averageAge =
+    ages.length > 0
+      ? Math.round(ages.reduce((s, a) => s + a, 0) / ages.length)
+      : null;
+
+  const fmt = (d: Date) =>
+    d.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+
+  return {
+    periodLabel: `${fmt(periodStart)} – ${fmt(new Date(periodEnd.getTime() - 1))}`,
+    periodStart: periodStart.toISOString().slice(0, 10),
+    periodEnd: periodEnd.toISOString().slice(0, 10),
+    totalMembers: members.length,
+    active: members.filter((m) => m.membership_status === "active").length,
+    suspended: members.filter((m) => m.membership_status === "suspended").length,
+    resigned: members.filter((m) => m.membership_status === "resigned").length,
+    excluded: members.filter((m) => m.membership_status === "excluded").length,
+    royalArch: members.filter((m) => m.royal_arch).length,
+    honorary: members.filter((m) => m.honorary).length,
+    averageAge,
+    initiationsInYear: members.filter((m) => inYear(m.date_of_initiation)).length,
+    passingsInYear: members.filter((m) => inYear(m.date_of_passing)).length,
+    raisingsInYear: members.filter((m) => inYear(m.date_of_raising)).length,
+    members: rows.sort((a, b) => a.name.localeCompare(b.name)),
+  };
+}
