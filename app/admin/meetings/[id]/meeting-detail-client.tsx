@@ -247,6 +247,7 @@ export function MeetingDetailClient({
     new_declarations_preview: number;
     closed_batch_id: string | null;
     closed_batch_declarations_count: number;
+    relief_chest_delivered_at?: string | null;
     currency: string;
   };
   /** Collected payments taken on the meeting date but not tagged to any meeting. */
@@ -1309,6 +1310,7 @@ export function MeetingDetailClient({
               newDeclarationsPreview={closeState.new_declarations_preview}
               closedBatchId={closeState.closed_batch_id}
               closedBatchDeclarationsCount={closeState.closed_batch_declarations_count}
+              reliefChestDeliveredAt={closeState.relief_chest_delivered_at ?? null}
               currency={closeState.currency}
             />
           ) : null}

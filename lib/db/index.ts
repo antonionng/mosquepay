@@ -1633,6 +1633,29 @@ export async function attachClaimBatchToMeetingCollection(
   if (error) throw error;
 }
 
+// Stamp (or clear) the Relief Chest delivery on the meeting collection(s)
+// for an event. Used by the meeting close panel so the treasurer can record
+// that the Gift Aid pack has actually been forwarded to UGLE.
+export async function markReliefChestDeliveredForEvent(
+  lodgeId: string,
+  eventId: string,
+  opts: { deliveredAt?: string | null; deliveredTo?: string | null }
+): Promise<void> {
+  const { error } = await db()
+    .from("meeting_collections")
+    .update({
+      relief_chest_delivered_at:
+        opts.deliveredAt === undefined
+          ? new Date().toISOString()
+          : opts.deliveredAt,
+      relief_chest_delivered_to: opts.deliveredTo ?? null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("lodge_id", lodgeId)
+    .eq("event_id", eventId);
+  if (error) throw error;
+}
+
 // ---------------------------------------------------------------------------
 // Lodge Subscriptions
 // ---------------------------------------------------------------------------

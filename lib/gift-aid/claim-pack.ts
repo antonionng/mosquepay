@@ -236,6 +236,17 @@ export type ClaimPackInput = {
    */
   declarationAddressLookup?: GiftAidDeclaration[];
   previousBatchCreatedAt: string | null;
+  /**
+   * Small-donations (GASDS) figures from the meeting collection linked to
+   * this batch, when there is one. GASDS is claimed separately from Gift
+   * Aid but the Relief Chest wants the small-cash total alongside the
+   * declaration-backed claim, so we include a summary sheet + manifest note.
+   */
+  gasds?: {
+    eligibleAmount: number;
+    reclaimableAmount: number;
+    taxYear: string | null;
+  } | null;
 };
 
 export type ClaimPackResult = {
@@ -261,6 +272,7 @@ export async function buildClaimPack(
     previouslySupplied = [],
     declarationAddressLookup,
     previousBatchCreatedAt,
+    gasds = null,
   } = input;
   const zip = new JSZip();
   const supabase = createServiceClient();
@@ -314,6 +326,23 @@ export async function buildClaimPack(
   }
   zip.file("claim-pack.csv", donationLines.join("\n") + "\n");
 
+  // ---- 1b. GASDS small-donations summary (only when present) -----------
+  // GASDS (Gift Aid Small Donations Scheme) lets the lodge reclaim the
+  // basic-rate top-up on small anonymous cash donations without a
+  // declaration. It's a separate HMRC claim, but the Relief Chest likes
+  // the figure bundled so it can be reconciled with the same meeting.
+  if (gasds && gasds.eligibleAmount > 0) {
+    const gasdsLines = [
+      csvRow(["Tax year", "Eligible small cash", "Reclaimable (25%)"]),
+      csvRow([
+        gasds.taxYear ?? "",
+        gasds.eligibleAmount.toFixed(2),
+        gasds.reclaimableAmount.toFixed(2),
+      ]),
+    ];
+    zip.file("gasds-summary.csv", gasdsLines.join("\n") + "\n");
+  }
+
   // ---- 2. New declarations folder (evidence UGLE must retain) ----------
   const newResult = await addDeclarationsFolder({
     zip,
@@ -363,6 +392,15 @@ export async function buildClaimPack(
     `Donations in claim: ${items.length}`,
     `Eligible amount: £${batch.eligible_amount.toFixed(2)}`,
     `Reclaimable (25%): £${batch.reclaimable_amount.toFixed(2)}`,
+    ...(gasds && gasds.eligibleAmount > 0
+      ? [
+          ``,
+          `GASDS small donations (separate scheme, see gasds-summary.csv):`,
+          `  Tax year: ${gasds.taxYear ?? "(not set)"}`,
+          `  Eligible small cash: £${gasds.eligibleAmount.toFixed(2)}`,
+          `  Reclaimable (25%): £${gasds.reclaimableAmount.toFixed(2)}`,
+        ]
+      : []),
     ``,
     `New declarations in this pack: ${newResult.count}  (folder: new-declarations/)`,
     prevFolderLine,

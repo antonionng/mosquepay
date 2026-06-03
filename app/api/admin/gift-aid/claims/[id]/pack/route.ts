@@ -57,11 +57,27 @@ export async function GET(
     return NextResponse.json({ error: "Batch not found." }, { status: 404 });
   }
 
-  const [items, declarationLinks, previous] = await Promise.all([
+  const [items, declarationLinks, previous, collections] = await Promise.all([
     db.getGiftAidClaimItems(lodgeId, batchId),
     db.listClaimBatchDeclarations(lodgeId, batchId),
     db.getMostRecentClaimBatchBefore(lodgeId, batch.created_at),
+    db.getMeetingCollections(lodgeId).catch(() => []),
   ]);
+
+  // GASDS lives on the meeting collection this batch was created from (if
+  // the batch came from a meeting close). Bundle the small-cash figure into
+  // the pack so the Relief Chest can reconcile it with the same meeting.
+  const linkedCollection = collections.find(
+    (c) => c.gift_aid_claim_batch_id === batchId,
+  );
+  const gasds =
+    linkedCollection && Number(linkedCollection.gasds_eligible_amount ?? 0) > 0
+      ? {
+          eligibleAmount: Number(linkedCollection.gasds_eligible_amount),
+          reclaimableAmount: Number(linkedCollection.gasds_eligible_amount) * 0.25,
+          taxYear: linkedCollection.gasds_tax_year,
+        }
+      : null;
 
   // Three sets of declarations the pack needs, driven by inclusion_reason:
   //
@@ -110,6 +126,7 @@ export async function GET(
       previouslySupplied,
       declarationAddressLookup,
       previousBatchCreatedAt: previous?.created_at ?? null,
+      gasds,
     });
   } catch (err) {
     console.error("claim pack build failed", {

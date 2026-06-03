@@ -38,6 +38,7 @@ type Props = {
   newDeclarationsPreview: number;
   closedBatchId: string | null;
   closedBatchDeclarationsCount: number;
+  reliefChestDeliveredAt?: string | null;
   currency: string;
 };
 
@@ -58,6 +59,7 @@ export function MeetingClosePanel({
   newDeclarationsPreview,
   closedBatchId,
   closedBatchDeclarationsCount,
+  reliefChestDeliveredAt,
   currency,
 }: Props) {
   const router = useRouter();
@@ -65,6 +67,30 @@ export function MeetingClosePanel({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [markingDelivered, setMarkingDelivered] = useState(false);
+
+  async function markDelivered() {
+    setMarkingDelivered(true);
+    try {
+      const res = await fetch(
+        `/api/admin/meetings/${encodeURIComponent(eventId)}/relief-chest`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ delivered: true }),
+        },
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? "Could not update delivery.");
+      }
+      router.refresh();
+    } catch {
+      /* surfaced via no-op; treasurer can retry */
+    } finally {
+      setMarkingDelivered(false);
+    }
+  }
 
   if (closedAt) {
     return (
@@ -100,6 +126,39 @@ export function MeetingClosePanel({
             >
               Download Gift Aid pack (ZIP)
             </a>
+          ) : null}
+          {closedBatchId ? (
+            <div className="mt-3 rounded-lg border border-dash-border bg-dash-surface-subtle/40 p-3">
+              {reliefChestDeliveredAt ? (
+                <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-700">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Delivered to Relief Chest on{" "}
+                  {new Date(reliefChestDeliveredAt).toLocaleDateString("en-GB", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </p>
+              ) : (
+                <>
+                  <p className="text-xs text-dash-muted">
+                    Once you&rsquo;ve emailed the pack to the Relief Chest, mark
+                    it delivered to keep the audit trail complete.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    onClick={markDelivered}
+                    disabled={markingDelivered}
+                  >
+                    {markingDelivered
+                      ? "Saving…"
+                      : "Mark delivered to Relief Chest"}
+                  </Button>
+                </>
+              )}
+            </div>
           ) : null}
           <p className="mt-3 text-xs text-dash-muted">
             All claims and packs are listed in{" "}

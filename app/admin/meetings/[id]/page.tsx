@@ -168,6 +168,7 @@ export default async function AdminMeetingDetailPage({
   let newDeclarationsPreview = 0;
   let closedBatchId: string | null = null;
   let closedBatchDeclarationsCount = 0;
+  let reliefChestDeliveredAt: string | null = null;
   if (lodgeId && !useMock) {
     try {
       const { resolveDeclarationsForBatch } = await import(
@@ -205,6 +206,9 @@ export default async function AdminMeetingDetailPage({
         const collectionWithBatch = collections.find(
           (c) => c.gift_aid_claim_batch_id,
         );
+        reliefChestDeliveredAt =
+          collections.find((c) => c.relief_chest_delivered_at)
+            ?.relief_chest_delivered_at ?? null;
         if (collectionWithBatch?.gift_aid_claim_batch_id) {
           closedBatchId = collectionWithBatch.gift_aid_claim_batch_id;
           const batches = await db.getGiftAidClaimBatches(lodgeId);
@@ -233,6 +237,7 @@ export default async function AdminMeetingDetailPage({
     new_declarations_preview: newDeclarationsPreview,
     closed_batch_id: closedBatchId,
     closed_batch_declarations_count: closedBatchDeclarationsCount,
+    relief_chest_delivered_at: reliefChestDeliveredAt,
     currency: "GBP",
   };
 
