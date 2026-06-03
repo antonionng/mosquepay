@@ -23,10 +23,29 @@
  * that has a `mooov_payment_method_id` or `last_charged_at` set, so
  * a successful checkout that's still mid-webhook can't be rolled
  * back by mistake.
+ *
+ * IMPORTANT — this blind timer is the FALLBACK, not the primary abandon
+ * mechanism. The authoritative signal is Mooov's `payment.failed` /
+ * `failure_code: checkout_abandoned` event, handled in the connect
+ * webhook, which cancels the pending schedule the moment the hosted
+ * checkout session actually expires. The timer only exists to mop up
+ * schedules where that event never arrives.
+ *
+ * The window is deliberately LONGER than a Stripe Checkout session can
+ * live (max 24h) plus webhook latency. The 2026-06-02 incident proved
+ * why a short window is dangerous: a 30-minute sweep cancelled a
+ * schedule whose £24 first charge had actually captured on Stripe,
+ * because Mooov's (then-broken) activation webhook hadn't arrived yet.
+ * Even with the longer window, the webhook handler's resurrection guard
+ * is the ultimate safety net — a `subscription.activated` for a
+ * soft-cancelled schedule un-cancels it.
  */
 import * as db from "@/lib/db";
 
-const DEFAULT_STALE_AFTER_MS = 30 * 60 * 1000; // 30 minutes
+// 26h: comfortably past the 24h max lifetime of a Stripe Checkout
+// session, so a real charge's (possibly delayed) activation webhook
+// is never pre-empted by this timer.
+const DEFAULT_STALE_AFTER_MS = 26 * 60 * 60 * 1000; // 26 hours
 
 /**
  * Cancel `pending` schedules for a lodge that are older than

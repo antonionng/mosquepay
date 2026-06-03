@@ -409,6 +409,65 @@ async function projectConnectEvent(
         });
       }
 
+      // Event-driven abandon for the open-ended subscription_checkouts
+      // flow. Mooov fires `payment.failed` with `payment_id =
+      // sub_dues_<schedule_id>` (the enrolment handle) and
+      // `failure_code = checkout_abandoned` when the member never
+      // completes the hosted checkout and the session expires. This is
+      // the AUTHORITATIVE abandon signal — far safer than the blind
+      // time-based sweep, which can't tell an abandoned checkout from a
+      // real charge whose activation webhook is merely delayed. There is
+      // no `payment_attempts` row for this flow (we call
+      // /v1/subscription_checkouts directly), so it falls past the
+      // attemptRow branch above. We resolve the schedule from the
+      // metadata LP correlation id (preferred) or the payment_id suffix,
+      // and only cancel it if it is still `pending` — never touch an
+      // already-active / activated row.
+      if (
+        paymentId &&
+        paymentId.startsWith("sub_dues_") &&
+        failureCode === "checkout_abandoned"
+      ) {
+        const meta = (event.data?.metadata ?? {}) as Record<string, unknown>;
+        const scheduleId =
+          typeof meta.lp_schedule_id === "string" && meta.lp_schedule_id
+            ? meta.lp_schedule_id
+            : paymentId.slice("sub_dues_".length);
+        try {
+          const sched = await db
+            .getDuesSchedule(scheduleId, lodgeId)
+            .catch(() => null);
+          if (sched && sched.status === "pending") {
+            await db.updateDuesSchedule(scheduleId, lodgeId, {
+              status: "cancelled",
+              cancelled_at: new Date().toISOString(),
+              cancelled_by_actor: "system_abandoned_checkout",
+              next_charge_at: null,
+            });
+            console.log(
+              "mooov webhook: cancelled pending schedule on checkout_abandoned",
+              {
+                event_id: event.id,
+                schedule_id: scheduleId,
+                payment_id: paymentId,
+              },
+            );
+          }
+        } catch (abandonErr) {
+          console.error(
+            "mooov webhook: checkout_abandoned schedule cancel failed",
+            {
+              event_id: event.id,
+              schedule_id: scheduleId,
+              message:
+                abandonErr instanceof Error
+                  ? abandonErr.message
+                  : String(abandonErr),
+            },
+          );
+        }
+      }
+
       // account_invalid means the lodge's underlying PSP connection got
       // severed (typically: the lodge clicked "Disconnect" from inside
       // their Stripe dashboard, or Stripe's risk team paused the
@@ -1738,32 +1797,77 @@ async function handleSubscriptionEvent(
   event: MooovConnectEvent,
 ): Promise<void> {
   const parsed = readSubscriptionEvent(event);
-  const schedule = await resolveSubscriptionSchedule(lodgeId, parsed, event.id);
+  let schedule = await resolveSubscriptionSchedule(lodgeId, parsed, event.id);
   if (!schedule) return;
 
-  // Terminal-state guard. Once a schedule has been cancelled (by member,
-  // admin, or system) or completed, late webhooks from Mooov MUST NOT
-  // mutate it. Without this, a `subscription.invoice_failed` arriving
-  // after a member self-cancel resurrects the row to `past_due` (and
-  // the members-list "Online" pill lights up again). The
-  // `subscription.canceled` event still flows through so its own
-  // idempotency log fires — that handler short-circuits on
-  // already-cancelled rows of its own accord.
+  // Terminal-state guard. Once a schedule has been cancelled or completed,
+  // late webhooks from Mooov MUST NOT mutate it. Without this, a
+  // `subscription.invoice_failed` arriving after a member self-cancel
+  // resurrects the row to `past_due` (and the members-list "Online" pill
+  // lights up again).
+  //
+  // EXCEPTION — resurrection. A schedule we cancelled via a SOFT system
+  // actor (the abandoned-checkout sweep, an enrolment-retry supersede,
+  // etc.) is not truly dead: it means "we gave up waiting, assuming the
+  // member never paid". If Mooov later sends `subscription.activated` or
+  // `subscription.invoice_paid` for that exact schedule, that is ground
+  // truth that the subscription IS live on Stripe and the member WAS
+  // charged. In that case we resurrect the row (clear cancelled_at /
+  // cancelled_by_actor, drop back to `pending`) and let the normal
+  // handler project it. This is exactly the 2026-06-02 incident: the
+  // 30-min sweep cancelled a schedule whose £24 first charge had in fact
+  // captured on Stripe, before Mooov's (then-broken) webhook arrived.
+  //
+  // We only resurrect SOFT system cancels — never a genuine `member` /
+  // admin / `stripe_subscription_canceled` cancellation. `subscription.
+  // canceled` still flows through untouched so its own handler runs.
+  const isLiveProof =
+    event.type === "subscription.activated" ||
+    event.type === "subscription.invoice_paid";
+  const softSystemCancel =
+    typeof schedule.cancelled_by_actor === "string" &&
+    schedule.cancelled_by_actor.startsWith("system_");
+
   if (
     (schedule.status === "cancelled" || schedule.status === "completed") &&
     event.type !== "subscription.canceled"
   ) {
-    console.warn(
-      "mooov webhook: ignoring event for terminal schedule (idempotent)",
-      {
-        event_id: event.id,
-        event_type: event.type,
-        schedule_id: schedule.id,
-        schedule_status: schedule.status,
-        cancelled_at: schedule.cancelled_at,
-      },
-    );
-    return;
+    if (isLiveProof && softSystemCancel) {
+      console.warn(
+        "mooov webhook: resurrecting soft-cancelled schedule on live subscription event",
+        {
+          event_id: event.id,
+          event_type: event.type,
+          schedule_id: schedule.id,
+          prior_status: schedule.status,
+          prior_cancelled_by_actor: schedule.cancelled_by_actor,
+        },
+      );
+      await db.updateDuesSchedule(schedule.id, lodgeId, {
+        status: "pending",
+        cancelled_at: null,
+        cancelled_by_actor: null,
+      });
+      schedule = {
+        ...schedule,
+        status: "pending",
+        cancelled_at: null,
+        cancelled_by_actor: null,
+      };
+      // fall through to the switch and project normally
+    } else {
+      console.warn(
+        "mooov webhook: ignoring event for terminal schedule (idempotent)",
+        {
+          event_id: event.id,
+          event_type: event.type,
+          schedule_id: schedule.id,
+          schedule_status: schedule.status,
+          cancelled_at: schedule.cancelled_at,
+        },
+      );
+      return;
+    }
   }
 
   switch (event.type) {
