@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
+import { resolveTodaysMeetingId } from "@/lib/meetings/todays-meeting";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { getCurrentAdminContextAny } from "@/lib/auth/permissions";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -186,6 +187,12 @@ export async function POST(request: NextRequest) {
         message: err instanceof Error ? err.message : String(err),
       });
     }
+  }
+  // No meeting chosen: if exactly one meeting is dated today, attribute the
+  // takings to it so reconciliation rolls up cleanly without the treasurer
+  // having to pick the event each time during a live meeting.
+  if (!resolvedEventId) {
+    resolvedEventId = await resolveTodaysMeetingId(lodgeId);
   }
 
   // Capture who is generating this QR so the history view can show
