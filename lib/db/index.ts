@@ -759,6 +759,36 @@ export async function updateEvent(
   return data as Event | null;
 }
 
+/**
+ * Permanently remove a meeting. RSVPs, summons, guests, and other
+ * event-scoped rows cascade away. Payments and donations stay in the ledger
+ * but are detached from the meeting first so the FK on payments does not
+ * block the delete.
+ */
+export async function deleteEvent(
+  id: string,
+  lodgeId: string,
+): Promise<{ title: string } | null> {
+  const event = await getEventById(id, lodgeId);
+  if (!event) return null;
+
+  const { error: detachError } = await db()
+    .from("payments")
+    .update({ event_id: null })
+    .eq("event_id", id)
+    .eq("lodge_id", lodgeId);
+  if (detachError) throw detachError;
+
+  const { error } = await db()
+    .from("events")
+    .delete()
+    .eq("id", id)
+    .eq("lodge_id", lodgeId);
+  if (error) throw error;
+
+  return { title: event.title };
+}
+
 // ---------------------------------------------------------------------------
 // RSVPs
 // ---------------------------------------------------------------------------

@@ -32,6 +32,7 @@ import {
   CheckCircle2,
   Copy,
   AlertTriangle,
+  Trash2,
 } from "lucide-react";
 import {
   type MeetingReadiness,
@@ -357,6 +358,34 @@ export function AdminMeetingsClient({
     }
   }
 
+  async function deleteMeeting(meeting: MeetingEvent) {
+    const finance = financeMap?.[meeting.id];
+    const paymentNote =
+      finance && (finance.raised > 0 || finance.count > 0)
+        ? `\n\n${finance.count} payment${finance.count === 1 ? "" : "s"} (£${finance.raised.toFixed(2)} raised) will stay in the ledger but will no longer be linked to this meeting.`
+        : "";
+    const ok =
+      typeof window !== "undefined" &&
+      window.confirm(
+        `Delete "${meeting.title}" permanently?\n\nThis removes RSVPs, summons, and guest records for this meeting.${paymentNote}\n\nThis cannot be undone.`,
+      );
+    if (!ok) return;
+    try {
+      const res = await fetch(`/api/events/${meeting.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        window.alert(data.error ?? "Could not delete meeting.");
+        return;
+      }
+      router.refresh();
+    } catch (err) {
+      console.error("delete meeting failed", err);
+      window.alert("Could not delete meeting.");
+    }
+  }
+
   const typeColor: Record<string, string> = {
     regular_meeting: "bg-blue-500",
     lodge_meeting: "bg-blue-500",
@@ -571,6 +600,7 @@ export function AdminMeetingsClient({
                           rsvpCount={(rsvpMap[m.id] ?? []).length}
                           readiness={readinessMap[m.id]}
                           onDuplicate={() => duplicateMeeting(m)}
+                          onDelete={() => deleteMeeting(m)}
                           finance={financeMap?.[m.id]}
                         />
                       ))}
@@ -594,6 +624,7 @@ export function AdminMeetingsClient({
                           rsvpCount={(rsvpMap[m.id] ?? []).length}
                           readiness={readinessMap[m.id]}
                           onDuplicate={() => duplicateMeeting(m)}
+                          onDelete={() => deleteMeeting(m)}
                           isPast
                           finance={financeMap?.[m.id]}
                         />
@@ -737,6 +768,7 @@ function MeetingCard({
   isPast,
   readiness,
   onDuplicate,
+  onDelete,
   finance,
 }: {
   meeting: MeetingEvent;
@@ -748,6 +780,7 @@ function MeetingCard({
   isPast?: boolean;
   readiness?: MeetingReadiness;
   onDuplicate?: () => void;
+  onDelete?: () => void;
   finance?: { raised: number; pending: number; count: number };
 }) {
   return (
@@ -840,6 +873,21 @@ function MeetingCard({
             }}
           >
             <Copy className="h-3.5 w-3.5" />
+          </Button>
+        )}
+        {onDelete && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 text-rose-600 opacity-0 hover:bg-rose-50 hover:text-rose-700 group-hover:opacity-100"
+            aria-label="Delete meeting"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
           </Button>
         )}
       </div>

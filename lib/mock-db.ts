@@ -666,6 +666,15 @@ export function updateEvent(id: string, updates: Partial<MockEvent>, opts?: { lo
   return events[i];
 }
 
+export function deleteEvent(id: string, opts?: { lodge_slug?: string }): MockEvent | null {
+  assertInMemoryMock();
+  const lodgeSlug = withLodgeSlug(opts?.lodge_slug);
+  const i = events.findIndex((e) => e.id === id && e.lodge_slug === lodgeSlug);
+  if (i === -1) return null;
+  const [removed] = events.splice(i, 1);
+  return removed;
+}
+
 // --- RSVPs ---
 export type MockRsvp = LodgeScoped & {
   id: string;

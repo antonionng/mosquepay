@@ -152,10 +152,6 @@ export async function DELETE(
     const adminCtx = await getAdminReadContext();
     const lodgeSlug =
       adminCtx.mode === "database" ? adminCtx.lodgeSlug : "";
-    const updates = {
-      published: false,
-      updated_at: new Date().toISOString(),
-    };
 
     if (isSupabaseConfigured()) {
       if (adminCtx.mode !== "database" || !adminCtx.lodgeId) {
@@ -165,25 +161,39 @@ export async function DELETE(
       const forbidden = await requireAdminApiPermission("meetings:write", lodgeId);
       if (forbidden) return forbidden;
 
-      const updated = await db.updateEvent(id, lodgeId, updates);
-      if (!updated) {
+      const existing = await db.getEventById(id, lodgeId);
+      if (!existing) {
+        return NextResponse.json({ error: "Event not found." }, { status: 404 });
+      }
+      if (existing.meeting_closed_at) {
+        return NextResponse.json(
+          {
+            error:
+              "This meeting has been closed and cannot be deleted. Reopen or contact support if you need it removed.",
+          },
+          { status: 409 },
+        );
+      }
+
+      const removed = await db.deleteEvent(id, lodgeId);
+      if (!removed) {
         return NextResponse.json({ error: "Event not found." }, { status: 404 });
       }
       await writeAuditLog({
         lodgeId,
-        action: "unpublished",
+        action: "deleted",
         entityType: "meeting",
-        entityId: updated.id,
-        summary: `Unpublished meeting ${updated.title}`,
+        entityId: id,
+        summary: `Deleted meeting ${removed.title}`,
       });
-      return NextResponse.json({ success: true, event: updated });
+      return NextResponse.json({ success: true });
     }
 
-    const updated = mockDb.updateEvent(id, updates, { lodge_slug: lodgeSlug });
-    if (!updated) {
+    const removed = mockDb.deleteEvent(id, { lodge_slug: lodgeSlug });
+    if (!removed) {
       return NextResponse.json({ error: "Event not found." }, { status: 404 });
     }
-    return NextResponse.json({ success: true, event: updated });
+    return NextResponse.json({ success: true });
   } catch (e) {
     console.error("Events DELETE API error:", e);
     return NextResponse.json(

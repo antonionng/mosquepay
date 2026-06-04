@@ -33,6 +33,7 @@ import {
   AlertTriangle,
   XCircle,
   EyeOff,
+  Trash2,
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -280,6 +281,7 @@ export function MeetingDetailClient({
   const [formError, setFormError] = useState<string | null>(null);
   const [formSaving, setFormSaving] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const isPast = new Date(meeting.event_date) < new Date();
 
@@ -410,6 +412,38 @@ export function MeetingDetailClient({
       );
     } finally {
       setFormSaving(false);
+    }
+  }
+
+  async function deleteMeeting() {
+    const raised = finance?.meeting.succeededTotal ?? 0;
+    const count = finance?.meeting.succeededCount ?? 0;
+    const paymentNote =
+      count > 0
+        ? `\n\n${count} payment${count === 1 ? "" : "s"} (£${raised.toFixed(2)} raised) will stay in the ledger but will no longer be linked to this meeting.`
+        : "";
+    const ok =
+      typeof window !== "undefined" &&
+      window.confirm(
+        `Delete "${meeting.title}" permanently?\n\nThis removes RSVPs, summons, and guest records for this meeting.${paymentNote}\n\nThis cannot be undone.`,
+      );
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/events/${meeting.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        window.alert(data.error ?? "Could not delete meeting.");
+        setDeleting(false);
+        return;
+      }
+      router.push("/admin/meetings");
+      router.refresh();
+    } catch {
+      window.alert("Could not delete meeting.");
+      setDeleting(false);
     }
   }
 
@@ -814,6 +848,18 @@ export function MeetingDetailClient({
                   Open summons
                 </Link>
               </Button>
+              {!closeState?.meeting_closed_at ? (
+                <Button
+                  type="button"
+                  variant="dashboard"
+                  disabled={deleting}
+                  className="text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+                  onClick={deleteMeeting}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {deleting ? "Deleting…" : "Delete meeting"}
+                </Button>
+              ) : null}
             </div>
           </div>
 
