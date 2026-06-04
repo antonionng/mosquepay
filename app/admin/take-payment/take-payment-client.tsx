@@ -68,10 +68,20 @@ export function TakePaymentClient({
   //   ?category=<id>    preselects the contribution category
   // Both come from the meeting detail page's "Take a payment for this
   // meeting" CTAs so the duty officer lands on a pre-filled form.
+  // Auto-suggest today's meeting when there's exactly one on, so the operator
+  // confirms rather than has to remember. A deep-linked ?event_id wins; an
+  // explicit choice later overrides either.
+  const todaysMeetingId = (() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const todays = events.filter(
+      (event) => event.event_date.slice(0, 10) === today,
+    );
+    return todays.length === 1 ? todays[0].id : null;
+  })();
   const initialEventId = (() => {
     const raw = searchParams.get("event_id");
-    if (!raw) return null;
-    return events.find((event) => event.id === raw) ? raw : null;
+    if (raw) return events.find((event) => event.id === raw) ? raw : null;
+    return todaysMeetingId;
   })();
   const initialCategory: CategoryId = (() => {
     const raw = searchParams.get("category");
@@ -369,6 +379,7 @@ export function TakePaymentClient({
           setDescription={setDescription}
           eventId={eventId}
           setEventId={setEventId}
+          eventAutoSelected={eventId != null && eventId === todaysMeetingId}
           payer={payer}
           setPayer={setPayer}
           lineItems={lineItems}
@@ -394,6 +405,7 @@ export function TakePaymentClient({
           setDescription={setDescription}
           eventId={eventId}
           setEventId={setEventId}
+          eventAutoSelected={eventId != null && eventId === todaysMeetingId}
           payer={payer}
           setPayer={setPayer}
           lineItems={lineItems}

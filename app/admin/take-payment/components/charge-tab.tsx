@@ -9,6 +9,7 @@ import { AmountDisplay } from "./amount-display";
 import { AmountKeypad } from "./amount-keypad";
 import { PayerRow } from "./payer-row";
 import { ExtrasSection } from "./extras-section";
+import { MeetingLinkField } from "./meeting-link-field";
 import { LineItemsSection } from "./line-items-section";
 import { ActiveSession, type ActiveSessionState } from "./active-session";
 import type {
@@ -72,6 +73,7 @@ export function ChargeTab({
   setDescription,
   eventId,
   setEventId,
+  eventAutoSelected,
   payer,
   setPayer,
   lineItems,
@@ -95,6 +97,7 @@ export function ChargeTab({
   setDescription: (v: string) => void;
   eventId: string | null;
   setEventId: (v: string | null) => void;
+  eventAutoSelected?: boolean;
   payer: PayerSelection;
   setPayer: (v: PayerSelection) => void;
   lineItems: LineItemDraft[];
@@ -250,6 +253,12 @@ export function ChargeTab({
           setPayer={setPayer}
           hint="Tap Guest to attach a guest record (or add a new one). Tap Member to attribute to a Lodgepay member and auto-attach Gift Aid."
         />
+        <MeetingLinkField
+          events={events}
+          eventId={eventId}
+          setEventId={setEventId}
+          autoSelected={eventAutoSelected}
+        />
         <ExtrasSection
           category={category}
           setCategory={setCategory}
@@ -261,7 +270,8 @@ export function ChargeTab({
           eventId={eventId}
           setEventId={setEventId}
           hideCategory={itemised}
-          defaultOpen={Boolean(eventId) || (!itemised && category !== "general")}
+          hideEvent
+          defaultOpen={!itemised && category !== "general"}
         />
         {error ? (
           <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -13,16 +13,21 @@ import {
   CircleDot,
   Clock,
   Copy,
+  CreditCard,
   Download,
   Eye,
   ExternalLink,
   FileText,
   Globe,
+  Link2,
+  ListChecks,
+  Loader2,
   Lock,
   Link as LinkIcon,
   MapPin,
   Pencil,
   PoundSterling,
+  Receipt,
   Send,
   Users,
   AlertTriangle,
@@ -50,10 +55,14 @@ import { MeetingClosePanel } from "./meeting-close-panel";
 import {
   reconcileMeeting,
   METHOD_GROUP_LABEL,
+  CATEGORY_LABEL,
   type PaymentMethodGroup,
+  type ReconciledPayer,
 } from "@/lib/meetings/reconcile";
 
 type MeetingEvent = MeetingFormMeeting;
+
+type EventOption = { id: string; title: string; event_date: string };
 
 type RsvpEntry = {
   id: string;
@@ -214,6 +223,8 @@ export function MeetingDetailClient({
   finance,
   closeState,
   unattributed,
+  sameDayUntagged = [],
+  events = [],
 }: {
   meeting: MeetingEvent;
   rsvps: RsvpEntry[];
@@ -252,8 +263,16 @@ export function MeetingDetailClient({
   };
   /** Collected payments taken on the meeting date but not tagged to any meeting. */
   unattributed?: { count: number; total: number };
+  /** Collected, untagged payments taken within a day of this meeting — the
+   *  candidates for the "associate to this meeting" reconciliation panel. */
+  sameDayUntagged?: PaymentEntry[];
+  /** Lodge meetings for the associate / recategorise pickers. */
+  events?: EventOption[];
 }) {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<"overview" | "payments">(
+    "overview",
+  );
   const [formOpen, setFormOpen] = useState(false);
   const [meetingForm, setMeetingForm] = useState<MeetingForm>(() =>
     formFromMeeting(meeting)
@@ -957,6 +976,33 @@ export function MeetingDetailClient({
         </CardContent>
       </Card>
 
+      <div className="flex items-center gap-1 border-b border-dash-border">
+        <TabButton
+          active={activeTab === "overview"}
+          onClick={() => setActiveTab("overview")}
+        >
+          Overview
+        </TabButton>
+        <TabButton
+          active={activeTab === "payments"}
+          onClick={() => setActiveTab("payments")}
+          badge={sameDayUntagged.length > 0 ? sameDayUntagged.length : undefined}
+        >
+          Payments
+        </TabButton>
+      </div>
+
+      {activeTab === "payments" ? (
+        <MeetingPaymentsTab
+          eventId={meeting.id}
+          eventTitle={meeting.title}
+          eventDate={meeting.event_date}
+          payments={payments}
+          sameDayUntagged={sameDayUntagged}
+          events={events}
+          currency={finance?.currency ?? "GBP"}
+        />
+      ) : (
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <Card variant="panel" className="overflow-hidden p-0">
@@ -1297,6 +1343,7 @@ export function MeetingDetailClient({
             payments={payments}
             unattributed={unattributed}
             currency={finance?.currency ?? "GBP"}
+            onReviewUntagged={() => setActiveTab("payments")}
           />
 
           {closeState ? (
@@ -1564,6 +1611,7 @@ export function MeetingDetailClient({
           </Card>
         </div>
       </div>
+      )}
 
       <MeetingFormDrawer
         open={formOpen}
@@ -1610,11 +1658,13 @@ function ReconcileCard({
   payments,
   unattributed,
   currency,
+  onReviewUntagged,
 }: {
   eventId: string;
   payments: PaymentEntry[];
   unattributed?: { count: number; total: number };
   currency: string;
+  onReviewUntagged?: () => void;
 }) {
   const [rafflePrice, setRafflePrice] = useState(5);
   const [counted, setCounted] = useState("");
@@ -1760,22 +1810,22 @@ function ReconcileCard({
         )}
 
         {unattributed && unattributed.count > 0 ? (
-          <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+          <button
+            type="button"
+            onClick={onReviewUntagged}
+            className="flex w-full items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-left text-xs text-amber-800 transition hover:bg-amber-100"
+          >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
               {unattributed.count} payment
               {unattributed.count === 1 ? "" : "s"} (
-              {formatMoney(unattributed.total, currency)}) taken today
-              aren&rsquo;t tagged to a meeting. Open{" "}
-              <Link
-                href="/admin/payments"
-                className="font-medium underline underline-offset-2"
-              >
-                Payments
-              </Link>{" "}
-              to check they belong to this evening.
+              {formatMoney(unattributed.total, currency)}) taken around this
+              date aren&rsquo;t tagged to a meeting.{" "}
+              <span className="font-medium underline underline-offset-2">
+                Review &amp; associate in the Payments tab →
+              </span>
             </span>
-          </div>
+          </button>
         ) : null}
 
         <Button asChild variant="outline" size="sm" className="w-full">
@@ -1799,6 +1849,600 @@ function formatMoney(amount: number, currency = "GBP") {
   } catch {
     return `£${amount.toFixed(2)}`;
   }
+}
+
+function TabButton({
+  active,
+  onClick,
+  badge,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  badge?: number;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "-mb-px flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition",
+        active
+          ? "border-blue-600 text-dash-text"
+          : "border-transparent text-dash-muted hover:text-dash-text",
+      )}
+      aria-current={active ? "page" : undefined}
+    >
+      {children}
+      {badge != null ? (
+        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[11px] font-semibold text-white">
+          {badge}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+const PAYMENTS_TAB_CATEGORIES = [
+  "meeting_fee",
+  "dining",
+  "guest_ticket",
+  "charity",
+  "raffle",
+  "general",
+] as const;
+type PaymentsTabCategory = (typeof PAYMENTS_TAB_CATEGORIES)[number];
+
+// Derive the headline category for an existing payment from its sub-amounts.
+// Mixed baskets resolve to whichever bucket is largest; an empty basket is
+// "general".
+function derivePaymentCategory(p: PaymentEntry): PaymentsTabCategory {
+  const buckets: Array<[PaymentsTabCategory, number]> = [
+    ["charity", p.charity_amount ?? 0],
+    ["raffle", p.raffle_amount ?? 0],
+    ["dining", p.dining_amount ?? 0],
+    ["meeting_fee", p.meeting_fee_amount ?? 0],
+    ["guest_ticket", p.guest_ticket_amount ?? 0],
+  ];
+  let best: PaymentsTabCategory = "general";
+  let bestVal = 0;
+  for (const [key, val] of buckets) {
+    if (val > bestVal) {
+      bestVal = val;
+      best = key;
+    }
+  }
+  return best;
+}
+
+const METHOD_ICON: Record<PaymentMethodGroup, typeof CreditCard> = {
+  cash: PoundSterling,
+  lodgepay: CreditCard,
+  other: Receipt,
+};
+
+/**
+ * Meeting-scoped "Payments" tab. Mirrors the main /admin/payments section but
+ * pinned to this meeting: a same-day reconciliation panel (bulk-associate
+ * untagged takings), a revenue-by-type + method breakdown, and a per-payment
+ * ledger with inline re-categorise / re-link / detach.
+ */
+function MeetingPaymentsTab({
+  eventId,
+  eventTitle,
+  eventDate,
+  payments,
+  sameDayUntagged,
+  events,
+  currency,
+}: {
+  eventId: string;
+  eventTitle: string;
+  eventDate: string;
+  payments: PaymentEntry[];
+  sameDayUntagged: PaymentEntry[];
+  events: EventOption[];
+  currency: string;
+}) {
+  const router = useRouter();
+  const [rafflePrice, setRafflePrice] = useState(5);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem("c0v.rafflePricePerStrip");
+    const n = saved ? Number(saved) : NaN;
+    if (Number.isFinite(n) && n > 0) setRafflePrice(n);
+  }, []);
+
+  const recon = useMemo(
+    () => reconcileMeeting(payments, { rafflePrice }),
+    [payments, rafflePrice],
+  );
+
+  const methodOrder: PaymentMethodGroup[] = ["lodgepay", "cash", "other"];
+  const activeMethods = methodOrder.filter(
+    (m) => recon.byMethod[m].count > 0 || recon.byMethod[m].amount > 0,
+  );
+
+  const categoryTiles = PAYMENTS_TAB_CATEGORIES.filter(
+    (c) => recon.byCategory[c] > 0,
+  );
+
+  return (
+    <div className="space-y-6">
+      {sameDayUntagged.length > 0 ? (
+        <SameDayAssociatePanel
+          eventId={eventId}
+          eventTitle={eventTitle}
+          eventDate={eventDate}
+          rows={sameDayUntagged}
+          currency={currency}
+          rafflePrice={rafflePrice}
+          onChanged={() => router.refresh()}
+        />
+      ) : null}
+
+      <Card variant="panel" className="overflow-hidden p-0">
+        <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
+          <div className="flex items-center gap-2">
+            <Receipt className="h-4 w-4 text-slate-700" />
+            <h3 className="dash-panel-header-title">
+              Payments for this meeting
+            </h3>
+          </div>
+        </div>
+        <CardContent className="space-y-5 border-t border-dash-border bg-dash-surface p-5">
+          {recon.collectedCount === 0 ? (
+            <p className="rounded-md border border-dashed border-dash-border bg-dash-surface-subtle/40 px-3 py-6 text-center text-sm text-dash-text-muted">
+              No payments tagged to this meeting yet.
+              {sameDayUntagged.length === 0
+                ? " Link payments here from the take-payment app, or attach them from /admin/payments."
+                : " Use the panel above to associate the takings from this date."}
+            </p>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {categoryTiles.map((c) => (
+                  <div
+                    key={c}
+                    className="rounded-lg border border-dash-border bg-dash-surface-subtle/40 p-3"
+                  >
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-dash-faint">
+                      {CATEGORY_LABEL[c]}
+                    </p>
+                    <p className="mt-1 text-lg font-semibold tabular-nums text-dash-text">
+                      {formatMoney(recon.byCategory[c], currency)}
+                    </p>
+                    {c === "raffle" ? (
+                      <p className="text-[11px] text-dash-faint">
+                        {recon.raffleStrips} strip
+                        {recon.raffleStrips === 1 ? "" : "s"} ·{" "}
+                        {recon.raffleBuyers} buyer
+                        {recon.raffleBuyers === 1 ? "" : "s"}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+                <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-blue-700">
+                    Collected
+                  </p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums text-blue-900">
+                    {formatMoney(recon.collectedTotal, currency)}
+                  </p>
+                  <p className="text-[11px] text-blue-700/80">
+                    {recon.collectedCount} payment
+                    {recon.collectedCount === 1 ? "" : "s"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {activeMethods.map((m) => {
+                  const t = recon.byMethod[m];
+                  const pct =
+                    recon.collectedTotal > 0
+                      ? Math.round((t.amount / recon.collectedTotal) * 100)
+                      : 0;
+                  const Icon = METHOD_ICON[m];
+                  return (
+                    <span
+                      key={m}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-dash-border bg-dash-surface-subtle/50 px-3 py-1 text-xs text-dash-text"
+                    >
+                      <Icon className="h-3.5 w-3.5 text-dash-muted" />
+                      {METHOD_GROUP_LABEL[m]}{" "}
+                      <span className="font-medium tabular-nums">
+                        {formatMoney(t.amount, currency)}
+                      </span>
+                      <span className="text-dash-faint">· {pct}%</span>
+                    </span>
+                  );
+                })}
+              </div>
+
+              <div className="divide-y divide-dash-border rounded-lg border border-dash-border">
+                {recon.payers.map((payer) => (
+                  <LedgerRow
+                    key={payer.id}
+                    payer={payer}
+                    eventId={eventId}
+                    events={events}
+                    currency={currency}
+                    rafflePrice={rafflePrice}
+                    onChanged={() => router.refresh()}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SameDayAssociatePanel({
+  eventId,
+  eventTitle,
+  eventDate,
+  rows,
+  currency,
+  rafflePrice,
+  onChanged,
+}: {
+  eventId: string;
+  eventTitle: string;
+  eventDate: string;
+  rows: PaymentEntry[];
+  currency: string;
+  rafflePrice: number;
+  onChanged: () => void;
+}) {
+  // Pre-check everything: the common case is "yes, all of these were for the
+  // meeting" — uncheck the odd one out.
+  const [selected, setSelected] = useState<Set<string>>(
+    () => new Set(rows.map((r) => r.id)),
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const allChecked = selected.size === rows.length;
+
+  const selectedTotal = rows
+    .filter((r) => selected.has(r.id))
+    .reduce((s, r) => s + Math.max(0, r.total_amount - (r.refund_amount ?? 0)), 0);
+
+  const associate = async () => {
+    if (selected.size === 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/admin/meetings/${eventId}/associate-payments`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ payment_ids: Array.from(selected) }),
+        },
+      );
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        skipped?: { id: string; reason: string }[];
+      };
+      if (!res.ok) {
+        setError(data.error ?? "Could not associate payments.");
+        setBusy(false);
+        return;
+      }
+      const blocked = (data.skipped ?? []).filter(
+        (s) => s.reason === "in_claim_batch",
+      ).length;
+      if (blocked > 0) {
+        setError(
+          `${blocked} payment${blocked === 1 ? "" : "s"} skipped — already in a Gift Aid claim batch.`,
+        );
+      }
+      onChanged();
+    } catch {
+      setError("Network error. Please try again.");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card
+      variant="panel"
+      className="overflow-hidden border-amber-200 p-0"
+    >
+      <div className="border-b border-amber-200 bg-amber-50 px-5 py-4">
+        <div className="flex items-start gap-2">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+          <div>
+            <h3 className="text-sm font-semibold text-amber-900">
+              {rows.length} payment{rows.length === 1 ? "" : "s"} (
+              {formatMoney(
+                rows.reduce(
+                  (s, r) =>
+                    s + Math.max(0, r.total_amount - (r.refund_amount ?? 0)),
+                  0,
+                ),
+                currency,
+              )}
+              ) were taken around {formatDate(eventDate)}
+            </h3>
+            <p className="mt-0.5 text-xs text-amber-800">
+              The same day as <strong>{eventTitle}</strong>, but they aren&rsquo;t
+              tagged to any meeting. Tick the ones that belong to this evening
+              and associate them in one go. Untick any that don&rsquo;t.
+            </p>
+          </div>
+        </div>
+      </div>
+      <CardContent className="space-y-3 bg-dash-surface p-5">
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() =>
+              setSelected(
+                allChecked ? new Set() : new Set(rows.map((r) => r.id)),
+              )
+            }
+            className="text-xs font-medium text-blue-700 hover:underline"
+          >
+            {allChecked ? "Clear all" : "Select all"}
+          </button>
+          <span className="text-xs text-dash-muted">
+            {selected.size} selected · {formatMoney(selectedTotal, currency)}
+          </span>
+        </div>
+
+        <div className="divide-y divide-dash-border rounded-lg border border-dash-border">
+          {rows.map((r) => {
+            const net = Math.max(0, r.total_amount - (r.refund_amount ?? 0));
+            const cat = derivePaymentCategory(r);
+            const method = r.payment_method === "cash" ? "Cash" : "LodgePay";
+            const checked = selected.has(r.id);
+            return (
+              <label
+                key={r.id}
+                className="flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm hover:bg-dash-surface-subtle/40"
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggle(r.id)}
+                  className="h-4 w-4 shrink-0 accent-blue-600"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium text-dash-text">
+                    {r.user_name || r.user_email || "Unknown payer"}
+                  </span>
+                  <span className="block text-xs text-dash-muted">
+                    {method} · {CATEGORY_LABEL[cat]}
+                    {cat === "raffle"
+                      ? ` · ${stripsFor(r.raffle_amount ?? 0, rafflePrice)} strip${stripsFor(r.raffle_amount ?? 0, rafflePrice) === 1 ? "" : "s"}`
+                      : ""}{" "}
+                    · {new Date(r.created_at).toLocaleString("en-GB")}
+                  </span>
+                </span>
+                <span className="shrink-0 font-medium tabular-nums text-dash-text">
+                  {formatMoney(net, currency)}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+
+        {error ? (
+          <p className="text-xs text-rose-700">{error}</p>
+        ) : null}
+
+        <Button
+          type="button"
+          variant="primary"
+          size="sm"
+          className="w-full"
+          disabled={busy || selected.size === 0}
+          onClick={associate}
+        >
+          {busy ? (
+            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+          ) : (
+            <Link2 className="mr-1.5 h-4 w-4" />
+          )}
+          Associate {selected.size} payment{selected.size === 1 ? "" : "s"} with
+          this meeting
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function stripsFor(amount: number, rafflePrice: number): number {
+  return rafflePrice > 0 ? Math.round((amount ?? 0) / rafflePrice) : 0;
+}
+
+function LedgerRow({
+  payer,
+  eventId,
+  events,
+  currency,
+  rafflePrice,
+  onChanged,
+}: {
+  payer: ReconciledPayer;
+  eventId: string;
+  events: EventOption[];
+  currency: string;
+  rafflePrice: number;
+  onChanged: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const currentCategory: PaymentsTabCategory =
+    payer.charity > 0
+      ? "charity"
+      : payer.raffle > 0
+        ? "raffle"
+        : payer.dining > 0
+          ? "dining"
+          : payer.meeting_fee > 0
+            ? "meeting_fee"
+            : payer.guest_ticket > 0
+              ? "guest_ticket"
+              : "general";
+
+  const [category, setCategory] = useState<PaymentsTabCategory>(currentCategory);
+  const [linkedEvent, setLinkedEvent] = useState<string>(eventId);
+
+  const dirty = category !== currentCategory || linkedEvent !== eventId;
+
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const body: Record<string, unknown> = {};
+      if (category !== currentCategory) body.category = category;
+      if (linkedEvent !== eventId)
+        body.event_id = linkedEvent === "" ? null : linkedEvent;
+      const res = await fetch(`/api/admin/payments/${payer.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(data.error ?? "Could not update payment.");
+        setBusy(false);
+        return;
+      }
+      onChanged();
+    } catch {
+      setError("Network error. Please try again.");
+      setBusy(false);
+    }
+  };
+
+  const Icon = METHOD_ICON[payer.method];
+
+  return (
+    <div className="px-3 py-2.5 text-sm">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-3 text-left"
+      >
+        <Icon className="h-4 w-4 shrink-0 text-dash-muted" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-medium text-dash-text">
+            {payer.name || payer.email || "Unknown payer"}
+          </span>
+          <span className="block text-xs text-dash-muted">
+            {CATEGORY_LABEL[currentCategory]}
+            {currentCategory === "raffle"
+              ? ` · ${payer.raffleStrips} strip${payer.raffleStrips === 1 ? "" : "s"}`
+              : ""}{" "}
+            · {METHOD_GROUP_LABEL[payer.method]}
+          </span>
+        </span>
+        <span className="shrink-0 font-medium tabular-nums text-dash-text">
+          {formatMoney(payer.total, currency)}
+        </span>
+        <Pencil className="h-3.5 w-3.5 shrink-0 text-dash-faint" />
+      </button>
+
+      {open ? (
+        <div className="mt-3 space-y-3 rounded-lg border border-dash-border bg-dash-surface-subtle/40 p-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-xs">
+              <span className="mb-1 block font-medium text-dash-text">
+                Category
+              </span>
+              <select
+                value={category}
+                onChange={(e) =>
+                  setCategory(e.target.value as PaymentsTabCategory)
+                }
+                className="h-9 w-full rounded-lg border border-dash-border bg-dash-surface px-2 text-sm text-dash-text outline-none focus:border-dash-ring"
+              >
+                {PAYMENTS_TAB_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {CATEGORY_LABEL[c]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-xs">
+              <span className="mb-1 block font-medium text-dash-text">
+                Linked meeting
+              </span>
+              <select
+                value={linkedEvent}
+                onChange={(e) => setLinkedEvent(e.target.value)}
+                className="h-9 w-full rounded-lg border border-dash-border bg-dash-surface px-2 text-sm text-dash-text outline-none focus:border-dash-ring"
+              >
+                <option value="">No meeting (detach)</option>
+                {events.map((ev) => (
+                  <option key={ev.id} value={ev.id}>
+                    {ev.title} · {formatDate(ev.event_date)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          {category === "charity" && currentCategory !== "charity" ? (
+            <p className="text-[11px] text-emerald-700">
+              Recategorising to Charity creates a matching donation (and links
+              an active Gift Aid declaration if one is on file).
+            </p>
+          ) : null}
+          {currentCategory === "charity" && category !== "charity" ? (
+            <p className="text-[11px] text-amber-700">
+              Moving away from Charity removes the linked donation — blocked if
+              it&rsquo;s already in a Gift Aid claim batch.
+            </p>
+          ) : null}
+
+          {error ? <p className="text-xs text-rose-700">{error}</p> : null}
+
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              disabled={busy || !dirty}
+              onClick={save}
+            >
+              {busy ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              Save
+            </Button>
+            <Button asChild variant="ghost" size="sm">
+              <Link href={`/admin/payments/${payer.id}`}>
+                <ListChecks className="mr-1.5 h-3.5 w-3.5" />
+                Open full record
+              </Link>
+            </Button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 /**

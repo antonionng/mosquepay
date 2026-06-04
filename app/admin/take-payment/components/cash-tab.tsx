@@ -17,6 +17,7 @@ import { AmountDisplay } from "./amount-display";
 import { AmountKeypad } from "./amount-keypad";
 import { PayerRow } from "./payer-row";
 import { ExtrasSection } from "./extras-section";
+import { MeetingLinkField } from "./meeting-link-field";
 import { LineItemsSection } from "./line-items-section";
 import { formatMoney, newClientToken } from "./helpers";
 import type {
@@ -81,6 +82,7 @@ export function CashTab({
   setDescription,
   eventId,
   setEventId,
+  eventAutoSelected,
   payer,
   setPayer,
   lineItems,
@@ -100,6 +102,7 @@ export function CashTab({
   setDescription: (v: string) => void;
   eventId: string | null;
   setEventId: (v: string | null) => void;
+  eventAutoSelected?: boolean;
   payer: PayerSelection;
   setPayer: (v: PayerSelection) => void;
   lineItems: LineItemDraft[];
@@ -442,6 +445,12 @@ export function CashTab({
           setPayer={setPayer}
           hint="Tap Guest to attach a guest record (add a new one if needed). Tap Member for Lodgepay members. Receipts go automatically to whichever email we have on file."
         />
+        <MeetingLinkField
+          events={events}
+          eventId={eventId}
+          setEventId={setEventId}
+          autoSelected={eventAutoSelected}
+        />
         <ExtrasSection
           category={category}
           setCategory={setCategory}
@@ -456,7 +465,8 @@ export function CashTab({
           setNote={setNote}
           showNote
           hideCategory={itemised}
-          defaultOpen={Boolean(eventId) || (!itemised && category !== "general")}
+          hideEvent
+          defaultOpen={!itemised && category !== "general"}
         />
         {error ? (
           <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">

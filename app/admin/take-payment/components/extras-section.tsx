@@ -40,6 +40,7 @@ export function ExtrasSection({
   setNote,
   showNote,
   hideCategory,
+  hideEvent,
   defaultOpen,
 }: {
   category: CategoryId;
@@ -57,6 +58,9 @@ export function ExtrasSection({
   /** Hidden when the form is in itemised mode — each line carries its own
    *  category, so the single-category picker would be misleading. */
   hideCategory?: boolean;
+  /** Hidden when the meeting picker is surfaced prominently above the form
+   *  (MeetingLinkField) so the two don't duplicate. */
+  hideEvent?: boolean;
   /** Initial collapsed/open state. Pages that deep-link with a preset
    *  event_id or non-default category pass true so the operator sees the
    *  inherited selections without having to expand the section first. */
@@ -69,7 +73,7 @@ export function ExtrasSection({
     reference ||
     description ||
     note ||
-    eventId;
+    (!hideEvent && eventId);
 
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50/60">
@@ -88,7 +92,7 @@ export function ExtrasSection({
       </button>
       {open ? (
         <div className="space-y-4 border-t border-slate-200 p-4">
-          {events.length > 0 ? (
+          {events.length > 0 && !hideEvent ? (
             <div className="space-y-2">
               <Label htmlFor="tp-event">Link to meeting (optional)</Label>
               <Select

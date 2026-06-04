@@ -42,6 +42,8 @@ import {
   Ticket,
   CalendarDays,
   UtensilsCrossed,
+  AlertTriangle,
+  ArrowUpRight,
 } from "lucide-react";
 
 type Payment = {
@@ -1036,6 +1038,44 @@ export function AdminPaymentsClient({
     }
   }
 
+  // Reconciliation nudge: collected payments with no meeting that were taken
+  // on the same calendar day as a meeting. Treasurers forget to tag takings,
+  // so we surface "N payments from [meeting]'s day aren't linked" with a
+  // jump into that meeting where they can bulk-associate. Uses the full
+  // (unscoped) payment set so the nudge shows regardless of the date filter.
+  const untaggedMeetingMatches = useMemo(() => {
+    const byDay = new Map<string, Payment[]>();
+    for (const p of payments) {
+      if (p.event_id) continue;
+      if (!isCollected(p.status)) continue;
+      const day = p.created_at.slice(0, 10);
+      const arr = byDay.get(day) ?? [];
+      arr.push(p);
+      byDay.set(day, arr);
+    }
+    const matches: {
+      event: EventOption;
+      count: number;
+      total: number;
+    }[] = [];
+    for (const ev of events) {
+      const ps = byDay.get(ev.event_date.slice(0, 10));
+      if (ps && ps.length > 0) {
+        matches.push({
+          event: ev,
+          count: ps.length,
+          total: ps.reduce(
+            (s, p) => s + Math.max(0, p.total_amount - (p.refund_amount ?? 0)),
+            0,
+          ),
+        });
+      }
+    }
+    return matches.sort((a, b) =>
+      b.event.event_date.localeCompare(a.event.event_date),
+    );
+  }, [payments, events]);
+
   return (
     <div className="space-y-5 sm:space-y-8">
       <div className="admin-page-head">
@@ -1070,6 +1110,49 @@ export function AdminPaymentsClient({
           )}
         </div>
       </div>
+
+      {untaggedMeetingMatches.length > 0 ? (
+        <Card variant="panel" className="border-amber-200 bg-amber-50/60 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <p className="text-sm font-semibold text-amber-900">
+                Some takings aren&rsquo;t linked to a meeting
+              </p>
+              <p className="text-xs text-amber-800">
+                These collected payments were taken on the same day as a
+                meeting but aren&rsquo;t tagged to it. Open the meeting to review
+                and bulk-associate them.
+              </p>
+              <div className="flex flex-col gap-2 pt-1">
+                {untaggedMeetingMatches.slice(0, 4).map((m) => (
+                  <Link
+                    key={m.event.id}
+                    href={`/admin/meetings/${m.event.id}`}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm transition hover:border-amber-300 hover:bg-amber-50"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium text-dash-text">
+                        {m.event.title}
+                      </span>
+                      <span className="block text-xs text-dash-muted">
+                        {m.count} payment{m.count === 1 ? "" : "s"} · £
+                        {m.total.toFixed(2)} on{" "}
+                        {new Date(m.event.event_date).toLocaleDateString(
+                          "en-GB",
+                        )}
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-amber-700">
+                      Review <ArrowUpRight className="h-3.5 w-3.5" />
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Card>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {summaryCards.map((card) => {

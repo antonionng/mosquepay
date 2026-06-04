@@ -123,18 +123,29 @@ export default async function AdminMeetingDetailPage({
   const lodgeAllTimeTotal =
     lodgeFinance.succeededTotal + lodgeFinance.pendingTotal;
 
-  // Heads-up for reconciliation: collected payments taken on the meeting date
-  // that are NOT attributed to any meeting. These are the takings most likely
-  // meant for this evening that someone forgot to tag, so the treasurer can
-  // re-attribute them before closing.
+  // Reconciliation: collected payments taken on (or within a day of) the
+  // meeting date that are NOT attributed to any meeting. These are the
+  // takings most likely meant for this evening that someone forgot to tag,
+  // so the treasurer can bulk-associate them before closing. We widen to
+  // ±1 day to catch late-night / timezone edges around the event date.
   const collectedStatuses = new Set(["succeeded", "completed", "paid"]);
   const meetingDay = event.event_date.slice(0, 10);
+  const dayOffset = (iso: string, days: number) => {
+    const d = new Date(`${iso}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+  };
+  const allowedDays = new Set([
+    dayOffset(meetingDay, -1),
+    meetingDay,
+    dayOffset(meetingDay, 1),
+  ]);
   const unattributedSameDay = lodgePaymentsAll.filter(
     (p) =>
       !p.event_id &&
       collectedStatuses.has(p.status) &&
       typeof p.created_at === "string" &&
-      p.created_at.slice(0, 10) === meetingDay,
+      allowedDays.has(p.created_at.slice(0, 10)),
   );
   const unattributed = {
     count: unattributedSameDay.length,
@@ -143,6 +154,14 @@ export default async function AdminMeetingDetailPage({
       0,
     ),
   };
+
+  // Meetings list for the "associate to a different meeting / detach" picker
+  // inside the reconciliation panel and the per-payment edit controls.
+  const eventOptions = lodgeId
+    ? (await db.getEvents(lodgeId).catch(() => []))
+        .map((e) => ({ id: e.id, title: e.title, event_date: e.event_date }))
+        .sort((a, b) => b.event_date.localeCompare(a.event_date))
+    : [];
 
   // Per-meeting Gift Aid close state (migration 059). Donor-linked donations
   // for this event are what the per-meeting batch will sweep. Treasurer sees
@@ -344,6 +363,8 @@ export default async function AdminMeetingDetailPage({
       }}
       closeState={closeState}
       unattributed={unattributed}
+      sameDayUntagged={JSON.parse(JSON.stringify(unattributedSameDay))}
+      events={eventOptions}
     />
   );
 }
