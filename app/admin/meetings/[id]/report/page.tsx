@@ -106,6 +106,16 @@ export default async function MeetingReportPage({
   const cashVariance =
     cashCounted != null ? cashCounted - recon.byMethod.cash.amount : null;
 
+  // When a meeting's takings all come through the take-payment terminal there
+  // are no RSVPs, so every attendance figure is 0. A wall of zeros at the top
+  // of the report is noise — only show the section when there's real data.
+  const hasAttendanceData =
+    ceremonyCount > 0 ||
+    diningCount > 0 ||
+    guestCount > 0 ||
+    apologies > 0 ||
+    wineBottles > 0;
+
   const closedAt =
     "meeting_closed_at" in event
       ? (event as { meeting_closed_at: string | null }).meeting_closed_at
@@ -159,21 +169,24 @@ export default async function MeetingReportPage({
           </div>
         </header>
 
-        {/* Attendance */}
-        <Section title="Attendance & dining">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat label="At ceremony" value={String(ceremonyCount)} />
-            <Stat label="Dining covers" value={String(diningCount)} />
-            <Stat label="Guests" value={String(guestCount)} />
-            <Stat label="Apologies" value={String(apologies)} />
-          </div>
-          {wineBottles > 0 ? (
-            <p className="mt-2 text-xs text-slate-500">
-              Wine raffle pledges: {wineBottles} bottle
-              {wineBottles === 1 ? "" : "s"}
-            </p>
-          ) : null}
-        </Section>
+        {/* Attendance — hidden when there are no RSVPs to report (e.g. all
+            takings came through the take-payment terminal). */}
+        {hasAttendanceData ? (
+          <Section title="Attendance & dining">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Stat label="At ceremony" value={String(ceremonyCount)} />
+              <Stat label="Dining covers" value={String(diningCount)} />
+              <Stat label="Guests" value={String(guestCount)} />
+              <Stat label="Apologies" value={String(apologies)} />
+            </div>
+            {wineBottles > 0 ? (
+              <p className="mt-2 text-xs text-slate-500">
+                Wine raffle pledges: {wineBottles} bottle
+                {wineBottles === 1 ? "" : "s"}
+              </p>
+            ) : null}
+          </Section>
+        ) : null}
 
         {/* Money in by method */}
         <Section title="Money collected — by method">
