@@ -96,7 +96,7 @@ export function MediaLibrary() {
         <div>
           <h2 className="text-lg font-semibold text-dash-text">Website media library</h2>
           <p className="mt-1 max-w-2xl text-sm text-dash-muted">
-            Store lodge website images once, then reuse them in sections, hero backgrounds,
+            Store church website images once, then reuse them in sections, hero backgrounds,
             and design blocks.
           </p>
         </div>
@@ -159,7 +159,7 @@ export function MediaLibrary() {
           <ImagePlus className="mx-auto h-8 w-8 text-dash-muted" />
           <h3 className="mt-3 font-semibold text-dash-text">No website images yet</h3>
           <p className="mx-auto mt-2 max-w-md text-sm text-dash-muted">
-            Upload hero images, room photos, charity shots, and lodge visuals here.
+            Upload hero images, room photos, charity shots, and church visuals here.
           </p>
           <Button
             type="button"

@@ -1,7 +1,7 @@
 // GET /api/donations/gift-aid-status?email=...
 //
 // Public lookup used by the donate form to detect whether the donor's email
-// already has an active Gift Aid declaration on file for this lodge. When it
+// already has an active Gift Aid declaration on file for this church. When it
 // does, the donate form can:
 //   - automatically apply Gift Aid to the new donation
 //   - skip the address fields (we already have a signed declaration on file)
@@ -15,7 +15,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,13 +31,13 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const lodgeSlug = getLodgeSlugFromRequest(request);
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    if (!lodgeId) {
+    const churchSlug = getChurchSlugFromRequest(request);
+    const churchId = await db.resolveChurchId(churchSlug);
+    if (!churchId) {
       return NextResponse.json({ has_active_declaration: false });
     }
     const declaration = await db.getActiveGiftAidDeclarationByEmail(
-      lodgeId,
+      churchId,
       email
     );
     return NextResponse.json({

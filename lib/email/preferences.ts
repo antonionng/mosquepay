@@ -10,8 +10,8 @@
 //      optional emails. Default is on; an explicit row with
 //      enabled=false is the only opt-out signal.
 //
-// Lodge-wide opt-outs for treasurers/secretaries live separately in
-// public.lodge_notification_settings and are consulted by
+// Church-wide opt-outs for treasurers/secretaries live separately in
+// public.church_notification_settings and are consulted by
 // lib/email/recipients.ts.
 
 import * as db from "@/lib/db";
@@ -22,13 +22,13 @@ import * as db from "@/lib/db";
  * subscription, account access).
  */
 export const CRITICAL_EVENT_TYPES = new Set<string>([
-  "dues_subscription_invoice_failed_member",
-  "dues_subscription_canceled_member",
+  "giving_subscription_invoice_failed_member",
+  "giving_subscription_canceled_member",
   "member_invite",
   "member_password_reset",
   "staff_invite",
   "staff_password_reset",
-  "summons_member", // legally important — suppress lodge-wide if at all
+  "notice_member", // legally important — suppress church-wide if at all
 ]);
 
 /**
@@ -41,41 +41,41 @@ export const OPTIONAL_PREFERENCES: Array<{
   items: Array<{ eventType: string; label: string; description: string }>;
 }> = [
   {
-    group: "Dues & subscriptions",
+    group: "Giving & subscriptions",
     items: [
       {
-        eventType: "dues_subscription_activated_member",
+        eventType: "giving_subscription_activated_member",
         label: "Subscription confirmation",
         description:
-          "When you set up a new dues subscription, we email a confirmation with your cycle amount and cadence.",
+          "When you set up a new giving subscription, we email a confirmation with your cycle amount and cadence.",
       },
       {
-        eventType: "dues_subscription_invoice_paid_member",
-        label: "Per-cycle dues receipts",
+        eventType: "giving_subscription_invoice_paid_member",
+        label: "Per-cycle giving receipts",
         description:
           "Receipt for every successful subscription cycle (monthly or quarterly).",
       },
       {
-        eventType: "dues_method_changed_bacs_member",
+        eventType: "giving_method_changed_bacs_member",
         label: "BACS recorded",
         description:
           "When the treasurer marks you as paying by BACS standing order.",
       },
       {
-        eventType: "dues_method_changed_paid_in_full_member",
+        eventType: "giving_method_changed_paid_in_full_member",
         label: "Paid in full",
-        description: "Confirmation when your dues are settled for the year.",
+        description: "Confirmation when your giving are settled for the year.",
       },
       {
-        eventType: "dues_method_changed_fee_waived_member",
+        eventType: "giving_method_changed_fee_waived_member",
         label: "Fee waived",
-        description: "Confirmation when your dues are waived for the year.",
+        description: "Confirmation when your giving are waived for the year.",
       },
       {
-        eventType: "dues_reminder_member",
-        label: "Dues reminders",
+        eventType: "giving_reminder_member",
+        label: "Giving reminders",
         description:
-          "Friendly reminders before your annual dues are due. Skipping these does not stop your dues from accruing.",
+          "Friendly reminders before your annual giving are due. Skipping these does not stop your giving from accruing.",
       },
     ],
   },
@@ -83,9 +83,9 @@ export const OPTIONAL_PREFERENCES: Array<{
     group: "Payments & receipts",
     items: [
       {
-        eventType: "payment_receipt_dues_full",
-        label: "One-off dues receipts",
-        description: "Receipt when you pay annual dues in one transaction.",
+        eventType: "payment_receipt_giving_full",
+        label: "One-off giving receipts",
+        description: "Receipt when you pay annual giving in one transaction.",
       },
       {
         eventType: "payment_receipt_donation",
@@ -107,13 +107,13 @@ export const OPTIONAL_PREFERENCES: Array<{
     ],
   },
   {
-    group: "Lodge updates",
+    group: "Church updates",
     items: [
       {
-        eventType: "summons_acknowledgement_member",
-        label: "Summons acknowledgement",
+        eventType: "notice_acknowledgement_member",
+        label: "Notice acknowledgement",
         description:
-          "We confirm when you reply to a summons. The summons itself is always sent.",
+          "We confirm when you reply to a notice. The notice itself is always sent.",
       },
       {
         eventType: "wine_pledge_thanks_member",
@@ -210,7 +210,7 @@ export async function setMemberPreference(
 }
 
 // ---------------------------------------------------------------------------
-// Lodge-wide settings convenience (admin UI uses these too)
+// Church-wide settings convenience (admin UI uses these too)
 // ---------------------------------------------------------------------------
 
 export const ADMIN_NOTIFICATION_EVENTS: Array<{
@@ -219,48 +219,48 @@ export const ADMIN_NOTIFICATION_EVENTS: Array<{
   description: string;
 }> = [
   {
-    eventType: "dues_subscription_activated",
-    label: "New dues subscription",
+    eventType: "giving_subscription_activated",
+    label: "New giving subscription",
     description:
       "When a member sets up a new subscription. Useful for treasurer / secretary awareness.",
   },
   {
-    eventType: "dues_subscription_invoice_failed",
+    eventType: "giving_subscription_invoice_failed",
     label: "Subscription payment failed",
     description:
       "Escalation at the 1st, 3rd, and 5th consecutive failure. The 5th pauses the subscription.",
   },
   {
-    eventType: "dues_subscription_canceled",
+    eventType: "giving_subscription_canceled",
     label: "Subscription cancelled",
     description:
       "When a member or system cancels a subscription. Useful for follow-up.",
   },
   {
-    eventType: "dues_method_changed_bacs",
+    eventType: "giving_method_changed_bacs",
     label: "Member marked as BACS payer",
     description:
-      "When a treasurer records that a member is paying dues by BACS standing order. Other officers see who set the tag and the agreed monthly amount.",
+      "When a treasurer records that a member is paying giving by BACS standing order. Other officers see who set the tag and the agreed monthly amount.",
   },
   {
-    eventType: "dues_method_changed_paid_in_full",
-    label: "Member dues paid in full",
+    eventType: "giving_method_changed_paid_in_full",
+    label: "Member giving paid in full",
     description:
-      "When a treasurer marks dues paid in full off-platform (cash / cheque). Keeps the rest of the admin team in sync.",
+      "When a treasurer marks giving paid in full off-platform (cash / cheque). Keeps the rest of the admin team in sync.",
   },
   {
-    eventType: "dues_method_changed_fee_waived",
+    eventType: "giving_method_changed_fee_waived",
     label: "Member fee waived",
     description:
-      "When an admin waives this year's dues for a member. Sensitive — secretaries / almoners typically want to know.",
+      "When an admin waives this year's giving for a member. Sensitive — secretaries / pastoral_cares typically want to know.",
   },
 ];
 
 /**
  * Roles offered in the admin notifications settings UI. Mirrors
  * ADMIN_NOTIFY_ROLES in lib/email/recipients.ts. The 'platform_owner'
- * scope is intentionally excluded — that's the LodgePay vendor and
- * we don't expose them as a per-lodge toggle.
+ * scope is intentionally excluded — that's the ChurchPay vendor and
+ * we don't expose them as a per-church toggle.
  */
 export const ADMIN_NOTIFICATION_ROLES: Array<{
   role: string;
@@ -271,20 +271,20 @@ export const ADMIN_NOTIFICATION_ROLES: Array<{
   { role: "master", label: "Master" },
   { role: "charity_steward", label: "Charity steward" },
   { role: "membership_officer", label: "Membership officer" },
-  { role: "almoner", label: "Almoner" },
+  { role: "pastoral_care", label: "PastoralCare" },
   { role: "super_admin", label: "Super admin" },
 ];
 
-export async function listLodgeNotificationSettings(
-  lodgeId: string,
+export async function listChurchNotificationSettings(
+  churchId: string,
 ): Promise<Map<string, boolean>> {
   const supa = await getServiceClient();
   const { data, error } = await supa
-    .from("lodge_notification_settings")
+    .from("church_notification_settings")
     .select("role, event_type, enabled")
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) {
-    console.error("listLodgeNotificationSettings: query failed", error);
+    console.error("listChurchNotificationSettings: query failed", error);
     return new Map();
   }
   const out = new Map<string, boolean>();
@@ -298,8 +298,8 @@ export async function listLodgeNotificationSettings(
   return out;
 }
 
-export async function setLodgeNotificationSetting(
-  lodgeId: string,
+export async function setChurchNotificationSetting(
+  churchId: string,
   role: string,
   eventType: string,
   enabled: boolean,
@@ -308,25 +308,25 @@ export async function setLodgeNotificationSetting(
   if (enabled) {
     // "Send" is the default; clearing the row is enough.
     const { error } = await supa
-      .from("lodge_notification_settings")
+      .from("church_notification_settings")
       .delete()
-      .eq("lodge_id", lodgeId)
+      .eq("church_id", churchId)
       .eq("role", role)
       .eq("event_type", eventType);
     if (error) throw error;
     return;
   }
   const { error } = await supa
-    .from("lodge_notification_settings")
+    .from("church_notification_settings")
     .upsert(
       {
-        lodge_id: lodgeId,
+        church_id: churchId,
         role,
         event_type: eventType,
         enabled: false,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "lodge_id,role,event_type" },
+      { onConflict: "church_id,role,event_type" },
     );
   if (error) throw error;
 }

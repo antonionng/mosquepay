@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -21,38 +21,38 @@ export async function GET(request: NextRequest) {
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ rows: [] });
   }
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("members:read", lodgeId);
+  const forbidden = await requireAdminApiPermission("members:read", churchId);
   if (forbidden) return forbidden;
 
-  const members = await db.getMembers(lodgeId, { status: "active" });
-  const allDues = await Promise.all(
+  const members = await db.getMembers(churchId, { status: "active" });
+  const allGiving = await Promise.all(
     members.map((m) =>
-      db.getMemberDues(lodgeId, { memberEmail: m.email }).catch(() => [])
+      db.getMemberGiving(churchId, { memberEmail: m.email }).catch(() => [])
     )
   ).catch(() => []);
-  const recentEvents = await db.getEvents(lodgeId, { upcoming: false });
+  const recentEvents = await db.getEvents(churchId, { upcoming: false });
   const past = recentEvents
     .filter((e) => new Date(e.event_date) < new Date())
     .slice(0, 5);
   const rsvpByEvent: Record<string, Awaited<ReturnType<typeof db.getRsvpsByEventId>>> = {};
   await Promise.all(
     past.map(async (e) => {
-      rsvpByEvent[e.id] = await db.getRsvpsByEventId(e.id, lodgeId).catch(() => []);
+      rsvpByEvent[e.id] = await db.getRsvpsByEventId(e.id, churchId).catch(() => []);
     })
   );
 
   const rows: RiskRow[] = members.map((member, i) => {
     const reasons: string[] = [];
     let score = 0;
-    const dues = (allDues[i] ?? []) as Array<{ status: string }>;
-    const overdue = dues.filter((d) => d.status === "overdue").length;
+    const giving = (allGiving[i] ?? []) as Array<{ status: string }>;
+    const overdue = giving.filter((d) => d.status === "overdue").length;
     if (overdue > 0) {
-      reasons.push(`${overdue} overdue dues`);
+      reasons.push(`${overdue} overdue giving`);
       score += overdue * 2;
     }
     let attended = 0;
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
       }
     }
     if (totalEligible >= 3 && attended === 0) {
-      reasons.push("Missed last 3+ meetings");
+      reasons.push("Missed last 3+ services");
       score += 3;
     }
     if (!member.phone) {

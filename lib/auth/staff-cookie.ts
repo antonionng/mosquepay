@@ -3,7 +3,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 export const STAFF_ADMIN_COOKIE = "covenant_staff_admin_session";
 
 const SESSION_SECRET =
-  process.env.SESSION_SECRET ?? "covenant-dummy-secret-change-in-production";
+  process.env.SESSION_SECRET ?? "churchpay-dummy-secret-change-in-production";
 
 export interface StaffAdminCookiePayload {
   email: string;

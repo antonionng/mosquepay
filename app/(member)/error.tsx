@@ -28,7 +28,7 @@ export default function MemberError({
         We could not load this page
       </h1>
       <p className="text-sm text-slate-500">
-        Please try again. If the problem continues, contact your lodge
+        Please try again. If the problem continues, contact your church
         secretary.
       </p>
       <div className="flex gap-2">

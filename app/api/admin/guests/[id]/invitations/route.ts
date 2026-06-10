@@ -8,7 +8,7 @@ import {
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -17,36 +17,36 @@ import { writeAuditLog } from "@/lib/audit";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import {
   generateGuestInvitationToken,
-  generateVisitorToken,
+  generateNewcomerToken,
   hashGuestInvitationToken,
-  hashVisitorToken,
+  hashNewcomerToken,
 } from "@/lib/guest-tokens";
 import { sendGuestInviteEmail } from "@/lib/email/guest";
 import {
   buildPublicUrl,
-  lodgeScopedGuestPath,
-  lodgeScopedVisitorPath,
+  churchScopedGuestPath,
+  churchScopedNewcomerPath,
 } from "@/lib/public-links";
 
-function buildGuestUrl(request: NextRequest, lodgeSlug: string, token: string) {
+function buildGuestUrl(request: NextRequest, churchSlug: string, token: string) {
   const base = (
     process.env.NEXT_PUBLIC_SITE_URL ?? request.nextUrl.origin
   ).replace(/\/$/, "");
-  return buildPublicUrl(base, lodgeScopedGuestPath(lodgeSlug, token));
+  return buildPublicUrl(base, churchScopedGuestPath(churchSlug, token));
 }
 
-function buildVisitorUrl(request: NextRequest, lodgeSlug: string, token: string) {
+function buildNewcomerUrl(request: NextRequest, churchSlug: string, token: string) {
   const base = (
     process.env.NEXT_PUBLIC_SITE_URL ?? request.nextUrl.origin
   ).replace(/\/$/, "");
-  return buildPublicUrl(base, lodgeScopedVisitorPath(lodgeSlug, token));
+  return buildPublicUrl(base, churchScopedNewcomerPath(churchSlug, token));
 }
 
-async function ensureFlag(lodgeId: string | null) {
-  const enabled = await isFeatureEnabled(lodgeId, "guest_links");
+async function ensureFlag(churchId: string | null) {
+  const enabled = await isFeatureEnabled(churchId, "guest_links");
   if (enabled) return null;
   return NextResponse.json(
-    { error: "Guest links are disabled for this lodge." },
+    { error: "Guest links are disabled for this church." },
     { status: 403 }
   );
 }
@@ -59,18 +59,18 @@ export async function GET(
   if (unauthorized) return unauthorized;
 
   const { id: guestId } = await params;
-  const lodgeSlug = getLodgeSlugFromRequest(request);
+  const churchSlug = getChurchSlugFromRequest(request);
 
   if (isSupabaseConfigured()) {
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    if (!lodgeId) {
-      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    const churchId = await db.resolveChurchId(churchSlug);
+    if (!churchId) {
+      return NextResponse.json({ error: "Church not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("members:read", lodgeId);
+    const forbidden = await requireAdminApiPermission("members:read", churchId);
     if (forbidden) return forbidden;
-    const flagBlocked = await ensureFlag(lodgeId);
+    const flagBlocked = await ensureFlag(churchId);
     if (flagBlocked) return flagBlocked;
-    const invitations = await db.listGuestInvitationsForGuest(guestId, lodgeId);
+    const invitations = await db.listGuestInvitationsForGuest(guestId, churchId);
     return NextResponse.json({ invitations });
   }
 
@@ -78,7 +78,7 @@ export async function GET(
     return NextResponse.json({ invitations: [] });
   }
   const invitations = mockDb.listGuestInvitationsForGuest(guestId, {
-    lodge_slug: lodgeSlug,
+    church_slug: churchSlug,
   });
   return NextResponse.json({ invitations });
 }
@@ -94,7 +94,7 @@ export async function POST(
   if (unauthorized) return unauthorized;
 
   const { id: guestId } = await params;
-  const lodgeSlug = getLodgeSlugFromRequest(request);
+  const churchSlug = getChurchSlugFromRequest(request);
 
   let body: Record<string, unknown> = {};
   try {
@@ -115,20 +115,20 @@ export async function POST(
   const sendEmail = body.send_email !== false;
 
   if (isSupabaseConfigured()) {
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    if (!lodgeId) {
-      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    const churchId = await db.resolveChurchId(churchSlug);
+    if (!churchId) {
+      return NextResponse.json({ error: "Church not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("meetings:write", lodgeId);
+    const forbidden = await requireAdminApiPermission("services:write", churchId);
     if (forbidden) return forbidden;
-    const flagBlocked = await ensureFlag(lodgeId);
+    const flagBlocked = await ensureFlag(churchId);
     if (flagBlocked) return flagBlocked;
 
-    const guest = await db.getGuestById(guestId, lodgeId);
+    const guest = await db.getGuestById(guestId, churchId);
     if (!guest) {
       return NextResponse.json({ error: "Guest not found." }, { status: 404 });
     }
-    const event = await db.getEventById(eventId, lodgeId);
+    const event = await db.getEventById(eventId, churchId);
     if (!event) {
       return NextResponse.json({ error: "Event not found." }, { status: 404 });
     }
@@ -145,7 +145,7 @@ export async function POST(
     const token = generateGuestInvitationToken();
     const tokenHash = hashGuestInvitationToken(token);
 
-    const invitation = await db.createGuestInvitation(lodgeId, {
+    const invitation = await db.createGuestInvitation(churchId, {
       event_id: eventId,
       inviter_member_id: null,
       inviter_admin_user_id: null,
@@ -158,25 +158,25 @@ export async function POST(
       guest_id: guest.id,
     });
 
-    let visitorPortalUrl: string | null = null;
-    if (!guest.visitor_token_hash) {
-      const visitorToken = generateVisitorToken();
-      await db.setGuestVisitorTokenHash(
+    let newcomerPortalUrl: string | null = null;
+    if (!guest.newcomer_token_hash) {
+      const newcomerToken = generateNewcomerToken();
+      await db.setGuestNewcomerTokenHash(
         guest.id,
-        lodgeId,
-        hashVisitorToken(visitorToken)
+        churchId,
+        hashNewcomerToken(newcomerToken)
       );
-      visitorPortalUrl = buildVisitorUrl(request, lodgeSlug, visitorToken);
+      newcomerPortalUrl = buildNewcomerUrl(request, churchSlug, newcomerToken);
     }
 
-    const inviteUrl = buildGuestUrl(request, lodgeSlug, token);
+    const inviteUrl = buildGuestUrl(request, churchSlug, token);
 
     let emailSent = false;
     if (sendEmail && guest.email) {
       const result = await sendGuestInviteEmail({
         toEmail: guest.email,
         toName: guest.full_name,
-        lodgeName: (await db.getLodgeById(lodgeId))?.name ?? "the Lodge",
+        churchName: (await db.getChurchById(churchId))?.name ?? "the Church",
         eventTitle: event.title,
         eventDate: event.event_date,
         eventTime: event.event_time,
@@ -184,14 +184,14 @@ export async function POST(
         dressCode: event.dress_code,
         inviterName: null,
         inviteUrl,
-        visitorPortalUrl,
+        newcomerPortalUrl,
         isFirstTime: guest.visit_count === 0,
       });
       emailSent = Boolean(result.sent);
     }
 
     await writeAuditLog({
-      lodgeId,
+      churchId,
       action: "created",
       entityType: "guest_invitation",
       entityId: invitation.id,
@@ -210,11 +210,11 @@ export async function POST(
     });
   }
 
-  const guest = mockDb.getGuestById(guestId, { lodge_slug: lodgeSlug });
+  const guest = mockDb.getGuestById(guestId, { church_slug: churchSlug });
   if (!guest) {
     return NextResponse.json({ error: "Guest not found." }, { status: 404 });
   }
-  const event = mockDb.getEventById(eventId, { lodge_slug: lodgeSlug });
+  const event = mockDb.getEventById(eventId, { church_slug: churchSlug });
   if (!event) {
     return NextResponse.json({ error: "Event not found." }, { status: 404 });
   }
@@ -240,13 +240,13 @@ export async function POST(
     payer,
     max_uses: 1,
     expires_at: null,
-    lodge_slug: lodgeSlug,
+    church_slug: churchSlug,
     guest_id: guest.id,
   });
 
   return NextResponse.json({
     invitation,
-    url: buildGuestUrl(request, lodgeSlug, token),
+    url: buildGuestUrl(request, churchSlug, token),
     email_sent: false,
   });
 }

@@ -3,11 +3,11 @@
 // Gift Aid help drawer.
 //
 // A pop-out reference the treasurer (and anyone covering for them) can open
-// from the Gift Aid screen or the meeting-close panel. It explains, in
+// from the Gift Aid screen or the service-close panel. It explains, in
 // plain English, the whole machine behind the scenes: how declarations are
 // captured and kept audit-proof, the two ways to raise a claim, exactly
 // what lands in the downloadable pack, and an FAQ for the questions that
-// actually come up at lodge. Pure presentation, no data dependencies, so it
+// actually come up at church. Pure presentation, no data dependencies, so it
 // can be dropped onto any surface.
 
 import { useState } from "react";
@@ -52,15 +52,15 @@ type Section = {
 const SECTIONS: Section[] = [
   {
     icon: HeartHandshake,
-    title: "What Gift Aid does for the lodge",
+    title: "What Gift Aid does for the church",
     blocks: [
       {
         kind: "p",
-        text: "Gift Aid lets a charity reclaim the basic-rate tax a UK taxpayer already paid on their donation. For every eligible pound a Brother gives, the Relief Chest can reclaim 25p from HMRC at no extra cost to the donor. On a £100 charity collection that is an extra £25 toward the lodge's causes.",
+        text: "Gift Aid lets a charity reclaim the basic-rate tax a UK taxpayer already paid on their donation. For every eligible pound a Member gives, the Gift Aid pack can reclaim 25p from HMRC at no extra cost to the donor. On a £100 charity collection that is an extra £25 toward the church's causes.",
       },
       {
         kind: "p",
-        text: "We use HMRC's enduring declaration model: a member signs once and that single declaration covers this donation, future donations, and donations made in the past four years, until they tell us to stop. There is no need to re-sign at every meeting.",
+        text: "We use HMRC's enduring declaration model: a member signs once and that single declaration covers this donation, future donations, and donations made in the past four years, until they tell us to stop. There is no need to re-sign at every service.",
       },
       {
         kind: "note",
@@ -80,7 +80,7 @@ const SECTIONS: Section[] = [
         kind: "list",
         items: [
           "Digital: the member ticks the Gift Aid box in the portal or on a donate form. We snapshot exactly what they saw (the wording, the date, their IP address and device) into a printable HTML record.",
-          "Paper: the member signs a physical slip at the meeting. The lodge team scans or photographs it and uploads it against the member's profile. This is the route for those who prefer wet ink.",
+          "Paper: the member signs a physical slip at the service. The church team scans or photographs it and uploads it against the member's profile. This is the route for those who prefer wet ink.",
         ],
       },
       {
@@ -113,12 +113,12 @@ const SECTIONS: Section[] = [
     blocks: [
       {
         kind: "p",
-        text: "Both routes build the same thing (a claim batch) and both bundle the same declarations. Pick whichever matches how your lodge works:",
+        text: "Both routes build the same thing (a claim batch) and both bundle the same declarations. Pick whichever matches how your church works:",
       },
       {
         kind: "list",
         items: [
-          "Close the meeting: from the meeting page, one button rolls up that meeting's donations into a collection and a claim batch dated to the meeting. This is the after-every-meeting workflow.",
+          "Close the service: from the service page, one button rolls up that service's donations into a collection and a claim batch dated to the service. This is the after-every-service workflow.",
           "Period batch: from the Gift Aid screen, choose a start and end date and create a batch covering everything eligible in that window. Useful for catching up or claiming termly.",
         ],
       },
@@ -148,12 +148,12 @@ const SECTIONS: Section[] = [
     blocks: [
       {
         kind: "p",
-        text: "Download once, forward the whole ZIP to the Relief Chest. Nothing else needs assembling by hand. Inside:",
+        text: "Download once, forward the whole ZIP to the Gift Aid pack. Nothing else needs assembling by hand. Inside:",
       },
       {
         kind: "list",
         items: [
-          "claim-pack.csv: one row per donation in HMRC's ChR1 column order, with donor name, postcode and house number. This is the figure list the Relief Chest works from.",
+          "claim-pack.csv: one row per donation in HMRC's ChR1 column order, with donor name, postcode and house number. This is the figure list the Gift Aid pack works from.",
           "new-declarations/: the declarations signed since your last claim, each with its evidence file plus an INDEX.csv. These are the ones UGLE retains this cycle.",
           "previously-supplied-declarations/: donors who gave this period whose declaration was already sent before. Included so the pack is self-contained, clearly flagged, no action needed if you hold them already. Omitted when there are none.",
           "MANIFEST.txt: a plain-English summary, the counts, and instructions for verifying every file's SHA-256 fingerprint.",
@@ -167,7 +167,7 @@ const SECTIONS: Section[] = [
     blocks: [
       {
         kind: "p",
-        text: "Small anonymous cash donations (the loose alms where no donor is recorded) cannot be Gift Aided because there is no declaration. They may instead qualify under the Gift Aid Small Donations Scheme, which lets the lodge reclaim a top-up on cash collections up to an annual cap. When you close a meeting we work out the eligible anonymous cash and track it against that cap for the tax year.",
+        text: "Small anonymous cash donations (the loose alms where no donor is recorded) cannot be Gift Aided because there is no declaration. They may instead qualify under the Gift Aid Small Donations Scheme, which lets the church reclaim a top-up on cash collections up to an annual cap. When you close a service we work out the eligible anonymous cash and track it against that cap for the tax year.",
       },
     ],
   },
@@ -177,12 +177,12 @@ type Faq = { q: string; a: string };
 
 const FAQS: Faq[] = [
   {
-    q: "A Brother signed years ago. Why is his declaration not in every pack?",
+    q: "A Member signed years ago. Why is his declaration not in every pack?",
     a: "Because he only needs to be sent to UGLE once. His declaration ships in the first pack after he signs (counted as new). In later packs, if he donates again, he appears in the donations CSV and, for completeness, his evidence is tucked into the previously-supplied folder, but he is not counted as new again.",
   },
   {
-    q: "I closed meetings out of order. Does that break anything?",
-    a: "No money or donation is ever lost or double-counted. The new-declaration sweep follows the order batches are created, not meeting dates, so if you close out of order the back-catalogue attaches to whichever batch you created first. Each declaration still ships exactly once. For the tidiest packs, close meetings in date order soon after each meeting.",
+    q: "I closed services out of order. Does that break anything?",
+    a: "No money or donation is ever lost or double-counted. The new-declaration sweep follows the order batches are created, not service dates, so if you close out of order the back-catalogue attaches to whichever batch you created first. Each declaration still ships exactly once. For the tidiest packs, close services in date order soon after each service.",
   },
   {
     q: "What is the difference between 'eligible amount' and 'reclaimable amount'?",
@@ -194,7 +194,7 @@ const FAQS: Faq[] = [
   },
   {
     q: "Can I email the pack straight from here?",
-    a: "Not automatically by design. You download the pack and send it yourself, so the treasurer stays in control of what goes to the Relief Chest and when. The pack is a single ZIP, ready to attach.",
+    a: "Not automatically by design. You download the pack and send it yourself, so the treasurer stays in control of what goes to the Gift Aid pack and when. The pack is a single ZIP, ready to attach.",
   },
   {
     q: "A pack file is named something.HASH-MISMATCH.pdf. What does that mean?",
@@ -245,7 +245,7 @@ export function GiftAidHelpDrawer({
           </SheetTitle>
           <SheetDescription>
             How declarations, claims and packs work end to end, plus answers
-            to the questions that come up at lodge.
+            to the questions that come up at church.
           </SheetDescription>
         </SheetHeader>
 

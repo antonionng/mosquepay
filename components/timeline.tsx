@@ -87,12 +87,12 @@ const ACTIVITY_CONFIG: Record<
     lineColor: "bg-blue-100",
     label: "Note",
   },
-  meeting: {
+  service: {
     icon: Calendar,
     color: "text-amber-800",
     dotColor: "bg-amber-500 shadow-sm shadow-amber-500/25",
     lineColor: "bg-amber-100",
-    label: "Meeting",
+    label: "Service",
   },
   phone_call: {
     icon: Phone,
@@ -119,11 +119,11 @@ const ACTIVITY_CONFIG: Record<
 
 export type ActivityTimelineItem = {
   id: string;
-  type: "note" | "meeting" | "phone_call" | "email" | "task";
+  type: "note" | "service" | "phone_call" | "email" | "task";
   title: string;
   description?: string;
   date: string;
-  meetingDate?: string;
+  serviceDate?: string;
   dueDate?: string;
   completed?: boolean;
   createdBy?: string;
@@ -157,7 +157,7 @@ function ActivityTimelineEntry({
   const config = ACTIVITY_CONFIG[item.type] ?? ACTIVITY_CONFIG.note;
   const Icon = config.icon;
   const hasDetails =
-    item.description || item.meetingDate || item.dueDate || item.attendees?.length;
+    item.description || item.serviceDate || item.dueDate || item.attendees?.length;
 
   function relativeTime(dateStr: string): string {
     const diff = RELATIVE_TIME_NOW - new Date(dateStr).getTime();
@@ -245,10 +245,10 @@ function ActivityTimelineEntry({
                 {item.description}
               </p>
             )}
-            {item.meetingDate && (
+            {item.serviceDate && (
               <div className="flex items-center gap-2 text-xs text-slate-600">
                 <Calendar className="h-3 w-3" />
-                Meeting: {formatDateTime(item.meetingDate)}
+                Service: {formatDateTime(item.serviceDate)}
               </div>
             )}
             {item.dueDate && (

@@ -3,7 +3,7 @@ import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
 import * as db from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 
 const GASDS_ANNUAL_LIMIT = 8000;
 
@@ -15,15 +15,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ claims: [] });
   }
 
-  const lodgeId = await resolveLodge(request);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchId = await resolveChurch(request);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
 
-  const forbidden = await requireAdminApiPermission("charity:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("charity:write", churchId);
   if (forbidden) return forbidden;
 
-  const claims = await db.getGasdsClaims(lodgeId);
+  const claims = await db.getGasdsClaims(churchId);
   return NextResponse.json({ claims });
 }
 
@@ -35,25 +35,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Database not configured." }, { status: 503 });
   }
 
-  const lodgeId = await resolveLodge(request);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchId = await resolveChurch(request);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
 
-  const forbidden = await requireAdminApiPermission("charity:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("charity:write", churchId);
   if (forbidden) return forbidden;
 
   const body = await request.json().catch(() => ({}));
   const taxYear = typeof body.tax_year === "string" && body.tax_year
     ? body.tax_year
     : currentTaxYear();
-  const collections = await db.getMeetingCollections(lodgeId, { taxYear });
+  const collections = await db.getServiceCollections(churchId, { taxYear });
   const eligibleCashAmount = collections.reduce(
     (sum, collection) => sum + Number(collection.gasds_eligible_amount ?? 0),
     0
   );
   const claimedCashAmount = Math.min(eligibleCashAmount, GASDS_ANNUAL_LIMIT);
-  const claim = await db.upsertGasdsClaim(lodgeId, {
+  const claim = await db.upsertGasdsClaim(churchId, {
     tax_year: taxYear,
     eligible_cash_amount: eligibleCashAmount,
     claimed_cash_amount: claimedCashAmount,
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
   });
 
   await writeAuditLog({
-    lodgeId,
+    churchId,
     action: "gasds_claim_created",
     entityType: "gasds_claim",
     entityId: claim.id,
@@ -81,9 +81,9 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ claim }, { status: 201 });
 }
 
-async function resolveLodge(request: NextRequest) {
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  return db.resolveLodgeId(lodgeSlug);
+async function resolveChurch(request: NextRequest) {
+  const churchSlug = getChurchSlugFromRequest(request);
+  return db.resolveChurchId(churchSlug);
 }
 
 function currentTaxYear() {

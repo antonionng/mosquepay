@@ -5,7 +5,7 @@
  * Otherwise we return null so callers can fall back to deterministic logic.
  *
  * This stays consistent with the existing AI draft route in
- * app/api/lodges/[slug]/ai-draft/route.ts and keeps us independent of any
+ * app/api/churches/[slug]/ai-draft/route.ts and keeps us independent of any
  * specific AI SDK package.
  */
 

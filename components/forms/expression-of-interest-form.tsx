@@ -30,13 +30,13 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-export function ExpressionOfInterestForm({ lodgeSlug }: { lodgeSlug?: string }) {
+export function ExpressionOfInterestForm({ churchSlug }: { churchSlug?: string }) {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const searchParams = useSearchParams();
-  const lodgeFromQuery = searchParams.get("lodge");
-  const effectiveLodge = lodgeSlug ?? lodgeFromQuery ?? undefined;
-  const lodgeQuery = effectiveLodge ? `?lodge=${encodeURIComponent(effectiveLodge)}` : "";
+  const churchFromQuery = searchParams.get("church");
+  const effectiveChurch = churchSlug ?? churchFromQuery ?? undefined;
+  const churchQuery = effectiveChurch ? `?church=${encodeURIComponent(effectiveChurch)}` : "";
 
   const {
     register,
@@ -56,7 +56,7 @@ export function ExpressionOfInterestForm({ lodgeSlug }: { lodgeSlug?: string }) 
   async function onSubmit(data: FormData) {
     setError(null);
     try {
-      const res = await fetch(`/api/leads${lodgeQuery}`, {
+      const res = await fetch(`/api/newcomers${churchQuery}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),

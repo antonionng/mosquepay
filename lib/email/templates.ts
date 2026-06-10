@@ -1,7 +1,7 @@
 import { formatDate } from "@/lib/utils";
 
 const brand = {
-  name: "LodgePay",
+  name: "ChurchPay",
   ink: "#111827",
   muted: "#64748b",
   faint: "#94a3b8",
@@ -13,14 +13,14 @@ const brand = {
   border: "#E6EAF2",
 };
 
-export function lodgePayFromEmail(value?: string | null) {
-  const fallbackAddress = "noreply@lodgepayments.co.uk";
+export function churchPayFromEmail(value?: string | null) {
+  const fallbackAddress = "noreply@churchpay.co.uk";
   const from = value?.trim();
-  if (!from) return `LodgePay <${fallbackAddress}>`;
+  if (!from) return `ChurchPay <${fallbackAddress}>`;
 
   const bracketMatch = from.match(/<([^>]+)>/);
   const address = bracketMatch?.[1]?.trim() || from;
-  return `LodgePay <${address}>`;
+  return `ChurchPay <${address}>`;
 }
 
 export function escapeEmailHtml(value: string) {
@@ -68,7 +68,7 @@ function renderShell({
 }) {
   const logoUrl =
     process.env.EMAIL_LOGO_URL ??
-    "https://fgtqpeswnakznsvibfvp.supabase.co/storage/v1/object/public/email-assets/lodgepay-email-logo.png";
+    "https://gjxswrazgoedjkyfhbcn.supabase.co/storage/v1/object/public/email-assets/churchpay-email-logo.png";
   return `
     <!doctype html>
     <html>
@@ -109,7 +109,7 @@ function renderShell({
                 </tr>
                 <tr>
                   <td style="padding:18px 8px 0;text-align:center;color:${brand.faint};font-size:12px;line-height:1.6;">
-                    Sent securely by ${brand.name}. This message was generated from lodge records in the platform.
+                    Sent securely by ${brand.name}. This message was generated from church records in the platform.
                   </td>
                 </tr>
               </table>
@@ -239,25 +239,25 @@ function listItems(items: string[], ordered = false) {
 export function renderStaffInviteEmail({
   name,
   roleLabel,
-  lodgeName,
+  churchName,
   actionUrl,
   actionLabel,
 }: {
   name: string;
   roleLabel: string;
-  lodgeName: string;
+  churchName: string;
   actionUrl: string;
   actionLabel: string;
 }) {
   return renderShell({
     eyebrow: "Admin invite",
-    title: "Your LodgePay admin invite",
-    preview: `You have been invited to manage ${lodgeName}.`,
+    title: "Your ChurchPay admin invite",
+    preview: `You have been invited to manage ${churchName}.`,
     children: `
-      <h1 style="margin:0;color:${brand.ink};font-size:28px;line-height:1.15;">Welcome to your lodge admin workspace</h1>
+      <h1 style="margin:0;color:${brand.ink};font-size:28px;line-height:1.15;">Welcome to your church admin workspace</h1>
       <p style="margin:18px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;">Hello ${escapeEmailHtml(name)},</p>
       <p style="margin:12px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;">
-        You have been given <strong style="color:${brand.ink};">${escapeEmailHtml(roleLabel)}</strong> access for <strong style="color:${brand.ink};">${escapeEmailHtml(lodgeName)}</strong>.
+        You have been given <strong style="color:${brand.ink};">${escapeEmailHtml(roleLabel)}</strong> access for <strong style="color:${brand.ink};">${escapeEmailHtml(churchName)}</strong>.
       </p>
       <div style="margin:26px 0 24px;">${button(actionLabel, actionUrl)}</div>
       <div style="border-radius:18px;border:1px solid ${brand.border};background:${brand.surfaceSubtle};padding:16px 18px;">
@@ -272,12 +272,12 @@ export function renderPasswordResetEmail({
   name,
   actionUrl,
   audience,
-  lodgeName,
+  churchName,
 }: {
   name: string;
   actionUrl: string;
   audience: "admin" | "member";
-  lodgeName?: string | null;
+  churchName?: string | null;
 }) {
   const eyebrow = audience === "admin" ? "Admin password reset" : "Member password reset";
   const heading =
@@ -286,11 +286,11 @@ export function renderPasswordResetEmail({
       : "Reset your member portal password";
   const intro =
     audience === "admin"
-      ? `We received a request to reset the password for your LodgePay admin account${
-          lodgeName ? ` for ${lodgeName}` : ""
+      ? `We received a request to reset the password for your ChurchPay admin account${
+          churchName ? ` for ${churchName}` : ""
         }.`
-      : `We received a request to reset the password for your LodgePay member portal${
-          lodgeName ? ` at ${lodgeName}` : ""
+      : `We received a request to reset the password for your ChurchPay member portal${
+          churchName ? ` at ${churchName}` : ""
         }.`;
   return renderShell({
     eyebrow,
@@ -313,116 +313,116 @@ export function renderPasswordResetEmail({
 
 export function renderMemberInviteEmail({
   name,
-  lodgeName,
+  churchName,
   actionUrl,
   actionLabel,
 }: {
   name: string;
-  lodgeName: string;
+  churchName: string;
   actionUrl: string;
   actionLabel: string;
 }) {
   return renderShell({
     eyebrow: "Member portal",
-    title: "Your LodgePay member portal invite",
-    preview: `You have been invited to access the ${lodgeName} member portal.`,
+    title: "Your ChurchPay member portal invite",
+    preview: `You have been invited to access the ${churchName} member portal.`,
     children: `
       <h1 style="margin:0;color:${brand.ink};font-size:28px;line-height:1.15;">Welcome to your member portal</h1>
       <p style="margin:18px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;">Hello ${escapeEmailHtml(name)},</p>
       <p style="margin:12px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;">
-        You have been invited to access the member portal for <strong style="color:${brand.ink};">${escapeEmailHtml(lodgeName)}</strong>.
+        You have been invited to access the member portal for <strong style="color:${brand.ink};">${escapeEmailHtml(churchName)}</strong>.
       </p>
       <div style="margin:26px 0 24px;">${button(actionLabel, actionUrl)}</div>
       <div style="border-radius:18px;border:1px solid ${brand.border};background:${brand.surfaceSubtle};padding:16px 18px;">
         <p style="margin:0;color:${brand.ink};font-size:14px;font-weight:800;">What you can do next</p>
-        <p style="margin:6px 0 0;color:${brand.muted};font-size:14px;line-height:1.6;">Set your password, sign in, view summons, RSVP to events, manage dues, and keep your profile details up to date.</p>
+        <p style="margin:6px 0 0;color:${brand.muted};font-size:14px;line-height:1.6;">Set your password, sign in, view notice, RSVP to events, manage giving, and keep your profile details up to date.</p>
       </div>
     `,
   });
 }
 
-export function renderSummonsEmail({
+export function renderNoticeEmail({
   memberName,
-  lodgeName,
+  churchName,
   eventTitle,
   eventDate,
   venue,
   openingText,
-  summonsUrl,
+  noticeUrl,
   rsvpUrl,
   agendaItems,
   menuItems,
   notices,
-  masterElectName,
-  masterElectQualification,
-  visitingOfficers,
-  visitingOfficerName,
-  visitingOfficerEmail,
-  visitingOfficerPhone,
-  nextMeetingDate,
-  nextMeetingNote,
+  serviceLeadName,
+  serviceLeadRole,
+  newcomerContacts,
+  newcomerContactName,
+  newcomerContactEmail,
+  newcomerContactPhone,
+  nextServiceDate,
+  nextServiceNote,
 }: {
   memberName: string;
-  lodgeName: string;
+  churchName: string;
   eventTitle: string;
   eventDate: string;
   venue: string;
   openingText: string;
-  summonsUrl: string;
+  noticeUrl: string;
   rsvpUrl: string;
   agendaItems: string[];
   menuItems: string[];
   notices: string[];
-  masterElectName?: string | null;
-  masterElectQualification?: string | null;
-  visitingOfficers?: Array<{
+  serviceLeadName?: string | null;
+  serviceLeadRole?: string | null;
+  newcomerContacts?: Array<{
     name?: string | null;
     email?: string | null;
     phone?: string | null;
   }> | null;
-  visitingOfficerName?: string | null;
-  visitingOfficerEmail?: string | null;
-  visitingOfficerPhone?: string | null;
-  nextMeetingDate?: string | null;
-  nextMeetingNote?: string | null;
+  newcomerContactName?: string | null;
+  newcomerContactEmail?: string | null;
+  newcomerContactPhone?: string | null;
+  nextServiceDate?: string | null;
+  nextServiceNote?: string | null;
 }) {
-  const masterElectBlock =
-    masterElectName || masterElectQualification
+  const serviceLeadBlock =
+    serviceLeadName || serviceLeadRole
       ? `<div style="margin-top:16px;border-radius:14px;border:1px solid ${brand.border};background:${brand.surfaceSubtle};padding:14px 16px;">
           ${
-            masterElectName
-              ? `<p style="margin:0;color:${brand.ink};font-size:14px;font-weight:700;">Master Elect: ${escapeEmailHtml(masterElectName)}</p>`
+            serviceLeadName
+              ? `<p style="margin:0;color:${brand.ink};font-size:14px;font-weight:700;">Service lead: ${escapeEmailHtml(serviceLeadName)}</p>`
               : ""
           }
           ${
-            masterElectQualification
-              ? `<p style="margin:${masterElectName ? "6px" : "0"} 0 0;color:${brand.muted};font-size:14px;line-height:1.7;">${escapeEmailHtml(masterElectQualification)}</p>`
+            serviceLeadRole
+              ? `<p style="margin:${serviceLeadName ? "6px" : "0"} 0 0;color:${brand.muted};font-size:14px;line-height:1.7;">${escapeEmailHtml(serviceLeadRole)}</p>`
               : ""
           }
         </div>`
       : "";
 
-  const safeVisitingOfficers =
-    visitingOfficers?.filter(
+  const safeNewcomerOfficers =
+    newcomerContacts?.filter(
       (officer) => officer.name || officer.email || officer.phone
     ) ?? [];
-  const legacyVisitingOfficers =
-    safeVisitingOfficers.length === 0 &&
-    (visitingOfficerName || visitingOfficerEmail || visitingOfficerPhone)
+  const legacyNewcomerOfficers =
+    safeNewcomerOfficers.length === 0 &&
+    (newcomerContactName || newcomerContactEmail || newcomerContactPhone)
       ? [
           {
-            name: visitingOfficerName,
-            email: visitingOfficerEmail,
-            phone: visitingOfficerPhone,
+            name: newcomerContactName,
+            email: newcomerContactEmail,
+            phone: newcomerContactPhone,
           },
         ]
       : [];
-  const allVisitingOfficers = [...safeVisitingOfficers, ...legacyVisitingOfficers];
-  const voRows = allVisitingOfficers.map((officer, index) => {
+  const allNewcomerOfficers = [...safeNewcomerOfficers, ...legacyNewcomerOfficers];
+  const voRows = allNewcomerOfficers.map((officer, index) => {
     const heading =
-      allVisitingOfficers.length === 1
-        ? "Visiting Officer"
-        : `Visiting Officer ${index + 1}`;
+      allNewcomerOfficers.length === 1
+        ? "Newcomer contact"
+        : `Newcomer contact ${index + 1}`;
 
     return `<div style="margin:${index === 0 ? "0" : "12px"} 0 0;">
       ${
@@ -442,9 +442,9 @@ export function renderSummonsEmail({
       }
     </div>`;
   });
-  if (nextMeetingDate) {
+  if (nextServiceDate) {
     voRows.push(
-      `<p style="margin:10px 0 0;color:${brand.muted};font-size:14px;line-height:1.6;"><strong style="color:${brand.ink};">Next regular meeting:</strong> ${escapeEmailHtml(formatDate(nextMeetingDate))}${nextMeetingNote ? ` — ${escapeEmailHtml(nextMeetingNote)}` : ""}</p>`
+      `<p style="margin:10px 0 0;color:${brand.muted};font-size:14px;line-height:1.6;"><strong style="color:${brand.ink};">Next regular service:</strong> ${escapeEmailHtml(formatDate(nextServiceDate))}${nextServiceNote ? ` — ${escapeEmailHtml(nextServiceNote)}` : ""}</p>`
     );
   }
 
@@ -453,11 +453,11 @@ export function renderSummonsEmail({
     : "";
 
   return renderShell({
-    eyebrow: "Meeting summons",
+    eyebrow: "Service notice",
     title: eventTitle,
-    preview: `You are summoned to attend ${lodgeName} on ${formatDate(eventDate)}.`,
+    preview: `You are invited to ${churchName} on ${formatDate(eventDate)}.`,
     children: `
-      <p style="margin:0 0 10px;color:${brand.blue};font-size:12px;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;">${escapeEmailHtml(lodgeName)}</p>
+      <p style="margin:0 0 10px;color:${brand.blue};font-size:12px;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;">${escapeEmailHtml(churchName)}</p>
       <h1 style="margin:0;color:${brand.ink};font-size:30px;line-height:1.12;">${escapeEmailHtml(eventTitle)}</h1>
       <p style="margin:18px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;">Dear ${escapeEmailHtml(memberName)},</p>
       <p style="margin:12px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;white-space:pre-line;">
@@ -470,14 +470,14 @@ export function renderSummonsEmail({
       }
       <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:26px 0 24px;">
         <tr>
-          <td style="padding:0 14px 8px 0;vertical-align:middle;">${button("View Summons", summonsUrl)}</td>
+          <td style="padding:0 14px 8px 0;vertical-align:middle;">${button("View Notice", noticeUrl)}</td>
           <td style="vertical-align:middle;padding-bottom:8px;">${secondaryLink("RSVP", rsvpUrl)}</td>
         </tr>
       </table>
       <div style="border-top:1px solid ${brand.border};padding-top:22px;">
-        <h2 style="margin:0;color:${brand.ink};font-size:18px;">Lodge Business</h2>
+        <h2 style="margin:0;color:${brand.ink};font-size:18px;">Church Business</h2>
         ${listItems(agendaItems, true)}
-        ${masterElectBlock}
+        ${serviceLeadBlock}
       </div>
       ${
         menuItems.length
@@ -499,16 +499,16 @@ export function renderSummonsEmail({
   });
 }
 
-export function renderDuesReminderEmail({
+export function renderGivingReminderEmail({
   memberName,
-  lodgeName,
+  churchName,
   amountDue,
   dueDate,
   portalUrl,
   reminderNumber,
 }: {
   memberName: string;
-  lodgeName: string;
+  churchName: string;
   amountDue: string;
   dueDate: string;
   portalUrl: string;
@@ -522,20 +522,20 @@ export function renderDuesReminderEmail({
         : "Final reminder";
   return renderShell({
     eyebrow,
-    title: `${lodgeName} dues reminder`,
-    preview: `Your annual lodge dues of ${amountDue} are due ${dueDate}.`,
+    title: `${churchName} giving reminder`,
+    preview: `Your annual church giving of ${amountDue} are due ${dueDate}.`,
     children: `
-      <h1 style="margin:0;color:${brand.ink};font-size:28px;line-height:1.15;">Annual dues reminder</h1>
+      <h1 style="margin:0;color:${brand.ink};font-size:28px;line-height:1.15;">Annual giving reminder</h1>
       <p style="margin:18px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;">Dear ${escapeEmailHtml(memberName)},</p>
       <p style="margin:14px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;">
-        This is a ${escapeEmailHtml(eyebrow.toLowerCase())} that your annual dues for
-        ${escapeEmailHtml(lodgeName)} of <strong style="color:${brand.ink};">${escapeEmailHtml(amountDue)}</strong>
+        This is a ${escapeEmailHtml(eyebrow.toLowerCase())} that your annual giving for
+        ${escapeEmailHtml(churchName)} of <strong style="color:${brand.ink};">${escapeEmailHtml(amountDue)}</strong>
         are due on <strong style="color:${brand.ink};">${escapeEmailHtml(dueDate)}</strong>.
       </p>
       <p style="margin:14px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;">
-        You can review your dues, set up instalments, or speak to the treasurer from your member portal.
+        You can review your giving, set up instalments, or speak to the treasurer from your member portal.
       </p>
-      <div style="margin:26px 0 24px;">${button("Review my dues", portalUrl)}</div>
+      <div style="margin:26px 0 24px;">${button("Review my giving", portalUrl)}</div>
       <p style="margin:0;color:${brand.muted};font-size:13px;line-height:1.6;">
         If you have already paid, please ignore this email. ${secondaryLink("Contact the treasurer", portalUrl)}
       </p>
@@ -543,27 +543,27 @@ export function renderDuesReminderEmail({
   });
 }
 
-export function renderInitiationDuesEmail({
+export function renderInitiationGivingEmail({
   memberName,
-  duesAmount,
+  givingAmount,
   paymentUrl,
 }: {
   memberName: string;
-  duesAmount: string;
+  givingAmount: string;
   paymentUrl: string;
 }) {
   return renderShell({
     eyebrow: "Member welcome",
-    title: "Welcome to the lodge",
+    title: "Welcome to the church",
     preview: "Your membership fee payment link is ready.",
     children: `
-      <h1 style="margin:0;color:${brand.ink};font-size:30px;line-height:1.12;">Welcome to the lodge</h1>
+      <h1 style="margin:0;color:${brand.ink};font-size:30px;line-height:1.12;">Welcome to the church</h1>
       <p style="margin:18px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;">Congratulations ${escapeEmailHtml(memberName)}. We are delighted to welcome you as a member.</p>
       <p style="margin:12px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;">
-        Your annual membership fees of <strong style="color:${brand.ink};">${escapeEmailHtml(duesAmount)}</strong> are now due. You can pay in full or set up instalments securely online.
+        Your annual membership fees of <strong style="color:${brand.ink};">${escapeEmailHtml(givingAmount)}</strong> are now due. You can pay in full or set up instalments securely online.
       </p>
       <div style="margin:26px 0 24px;">${button("Pay Membership Fees", paymentUrl)}</div>
-      <p style="margin:0;color:${brand.muted};font-size:14px;line-height:1.7;">If you have any questions, please contact your lodge secretary.</p>
+      <p style="margin:0;color:${brand.muted};font-size:14px;line-height:1.7;">If you have any questions, please contact your church secretary.</p>
     `,
   });
 }

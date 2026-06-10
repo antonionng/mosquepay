@@ -11,8 +11,8 @@ const PRESET_AMOUNTS = [10, 25, 50, 100];
 
 function DonatePageContent() {
   const searchParams = useSearchParams();
-  const lodge = searchParams.get("lodge") ?? "";
-  const lodgeQuery = lodge ? `?lodge=${encodeURIComponent(lodge)}` : "";
+  const church = searchParams.get("church") ?? "";
+  const churchQuery = church ? `?church=${encodeURIComponent(church)}` : "";
 
   // Optional URL pre-fill: the member portal links here from
   // /member/donations with the signed-in member's email/name and a
@@ -23,12 +23,12 @@ function DonatePageContent() {
   const initialName = searchParams.get("name") ?? "";
   const initialGiftAid = searchParams.get("gift_aid") === "1";
 
-  // Lodge name for the hero. Fetched client-side using the same public
-  // endpoint the PublicHeader uses so donors see "Donate to Covenant Lodge
-  // No. 4344" (or whichever lodge the link routes to) instead of the
-  // platform-generic copy. We only render the lodge label once it's loaded
+  // Church name for the hero. Fetched client-side using the same public
+  // endpoint the PublicHeader uses so donors see "Donate to St Mary's Church
+  // No. 4344" (or whichever church the link routes to) instead of the
+  // platform-generic copy. We only render the church label once it's loaded
   // so we don't flash the wrong name.
-  const [lodgeName, setLodgeName] = useState<string | null>(null);
+  const [churchName, setChurchName] = useState<string | null>(null);
 
   const [amount, setAmount] = useState<number>(0);
   const [customAmount, setCustomAmount] = useState("");
@@ -43,7 +43,7 @@ function DonatePageContent() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   // Whether this email already has an active Gift Aid declaration on file
-  // for this lodge. When true the donor doesn't need to re-enter the
+  // for this church. When true the donor doesn't need to re-enter the
   // address / re-tick the eligibility confirmation: the existing
   // enduring declaration covers this and all future donations from this
   // email until the donor revokes it.
@@ -55,35 +55,35 @@ function DonatePageContent() {
 
   const effectiveAmount = amount || Number(customAmount) || 0;
 
-  // Resolve the lodge label for the hero. We only attempt the lookup when
+  // Resolve the church label for the hero. We only attempt the lookup when
   // a slug is on the URL -- on the bare /donate path we keep the generic
-  // copy. The same endpoint powers the lodge-aware PublicHeader, so this
+  // copy. The same endpoint powers the church-aware PublicHeader, so this
   // adds no new public surface area.
   useEffect(() => {
-    if (!lodge) {
-      setLodgeName(null);
+    if (!church) {
+      setChurchName(null);
       return;
     }
     let active = true;
-    async function loadLodge() {
+    async function loadChurch() {
       try {
         const res = await fetch(
-          `/api/lodges/${encodeURIComponent(lodge)}/site`,
+          `/api/churches/${encodeURIComponent(church)}/site`,
           { cache: "no-store" }
         );
         if (!res.ok) return;
-        const data = (await res.json()) as { lodge?: { name?: string } };
+        const data = (await res.json()) as { church?: { name?: string } };
         if (!active) return;
-        if (data.lodge?.name) setLodgeName(data.lodge.name);
+        if (data.church?.name) setChurchName(data.church.name);
       } catch {
         // Keep generic copy on failure.
       }
     }
-    loadLodge();
+    loadChurch();
     return () => {
       active = false;
     };
-  }, [lodge]);
+  }, [church]);
 
   // Debounced lookup: whenever the donor's email looks valid, ask the API
   // whether we already have a Gift Aid declaration on file for it. If we do,
@@ -103,7 +103,7 @@ function DonatePageContent() {
       try {
         const res = await fetch(
           `/api/donations/gift-aid-status?email=${encodeURIComponent(email)}${
-            lodge ? `&lodge=${encodeURIComponent(lodge)}` : ""
+            church ? `&church=${encodeURIComponent(church)}` : ""
           }`,
           { cache: "no-store" }
         );
@@ -127,7 +127,7 @@ function DonatePageContent() {
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [donorEmail, lodge]);
+  }, [donorEmail, church]);
 
   function selectPreset(value: number) {
     setAmount(value);
@@ -164,7 +164,7 @@ function DonatePageContent() {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/donations${lodgeQuery}`, {
+      const res = await fetch(`/api/donations${churchQuery}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -204,15 +204,15 @@ function DonatePageContent() {
         <div className="public-hero-shell">
           <div className="public-hero-copy">
             <p className="public-kicker">
-              {lodgeName ? `Donate to ${lodgeName}` : "Make a donation"}
+              {churchName ? `Donate to ${churchName}` : "Make a donation"}
             </p>
             <h1 className="public-hero-title">
               Every contribution makes a difference.
             </h1>
             <p className="public-hero-body">
-              {lodgeName
-                ? `Support ${lodgeName}'s charitable work with a one-off donation. Your generosity helps fund community causes, education, and welfare programmes.`
-                : "Support our charitable work with a one-off donation. Your generosity helps fund community causes, education, and welfare programmes."}
+              {churchName
+                ? `Support ${churchName}'s charitable work with a one-off donation. Your generosity helps fund community causes, education, and pastoral programmes.`
+                : "Support our charitable work with a one-off donation. Your generosity helps fund community causes, education, and pastoral programmes."}
             </p>
           </div>
           <div className="public-hero-panel">

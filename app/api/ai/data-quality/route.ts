@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -17,15 +17,15 @@ export async function GET(request: NextRequest) {
   const unauthorized = await requireAdminApiAuth();
   if (unauthorized) return unauthorized;
   if (!isSupabaseConfigured()) return NextResponse.json({ issues: [] });
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("members:read", lodgeId);
+  const forbidden = await requireAdminApiPermission("members:read", churchId);
   if (forbidden) return forbidden;
 
-  const members = await db.getMembers(lodgeId, { status: "active" });
+  const members = await db.getMembers(churchId, { status: "active" });
   const issues: Issue[] = [];
   for (const m of members) {
     const fields: string[] = [];
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     if (!m.phone) fields.push("phone");
     if (!m.address_line_1 && !m.postcode) fields.push("address");
     if (!m.date_of_birth) fields.push("date of birth");
-    if (!m.date_of_initiation) fields.push("date of initiation");
+    if (!m.date_of_membership) fields.push("date of membership");
     if (m.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m.email)) {
       fields.push("invalid email format");
     }

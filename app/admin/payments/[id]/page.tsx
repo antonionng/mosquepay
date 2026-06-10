@@ -15,7 +15,7 @@ import {
   Calendar,
   ExternalLink,
 } from "lucide-react";
-import { AttachToMeetingCard } from "./attach-to-meeting";
+import { AttachToServiceCard } from "./attach-to-service";
 
 export const dynamic = "force-dynamic";
 
@@ -36,27 +36,27 @@ export default async function AdminPaymentDetailPage({
 }) {
   const { id } = await params;
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.lodgeId) {
+  if (ctx.mode !== "database" || !ctx.churchId) {
     redirect("/admin/payments");
   }
-  const lodgeId = ctx.lodgeId;
+  const churchId = ctx.churchId;
 
-  const payment = await db.getPaymentById(id, lodgeId);
+  const payment = await db.getPaymentById(id, churchId);
   if (!payment) notFound();
 
   const [event, rsvp, donations, auditLogs, allEvents] = await Promise.all([
     payment.event_id
-      ? db.getEventById(payment.event_id, lodgeId)
+      ? db.getEventById(payment.event_id, churchId)
       : Promise.resolve(null),
-    payment.rsvp_id ? db.getRsvpById(payment.rsvp_id, lodgeId) : Promise.resolve(null),
-    db.getDonationsByEmail(payment.user_email, lodgeId),
-    db.listAuditLogsByEntity(lodgeId, "payment", id),
-    db.getEvents(lodgeId),
+    payment.rsvp_id ? db.getRsvpById(payment.rsvp_id, churchId) : Promise.resolve(null),
+    db.getDonationsByEmail(payment.user_email, churchId),
+    db.listAuditLogsByEntity(churchId, "payment", id),
+    db.getEvents(churchId),
   ]);
 
-  // Picker window: every upcoming meeting + 180 days of recent history,
+  // Picker window: every upcoming service + 180 days of recent history,
   // capped to the 30 closest. Wide enough that a treasurer attaching a
-  // payment after the fact can still see a future installation that was
+  // payment after the fact can still see a future special_service that was
   // scheduled months ahead. The lint disable is for the react-hooks/purity
   // rule which flags Date.now in a server component, where it's fine.
   // eslint-disable-next-line react-hooks/purity
@@ -111,7 +111,7 @@ export default async function AdminPaymentDetailPage({
               <SplitCard label="Dining" value={payment.dining_amount} />
               <SplitCard label="Charity" value={payment.charity_amount} hint={payment.charity_name ?? undefined} icon={Heart} />
               <SplitCard label="Raffle" value={payment.raffle_amount} icon={Gift} />
-              <SplitCard label="Meeting fee" value={payment.meeting_fee_amount} />
+              <SplitCard label="Service fee" value={payment.service_fee_amount} />
               <SplitCard label="Guest tickets" value={payment.guest_ticket_amount} />
               <SplitCard
                 label="Refunded"
@@ -187,12 +187,12 @@ export default async function AdminPaymentDetailPage({
 
           <Card variant="panel" className="space-y-3 p-5">
             <h2 className="flex items-center gap-2 text-base font-semibold text-dash-text">
-              <Calendar className="h-4 w-4" /> Meeting
+              <Calendar className="h-4 w-4" /> Service
             </h2>
             {event ? (
               <div className="space-y-1">
                 <Link
-                  href={`/admin/meetings/${event.id}`}
+                  href={`/admin/services/${event.id}`}
                   className="inline-flex items-center gap-1 text-sm font-medium text-dash-text hover:text-dash-ring"
                 >
                   {event.title} <ExternalLink className="h-3 w-3" />
@@ -203,10 +203,10 @@ export default async function AdminPaymentDetailPage({
               </div>
             ) : (
               <p className="text-xs text-dash-text-muted">
-                Not linked to a meeting.
+                Not linked to a service.
               </p>
             )}
-            <AttachToMeetingCard
+            <AttachToServiceCard
               paymentId={payment.id}
               currentEventId={payment.event_id ?? null}
               events={eventPickerOptions}

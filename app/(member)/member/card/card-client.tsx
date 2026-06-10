@@ -11,12 +11,12 @@ type Member = {
   rank: string | null;
   office_title: string | null;
   membership_status: string;
-  date_of_initiation: string | null;
+  date_of_membership: string | null;
 };
 
-type Lodge = {
+type Church = {
   name: string;
-  lodge_number: string | null;
+  church_number: string | null;
   city: string | null;
   primary_color: string | null;
   logo_url: string | null;
@@ -24,18 +24,18 @@ type Lodge = {
 
 export function MemberCardClient({
   member,
-  lodge,
+  church,
   qrDataUrl,
   verifyUrl,
   calendarUrl,
 }: {
   member: Member;
-  lodge: Lodge;
+  church: Church;
   qrDataUrl: string;
   verifyUrl: string;
   calendarUrl: string;
 }) {
-  const primary = lodge?.primary_color ?? "#1d4ed8";
+  const primary = church?.primary_color ?? "#1d4ed8";
   const [copiedField, setCopiedField] = useState<"verify" | "calendar" | null>(null);
 
   function copy(value: string, field: "verify" | "calendar") {
@@ -50,7 +50,7 @@ export function MemberCardClient({
       <div>
         <h1 className="text-2xl font-bold text-slate-900">My membership card</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Show this card when visiting other lodges. Scanning the QR confirms your
+          Show this card when newcomer other churches. Scanning the QR confirms your
           current membership.
         </p>
       </div>
@@ -66,10 +66,10 @@ export function MemberCardClient({
 
         <div className="relative flex items-start justify-between">
           <div className="flex items-center gap-3">
-            {lodge?.logo_url ? (
+            {church?.logo_url ? (
               <Image
-                src={lodge.logo_url}
-                alt={lodge.name}
+                src={church.logo_url}
+                alt={church.name}
                 width={48}
                 height={48}
                 className="h-12 w-12 rounded-xl bg-white/10 object-cover"
@@ -77,15 +77,15 @@ export function MemberCardClient({
               />
             ) : (
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/15 text-sm font-bold">
-                {(lodge?.name ?? "L").slice(0, 1).toUpperCase()}
+                {(church?.name ?? "L").slice(0, 1).toUpperCase()}
               </div>
             )}
             <div className="min-w-0">
               <p className="text-xs uppercase tracking-[0.18em] text-white/70">
-                {lodge?.lodge_number ? `Lodge No. ${lodge.lodge_number}` : "Member"}
+                {church?.church_number ? `Church No. ${church.church_number}` : "Member"}
               </p>
               <p className="truncate text-base font-semibold">
-                {lodge?.name ?? "Lodge"}
+                {church?.name ?? "Church"}
               </p>
             </div>
           </div>
@@ -106,9 +106,9 @@ export function MemberCardClient({
             {member.rank && (
               <p className="text-xs text-white/70">{rankLabel(member.rank)}</p>
             )}
-            {member.date_of_initiation && (
+            {member.date_of_membership && (
               <p className="mt-2 text-xs text-white/70">
-                Initiated {new Date(member.date_of_initiation).toLocaleDateString("en-GB", {
+                Joined {new Date(member.date_of_membership).toLocaleDateString("en-GB", {
                   year: "numeric",
                   month: "short",
                   day: "numeric",
@@ -154,7 +154,7 @@ export function MemberCardClient({
         </div>
         <p className="mt-1 text-xs text-slate-500">
           Anyone scanning the QR sees a public page confirming your current
-          membership. No personal data beyond name, lodge, and status is shown.
+          membership. No personal data beyond name, church, and status is shown.
         </p>
         <div className="mt-3 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
           <code className="flex-1 truncate font-mono text-slate-700">
@@ -182,7 +182,7 @@ export function MemberCardClient({
         </div>
         <p className="mt-1 text-xs text-slate-500">
           Add this URL in Google Calendar, Apple Calendar, or Outlook to keep
-          your lodge meetings synced.
+          your church services synced.
         </p>
         <div className="mt-3 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
           <code className="flex-1 truncate font-mono text-slate-700">

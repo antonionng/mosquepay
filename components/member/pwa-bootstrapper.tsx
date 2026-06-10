@@ -8,7 +8,7 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
-const DISMISS_KEY = "lodge-pwa-install-dismissed-at";
+const DISMISS_KEY = "church-pwa-install-dismissed-at";
 const DISMISS_TTL_MS = 1000 * 60 * 60 * 24 * 14; // 14 days
 
 export function PwaBootstrapper() {
@@ -75,7 +75,7 @@ export function PwaBootstrapper() {
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-slate-900">
-          Install Lodge Portal
+          Install Church Portal
         </p>
         <p className="truncate text-xs text-slate-500">
           Add to your home screen for one-tap RSVPs and your member card.

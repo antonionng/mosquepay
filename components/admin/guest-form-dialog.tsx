@@ -19,15 +19,16 @@ export type GuestFormValues = {
   full_name: string;
   email: string;
   phone: string;
-  mother_lodge_name: string;
-  mother_lodge_number: string;
+  mother_church_name: string;
+  mother_church_number: string;
   constitution: string;
   rank: string;
   dietary_requirements: string;
   guest_category: "guest" | "honorary_guest";
   guest_dining_amount: string;
   dining_waived: boolean;
-  is_mason: boolean;
+  gift_aid_consent_status: "unknown" | "declared" | "declined";
+  is_member: boolean;
   notes: string;
 };
 
@@ -35,15 +36,16 @@ const EMPTY: GuestFormValues = {
   full_name: "",
   email: "",
   phone: "",
-  mother_lodge_name: "",
-  mother_lodge_number: "",
+  mother_church_name: "",
+  mother_church_number: "",
   constitution: "",
   rank: "",
   dietary_requirements: "",
   guest_category: "guest",
   guest_dining_amount: "",
   dining_waived: false,
-  is_mason: true,
+  gift_aid_consent_status: "unknown",
+  is_member: true,
   notes: "",
 };
 
@@ -127,7 +129,7 @@ export function GuestFormDialog({
             {mode === "create" ? "Add a guest" : "Edit guest"}
           </DialogTitle>
           <DialogDescription>
-            Visiting brethren or other guests known to the lodge. Email is
+            Newcomer members or other guests known to the church. Email is
             optional, but lets us send them their invitation and receipts.
           </DialogDescription>
         </DialogHeader>
@@ -154,7 +156,7 @@ export function GuestFormDialog({
               type="email"
               value={values.email}
               onChange={(event) => update("email", event.target.value)}
-              placeholder="brother@example.com"
+              placeholder="member@example.com"
             />
           </div>
 
@@ -169,24 +171,24 @@ export function GuestFormDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="mother_lodge_name">Mother lodge</Label>
+            <Label htmlFor="mother_church_name">Mother church</Label>
             <Input
-              id="mother_lodge_name"
-              value={values.mother_lodge_name}
+              id="mother_church_name"
+              value={values.mother_church_name}
               onChange={(event) =>
-                update("mother_lodge_name", event.target.value)
+                update("mother_church_name", event.target.value)
               }
-              placeholder="St James's Lodge"
+              placeholder="St James's Church"
             />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="mother_lodge_number">Lodge number</Label>
+            <Label htmlFor="mother_church_number">Church number</Label>
             <Input
-              id="mother_lodge_number"
-              value={values.mother_lodge_number}
+              id="mother_church_number"
+              value={values.mother_church_number}
               onChange={(event) =>
-                update("mother_lodge_number", event.target.value)
+                update("mother_church_number", event.target.value)
               }
               placeholder="1234"
             />
@@ -232,7 +234,7 @@ export function GuestFormDialog({
                 checked={values.guest_category === "guest"}
                 onChange={() => update("guest_category", "guest")}
               />
-              Guest (invited per meeting)
+              Guest (invited per service)
             </label>
             <label className="flex items-center gap-2 text-sm">
               <input
@@ -240,7 +242,7 @@ export function GuestFormDialog({
                 checked={values.guest_category === "honorary_guest"}
                 onChange={() => update("guest_category", "honorary_guest")}
               />
-              Honorary guest (included on every summons)
+              Honorary guest (included on every notice)
             </label>
           </div>
 
@@ -253,7 +255,7 @@ export function GuestFormDialog({
               min="0"
               value={values.guest_dining_amount}
               onChange={(event) => update("guest_dining_amount", event.target.value)}
-              placeholder="Lodge default"
+              placeholder="Church default"
             />
           </div>
 
@@ -272,15 +274,38 @@ export function GuestFormDialog({
 
           <div className="sm:col-span-2 flex items-center gap-2">
             <input
-              id="is_mason"
+              id="is_member"
               type="checkbox"
-              checked={values.is_mason}
-              onChange={(event) => update("is_mason", event.target.checked)}
+              checked={values.is_member}
+              onChange={(event) => update("is_member", event.target.checked)}
               className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
             />
-            <Label htmlFor="is_mason" className="font-normal">
-              Visiting brother (Mason)
+            <Label htmlFor="is_member" className="font-normal">
+              Newcomer member (member)
             </Label>
+          </div>
+
+          <div className="sm:col-span-2 space-y-1.5">
+            <Label htmlFor="gift_aid_consent_status">Gift Aid status</Label>
+            <select
+              id="gift_aid_consent_status"
+              value={values.gift_aid_consent_status}
+              onChange={(event) =>
+                update(
+                  "gift_aid_consent_status",
+                  event.target.value as GuestFormValues["gift_aid_consent_status"],
+                )
+              }
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="unknown">Unknown / not asked</option>
+              <option value="declared">Declared</option>
+              <option value="declined">Gift Aid refused</option>
+            </select>
+            <p className="text-xs text-dash-muted">
+              Use refused when the guest has explicitly asked not to Gift Aid
+              their donations.
+            </p>
           </div>
 
           <div className="sm:col-span-2 space-y-1.5">

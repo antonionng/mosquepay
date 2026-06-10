@@ -1,5 +1,5 @@
 import type { Event } from "@/lib/db/types";
-import { lodgeScopedEventPath } from "@/lib/public-links";
+import { churchScopedEventPath } from "@/lib/public-links";
 
 const CRLF = "\r\n";
 
@@ -46,18 +46,18 @@ export function eventsToIcs({
   calendarName,
   events,
   origin,
-  lodgeSlug,
+  churchSlug,
 }: {
   calendarName: string;
   events: Event[];
   origin: string;
-  lodgeSlug?: string | null;
+  churchSlug?: string | null;
 }): string {
   const now = toIcsDateTime(new Date().toISOString());
   const lines: string[] = [];
   lines.push("BEGIN:VCALENDAR");
   lines.push("VERSION:2.0");
-  lines.push("PRODID:-//LodgePay//Member Portal//EN");
+  lines.push("PRODID:-//ChurchPay//Member Portal//EN");
   lines.push("CALSCALE:GREGORIAN");
   lines.push(`X-WR-CALNAME:${escape(calendarName)}`);
   lines.push("METHOD:PUBLISH");
@@ -73,8 +73,8 @@ export function eventsToIcs({
     }
     const dtend = toIcsDateTime(endDate.toISOString());
 
-    const eventUrl = lodgeSlug
-      ? `${origin}${lodgeScopedEventPath(lodgeSlug, event.slug)}`
+    const eventUrl = churchSlug
+      ? `${origin}${churchScopedEventPath(churchSlug, event.slug)}`
       : `${origin}/events/${event.slug}`;
     const description = [
       event.description,
@@ -85,7 +85,7 @@ export function eventsToIcs({
       .join("\\n\\n");
 
     lines.push("BEGIN:VEVENT");
-    lines.push(fold(`UID:${event.id}@lodgepayments`));
+    lines.push(fold(`UID:${event.id}@churchpayments`));
     lines.push(fold(`DTSTAMP:${now}`));
     lines.push(fold(`DTSTART:${dtstart}`));
     lines.push(fold(`DTEND:${dtend}`));

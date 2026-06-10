@@ -8,35 +8,35 @@ export const dynamic = "force-dynamic";
 export default async function AdminPaymentsPage() {
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
-  const lodgeId = ctx.mode === "database" ? ctx.lodgeId : null;
+  const churchId = ctx.mode === "database" ? ctx.churchId : null;
 
   const payments = useMock
     ? mockDb.getPayments()
-    : lodgeId
-      ? await db.getPayments(lodgeId)
+    : churchId
+      ? await db.getPayments(churchId)
       : [];
   const donations = useMock
     ? mockDb.getDonations()
-    : lodgeId
-      ? await db.getDonations(lodgeId)
+    : churchId
+      ? await db.getDonations(churchId)
       : [];
   const giftAidDeclarations = useMock
     ? mockDb.getGiftAidDeclarations()
-    : lodgeId
-      ? await db.getGiftAidDeclarations(lodgeId)
+    : churchId
+      ? await db.getGiftAidDeclarations(churchId)
       : [];
-  const duesRecords = useMock
+  const givingRecords = useMock
     ? []
-    : lodgeId
-      ? await db.getMemberDues(lodgeId)
+    : churchId
+      ? await db.getMemberGiving(churchId)
       : [];
 
-  // Meetings list for the inline "associate to meeting" picker on each
+  // Services list for the inline "associate to service" picker on each
   // payment row. Slimmed to what the dropdown needs.
   const events = useMock
     ? []
-    : lodgeId
-      ? await db.getEvents(lodgeId)
+    : churchId
+      ? await db.getEvents(churchId)
       : [];
   const eventOptions = events
     .map((e) => ({ id: e.id, title: e.title, event_date: e.event_date }))
@@ -47,7 +47,7 @@ export default async function AdminPaymentsPage() {
       payments={JSON.parse(JSON.stringify(payments))}
       donations={JSON.parse(JSON.stringify(donations))}
       giftAidDeclarations={JSON.parse(JSON.stringify(giftAidDeclarations))}
-      duesRecords={JSON.parse(JSON.stringify(duesRecords))}
+      givingRecords={JSON.parse(JSON.stringify(givingRecords))}
       events={JSON.parse(JSON.stringify(eventOptions))}
     />
   );

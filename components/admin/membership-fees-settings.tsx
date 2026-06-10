@@ -153,7 +153,7 @@ export function MembershipFeesSettings() {
               Membership Fees
             </h2>
             <p className="dash-panel-header-description">
-              Configure annual dues amount and instalment payment options.
+              Configure annual giving amount and instalment payment options.
             </p>
           </div>
         </div>
@@ -209,9 +209,9 @@ export function MembershipFeesSettings() {
                   <PoundSterling className="h-4 w-4 text-dash-muted" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-dash-text">Gift Aid on dues</p>
+                  <p className="text-sm font-medium text-dash-text">Gift Aid on giving</p>
                   <p className="text-xs text-dash-muted">
-                    Itemise the charitable portion of annual dues so only the eligible part is reclaimed.
+                    Itemise the charitable portion of annual giving so only the eligible part is reclaimed.
                   </p>
                 </div>
               </div>
@@ -262,7 +262,7 @@ export function MembershipFeesSettings() {
                   </div>
                 </div>
                 <p className="text-xs leading-relaxed text-dash-muted sm:col-span-2">
-                  Members still pay the full dues amount. LodgePay records only £
+                  Members still pay the full giving amount. ChurchPay records only £
                   {Number(fees.charitable_amount || 0).toFixed(2)} as Gift Aid eligible when a valid declaration is on file.
                 </p>
               </div>
@@ -276,7 +276,7 @@ export function MembershipFeesSettings() {
               </div>
               <div>
                 <p className="text-sm font-medium text-dash-text">Active</p>
-                <p className="text-xs text-dash-muted">Members will be billed for these dues</p>
+                <p className="text-xs text-dash-muted">Members will be billed for these giving</p>
               </div>
             </div>
             <button
@@ -305,7 +305,7 @@ export function MembershipFeesSettings() {
                 <div>
                   <p className="text-sm font-medium text-dash-text">Allow instalment payments</p>
                   <p className="text-xs text-dash-muted">
-                    Let members split their annual dues into a Mooov subscription
+                    Let members split their annual giving into a Mooov subscription
                   </p>
                 </div>
               </div>
@@ -381,7 +381,7 @@ export function MembershipFeesSettings() {
                   </p>
                   <p className="text-xs text-dash-muted">
                     Existing members signing up to monthly partway through
-                    the lodge year see whichever options you enable below.
+                    the church year see whichever options you enable below.
                     The default (Reslice over remaining months) is always
                     available.
                   </p>
@@ -491,7 +491,7 @@ export function MembershipFeesSettings() {
                   Pay-in-advance for next year
                 </p>
                 <p className="text-xs text-dash-muted">
-                  Paid-up members can prepay next year&apos;s dues from their
+                  Paid-up members can prepay next year&apos;s giving from their
                   portal. Optional discount rewards early payment.
                 </p>
               </div>

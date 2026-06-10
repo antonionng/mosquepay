@@ -37,7 +37,7 @@ export function PayerRow({
     const sub = isMember
       ? payer.member.email
       : payer.guest.email ??
-        payer.guest.mother_lodge_name ??
+        payer.guest.mother_church_name ??
         (isMember ? null : "Guest");
     return (
       <div className="space-y-1.5">

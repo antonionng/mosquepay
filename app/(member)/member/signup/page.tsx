@@ -8,10 +8,10 @@ export default function MemberSignupPage() {
       <div className="w-full max-w-md">
         <div className="mb-8 flex flex-col items-center text-center">
           <Image
-            src="/brand/lodgepay-admin-signin.png"
-            alt="LodgePay"
-            width={1024}
-            height={1024}
+            src="/brand/churchpay-admin-signin.png"
+            alt="ChurchPay"
+            width={1200}
+            height={800}
             priority
             className="mb-6 h-36 w-36 object-contain"
           />
@@ -19,7 +19,7 @@ export default function MemberSignupPage() {
             Member access is invite only
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-dash-muted">
-            LodgePay member accounts are created by lodge officers. If you have been invited,
+            ChurchPay member accounts are created by church officers. If you have been invited,
             use the link in your email to activate your member portal.
           </p>
         </div>
@@ -30,7 +30,7 @@ export default function MemberSignupPage() {
             <div>
               <p className="font-semibold">Check your invite email</p>
               <p className="mt-1 leading-relaxed">
-                Your Secretary, Membership Officer, or lodge admin can send you a secure invite.
+                Your Secretary, Membership Officer, or church admin can send you a secure invite.
                 Public self-registration is not enabled.
               </p>
             </div>
@@ -47,7 +47,7 @@ export default function MemberSignupPage() {
               href="/contact#contact-form"
               className="inline-flex items-center justify-center rounded-lg border border-dash-border-strong bg-white px-5 py-3 text-sm font-semibold text-dash-text shadow-sm transition-colors hover:bg-dash-surface-subtle"
             >
-              Contact LodgePay
+              Contact ChurchPay
             </Link>
           </div>
         </div>

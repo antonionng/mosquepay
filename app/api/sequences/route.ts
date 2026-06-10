@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -103,13 +103,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ sequences: [] });
   }
 
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
     return NextResponse.json({ sequences: [] });
   }
 
-  const sequences = await db.listMeetingSequences(lodgeId);
+  const sequences = await db.listServiceSequences(churchId);
   return NextResponse.json({ sequences });
 }
 
@@ -128,12 +128,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const lodgeSlug = getLodgeSlugFromRequest(request);
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    if (!lodgeId) {
-      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    const churchSlug = getChurchSlugFromRequest(request);
+    const churchId = await db.resolveChurchId(churchSlug);
+    if (!churchId) {
+      return NextResponse.json({ error: "Church not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("meetings:write", lodgeId);
+    const forbidden = await requireAdminApiPermission("services:write", churchId);
     if (forbidden) return forbidden;
 
     const body = await request.json();
@@ -162,13 +162,13 @@ export async function POST(request: NextRequest) {
     }
     const month_overrides = parseMonthOverrides(body.month_overrides, months);
 
-    const admin = await getCurrentAdminContextAny(lodgeId);
-    const sequence = await db.createMeetingSequence(lodgeId, {
+    const admin = await getCurrentAdminContextAny(churchId);
+    const sequence = await db.createServiceSequence(churchId, {
       name,
       description: nullableTrim(body.description),
       event_type: typeof body.event_type === "string" && body.event_type.trim()
         ? body.event_type.trim()
-        : "regular_meeting",
+        : "regular_service",
       day_of_week,
       week_of_month,
       months,
@@ -178,9 +178,9 @@ export async function POST(request: NextRequest) {
       default_temple_room: nullableTrim(body.default_temple_room),
       default_dress_code: nullableTrim(body.default_dress_code),
       default_dining_price: nullableNumber(body.default_dining_price),
-      default_meeting_fee_amount: nullableNumber(body.default_meeting_fee_amount),
+      default_service_fee_amount: nullableNumber(body.default_service_fee_amount),
       default_enable_dining_rsvp: body.default_enable_dining_rsvp === true,
-      default_enable_meeting_fee: body.default_enable_meeting_fee === true,
+      default_enable_service_fee: body.default_enable_service_fee === true,
       default_enable_charity_donation: body.default_enable_charity_donation === true,
       default_charity_name: nullableTrim(body.default_charity_name),
       default_enable_raffle_donation: body.default_enable_raffle_donation === true,
@@ -190,19 +190,19 @@ export async function POST(request: NextRequest) {
       default_raffle_wine_description: nullableTrim(
         body.default_raffle_wine_description
       ),
-      summons_lead_weeks: parseInteger(body.summons_lead_weeks, 1, 26, 6),
-      summons_min_lead_weeks: parseInteger(body.summons_min_lead_weeks, 1, 26, 4),
-      auto_draft_summons: body.auto_draft_summons !== false,
+      notice_newcomer_weeks: parseInteger(body.notice_newcomer_weeks, 1, 26, 6),
+      notice_min_newcomer_weeks: parseInteger(body.notice_min_newcomer_weeks, 1, 26, 4),
+      auto_draft_notice: body.auto_draft_notice !== false,
       active: body.active !== false,
       created_by_email: admin?.email ?? null,
     });
 
     await writeAuditLog({
-      lodgeId,
+      churchId,
       action: "created",
-      entityType: "meeting_sequence",
+      entityType: "service_sequence",
       entityId: sequence.id,
-      summary: `Created meeting sequence ${sequence.name}`,
+      summary: `Created service sequence ${sequence.name}`,
     });
 
     return NextResponse.json({ sequence });

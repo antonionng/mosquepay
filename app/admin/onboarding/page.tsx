@@ -7,26 +7,26 @@ export const dynamic = "force-dynamic";
 
 export default async function OnboardingPage() {
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.lodgeId) {
+  if (ctx.mode !== "database" || !ctx.churchId) {
     redirect("/admin");
   }
-  const lodgeId = ctx.lodgeId;
+  const churchId = ctx.churchId;
 
-  const [lodge, members, dues, events, staff] = await Promise.all([
-    db.getLodgeBySlug(ctx.lodgeSlug),
-    db.getMembers(lodgeId, {}),
-    db.getMemberDues(lodgeId, {}),
-    db.getEvents(lodgeId, { upcoming: true }),
-    db.listAdminUsersForLodge(lodgeId).catch(() => []),
+  const [church, members, giving, events, staff] = await Promise.all([
+    db.getChurchBySlug(ctx.churchSlug),
+    db.getMembers(churchId, {}),
+    db.getMemberGiving(churchId, {}),
+    db.getEvents(churchId, { upcoming: true }),
+    db.listAdminUsersForChurch(churchId).catch(() => []),
   ]);
 
   return (
     <OnboardingWizard
-      lodgeSlug={ctx.lodgeSlug}
-      lodgeName={lodge?.name ?? "Your lodge"}
+      churchSlug={ctx.churchSlug}
+      churchName={church?.name ?? "Your church"}
       counts={{
         members: members.length,
-        dues: dues.length,
+        giving: giving.length,
         events: events.length,
         staff: staff.length,
       }}

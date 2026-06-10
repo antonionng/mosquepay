@@ -125,10 +125,10 @@ function AcceptInviteForm() {
     <div className="w-full max-w-sm">
       <div className="mb-8 flex flex-col items-center text-center">
         <Image
-          src="/brand/lodgepay-admin-signin.png"
-          alt="LodgePay"
-          width={1024}
-          height={1024}
+          src="/brand/churchpay-admin-signin.png"
+          alt="ChurchPay"
+          width={1200}
+          height={800}
           priority
           className="mb-6 h-44 w-44 object-contain"
         />

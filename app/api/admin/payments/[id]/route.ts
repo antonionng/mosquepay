@@ -3,7 +3,7 @@
 // Lightweight admin edit endpoint for an existing payments row. Currently
 // supports two adjustments treasurers ask for after the fact:
 //
-//   1. Attach (or detach) the payment to a meeting (event_id).
+//   1. Attach (or detach) the payment to a service (event_id).
 //   2. Re-categorise the payment (category) — this also re-runs the
 //      category->sub-amount splitter so the per-fee breakdown stays
 //      consistent. The total_amount is never changed.
@@ -46,12 +46,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   const { id } = await params;
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.lodgeId) {
-    return NextResponse.json({ error: "Lodge not selected." }, { status: 404 });
+  if (ctx.mode !== "database" || !ctx.churchId) {
+    return NextResponse.json({ error: "Church not selected." }, { status: 404 });
   }
-  const lodgeId = ctx.lodgeId;
+  const churchId = ctx.churchId;
 
-  const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("payments:write", churchId);
   if (forbidden) return forbidden;
 
   let body: Record<string, unknown>;
@@ -61,13 +61,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
   }
 
-  const payment = await db.getPaymentById(id, lodgeId);
+  const payment = await db.getPaymentById(id, churchId);
   if (!payment) {
     return NextResponse.json({ error: "Payment not found." }, { status: 404 });
   }
 
   // Resolve the event change (if any). `null`/empty detaches; a uuid attaches
-  // after we confirm the event belongs to this lodge.
+  // after we confirm the event belongs to this church.
   let changeEvent = false;
   let eventId: string | null = null;
   if ("event_id" in body) {
@@ -76,10 +76,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (raw === null || (typeof raw === "string" && raw.trim() === "")) {
       eventId = null;
     } else if (typeof raw === "string") {
-      const eventRow = await db.getEventById(raw.trim(), lodgeId);
+      const eventRow = await db.getEventById(raw.trim(), churchId);
       if (!eventRow) {
         return NextResponse.json(
-          { error: "Selected meeting not found in this lodge." },
+          { error: "Selected service not found in this church." },
           { status: 400 },
         );
       }
@@ -94,7 +94,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   const category = typeof body.category === "string" ? body.category : undefined;
 
-  const result = await applyPaymentEdit(lodgeId, payment, {
+  const result = await applyPaymentEdit(churchId, payment, {
     category,
     changeEvent,
     eventId,
@@ -104,7 +104,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 
   await writeAuditLog({
-    lodgeId,
+    churchId,
     action: "updated",
     entityType: "payment",
     entityId: id,
@@ -112,7 +112,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       changeEvent && category === undefined
         ? eventId
           ? `Linked payment to event ${eventId}`
-          : "Detached payment from meeting"
+          : "Detached payment from service"
         : "Re-categorised payment",
     metadata: {
       category: category ?? null,

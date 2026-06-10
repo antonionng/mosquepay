@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -21,12 +21,12 @@ export async function PATCH(
     );
   }
   const { id } = await params;
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("members:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("members:write", churchId);
   if (forbidden) return forbidden;
 
   const body = await request.json();
@@ -40,13 +40,13 @@ export async function PATCH(
     updates.ended_at = body.ended_at;
   }
 
-  const updated = await db.updateMentorAssignment(id, lodgeId, updates);
+  const updated = await db.updateMentorAssignment(id, churchId, updates);
   if (!updated) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
   await writeAuditLog({
-    lodgeId,
+    churchId,
     action: updates.ended_at ? "mentor_assignment_ended" : "mentor_assignment_updated",
     entityType: "mentor_assignment",
     entityId: id,

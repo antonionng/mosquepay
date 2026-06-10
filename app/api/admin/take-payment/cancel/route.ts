@@ -17,7 +17,7 @@
 //     mark the attempt 'refunded' (refunded_at=now()), and reverse any auto-
 //     logged Gift Aid donation so it does not enter the next reclaim batch.
 //
-// Auth: admin with payments:write on the active lodge.
+// Auth: admin with payments:write on the active church.
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
@@ -67,17 +67,17 @@ export async function POST(request: NextRequest) {
   }
 
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.lodgeId) {
-    return NextResponse.json({ error: "Lodge not selected." }, { status: 404 });
+  if (ctx.mode !== "database" || !ctx.churchId) {
+    return NextResponse.json({ error: "Church not selected." }, { status: 404 });
   }
-  const lodgeId = ctx.lodgeId;
+  const churchId = ctx.churchId;
 
-  const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("payments:write", churchId);
   if (forbidden) return forbidden;
 
   let adminEmail: string | null = null;
   try {
-    const admin = await getCurrentAdminContextAny(lodgeId);
+    const admin = await getCurrentAdminContextAny(churchId);
     adminEmail = admin?.email ?? null;
   } catch {
     // Best effort; the refund still proceeds, audit log just lacks an email.
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     .from("payment_attempts")
     .select("payment_id, status, intent, captured_at, refunded_at")
     .eq("payment_id", paymentId)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .maybeSingle<{
       payment_id: string;
       status: string;
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
   if (lookupErr) {
     console.error("Take payment cancel: lookup failed", {
       payment_id: paymentId,
-      lodge_id: lodgeId,
+      church_id: churchId,
       code: lookupErr.code,
       message: lookupErr.message,
     });
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
         failure_reason: "cancelled_by_admin",
       })
       .eq("payment_id", paymentId)
-      .eq("lodge_id", lodgeId);
+      .eq("church_id", churchId);
     if (updateErr) {
       console.error("Take payment cancel: QR update failed", {
         payment_id: paymentId,
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
     const projected = await db.getPaymentByMooovId(paymentId);
     if (projected) {
       try {
-        await db.updatePayment(projected.id, lodgeId, {
+        await db.updatePayment(projected.id, churchId, {
           status: "refunded",
           refund_amount: projected.total_amount,
           refund_reason: userReason
@@ -185,10 +185,10 @@ export async function POST(request: NextRequest) {
           .from("donations")
           .select("id, status")
           .eq("payment_id", projected.id)
-          .eq("lodge_id", lodgeId);
+          .eq("church_id", churchId);
         for (const d of relatedDonations ?? []) {
           if (d.status === "completed") {
-            await db.updateDonation(d.id as string, lodgeId, {
+            await db.updateDonation(d.id as string, churchId, {
               status: "voided",
             });
           }
@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
           : "cash_voided_by_admin",
       })
       .eq("payment_id", paymentId)
-      .eq("lodge_id", lodgeId);
+      .eq("church_id", churchId);
     if (attemptErr) {
       console.error("Take payment cancel: cash attempt update failed", {
         payment_id: paymentId,
@@ -228,7 +228,7 @@ export async function POST(request: NextRequest) {
 
     console.log("Take payment cancel: cash voided", {
       payment_id: paymentId,
-      lodge_id: lodgeId,
+      church_id: churchId,
       admin: adminEmail,
     });
     return NextResponse.json({ ok: true, action: "voided" });

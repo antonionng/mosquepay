@@ -15,12 +15,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import type { LodgeSiteSection } from "@/lib/db/types";
+import type { ChurchSiteSection } from "@/lib/db/types";
 import { mergeHeroPrimaryColor, sanitizeSectionStyle } from "@/lib/site-section-style";
 
-type SiteSection = LodgeSiteSection;
+type SiteSection = ChurchSiteSection;
 
-type LodgeSite = {
+type ChurchSite = {
   page_title: string;
   page_description: string | null;
   sections: SiteSection[];
@@ -37,7 +37,7 @@ const tonePresets = [
 const SECTION_TO_COMPONENT: Record<string, string> = {
   hero: "Hero",
   about: "About",
-  meeting_details: "MeetingDetails",
+  service_details: "ServiceDetails",
   officers: "Officers",
   charity: "Charity",
   events: "Events",
@@ -49,7 +49,7 @@ const SECTION_TO_COMPONENT: Record<string, string> = {
 const COMPONENT_TO_SECTION: Record<string, SiteSection["type"]> = {
   Hero: "hero",
   About: "about",
-  MeetingDetails: "meeting_details",
+  ServiceDetails: "service_details",
   Officers: "officers",
   Charity: "charity",
   Events: "events",
@@ -152,13 +152,13 @@ export function puckDataToSections(data: Data): SiteSection[] {
 }
 
 export function PuckEditor({
-  lodgeSlug,
+  churchSlug,
   initialSections,
   pageTitle: initialPageTitle,
   pageDescription: initialPageDescription,
   primaryColor = "#3b82f6",
 }: {
-  lodgeSlug: string;
+  churchSlug: string;
   initialSections: SiteSection[];
   pageTitle: string;
   pageDescription: string | null;
@@ -194,7 +194,7 @@ export function PuckEditor({
       setSaving(true);
       try {
         const sections = puckDataToSections(data);
-        const res = await fetch(`/api/lodges/${lodgeSlug}/site`, {
+        const res = await fetch(`/api/churches/${churchSlug}/site`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -211,13 +211,13 @@ export function PuckEditor({
         setSaving(false);
       }
     },
-    [lodgeSlug, pageTitle, pageDescription, flash]
+    [churchSlug, pageTitle, pageDescription, flash]
   );
 
   const handleAiGenerate = useCallback(async () => {
     setGenerating(true);
     try {
-      const res = await fetch(`/api/lodges/${lodgeSlug}/ai-draft`, {
+      const res = await fetch(`/api/churches/${churchSlug}/ai-draft`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -230,7 +230,7 @@ export function PuckEditor({
       });
       if (!res.ok) throw new Error("Draft generation failed");
       const json = await res.json();
-      const draft = json.draft as LodgeSite;
+      const draft = json.draft as ChurchSite;
       setPageTitle(draft.page_title);
       setPageDescription(draft.page_description ?? "");
       setPuckData(sectionsToPuckData(draft.sections, primaryColor));
@@ -245,7 +245,7 @@ export function PuckEditor({
     } finally {
       setGenerating(false);
     }
-  }, [lodgeSlug, aiBrief, aiTone, aiAudience, aiFocus, primaryColor, puckData, flash]);
+  }, [churchSlug, aiBrief, aiTone, aiAudience, aiFocus, primaryColor, puckData, flash]);
 
   return (
     <div className="flex flex-col">
@@ -361,7 +361,7 @@ export function PuckEditor({
           </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <Textarea
-              placeholder="Short lodge brief. Describe your lodge…"
+              placeholder="Short church brief. Describe your church…"
               rows={3}
               value={aiBrief}
               onChange={(e) => setAiBrief(e.target.value)}

@@ -41,14 +41,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { MembershipFeesSettings } from "@/components/admin/membership-fees-settings";
-import { LodgeFeeDefaultsSettings } from "@/components/admin/lodge-fee-defaults-settings";
-import { MasonicYearSettings } from "@/components/admin/masonic-year-settings";
-import { NextDuesPanel } from "@/components/admin/next-dues-panel";
+import { ChurchFeeDefaultsSettings } from "@/components/admin/church-fee-defaults-settings";
+import { ChurchYearSettings } from "@/components/admin/giving-year-settings";
+import { NextGivingPanel } from "@/components/admin/next-giving-panel";
 import { cn } from "@/lib/utils";
 
 type LedgerEntry = {
   source_id: string;
-  source_type: "payment" | "dues" | "donation";
+  source_type: "payment" | "giving" | "donation";
   occurred_at: string;
   contact_email: string | null;
   contact_name: string | null;
@@ -60,7 +60,7 @@ type LedgerEntry = {
   metadata: Record<string, unknown>;
 };
 
-type LodgeDues = {
+type ChurchGiving = {
   id: string;
   name: string;
   amount: number;
@@ -74,7 +74,7 @@ type LodgeDues = {
 
 type Instalment = {
   id: string;
-  member_dues_id: string;
+  member_giving_id: string;
   sequence: number;
   due_date: string;
   amount: number;
@@ -83,14 +83,14 @@ type Instalment = {
 
 const sourceColors: Record<string, "success" | "warning" | "secondary"> = {
   payment: "success",
-  dues: "warning",
+  giving: "warning",
   donation: "secondary",
 };
 
 function ledgerHref(sourceType: string, sourceId: string): string | null {
   if (sourceType === "payment") return `/admin/payments/${sourceId}`;
   if (sourceType === "donation") return `/admin/donations/${sourceId}`;
-  if (sourceType === "dues") return `/admin/payments?dues=${sourceId}`;
+  if (sourceType === "giving") return `/admin/payments?giving=${sourceId}`;
   return null;
 }
 
@@ -143,7 +143,7 @@ type MethodBreakdown = {
 
 export function TreasurerClient({
   ledger,
-  lodgeDues,
+  churchGiving,
   activeMembers,
   outstandingInstalments,
   scheduleCounts,
@@ -151,7 +151,7 @@ export function TreasurerClient({
   currentYearLabel,
 }: {
   ledger: LedgerEntry[];
-  lodgeDues: LodgeDues[];
+  churchGiving: ChurchGiving[];
   activeMembers: number;
   outstandingInstalments: Instalment[];
   scheduleCounts: ScheduleCounts;
@@ -168,13 +168,13 @@ export function TreasurerClient({
     const yearStart = new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10);
     const yearEnd = new Date(now.getFullYear(), 11, 31).toISOString().slice(0, 10);
     return {
-      dues_id: lodgeDues[0]?.id ?? "",
+      giving_id: churchGiving[0]?.id ?? "",
       period_start: yearStart,
       period_end: yearEnd,
-      amount: lodgeDues[0]?.amount ?? 0,
-      instalment_count: lodgeDues[0]?.instalment_count ?? 1,
+      amount: churchGiving[0]?.amount ?? 0,
+      instalment_count: churchGiving[0]?.instalment_count ?? 1,
       instalment_frequency:
-        (lodgeDues[0]?.instalment_frequency as
+        (churchGiving[0]?.instalment_frequency as
           | "monthly"
           | "quarterly"
           | "annually") ?? "monthly",
@@ -184,7 +184,7 @@ export function TreasurerClient({
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch("/api/settings/masonic-year");
+        const res = await fetch("/api/settings/giving-year");
         if (!res.ok) return;
         const data = await res.json();
         if (data.current) {
@@ -192,7 +192,7 @@ export function TreasurerClient({
             ...f,
             period_start: data.current.start_date?.slice(0, 10) ?? f.period_start,
             period_end: data.current.end_date?.slice(0, 10) ?? f.period_end,
-            amount: data.current.annual_dues_amount ?? f.amount,
+            amount: data.current.annual_giving_amount ?? f.amount,
           }));
         }
       } catch {
@@ -204,13 +204,13 @@ export function TreasurerClient({
   const totals = useMemo(() => {
     let inflow = 0;
     let refunds = 0;
-    let outstandingDues = 0;
+    let outstandingGiving = 0;
     let donations = 0;
     let payments = 0;
     for (const row of ledger) {
-      if (row.source_type === "dues") {
+      if (row.source_type === "giving") {
         if (row.status !== "paid" && row.status !== "waived") {
-          outstandingDues += Number(row.amount);
+          outstandingGiving += Number(row.amount);
           continue;
         }
       }
@@ -225,30 +225,30 @@ export function TreasurerClient({
     return {
       inflow: Math.round(inflow * 100) / 100,
       refunds: Math.round(refunds * 100) / 100,
-      outstandingDues: Math.round(outstandingDues * 100) / 100,
+      outstandingGiving: Math.round(outstandingGiving * 100) / 100,
       donations: Math.round(donations * 100) / 100,
       payments: Math.round(payments * 100) / 100,
     };
   }, [ledger]);
 
-  async function runBulkDues() {
+  async function runBulkGiving() {
     setBusyAction("run");
     setFeedback(null);
     try {
-      const res = await fetch("/api/dues/bulk-run", {
+      const res = await fetch("/api/giving/bulk-run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(bulkForm),
       });
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Bulk dues run failed.");
+      if (!res.ok) throw new Error(body.error ?? "Bulk giving run failed.");
       setFeedback(
-        `Created ${body.created.length} dues records. ${body.skipped.length} skipped (already billed).`
+        `Created ${body.created.length} giving records. ${body.skipped.length} skipped (already billed).`
       );
       router.refresh();
     } catch (error) {
       setFeedback(
-        error instanceof Error ? error.message : "Bulk dues run failed."
+        error instanceof Error ? error.message : "Bulk giving run failed."
       );
     } finally {
       setBusyAction(null);
@@ -259,7 +259,7 @@ export function TreasurerClient({
     setBusyAction("remind");
     setFeedback(null);
     try {
-      const res = await fetch("/api/dues/reminders", {
+      const res = await fetch("/api/giving/reminders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
@@ -300,7 +300,7 @@ export function TreasurerClient({
       }
     >();
     for (const row of ledger) {
-      if (row.source_type !== "dues") continue;
+      if (row.source_type !== "giving") continue;
       if (row.status === "paid" || row.status === "waived") continue;
       const key = (row.contact_email ?? row.contact_name ?? row.source_id).toLowerCase();
       const entry = map.get(key) ?? {
@@ -339,7 +339,7 @@ export function TreasurerClient({
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Treasurer</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Single ledger across payments, dues, and donations. Run bulk dues, send
+            Single ledger across payments, giving, and donations. Run bulk giving, send
             reminders, and reconcile from one place.
           </p>
         </div>
@@ -370,8 +370,8 @@ export function TreasurerClient({
             />
             <Kpi
               icon={Wallet}
-              label="Outstanding dues"
-              value={`£${totals.outstandingDues.toFixed(2)}`}
+              label="Outstanding giving"
+              value={`£${totals.outstandingGiving.toFixed(2)}`}
               color="amber"
               onClick={
                 outstandingByContact.length > 0
@@ -404,7 +404,7 @@ export function TreasurerClient({
                     ? "All healthy"
                     : undefined
               }
-              link="/admin/dues/schedules"
+              link="/admin/giving/schedules"
             />
             <Kpi
               icon={AlertTriangle}
@@ -422,7 +422,7 @@ export function TreasurerClient({
         );
       })()}
 
-      <DuesPaymentMethodPanel
+      <GivingPaymentMethodPanel
         breakdown={methodBreakdown}
         currentYearLabel={currentYearLabel}
         activeMembers={activeMembers}
@@ -437,11 +437,11 @@ export function TreasurerClient({
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="ledger">Ledger</TabsTrigger>
-          <TabsTrigger value="next-dues">Next dues</TabsTrigger>
+          <TabsTrigger value="next-giving">Next giving</TabsTrigger>
           <TabsTrigger value="fees">Membership fees</TabsTrigger>
-          <TabsTrigger value="meeting-fees">Meeting & dining</TabsTrigger>
-          <TabsTrigger value="masonic-year">Masonic year</TabsTrigger>
-          <TabsTrigger value="dues-run">Bulk dues run</TabsTrigger>
+          <TabsTrigger value="service-fees">Service & dining</TabsTrigger>
+          <TabsTrigger value="giving-year">Giving year</TabsTrigger>
+          <TabsTrigger value="giving-run">Bulk giving run</TabsTrigger>
           <TabsTrigger value="instalments">Instalments</TabsTrigger>
         </TabsList>
 
@@ -562,43 +562,43 @@ export function TreasurerClient({
           )}
         </TabsContent>
 
-        <TabsContent value="next-dues" className="space-y-4">
-          <NextDuesPanel />
+        <TabsContent value="next-giving" className="space-y-4">
+          <NextGivingPanel />
         </TabsContent>
 
         <TabsContent value="fees" className="space-y-4">
           <MembershipFeesSettings />
         </TabsContent>
 
-        <TabsContent value="meeting-fees" className="space-y-4">
-          <LodgeFeeDefaultsSettings />
+        <TabsContent value="service-fees" className="space-y-4">
+          <ChurchFeeDefaultsSettings />
         </TabsContent>
 
-        <TabsContent value="masonic-year" className="space-y-4">
-          <MasonicYearSettings />
+        <TabsContent value="giving-year" className="space-y-4">
+          <ChurchYearSettings />
         </TabsContent>
 
-        <TabsContent value="dues-run" className="space-y-4">
+        <TabsContent value="giving-run" className="space-y-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-base font-semibold text-slate-900">
-              Generate annual dues
+              Generate annual giving
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Creates an outstanding dues record (and optional instalment schedule)
+              Creates an outstanding giving record (and optional instalment schedule)
               for every active member who is not yet billed for the period.
             </p>
 
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <Field label="Dues template">
+              <Field label="Giving template">
                 <select
-                  value={bulkForm.dues_id}
+                  value={bulkForm.giving_id}
                   onChange={(e) =>
-                    setBulkForm((f) => ({ ...f, dues_id: e.target.value }))
+                    setBulkForm((f) => ({ ...f, giving_id: e.target.value }))
                   }
                   className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                 >
                   <option value="">No template (use amount below)</option>
-                  {lodgeDues.map((d) => (
+                  {churchGiving.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.name} (£{Number(d.amount).toFixed(2)} {d.billing_period})
                     </option>
@@ -674,13 +674,13 @@ export function TreasurerClient({
             </div>
 
             <div className="mt-5 flex flex-wrap gap-2">
-              <Button onClick={runBulkDues} disabled={busyAction !== null}>
+              <Button onClick={runBulkGiving} disabled={busyAction !== null}>
                 {busyAction === "run" ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <PlayCircle className="mr-2 h-4 w-4" />
                 )}
-                Run bulk dues
+                Run bulk giving
               </Button>
               <Button
                 variant="outline"
@@ -692,7 +692,7 @@ export function TreasurerClient({
                 ) : (
                   <Mail className="mr-2 h-4 w-4" />
                 )}
-                Send dues reminders
+                Send giving reminders
               </Button>
             </div>
           </div>
@@ -754,12 +754,12 @@ export function TreasurerClient({
       <Dialog open={outstandingOpen} onOpenChange={setOutstandingOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Outstanding dues</DialogTitle>
+            <DialogTitle>Outstanding giving</DialogTitle>
             <DialogDescription>
-              £{totals.outstandingDues.toFixed(2)} across{" "}
+              £{totals.outstandingGiving.toFixed(2)} across{" "}
               {outstandingByContact.length}{" "}
               {outstandingByContact.length === 1 ? "member" : "members"}. Click a
-              row to view their dues.
+              row to view their giving.
             </DialogDescription>
           </DialogHeader>
 
@@ -780,14 +780,14 @@ export function TreasurerClient({
                       colSpan={4}
                       className="py-8 text-center text-sm text-slate-500"
                     >
-                      No outstanding dues. All caught up.
+                      No outstanding giving. All caught up.
                     </TableCell>
                   </TableRow>
                 ) : (
                   outstandingByContact.map((entry) => {
                     const firstSource = entry.items[0]?.source_id;
                     const href = firstSource
-                      ? `/admin/payments?dues=${firstSource}`
+                      ? `/admin/payments?giving=${firstSource}`
                       : null;
                     return (
                       <TableRow
@@ -842,7 +842,7 @@ export function TreasurerClient({
               ) : (
                 <Mail className="mr-2 h-4 w-4" />
               )}
-              Send dues reminders
+              Send giving reminders
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -941,20 +941,20 @@ function Kpi({
 }
 
 // ---------------------------------------------------------------------------
-// DuesPaymentMethodPanel
+// GivingPaymentMethodPanel
 // ---------------------------------------------------------------------------
-// Shows how the lodge is collecting this year's dues across the
+// Shows how the church is collecting this year's giving across the
 // member base: online subscriptions, BACS standing orders, members
 // who paid in full offline, fee-waived members, and members who
 // haven't been tagged yet ("unset"). Counts come from
-// db.countMemberDuesByPaymentMethod scoped to the current masonic
+// db.countMemberGivingByPaymentMethod scoped to the current church
 // year.
 //
-// Each tile clicks through to a filtered admin members list (?dues=...)
+// Each tile clicks through to a filtered admin members list (?giving=...)
 // so the treasurer can drill into any bucket. The unset tile is the
 // admin's nudge target — the goal is to drive that count to zero.
 
-function DuesPaymentMethodPanel({
+function GivingPaymentMethodPanel({
   breakdown,
   currentYearLabel,
   activeMembers,
@@ -975,7 +975,7 @@ function DuesPaymentMethodPanel({
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-base font-semibold text-slate-900">
-            Dues payment methods
+            Giving payment methods
             {currentYearLabel ? (
               <span className="ml-2 text-xs font-normal text-slate-500">
                 {currentYearLabel}
@@ -1030,7 +1030,7 @@ function DuesPaymentMethodPanel({
           label="Fee waived"
           count={breakdown.fee_waived}
           tone="slate"
-          hint="Lodge-approved waivers"
+          hint="Church-approved waivers"
         />
         <MethodTile
           icon={AlertTriangle}
@@ -1042,7 +1042,7 @@ function DuesPaymentMethodPanel({
               ? "Tag from member profile"
               : totalRows > 0
                 ? "Everyone tagged"
-                : "No dues records yet"
+                : "No giving records yet"
           }
         />
       </div>

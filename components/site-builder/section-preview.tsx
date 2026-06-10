@@ -13,7 +13,7 @@ import {
   Mail,
   ArrowRight,
 } from "lucide-react";
-import type { LodgeSiteSection } from "@/lib/db/types";
+import type { ChurchSiteSection } from "@/lib/db/types";
 import {
   heroBackgroundLayers,
   mergeHeroPrimaryColor,
@@ -24,12 +24,12 @@ import {
 } from "@/lib/site-section-style";
 import { cn } from "@/lib/utils";
 
-type SiteSection = LodgeSiteSection;
+type SiteSection = ChurchSiteSection;
 
 const sectionIcons: Record<SiteSection["type"], React.ComponentType<{ className?: string }>> = {
   hero: Sparkles,
   about: BookOpen,
-  meeting_details: Calendar,
+  service_details: Calendar,
   officers: Users,
   charity: Heart,
   events: CalendarDays,
@@ -52,7 +52,7 @@ const sectionStyles: Record<
     accent: "text-blue-600",
     badge: "bg-blue-50 text-blue-700 border-blue-200",
   },
-  meeting_details: {
+  service_details: {
     bg: "bg-slate-50",
     accent: "text-indigo-600",
     badge: "bg-indigo-50 text-indigo-700 border-indigo-200",

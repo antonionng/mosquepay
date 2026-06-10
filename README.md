@@ -1,6 +1,6 @@
-# Covenant Lodge No. 4344 – Website & Application
+# St Mary's Church – Website & Application
 
-Next.js 14+ (App Router) website for Covenant Lodge No. 4344: public site, recruitment CRM (7-stage pipeline), event management with RSVP, and Stripe payments (dining, charity, raffle). **No database required** – all features run against an in-memory mock store so you can iterate on the experience. Plug in Supabase (or another DB) later when ready.
+Next.js 14+ (App Router) website for St Mary's Church: public site, recruitment CRM (7-stage pipeline), event management with RSVP, and Stripe payments (dining, charity, raffle). **No database required** – all features run against an in-memory mock store so you can iterate on the experience. Plug in Supabase (or another DB) later when ready.
 
 ## Stack
 
@@ -24,12 +24,12 @@ npm install
 
 Copy `.env.example` to `.env.local` if you want to override defaults:
 
-- **Admin (dummy):** `ADMIN_EMAIL`, `ADMIN_PASSWORD` (default: admin@covenantlodge.org.uk / admin). `SESSION_SECRET` for cookie signing (default works for local dev).
+- **Admin (dummy):** `ADMIN_EMAIL`, `ADMIN_PASSWORD` (default: admin@covenantchurch.org.uk / admin). `SESSION_SECRET` for cookie signing (default works for local dev).
 - **Stripe (optional):** Only needed for real payments. Set `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, and `STRIPE_WEBHOOK_SECRET` for webhook.
 - **Resend (optional):** For welcome/contact emails. No env = forms still work; data is stored in mock DB.
-- **AI draft generation (optional):** Set `OPENAI_API_KEY` to enable LLM-generated lodge one-pager drafts in admin settings. Without it, the app uses a structured fallback draft generator.
+- **AI draft generation (optional):** Set `OPENAI_API_KEY` to enable LLM-generated church one-pager drafts in admin settings. Without it, the app uses a structured fallback draft generator.
 
-**You do not need Supabase or any database to run the app.** All data (leads, events, RSVPs, payments, blog) is kept in memory and resets on server restart.
+**You do not need Supabase or any database to run the app.** All data (newcomers, events, RSVPs, payments, blog) is kept in memory and resets on server restart.
 
 ### 3. Run locally
 
@@ -38,11 +38,11 @@ npm run dev
 ```
 
 - Public site: [http://localhost:3000](http://localhost:3000)
-- Admin: [http://localhost:3000/admin](http://localhost:3000/admin) (log in with default admin@covenantlodge.org.uk / admin)
+- Admin: [http://localhost:3000/admin](http://localhost:3000/admin) (log in with default admin@covenantchurch.org.uk / admin)
 
 ## Front-end iteration (no DB)
 
-- **Leads:** Expression of Interest form on Join Us creates a lead in the mock store. Admin CRM (list + Kanban + detail + activities) reads/writes the same store.
+- **Newcomers:** Expression of Interest form on Join Us creates a newcomer in the mock store. Admin CRM (list + Kanban + detail + activities) reads/writes the same store.
 - **Events:** Admin creates/edits events in mock store. Public events list and event detail/RSVP read from it.
 - **RSVPs:** Stored in mock store. With Stripe configured, checkout creates RSVP + session; webhook records payment and updates RSVP.
 - **Blog:** Admin creates/edits posts in mock store. Public news list and post pages read from it.
@@ -50,45 +50,45 @@ npm run dev
 
 Data resets when you restart the dev server. Use this mode to iterate on UX and flows; when ready, swap `lib/mock-db` usage for Supabase (schemas in `supabase/migrations/001_initial_schema.sql` and `supabase/migrations/002_multi_tenant_saas_and_gift_aid.sql`).
 
-## Multi-lodge tenant scoping (new)
+## Multi-church tenant scoping (new)
 
-API routes now support lodge scoping with a fallback to `covenant-4344`.
+API routes now support church scoping with a fallback to `st-marys-demo`.
 
-- Preferred for local/testing: query string, e.g. `/api/events?lodge=my-lodge`
-- Alternative: `x-lodge-slug` request header
+- Preferred for local/testing: query string, e.g. `/api/events?church=my-church`
+- Alternative: `x-church-slug` request header
 - Future-ready: subdomain inference via request host
 
-The following route families are now lodge-aware:
+The following route families are now church-aware:
 
 - `app/api/events/*`
 - `app/api/rsvps/route.ts`
 - `app/api/payments/*`
-- `app/api/leads/*`
-- `app/api/lead-activities/route.ts`
+- `app/api/newcomers/*`
+- `app/api/newcomer-activities/route.ts`
 - `app/api/blog/*`
 
-New lodge management endpoints:
+New church management endpoints:
 
-- `GET /api/lodges` list lodges
-- `POST /api/lodges` create or update lodge settings
-- `GET /api/lodges/:slug/site` get a lodge one-pager configuration
-- `PATCH /api/lodges/:slug/site` update one-pager title, description, and sections
-- `POST /api/lodges/:slug/ai-draft` generate an unsaved one-pager draft (AI when configured, fallback otherwise)
+- `GET /api/churches` list churches
+- `POST /api/churches` create or update church settings
+- `GET /api/churches/:slug/site` get a church one-pager configuration
+- `PATCH /api/churches/:slug/site` update one-pager title, description, and sections
+- `POST /api/churches/:slug/ai-draft` generate an unsaved one-pager draft (AI when configured, fallback otherwise)
   - Supports full-page draft generation and section-only regeneration via `section_type`
   - Applies content guardrails (safe claims, clean CTA routes, length limits)
 
 ## Project structure
 
 - `app/(public)/` – Public pages (Home, About, Venue, Join, Charity, Events, News, Contact, FAQ)
-- `app/admin/` – Admin dashboard (dummy auth), leads CRM, events, blog, payments, settings
-- `app/api/` – API routes (leads, lead-activities, events, rsvps, payments, blog, contact, auth)
+- `app/admin/` – Admin dashboard (dummy auth), newcomers CRM, events, blog, payments, settings
+- `app/api/` – API routes (newcomers, newcomer-activities, events, rsvps, payments, blog, contact, auth)
 - `components/` – UI components, layout, forms, CRM Kanban
 - `lib/` – **mock-db** (in-memory store), auth (dummy), utils; Supabase client kept for future DB plug-in
 - `supabase/migrations/` – SQL schema for when you connect a real DB
 
 ## Admin (dummy auth)
 
-- Login: `/admin/login`. Credentials from `ADMIN_EMAIL` and `ADMIN_PASSWORD` (default admin@covenantlodge.org.uk / admin).
+- Login: `/admin/login`. Credentials from `ADMIN_EMAIL` and `ADMIN_PASSWORD` (default admin@covenantchurch.org.uk / admin).
 - Session is cookie-based. Replace with Supabase Auth later if needed.
 
 ## Deploy (Vercel)
@@ -101,8 +101,8 @@ New lodge management endpoints:
 
 - Colours: Navy (#1e3a5f), cream (#f8f6f3), gold (#d4af37)
 - Typography: Playfair Display (headings), Inter (body)
-- UGLE-compliant: no ritual/sensitive content; inclusive language; links to UGLE and women’s Freemasonry (OWF, HFAF)
+- UGLE-compliant: no ritual/sensitive content; inclusive language; links to UGLE and women’s church life (OWF, HFAF)
 
 ## License
 
-Private – Covenant Lodge No. 4344.
+Private – St Mary's Church.

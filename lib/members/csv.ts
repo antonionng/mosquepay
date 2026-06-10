@@ -34,7 +34,7 @@ export const KNOWN_HEADERS = [
   "country_list",
   "honorary",
   "dietary_requirements",
-  "date_of_initiation",
+  "date_of_membership",
 ];
 
 export function parseCsvLine(line: string): string[] {
@@ -143,7 +143,7 @@ export function buildImportPayload(row: ParsedMemberRow) {
     country_list: r.country_list === "true" || r.country_list === "yes",
     honorary: r.honorary === "true" || r.honorary === "yes",
     dietary_requirements: r.dietary_requirements || null,
-    date_of_initiation: r.date_of_initiation || null,
+    date_of_membership: r.date_of_membership || null,
   };
 }
 
@@ -164,6 +164,6 @@ function canonicalRank(value: string): string | null {
   if (normalised === "past master" || normalised === "p.m.") return "PM";
   if (normalised === "entered apprentice" || normalised === "e.a.") return "EA";
   if (normalised === "fellow craft" || normalised === "f.c.") return "FC";
-  if (normalised === "master mason" || normalised === "m.m.") return "MM";
+  if (normalised === "master member" || normalised === "m.m.") return "MM";
   return null;
 }

@@ -1,4 +1,4 @@
-// Generate the downloadable claim pack for the Relief Chest at UGLE.
+// Generate the downloadable claim pack for the Gift Aid pack at UGLE.
 //
 // Returns a ZIP buffer containing:
 //   - claim-pack.csv       HMRC ChR1-shaped row per donation in this batch
@@ -23,7 +23,7 @@ import type {
   GiftAidClaimBatch,
   GiftAidClaimItem,
   GiftAidDeclaration,
-  Lodge,
+  Church,
 } from "@/lib/db/types";
 
 function csvEscape(value: string | number | null | undefined): string {
@@ -91,10 +91,10 @@ function extensionFromMimeOrPath(mime: string | null, path: string): string {
 }
 
 /**
- * Filesystem-safe, human-readable stub for an evidence filename. We lead
+ * Filesystem-safe, human-readable stub for an evidence filename. We newcomer
  * with the donor's surname so a treasurer or UGLE clerk scanning the
  * folder can find a person at a glance, then append a short id fragment to
- * guarantee uniqueness when two Brothers share a surname.
+ * guarantee uniqueness when two Members share a surname.
  */
 function safeNameStub(name: string | null | undefined): string {
   const cleaned = (name ?? "")
@@ -211,7 +211,7 @@ async function addDeclarationsFolder(opts: {
 }
 
 export type ClaimPackInput = {
-  lodge: Lodge;
+  church: Church;
   batch: GiftAidClaimBatch;
   items: GiftAidClaimItem[];
   /**
@@ -237,9 +237,9 @@ export type ClaimPackInput = {
   declarationAddressLookup?: GiftAidDeclaration[];
   previousBatchCreatedAt: string | null;
   /**
-   * Small-donations (GASDS) figures from the meeting collection linked to
+   * Small-donations (GASDS) figures from the service collection linked to
    * this batch, when there is one. GASDS is claimed separately from Gift
-   * Aid but the Relief Chest wants the small-cash total alongside the
+   * Aid but the Gift Aid pack wants the small-cash total alongside the
    * declaration-backed claim, so we include a summary sheet + manifest note.
    */
   gasds?: {
@@ -265,7 +265,7 @@ export async function buildClaimPack(
   input: ClaimPackInput,
 ): Promise<ClaimPackResult> {
   const {
-    lodge,
+    church,
     batch,
     items,
     newDeclarations,
@@ -327,10 +327,10 @@ export async function buildClaimPack(
   zip.file("claim-pack.csv", donationLines.join("\n") + "\n");
 
   // ---- 1b. GASDS small-donations summary (only when present) -----------
-  // GASDS (Gift Aid Small Donations Scheme) lets the lodge reclaim the
+  // GASDS (Gift Aid Small Donations Scheme) lets the church reclaim the
   // basic-rate top-up on small anonymous cash donations without a
-  // declaration. It's a separate HMRC claim, but the Relief Chest likes
-  // the figure bundled so it can be reconciled with the same meeting.
+  // declaration. It's a separate HMRC claim, but the Gift Aid pack likes
+  // the figure bundled so it can be reconciled with the same service.
   if (gasds && gasds.eligibleAmount > 0) {
     const gasdsLines = [
       csvRow(["Tax year", "Eligible small cash", "Reclaimable (25%)"]),
@@ -373,19 +373,19 @@ export async function buildClaimPack(
       ? `Previously-supplied declarations: ${prevResult.count}  (folder: previously-supplied-declarations/)`
       : `Previously-supplied declarations: 0  (none -- folder omitted)`;
   const manifest = [
-    `LodgePay Gift Aid claim pack`,
+    `ChurchPay Gift Aid claim pack`,
     `============================`,
     ``,
     `WHAT THIS IS`,
-    `Everything the UGLE Relief Chest needs for one Gift Aid claim from`,
-    `this lodge: a ChR1-shaped list of donations, plus copies of the`,
+    `Everything the UGLE Gift Aid pack needs for one Gift Aid claim from`,
+    `this church: a ChR1-shaped list of donations, plus copies of the`,
     `signed declarations that back them. Forward the whole ZIP to the`,
-    `Relief Chest -- nothing else needs assembling by hand.`,
+    `Gift Aid pack -- nothing else needs assembling by hand.`,
     ``,
     `Generated: ${new Date().toISOString()}`,
-    `Lodge: ${lodge.name}${lodge.lodge_number ? ` No. ${lodge.lodge_number}` : ""}`,
-    `HMRC reference: ${lodge.hmrc_charity_reference ?? "(not set)"}`,
-    `Relief Chest: ${lodge.relief_chest_name ?? "(not set)"}`,
+    `Church: ${church.name}${church.church_number ? ` No. ${church.church_number}` : ""}`,
+    `HMRC reference: ${church.hmrc_charity_reference ?? "(not set)"}`,
+    `Gift Aid pack: ${church.gift_aid_pack_name ?? "(not set)"}`,
     ``,
     `Batch reference: ${batch.claim_reference ?? batch.id}`,
     `Period: ${batch.period_start} -- ${batch.period_end}`,
@@ -410,7 +410,7 @@ export async function buildClaimPack(
     `WHAT'S IN EACH FILE`,
     `- claim-pack.csv`,
     `    One row per donation in this claim, in HMRC ChR1 column order.`,
-    `    This is the figure list the Relief Chest works from.`,
+    `    This is the figure list the Gift Aid pack works from.`,
     `- new-declarations/INDEX.csv + evidence files`,
     `    Declarations signed since your last claim. THESE are the ones`,
     `    UGLE needs to retain for this cycle. Paper declarations are the`,
@@ -426,7 +426,7 @@ export async function buildClaimPack(
     `    shasum -a 256 new-declarations/<filename>`,
     `The result must match the "Evidence SHA-256" column. If a file is`,
     `named *.HASH-MISMATCH.* the stored bytes no longer match the hash`,
-    `recorded when the declaration was filed -- contact the lodge`,
+    `recorded when the declaration was filed -- contact the church`,
     `treasurer before relying on it.`,
     ``,
     `HMRC DECLARATION WORDING`,

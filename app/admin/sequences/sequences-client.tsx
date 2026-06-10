@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
-import { describeSequence } from "@/lib/meetings/sequences";
+import { describeSequence } from "@/lib/services/sequences";
 import { cn } from "@/lib/utils";
 
 type MonthOverride = { week_of_month?: number; day_of_week?: number };
@@ -44,18 +44,18 @@ type SequenceRecord = {
   default_temple_room: string | null;
   default_dress_code: string | null;
   default_dining_price: number | null;
-  default_meeting_fee_amount: number | null;
+  default_service_fee_amount: number | null;
   default_enable_dining_rsvp: boolean;
-  default_enable_meeting_fee: boolean;
+  default_enable_service_fee: boolean;
   default_enable_charity_donation: boolean;
   default_charity_name: string | null;
   default_enable_raffle_donation: boolean;
   default_raffle_description: string | null;
   default_enable_raffle_wine_pledge: boolean;
   default_raffle_wine_description: string | null;
-  summons_lead_weeks: number;
-  summons_min_lead_weeks: number;
-  auto_draft_summons: boolean;
+  notice_newcomer_weeks: number;
+  notice_min_newcomer_weeks: number;
+  auto_draft_notice: boolean;
   active: boolean;
 };
 
@@ -64,10 +64,10 @@ type SequenceEvent = {
   title: string;
   slug: string;
   event_date: string;
-  summons_status: string;
-  summons_auto_drafted_at: string | null;
-  summons_approved_at: string | null;
-  summons_last_sent_at: string | null;
+  notice_status: string;
+  notice_auto_drafted_at: string | null;
+  notice_approved_at: string | null;
+  notice_last_sent_at: string | null;
   published: boolean;
 };
 
@@ -83,18 +83,18 @@ type SequenceForm = {
   default_temple_room: string;
   default_dress_code: string;
   default_dining_price: string;
-  default_meeting_fee_amount: string;
+  default_service_fee_amount: string;
   default_enable_dining_rsvp: boolean;
-  default_enable_meeting_fee: boolean;
+  default_enable_service_fee: boolean;
   default_enable_charity_donation: boolean;
   default_charity_name: string;
   default_enable_raffle_donation: boolean;
   default_raffle_description: string;
   default_enable_raffle_wine_pledge: boolean;
   default_raffle_wine_description: string;
-  summons_lead_weeks: number;
-  summons_min_lead_weeks: number;
-  auto_draft_summons: boolean;
+  notice_newcomer_weeks: number;
+  notice_min_newcomer_weeks: number;
+  auto_draft_notice: boolean;
 };
 
 const DAY_OPTIONS = [
@@ -133,20 +133,20 @@ const MONTH_OPTIONS = [
 
 function defaultForm(): SequenceForm {
   return {
-    name: "Regular Meetings",
+    name: "Regular Services",
     description: "",
     day_of_week: 6,
     week_of_month: 3,
     months: [1, 3, 6, 9, 11],
     month_overrides: {},
     default_event_time: "18:00",
-    default_location: "Mark Masons' Hall",
+    default_location: "Mark members' Hall",
     default_temple_room: "",
     default_dress_code: "Dark lounge suit",
     default_dining_price: "",
-    default_meeting_fee_amount: "",
+    default_service_fee_amount: "",
     default_enable_dining_rsvp: false,
-    default_enable_meeting_fee: false,
+    default_enable_service_fee: false,
     default_enable_charity_donation: false,
     default_charity_name: "",
     default_enable_raffle_donation: false,
@@ -154,9 +154,9 @@ function defaultForm(): SequenceForm {
       "Buy strips of raffle tickets — proceeds fund the evening prizes",
     default_enable_raffle_wine_pledge: false,
     default_raffle_wine_description: "Bring a bottle of wine for the evening raffle",
-    summons_lead_weeks: 6,
-    summons_min_lead_weeks: 4,
-    auto_draft_summons: true,
+    notice_newcomer_weeks: 6,
+    notice_min_newcomer_weeks: 4,
+    auto_draft_notice: true,
   };
 }
 
@@ -249,13 +249,13 @@ export function SequencesClient({
     const future = allEvents.filter(
       (event) => new Date(event.event_date).getTime() >= Date.now()
     );
-    const drafts = future.filter((event) => event.summons_status === "draft").length;
-    const approved = future.filter((event) => event.summons_status === "approved").length;
-    const sent = future.filter((event) => event.summons_status === "sent").length;
+    const drafts = future.filter((event) => event.notice_status === "draft").length;
+    const approved = future.filter((event) => event.notice_status === "approved").length;
+    const sent = future.filter((event) => event.notice_status === "sent").length;
     return {
       sequences: sequences.length,
       activeSequences: sequences.filter((s) => s.active).length,
-      futureMeetings: future.length,
+      futureServices: future.length,
       drafts,
       approved,
       sent,
@@ -332,12 +332,12 @@ export function SequencesClient({
         sequence.default_dining_price !== null
           ? String(sequence.default_dining_price)
           : "",
-      default_meeting_fee_amount:
-        sequence.default_meeting_fee_amount !== null
-          ? String(sequence.default_meeting_fee_amount)
+      default_service_fee_amount:
+        sequence.default_service_fee_amount !== null
+          ? String(sequence.default_service_fee_amount)
           : "",
       default_enable_dining_rsvp: sequence.default_enable_dining_rsvp,
-      default_enable_meeting_fee: sequence.default_enable_meeting_fee,
+      default_enable_service_fee: sequence.default_enable_service_fee,
       default_enable_charity_donation: sequence.default_enable_charity_donation,
       default_charity_name: sequence.default_charity_name ?? "",
       default_enable_raffle_donation: sequence.default_enable_raffle_donation,
@@ -346,9 +346,9 @@ export function SequencesClient({
       default_raffle_wine_description:
         sequence.default_raffle_wine_description ??
         "Bring a bottle of wine for the evening raffle",
-      summons_lead_weeks: sequence.summons_lead_weeks,
-      summons_min_lead_weeks: sequence.summons_min_lead_weeks,
-      auto_draft_summons: sequence.auto_draft_summons,
+      notice_newcomer_weeks: sequence.notice_newcomer_weeks,
+      notice_min_newcomer_weeks: sequence.notice_min_newcomer_weeks,
+      auto_draft_notice: sequence.auto_draft_notice,
     });
     setCreateError(null);
     setCreateOpen(true);
@@ -372,7 +372,7 @@ export function SequencesClient({
         body: JSON.stringify({
           ...createForm,
           default_dining_price: createForm.default_dining_price || null,
-          default_meeting_fee_amount: createForm.default_meeting_fee_amount || null,
+          default_service_fee_amount: createForm.default_service_fee_amount || null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -415,7 +415,7 @@ export function SequencesClient({
       );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error ?? "Could not generate meetings.");
+        throw new Error(data.error ?? "Could not generate services.");
       }
       setGenerateState((current) => ({
         ...current,
@@ -433,7 +433,7 @@ export function SequencesClient({
         error:
           error instanceof Error
             ? error.message
-            : "Could not generate meetings.",
+            : "Could not generate services.",
       }));
     }
   }
@@ -463,11 +463,11 @@ export function SequencesClient({
     <div className="space-y-5 sm:space-y-8">
       <div className="admin-page-head">
         <div>
-          <h1 className="admin-page-title">Meeting sequences</h1>
+          <h1 className="admin-page-title">Service sequences</h1>
           <p className="admin-page-copy">
-            Set the recurring rhythm for your regular meetings (for example,
+            Set the recurring rhythm for your regular services (for example,
             third Saturday of January, March, June, September and November).
-            Generate the year in one click. Draft summons appear on a schedule.
+            Generate the year in one click. Draft notice appear on a schedule.
             Sending always needs a human approval.
           </p>
         </div>
@@ -484,7 +484,7 @@ export function SequencesClient({
             <div>
               <p className="font-medium text-dash-text">Database required</p>
               <p className="mt-1 text-dash-muted">
-                Sequences are stored per lodge in Supabase. Set the Supabase
+                Sequences are stored per church in Supabase. Set the Supabase
                 env vars to enable this page.
               </p>
             </div>
@@ -502,8 +502,8 @@ export function SequencesClient({
             tone: "violet",
           },
           {
-            label: "Future meetings linked",
-            value: summary.futureMeetings,
+            label: "Future services linked",
+            value: summary.futureServices,
             hint: "from sequences",
             icon: Calendar,
             tone: "blue",
@@ -518,7 +518,7 @@ export function SequencesClient({
           {
             label: "Sent",
             value: summary.sent,
-            hint: "summons sent",
+            hint: "notice sent",
             icon: ShieldCheck,
             tone: "emerald",
           },
@@ -597,7 +597,7 @@ export function SequencesClient({
                         {!sequence.active && (
                           <Badge variant="outline">Paused</Badge>
                         )}
-                        {sequence.auto_draft_summons ? (
+                        {sequence.auto_draft_notice ? (
                           <Badge
                             variant="outline"
                             className="border-violet-200 bg-violet-50 text-violet-900"
@@ -639,7 +639,7 @@ export function SequencesClient({
                         }
                       >
                         <Wand2 className="mr-1.5 h-4 w-4" />
-                        Generate meetings
+                        Generate services
                       </Button>
                       <Button
                         type="button"
@@ -672,16 +672,16 @@ export function SequencesClient({
                 <div className="grid gap-4 p-5 md:grid-cols-3">
                   <div className="rounded-xl border border-dash-border bg-dash-surface-subtle/40 p-4">
                     <p className="text-xs font-semibold uppercase tracking-wider text-dash-muted">
-                      Summons window
+                      Notice window
                     </p>
                     <p className="mt-2 text-sm text-dash-text">
                       Auto-draft up to{" "}
-                      <strong>{sequence.summons_lead_weeks} weeks</strong>{" "}
-                      before each meeting.
+                      <strong>{sequence.notice_newcomer_weeks} weeks</strong>{" "}
+                      before each service.
                     </p>
                     <p className="mt-1 text-xs text-dash-muted">
-                      Anything inside {sequence.summons_min_lead_weeks} weeks
-                      counts as urgent in the meetings list.
+                      Anything inside {sequence.notice_min_newcomer_weeks} weeks
+                      counts as urgent in the services list.
                     </p>
                   </div>
                   <div className="rounded-xl border border-dash-border bg-dash-surface-subtle/40 p-4">
@@ -699,8 +699,8 @@ export function SequencesClient({
                         ? `Dining £${(sequence.default_dining_price ?? 0).toFixed(2)}`
                         : "Dining off"}
                       {" · "}
-                      {sequence.default_enable_meeting_fee
-                        ? `Fee £${(sequence.default_meeting_fee_amount ?? 0).toFixed(2)}`
+                      {sequence.default_enable_service_fee
+                        ? `Fee £${(sequence.default_service_fee_amount ?? 0).toFixed(2)}`
                         : "No fee"}
                     </p>
                   </div>
@@ -710,7 +710,7 @@ export function SequencesClient({
                     </p>
                     <p className="mt-2 flex items-center gap-2 text-sm text-dash-text">
                       <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                      Summons never auto-send.
+                      Notice never auto-send.
                     </p>
                     <p className="mt-1 text-xs text-dash-muted">
                       A secretary or master must approve each draft before the
@@ -722,7 +722,7 @@ export function SequencesClient({
                 <div className="space-y-3 border-t border-dash-border p-5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-dash-text">
-                      Upcoming meetings ({upcoming.length})
+                      Upcoming services ({upcoming.length})
                     </p>
                     {past.length > 0 && (
                       <p className="text-xs text-dash-muted">
@@ -732,8 +732,8 @@ export function SequencesClient({
                   </div>
                   {upcoming.length === 0 ? (
                     <p className="rounded-lg border border-dashed border-dash-border bg-dash-surface-subtle/40 p-4 text-sm text-dash-muted">
-                      No future meetings yet. Use{" "}
-                      <strong>Generate meetings</strong> to lay them out.
+                      No future services yet. Use{" "}
+                      <strong>Generate services</strong> to lay them out.
                     </p>
                   ) : (
                     <ul className="divide-y divide-dash-border rounded-lg border border-dash-border bg-dash-surface">
@@ -749,11 +749,11 @@ export function SequencesClient({
                             <p className="text-xs text-dash-muted">
                               {formatDateTime(event.event_date)}
                             </p>
-                            {event.summons_auto_drafted_at && (
+                            {event.notice_auto_drafted_at && (
                               <p className="mt-1 flex items-center gap-1 text-xs text-violet-700">
                                 <Sparkles className="h-3 w-3" />
                                 Drafted{" "}
-                                {formatDateTime(event.summons_auto_drafted_at)}
+                                {formatDateTime(event.notice_auto_drafted_at)}
                               </p>
                             )}
                           </div>
@@ -761,19 +761,19 @@ export function SequencesClient({
                             <span
                               className={cn(
                                 "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium",
-                                statusClass(event.summons_status)
+                                statusClass(event.notice_status)
                               )}
                             >
-                              {event.summons_status === "sent" ? (
+                              {event.notice_status === "sent" ? (
                                 <CheckCircle2 className="h-3 w-3" />
-                              ) : event.summons_status === "approved" ? (
+                              ) : event.notice_status === "approved" ? (
                                 <ShieldCheck className="h-3 w-3" />
-                              ) : event.summons_status === "draft" ? (
+                              ) : event.notice_status === "draft" ? (
                                 <Clock className="h-3 w-3" />
                               ) : (
                                 <XCircle className="h-3 w-3" />
                               )}
-                              {statusLabel(event.summons_status)}
+                              {statusLabel(event.notice_status)}
                             </span>
                             <Button
                               asChild
@@ -781,9 +781,9 @@ export function SequencesClient({
                               size="sm"
                             >
                               <Link
-                                href={`/admin/meetings/${event.id}/summons/edit`}
+                                href={`/admin/services/${event.id}/notice/edit`}
                               >
-                                Open summons
+                                Open notice
                               </Link>
                             </Button>
                           </div>
@@ -813,11 +813,11 @@ export function SequencesClient({
             <div className="flex items-center justify-between border-b border-dash-border px-6 py-4">
               <div>
                 <h2 className="text-lg font-semibold text-dash-text">
-                  {editingId ? "Edit meeting sequence" : "New meeting sequence"}
+                  {editingId ? "Edit service sequence" : "New service sequence"}
                 </h2>
                 <p className="text-sm text-dash-muted">
                   {editingId
-                    ? "Update the recipe. Existing generated meetings stay where they are."
+                    ? "Update the recipe. Existing generated services stay where they are."
                     : "Define the recipe. You can generate the year afterwards."}
                 </p>
               </div>
@@ -968,7 +968,7 @@ export function SequencesClient({
                     </span>
                   </summary>
                   <p className="mt-2 text-xs text-dash-muted">
-                    Use this when a lodge meets on a different week (or
+                    Use this when a church meets on a different week (or
                     weekday) in some months, for example {`"3rd Saturday`} in
                     most months but {`2nd Saturday in June"`}.
                   </p>
@@ -1104,7 +1104,7 @@ export function SequencesClient({
                   Charity, raffle and wine pledge
                 </p>
                 <p className="text-xs text-dash-muted">
-                  Defaults applied when generating meetings. Each meeting can
+                  Defaults applied when generating services. Each service can
                   still override these.
                 </p>
 
@@ -1121,7 +1121,7 @@ export function SequencesClient({
                     }
                   />
                   <span className="text-sm text-dash-text">
-                    Offer a charity donation on the summons RSVP.
+                    Offer a charity donation on the notice RSVP.
                   </span>
                 </label>
                 {createForm.default_enable_charity_donation && (
@@ -1155,7 +1155,7 @@ export function SequencesClient({
                     }
                   />
                   <span className="text-sm text-dash-text">
-                    Sell strips of raffle tickets at every meeting in this
+                    Sell strips of raffle tickets at every service in this
                     sequence.
                   </span>
                 </label>
@@ -1215,7 +1215,7 @@ export function SequencesClient({
 
               <div className="space-y-3 rounded-xl border border-dash-border bg-dash-surface-subtle/60 p-4">
                 <p className="text-sm font-semibold text-dash-text">
-                  Summons workflow
+                  Notice workflow
                 </p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
@@ -1226,17 +1226,17 @@ export function SequencesClient({
                       type="number"
                       min={1}
                       max={26}
-                      value={createForm.summons_lead_weeks}
+                      value={createForm.notice_newcomer_weeks}
                       onChange={(event) =>
                         setCreateForm((current) => ({
                           ...current,
-                          summons_lead_weeks: Number(event.target.value || 0),
+                          notice_newcomer_weeks: Number(event.target.value || 0),
                         }))
                       }
                     />
                     <p className="text-xs text-dash-muted">
                       Drafts are created up to this many weeks before each
-                      meeting.
+                      service.
                     </p>
                   </div>
                   <div className="space-y-2">
@@ -1247,11 +1247,11 @@ export function SequencesClient({
                       type="number"
                       min={1}
                       max={26}
-                      value={createForm.summons_min_lead_weeks}
+                      value={createForm.notice_min_newcomer_weeks}
                       onChange={(event) =>
                         setCreateForm((current) => ({
                           ...current,
-                          summons_min_lead_weeks: Number(
+                          notice_min_newcomer_weeks: Number(
                             event.target.value || 0
                           ),
                         }))
@@ -1266,16 +1266,16 @@ export function SequencesClient({
                   <input
                     type="checkbox"
                     className="mt-1 h-4 w-4 rounded border-input text-blue-600"
-                    checked={createForm.auto_draft_summons}
+                    checked={createForm.auto_draft_notice}
                     onChange={(event) =>
                       setCreateForm((current) => ({
                         ...current,
-                        auto_draft_summons: event.target.checked,
+                        auto_draft_notice: event.target.checked,
                       }))
                     }
                   />
                   <span className="text-sm text-dash-text">
-                    Auto-create draft summons in the window above. Sends still
+                    Auto-create draft notice in the window above. Sends still
                     require an explicit Approve action.
                   </span>
                 </label>
@@ -1313,7 +1313,7 @@ export function SequencesClient({
           />
           <div className="relative w-full max-w-md rounded-2xl border border-dash-border bg-dash-surface p-6 shadow-2xl">
             <h3 className="text-lg font-semibold text-dash-text">
-              Generate meetings from sequence
+              Generate services from sequence
             </h3>
             <p className="mt-1 text-sm text-dash-muted">
               Creates one event per matching date in the range, linked to this
@@ -1356,7 +1356,7 @@ export function SequencesClient({
             )}
             {generateState.result && (
               <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
-                Created {generateState.result.created} meeting
+                Created {generateState.result.created} service
                 {generateState.result.created === 1 ? "" : "s"}.{" "}
                 {generateState.result.skipped} skipped (already present).
               </p>
@@ -1391,7 +1391,7 @@ export function SequencesClient({
           setDeleteState((current) => ({ ...current, open }))
         }
         title="Delete sequence?"
-        description="The sequence is removed. Meetings already generated stay in the calendar but lose their sequence link."
+        description="The sequence is removed. Services already generated stay in the calendar but lose their sequence link."
         confirmLabel={deleteState.busy ? "Deleting..." : "Delete"}
         loading={deleteState.busy}
         onConfirm={handleDelete}

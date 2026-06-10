@@ -18,7 +18,7 @@ export type TakePaymentCategory =
   | "charity"
   | "raffle"
   | "dining"
-  | "meeting_fee"
+  | "service_fee"
   | "guest_ticket"
   | "subscriptions"
   | "other";
@@ -27,7 +27,7 @@ export type Splits = {
   dining_amount: number;
   charity_amount: number;
   raffle_amount: number;
-  meeting_fee_amount: number;
+  service_fee_amount: number;
   guest_ticket_amount: number;
 };
 
@@ -35,7 +35,7 @@ const ZERO: Splits = {
   dining_amount: 0,
   charity_amount: 0,
   raffle_amount: 0,
-  meeting_fee_amount: 0,
+  service_fee_amount: 0,
   guest_ticket_amount: 0,
 };
 
@@ -51,8 +51,8 @@ export function splitAmountByCategory(
       return { ...ZERO, dining_amount: amountMajor };
     case "raffle":
       return { ...ZERO, raffle_amount: amountMajor };
-    case "meeting_fee":
-      return { ...ZERO, meeting_fee_amount: amountMajor };
+    case "service_fee":
+      return { ...ZERO, service_fee_amount: amountMajor };
     case "guest_ticket":
       return { ...ZERO, guest_ticket_amount: amountMajor };
     // general / subscriptions / other / unknown all stay in total_amount only;
@@ -89,7 +89,7 @@ export function splitAmountByLineItems(items: LineItemInput[]): Splits {
     out.dining_amount += part.dining_amount;
     out.charity_amount += part.charity_amount;
     out.raffle_amount += part.raffle_amount;
-    out.meeting_fee_amount += part.meeting_fee_amount;
+    out.service_fee_amount += part.service_fee_amount;
     out.guest_ticket_amount += part.guest_ticket_amount;
   }
   // Guard against floating point drift from repeated addition (e.g.
@@ -98,7 +98,7 @@ export function splitAmountByLineItems(items: LineItemInput[]): Splits {
     dining_amount: round2(out.dining_amount),
     charity_amount: round2(out.charity_amount),
     raffle_amount: round2(out.raffle_amount),
-    meeting_fee_amount: round2(out.meeting_fee_amount),
+    service_fee_amount: round2(out.service_fee_amount),
     guest_ticket_amount: round2(out.guest_ticket_amount),
   };
 }

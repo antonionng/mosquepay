@@ -55,7 +55,7 @@ interface MemberRow {
   directory_sort_order: number | null;
   rank: string | null;
   dietary_requirements: string | null;
-  date_of_initiation: string | null;
+  date_of_membership: string | null;
   membership_status: string;
   created_at: string;
 }
@@ -74,15 +74,15 @@ const STATUS_VARIANTS: Record<string, string> = {
   excluded: "bg-red-50 text-red-700 border-red-200",
 };
 
-type DuesMethodTag =
+type GivingMethodTag =
   | "online_subscription"
   | "bacs"
   | "paid_in_full"
   | "fee_waived"
   | null;
 
-type DuesMethodInfo = {
-  method: DuesMethodTag;
+type GivingMethodInfo = {
+  method: GivingMethodTag;
   bacsMonthlyAmount: number | null;
 };
 
@@ -90,20 +90,20 @@ export function AdminMembersClient({
   members,
   offices = [],
   giftAidDeclaredMemberIds = [],
-  duesMethodByMemberId = {},
+  givingMethodByMemberId = {},
 }: {
   members: MemberRow[];
   offices?: OfficeRung[];
   /** Member ids that have an active (non-revoked, confirmed) Gift Aid
-   *  declaration on file in this lodge. Drives the "missing Gift Aid"
+   *  declaration on file in this church. Drives the "missing Gift Aid"
    *  and "has declaration" quick filters; computed server-side once so
    *  we avoid an N+1 against gift_aid_declarations. */
   giftAidDeclaredMemberIds?: string[];
-  /** Map of member.id -> dues payment method tag for the current
-   *  masonic year, including BACS monthly amount when applicable.
-   *  Drives the "Dues" column on the list. Empty map = column shows
+  /** Map of member.id -> giving payment method tag for the current
+   *  giving year, including BACS monthly amount when applicable.
+   *  Drives the "Giving" column on the list. Empty map = column shows
    *  "Not tagged" everywhere. */
-  duesMethodByMemberId?: Record<string, DuesMethodInfo>;
+  givingMethodByMemberId?: Record<string, GivingMethodInfo>;
 }) {
   const giftAidDeclaredSet = new Set(giftAidDeclaredMemberIds);
   const router = useRouter();
@@ -136,7 +136,7 @@ export function AdminMembersClient({
     directory_sort_order: "",
     rank: "",
     dietary_requirements: "",
-    date_of_initiation: "",
+    date_of_membership: "",
     membership_status: "active",
   });
   const [sendPortalInvite, setSendPortalInvite] = useState(false);
@@ -170,7 +170,7 @@ export function AdminMembersClient({
           !m.dietary_requirements || m.dietary_requirements.trim().length === 0;
         break;
       case "missing_gift_aid":
-        // Only chase active members: chasing a resigned/excluded Brother
+        // Only chase active members: chasing a resigned/excluded Member
         // for a Gift Aid slip would be silly, and the Charity Steward
         // wants the stack-of-slips workflow as short as possible.
         matchQuick =
@@ -235,7 +235,7 @@ export function AdminMembersClient({
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "lodge-members.csv";
+    link.download = "church-members.csv";
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -278,7 +278,7 @@ export function AdminMembersClient({
             : null,
           rank: formData.rank || null,
           dietary_requirements: formData.dietary_requirements || null,
-          date_of_initiation: formData.date_of_initiation || null,
+          date_of_membership: formData.date_of_membership || null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -337,7 +337,7 @@ export function AdminMembersClient({
         directory_sort_order: "",
         rank: "",
         dietary_requirements: "",
-        date_of_initiation: "",
+        date_of_membership: "",
         membership_status: "active",
       });
       setSendPortalInvite(false);
@@ -359,7 +359,7 @@ export function AdminMembersClient({
         <div>
           <h1 className="admin-page-title">Members</h1>
           <p className="admin-page-copy">
-            Manage lodge membership, view history and dietary requirements.
+            Manage church membership, view history and dietary requirements.
           </p>
         </div>
         <div className="admin-action-row">
@@ -555,7 +555,7 @@ export function AdminMembersClient({
                 <th className="px-4 py-3 hidden md:table-cell">Rank</th>
                 <th className="px-4 py-3 hidden lg:table-cell">Initiation</th>
                 <th className="px-4 py-3 hidden lg:table-cell">Dietary</th>
-                <th className="px-4 py-3 hidden md:table-cell">Dues</th>
+                <th className="px-4 py-3 hidden md:table-cell">Giving</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 w-10" />
               </tr>
@@ -594,8 +594,8 @@ export function AdminMembersClient({
                       {rankLabel(m.rank) ?? "Not recorded"}
                     </td>
                     <td className="px-4 py-3.5 text-dash-muted hidden lg:table-cell">
-                      {m.date_of_initiation
-                        ? new Date(m.date_of_initiation).toLocaleDateString("en-GB", {
+                      {m.date_of_membership
+                        ? new Date(m.date_of_membership).toLocaleDateString("en-GB", {
                             day: "numeric",
                             month: "short",
                             year: "numeric",
@@ -606,8 +606,8 @@ export function AdminMembersClient({
                       {m.dietary_requirements ?? "Not recorded"}
                     </td>
                     <td className="px-4 py-3.5 hidden md:table-cell">
-                      <DuesMethodPill
-                        info={duesMethodByMemberId[m.id] ?? null}
+                      <GivingMethodPill
+                        info={givingMethodByMemberId[m.id] ?? null}
                       />
                     </td>
                     <td className="px-4 py-3.5">
@@ -742,7 +742,7 @@ export function AdminMembersClient({
               </div>
               <div className="space-y-3 rounded-xl border border-dash-border bg-dash-surface-subtle p-4">
                 <p className="text-sm font-semibold text-dash-text">
-                  Summons directory address
+                  Notice directory address
                 </p>
                 <div className="space-y-2">
                   <Label htmlFor="address_line_1">Address line 1</Label>
@@ -899,15 +899,15 @@ export function AdminMembersClient({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="initiation_date">Date of initiation</Label>
+                <Label htmlFor="membership_date">Date of membership</Label>
                 <div className="relative">
                   <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-dash-muted" />
                   <Input
-                    id="initiation_date"
+                    id="membership_date"
                     type="date"
                     className="pl-9"
-                    value={formData.date_of_initiation}
-                    onChange={(e) => setFormData({ ...formData, date_of_initiation: e.target.value })}
+                    value={formData.date_of_membership}
+                    onChange={(e) => setFormData({ ...formData, date_of_membership: e.target.value })}
                   />
                 </div>
                 <p className="text-xs text-dash-muted">
@@ -957,15 +957,15 @@ export function AdminMembersClient({
 }
 
 // ---------------------------------------------------------------------------
-// DuesMethodPill
+// GivingMethodPill
 // ---------------------------------------------------------------------------
 // Inline column pill showing how a member is paying this year's
-// dues. Mirrors the badges on the dues-method panel so admins see the
+// giving. Mirrors the badges on the giving-method panel so admins see the
 // same vocabulary across screens. The "Not tagged" state is styled
 // with an amber outline so it nudges the treasurer without being
 // alarmist — every untagged member is a follow-up they should make.
 
-function DuesMethodPill({ info }: { info: DuesMethodInfo | null }) {
+function GivingMethodPill({ info }: { info: GivingMethodInfo | null }) {
   const method = info?.method ?? null;
 
   if (method === "online_subscription") {

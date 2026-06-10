@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 // Native bottom tab bar for the member portal. Phone-only (hidden at lg).
 // 5 destinations is the sweet spot — iOS HIG says 3–5 tabs, anything more
 // turns into a horizontal scroll which feels weak. We collapse Payments and
-// Dues into a single "Pay" tab to stay at 5.
+// Giving into a single "Pay" tab to stay at 5.
 //
 // - Honours env(safe-area-inset-bottom) so the bar sits above the iOS
 //   home-indicator without ever being clipped.
@@ -26,9 +26,9 @@ import { cn } from "@/lib/utils";
 const tabs = [
   { href: "/member", label: "Home", icon: LayoutDashboard, match: (p: string) => p === "/member" },
   { href: "/member/events", label: "Events", icon: Calendar, match: (p: string) => p.startsWith("/member/events") },
-  // Combined pay tab: lands on /member/dues which has the outstanding
+  // Combined pay tab: lands on /member/giving which has the outstanding
   // balance summary at the top and links to payments history below.
-  { href: "/member/dues", label: "Pay", icon: Wallet, match: (p: string) => p.startsWith("/member/dues") || p.startsWith("/member/payments") || p.startsWith("/member/donations") },
+  { href: "/member/giving", label: "Pay", icon: Wallet, match: (p: string) => p.startsWith("/member/giving") || p.startsWith("/member/payments") || p.startsWith("/member/donations") },
   { href: "/member/card", label: "Card", icon: IdCard, match: (p: string) => p.startsWith("/member/card") },
   { href: "/member/profile", label: "Profile", icon: User, match: (p: string) => p.startsWith("/member/profile") },
 ] as const;

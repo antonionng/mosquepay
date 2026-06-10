@@ -8,28 +8,28 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import { listLodges, getLodgeSubscription } from "@/lib/db";
-import type { Lodge, LodgeSubscription } from "@/lib/db/types";
+import { listChurches, getChurchSubscription } from "@/lib/db";
+import type { Church, ChurchSubscription } from "@/lib/db/types";
 import { formatDate } from "@/lib/utils";
 import { getPlanDefinition } from "@/lib/billing/plans";
 import { requireOperatorPageAccess } from "@/lib/auth/operator-page";
 
-type LodgeWithSub = {
-  lodge: Lodge;
-  subscription: LodgeSubscription | null;
+type ChurchWithSub = {
+  church: Church;
+  subscription: ChurchSubscription | null;
 };
 
-async function getBillingData(): Promise<LodgeWithSub[]> {
+async function getBillingData(): Promise<ChurchWithSub[]> {
   if (!isSupabaseConfigured()) return [];
 
   try {
-    const lodges = await listLodges();
+    const churches = await listChurches();
     const results = await Promise.all(
-      lodges.map(async (lodge) => {
-        const subscription = await getLodgeSubscription(lodge.id).catch(
+      churches.map(async (church) => {
+        const subscription = await getChurchSubscription(church.id).catch(
           () => null
         );
-        return { lodge, subscription };
+        return { church, subscription };
       })
     );
     return results;
@@ -122,7 +122,7 @@ export default async function BillingPage() {
         <div>
           <h1 className="admin-page-title">Billing</h1>
           <p className="admin-page-copy">
-            Lodge subscriptions and revenue overview
+            Church subscriptions and revenue overview
           </p>
         </div>
       </div>
@@ -154,10 +154,10 @@ export default async function BillingPage() {
         <div className="admin-surface p-10 text-center">
           <CreditCard className="mx-auto h-10 w-10 text-slate-600" />
           <p className="mt-3 text-sm text-slate-500">
-            No lodge subscriptions found
+            No church subscriptions found
           </p>
           <p className="mt-1 text-xs text-slate-600">
-            Subscriptions will appear here once lodges are onboarded
+            Subscriptions will appear here once churches are onboarded
           </p>
         </div>
       ) : (
@@ -165,7 +165,7 @@ export default async function BillingPage() {
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Lodge</th>
+                <th>Church</th>
                 <th>Plan</th>
                 <th>Status</th>
                 <th className="hidden sm:table-cell">Amount</th>
@@ -174,14 +174,14 @@ export default async function BillingPage() {
               </tr>
             </thead>
             <tbody>
-              {data.map(({ lodge, subscription: sub }) => (
-                <tr key={lodge.id}>
+              {data.map(({ church, subscription: sub }) => (
+                <tr key={church.id}>
                   <td>
                     <Link
-                      href={`/operator/lodges/${lodge.slug}`}
+                      href={`/operator/churches/${church.slug}`}
                       className="font-medium text-white hover:text-blue-400 transition-colors"
                     >
-                      {lodge.name}
+                      {church.name}
                     </Link>
                   </td>
                   <td className="text-slate-300 capitalize">

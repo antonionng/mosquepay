@@ -10,14 +10,14 @@ import {
   isSuccessfulPaymentStatus,
 } from "@/lib/reports";
 import { ReportsClient } from "./reports-client";
-import type { Rsvp, EventSummonsSend } from "@/lib/db/types";
+import type { Rsvp, ServiceNoticeSend } from "@/lib/db/types";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReportsPage() {
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.lodgeId) {
+  if (ctx.mode !== "database" || !ctx.churchId) {
     return (
       <div className="space-y-4">
         <h1 className="admin-page-title">Reports</h1>
@@ -27,43 +27,43 @@ export default async function ReportsPage() {
       </div>
     );
   }
-  const lodgeId = ctx.lodgeId;
+  const churchId = ctx.churchId;
 
   const [
     members,
-    leads,
+    newcomers,
     events,
     payments,
-    memberDues,
+    memberGiving,
     donations,
     giftAid,
     campaigns,
-    meetingCollections,
+    serviceCollections,
   ] = await Promise.all([
-    db.getMembers(lodgeId),
-    db.getLeads(lodgeId),
-    db.getEvents(lodgeId),
-    db.getPayments(lodgeId),
-    db.getMemberDues(lodgeId),
-    db.getDonations(lodgeId),
-    db.getGiftAidDeclarations(lodgeId),
-    db.getCharityCampaigns(lodgeId),
-    db.getMeetingCollections(lodgeId).catch(() => []),
+    db.getMembers(churchId),
+    db.getNewcomers(churchId),
+    db.getEvents(churchId),
+    db.getPayments(churchId),
+    db.getMemberGiving(churchId),
+    db.getDonations(churchId),
+    db.getGiftAidDeclarations(churchId),
+    db.getCharityCampaigns(churchId),
+    db.getServiceCollections(churchId).catch(() => []),
   ]);
 
   const rsvpsByEvent = new Map<string, Rsvp[]>();
-  const summonsSendsByEvent = new Map<string, EventSummonsSend[]>();
-  const hasSummonsByEvent = new Set<string>();
+  const noticeSendsByEvent = new Map<string, ServiceNoticeSend[]>();
+  const hasNoticeByEvent = new Set<string>();
   await Promise.all(
     events.map(async (e) => {
-      const [rsvps, summons, sends] = await Promise.all([
-        db.getRsvpsByEventId(e.id, lodgeId),
-        db.getEventSummons(e.id, lodgeId),
-        db.listEventSummonsSends(lodgeId, e.id, 200),
+      const [rsvps, notice, sends] = await Promise.all([
+        db.getRsvpsByEventId(e.id, churchId),
+        db.getServiceNotice(e.id, churchId),
+        db.listServiceNoticeSends(churchId, e.id, 200),
       ]);
       rsvpsByEvent.set(e.id, rsvps);
-      summonsSendsByEvent.set(e.id, sends);
-      if (summons) hasSummonsByEvent.add(e.id);
+      noticeSendsByEvent.set(e.id, sends);
+      if (notice) hasNoticeByEvent.add(e.id);
     })
   );
 
@@ -71,38 +71,38 @@ export default async function ReportsPage() {
     events,
     rsvpsByEvent,
     members,
-    summonsSendsByEvent,
-    hasSummonsByEvent,
+    noticeSendsByEvent,
+    hasNoticeByEvent,
   });
-  const treasurer = buildTreasurerReport({ payments, memberDues });
+  const treasurer = buildTreasurerReport({ payments, memberGiving });
   const charity = buildCharityReport({
     campaigns,
     donations,
     giftAid,
     events,
-    meetingCollections,
+    serviceCollections,
   });
-  const recruitment = buildRecruitmentReport({ leads });
+  const recruitment = buildRecruitmentReport({ newcomers });
   const annualReturn = buildAnnualReturn({ members });
 
   let operator: ReturnType<typeof buildOperatorReport> | null = null;
   if (isSupabaseConfigured()) {
     try {
-      const lodges = await db.listLodges();
-      const membersByLodge = new Map<string, number>();
-      const upcomingByLodge = new Map<string, number>();
-      const paymentsLast30ByLodge = new Map<string, number>();
+      const churches = await db.listChurches();
+      const membersByChurch = new Map<string, number>();
+      const upcomingByChurch = new Map<string, number>();
+      const paymentsLast30ByChurch = new Map<string, number>();
       const since = new Date().getTime() - 30 * 24 * 60 * 60 * 1000;
       await Promise.all(
-        lodges.map(async (l) => {
+        churches.map(async (l) => {
           const [m, e, p] = await Promise.all([
             db.getMembers(l.id),
             db.getEvents(l.id, { upcoming: true }),
             db.getPayments(l.id),
           ]);
-          membersByLodge.set(l.id, m.length);
-          upcomingByLodge.set(l.id, e.length);
-          paymentsLast30ByLodge.set(
+          membersByChurch.set(l.id, m.length);
+          upcomingByChurch.set(l.id, e.length);
+          paymentsLast30ByChurch.set(
             l.id,
             p
               .filter(
@@ -116,10 +116,10 @@ export default async function ReportsPage() {
         })
       );
       operator = buildOperatorReport({
-        lodges,
-        membersByLodge,
-        upcomingByLodge,
-        paymentsLast30ByLodge,
+        churches,
+        membersByChurch,
+        upcomingByChurch,
+        paymentsLast30ByChurch,
       });
     } catch (e) {
       console.error("Operator report failed", e);
@@ -128,7 +128,7 @@ export default async function ReportsPage() {
 
   return (
     <ReportsClient
-      lodgeName={ctx.lodgeSlug}
+      churchName={ctx.churchSlug}
       secretary={JSON.parse(JSON.stringify(secretary))}
       treasurer={JSON.parse(JSON.stringify(treasurer))}
       charity={JSON.parse(JSON.stringify(charity))}

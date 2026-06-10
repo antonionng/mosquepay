@@ -3,10 +3,10 @@
 // Member-side event RSVP checkout, fronting three forms:
 //   * components/forms/event-rsvp-form.tsx   (full RSVP)
 //   * components/forms/standalone-pay-form.tsx (pay-only, no RSVP)
-//   * app/summons/[token]/rsvp-form.tsx        (summons-link RSVP)
+//   * app/notice/[token]/rsvp-form.tsx        (notice-link RSVP)
 //
 // Payment surface: 100% Mooov (Mooov Connect -> hosted Stripe Checkout on
-// the lodge's connected PSP). No direct Stripe SDK calls and no fallback,
+// the church's connected PSP). No direct Stripe SDK calls and no fallback,
 // matching /api/donations (Phase 1) and /api/g/[token]/checkout (Phase 2).
 //
 // Mock-payment branch (mock_payment === true || ALLOW_MOCK_PAYMENTS) is
@@ -20,7 +20,7 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getDefaultLodgeSlug, getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getDefaultChurchSlug, getChurchSlugFromRequest } from "@/lib/tenant";
 import { resolveCheckoutFeesForMember } from "@/lib/fees/server-resolve";
 import { createServiceClient } from "@/lib/supabase/server";
 import { callMooovConnect, MooovApiError } from "@/lib/mooov";
@@ -31,13 +31,13 @@ export const dynamic = "force-dynamic";
 
 async function loadMooovMerchant(
   supa: ReturnType<typeof createServiceClient>,
-  lodgeId: string,
+  churchId: string,
 ): Promise<string | null> {
   const { data, error } = await supa
     .schema("mooov")
-    .from("lodges")
+    .from("churches")
     .select("merchant_id, status")
-    .eq("id", lodgeId)
+    .eq("id", churchId)
     .maybeSingle<{ merchant_id: string; status: string }>();
   if (error) throw error;
   if (!data) return null;
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     dietary_requirements,
     special_requests,
     dining_total,
-    meeting_fee,
+    service_fee,
     guest_total,
     guests,
     charity_amount,
@@ -79,9 +79,9 @@ export async function POST(request: NextRequest) {
   } = body;
 
   // Wine pledge is a non-cash side-effect of attending: only honoured when
-  // the brother is actually saying "yes" and is not part of the cash total.
+  // the member is actually saying "yes" and is not part of the cash total.
   // We clamp bottles for the same defence-in-depth reason as the
-  // summons-access route.
+  // notice-access route.
   const winePledged =
     raffle_wine_pledged === true && attending_ceremony !== false;
   const wineBottles = winePledged
@@ -97,9 +97,9 @@ export async function POST(request: NextRequest) {
     (mock_payment === true || process.env.ALLOW_MOCK_PAYMENTS === "true");
 
   try {
-    const lodgeSlug = getLodgeSlugFromRequest(request);
-    const lodgeQuery =
-      lodgeSlug === getDefaultLodgeSlug() ? "" : `?lodge=${encodeURIComponent(lodgeSlug)}`;
+    const churchSlug = getChurchSlugFromRequest(request);
+    const churchQuery =
+      churchSlug === getDefaultChurchSlug() ? "" : `?church=${encodeURIComponent(churchSlug)}`;
 
     const guestList = Array.isArray(guests)
       ? guests.filter(
@@ -108,17 +108,17 @@ export async function POST(request: NextRequest) {
         )
       : [];
 
-    let meetingFeeVal = meeting_fee ?? 0;
+    let serviceFeeVal = service_fee ?? 0;
     let guestTotalVal = guest_total ?? 0;
     let diningTotalVal = dining_total ?? 0;
 
     if (isSupabaseConfigured()) {
-      const lodgeId = await db.resolveLodgeId(lodgeSlug);
-      if (lodgeId) {
-        const event = await db.getEventById(event_id, lodgeId);
+      const churchId = await db.resolveChurchId(churchSlug);
+      if (churchId) {
+        const event = await db.getEventById(event_id, churchId);
         if (event) {
           const resolved = await resolveCheckoutFeesForMember({
-            lodgeId,
+            churchId,
             event,
             memberEmail: String(user_email).trim().toLowerCase(),
             attendingCeremony: attending_ceremony !== false,
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
               guest_name: g.guest_name.trim(),
             })),
           });
-          meetingFeeVal = resolved.meetingFee;
+          serviceFeeVal = resolved.serviceFee;
           diningTotalVal = resolved.diningTotal;
           guestTotalVal = resolved.guestTotal;
         }
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
     const charityAmountVal = charity_amount ?? 0;
     const raffleAmountVal = raffle_amount ?? 0;
     const total =
-      diningTotalVal + meetingFeeVal + guestTotalVal + charityAmountVal + raffleAmountVal;
+      diningTotalVal + serviceFeeVal + guestTotalVal + charityAmountVal + raffleAmountVal;
     if (!event_id || !user_email || total <= 0) {
       return NextResponse.json(
         { error: "Invalid payment request." },
@@ -168,16 +168,16 @@ export async function POST(request: NextRequest) {
       };
 
       if (isSupabaseConfigured()) {
-        const lodgeId = await db.resolveLodgeId(lodgeSlug);
-        if (!lodgeId) {
-          return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+        const churchId = await db.resolveChurchId(churchSlug);
+        if (!churchId) {
+          return NextResponse.json({ error: "Church not found." }, { status: 404 });
         }
-        const rsvp = await db.addRsvp(lodgeId, rsvpData);
+        const rsvp = await db.addRsvp(churchId, rsvpData);
         rsvpId = rsvp.id;
 
         if (Array.isArray(guests) && guests.length > 0) {
           await db.addEventGuests(
-            lodgeId,
+            churchId,
             guests.map((g: { guest_name: string; dietary_requirements?: string }) => ({
               rsvp_id: rsvpId,
               event_id,
@@ -196,15 +196,15 @@ export async function POST(request: NextRequest) {
         // Fire-and-forget wine pledge confirmation. Don't block checkout.
         if (winePledged && wineBottles > 0) {
           try {
-            const [eventRow, lodge] = await Promise.all([
-              db.getEventById(event_id, lodgeId),
-              db.getLodgeById(lodgeId),
+            const [eventRow, church] = await Promise.all([
+              db.getEventById(event_id, churchId),
+              db.getChurchById(churchId),
             ]);
             if (eventRow) {
               await sendWinePledgeConfirmationEmail({
                 toEmail: user_email,
                 toName: user_name ?? user_email,
-                lodgeName: lodge?.name ?? "your lodge",
+                churchName: church?.name ?? "your church",
                 eventTitle: eventRow.title,
                 eventDate: eventRow.event_date,
                 eventTime: eventRow.event_time,
@@ -218,7 +218,7 @@ export async function POST(request: NextRequest) {
           }
         }
       } else {
-        const rsvp = mockDb.addRsvp({ ...rsvpData, lodge_slug: lodgeSlug });
+        const rsvp = mockDb.addRsvp({ ...rsvpData, church_slug: churchSlug });
         rsvpId = rsvp.id;
 
         if (Array.isArray(guests) && guests.length > 0) {
@@ -229,7 +229,7 @@ export async function POST(request: NextRequest) {
               guest_name: g.guest_name,
               dietary_requirements: g.dietary_requirements?.trim() || null,
             })),
-            lodgeSlug
+            churchSlug
           );
         }
       }
@@ -248,7 +248,7 @@ export async function POST(request: NextRequest) {
         dining_amount: diningTotalVal,
         charity_amount: charityAmountVal,
         raffle_amount: raffleAmountVal,
-        meeting_fee_amount: meetingFeeVal,
+        service_fee_amount: serviceFeeVal,
         guest_ticket_amount: guestTotalVal,
         total_amount: total,
         currency: "GBP",
@@ -260,36 +260,36 @@ export async function POST(request: NextRequest) {
       };
 
       if (isSupabaseConfigured()) {
-        const lodgeId = await db.resolveLodgeId(lodgeSlug);
-        if (!lodgeId) {
-          return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+        const churchId = await db.resolveChurchId(churchSlug);
+        if (!churchId) {
+          return NextResponse.json({ error: "Church not found." }, { status: 404 });
         }
-        const payment = await db.addPayment(lodgeId, paymentData);
+        const payment = await db.addPayment(churchId, paymentData);
         if (rsvpId) {
-          await db.updateRsvp(rsvpId, lodgeId, {
+          await db.updateRsvp(rsvpId, churchId, {
             payment_id: payment.id,
             payment_completed: true,
             status: "confirmed",
           });
         }
         return NextResponse.json({
-          url: `${siteUrl}/events/rsvp/success?mock=1${lodgeQuery ? `&lodge=${encodeURIComponent(lodgeSlug)}` : ""}`,
+          url: `${siteUrl}/events/rsvp/success?mock=1${churchQuery ? `&church=${encodeURIComponent(churchSlug)}` : ""}`,
           mock: true,
           rsvp_id: rsvpId,
           payment_id: payment.id,
         });
       }
 
-      const payment = mockDb.addPayment({ ...paymentData, lodge_slug: lodgeSlug });
+      const payment = mockDb.addPayment({ ...paymentData, church_slug: churchSlug });
       if (rsvpId) {
         mockDb.updateRsvp(
           rsvpId,
           { payment_id: payment.id, payment_completed: true, status: "confirmed" },
-          { lodge_slug: lodgeSlug }
+          { church_slug: churchSlug }
         );
       }
       return NextResponse.json({
-        url: `${siteUrl}/events/rsvp/success?mock=1${lodgeQuery ? `&lodge=${encodeURIComponent(lodgeSlug)}` : ""}`,
+        url: `${siteUrl}/events/rsvp/success?mock=1${churchQuery ? `&church=${encodeURIComponent(churchSlug)}` : ""}`,
         mock: true,
         rsvp_id: rsvpId,
         payment_id: payment.id,
@@ -307,9 +307,9 @@ export async function POST(request: NextRequest) {
         { status: 503 }
       );
     }
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    if (!lodgeId) {
-      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    const churchId = await db.resolveChurchId(churchSlug);
+    if (!churchId) {
+      return NextResponse.json({ error: "Church not found." }, { status: 404 });
     }
 
     let supa: ReturnType<typeof createServiceClient>;
@@ -327,14 +327,14 @@ export async function POST(request: NextRequest) {
 
     let merchantId: string | null;
     try {
-      merchantId = await loadMooovMerchant(supa, lodgeId);
+      merchantId = await loadMooovMerchant(supa, churchId);
     } catch (err) {
       console.error("checkout-session: mooov merchant lookup failed", {
-        lodge_id: lodgeId,
+        church_id: churchId,
         message: err instanceof Error ? err.message : String(err),
       });
       return NextResponse.json(
-        { error: "Could not look up payment processor for this lodge." },
+        { error: "Could not look up payment processor for this church." },
         { status: 500 }
       );
     }
@@ -342,8 +342,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "This lodge has not finished setting up online payments yet. Please contact the lodge directly.",
-          code: "lodge_not_connected",
+            "This church has not finished setting up online payments yet. Please contact the church directly.",
+          code: "church_not_connected",
         },
         { status: 503 }
       );
@@ -351,13 +351,13 @@ export async function POST(request: NextRequest) {
 
     const totalMinor = Math.round(total * 100);
     const currency = "GBP";
-    const paymentId = `evt_${lodgeId}_${rsvpId ?? "standalone"}_${Date.now().toString(36)}`;
+    const paymentId = `evt_${churchId}_${rsvpId ?? "standalone"}_${Date.now().toString(36)}`;
     const idempotencyKey = `evt_csk_${rsvpId ?? "standalone"}_${Date.now().toString(36)}`;
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
     const successUrl = `${siteUrl}/events/rsvp/success?payment_id=${encodeURIComponent(
       paymentId
-    )}${lodgeQuery ? `&lodge=${encodeURIComponent(lodgeSlug)}` : ""}`;
-    const cancelUrl = `${siteUrl}/events${lodgeQuery}`;
+    )}${churchQuery ? `&church=${encodeURIComponent(churchSlug)}` : ""}`;
+    const cancelUrl = `${siteUrl}/events${churchQuery}`;
     const description = standalone
       ? `Standalone payment${user_name ? ` -- ${user_name}` : ""}`
       : `Event RSVP${user_name ? ` -- ${user_name}` : ""}`;
@@ -366,11 +366,11 @@ export async function POST(request: NextRequest) {
       source: standalone ? "event_standalone" : "event_rsvp",
       rsvp_id: rsvpId,
       event_id,
-      lodge_slug: lodgeSlug,
+      church_slug: churchSlug,
       donor_email: user_email,
       donor_name: user_name ?? null,
       dining_total: diningTotalVal,
-      meeting_fee: meetingFeeVal,
+      service_fee: serviceFeeVal,
       charity_amount: charityAmountVal,
       raffle_amount: raffleAmountVal,
       guest_total: guestTotalVal,
@@ -388,9 +388,9 @@ export async function POST(request: NextRequest) {
         : {}),
     };
     const initialMetadata: Record<string, unknown> = {
-      source: "lodgepay_event_checkout_session",
-      lodge_slug: lodgeSlug,
-      lodge_id: lodgeId,
+      source: "churchpay_event_checkout_session",
+      church_slug: churchSlug,
+      church_id: churchId,
       intent: "event",
       rsvp_id: rsvpId,
       event_id,
@@ -401,7 +401,7 @@ export async function POST(request: NextRequest) {
       .from("payment_attempts")
       .insert({
         payment_id: paymentId,
-        lodge_id: lodgeId,
+        church_id: churchId,
         member_id: null,
         amount: totalMinor,
         currency,
@@ -413,7 +413,7 @@ export async function POST(request: NextRequest) {
       });
     if (insertError) {
       console.error("checkout-session: preflight insert failed", {
-        lodge_id: lodgeId,
+        church_id: churchId,
         payment_id: paymentId,
         code: insertError.code,
         message: insertError.message,
@@ -429,7 +429,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // All four LP payment surfaces (this route, dues/pay, donations,
+      // All four LP payment surfaces (this route, giving/pay, donations,
       // g/[token]/checkout) are on flow:"embedded" since the rollout on
       // 2026-05-26. hosted_url is https://pay.mooov.money/c/<payment_id>
       // (Mooov-branded page wrapping the Stripe Payment Element) instead of
@@ -456,8 +456,8 @@ export async function POST(request: NextRequest) {
           customer_email: user_email,
           metadata: {
             intent: "event",
-            lodge_id: lodgeId,
-            lodge_slug: lodgeSlug,
+            church_id: churchId,
+            church_slug: churchSlug,
             rsvp_id: rsvpId ?? "",
             event_id,
             standalone: standalone ? "true" : "false",
@@ -512,8 +512,8 @@ export async function POST(request: NextRequest) {
           return NextResponse.json(
             {
               error:
-                "This lodge has not finished setting up online payments yet. Please contact the lodge directly.",
-              code: "lodge_setup_incomplete",
+                "This church has not finished setting up online payments yet. Please contact the church directly.",
+              code: "church_setup_incomplete",
               setup_url: err.setupHint.setupUrl,
             },
             { status: 503 }

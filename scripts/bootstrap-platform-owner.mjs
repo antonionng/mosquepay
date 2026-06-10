@@ -16,8 +16,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 function loadDotEnv() {
-  const candidates = [".env.local", ".env"];
-  for (const file of candidates) {
+  const newcomers = [".env.local", ".env"];
+  for (const file of newcomers) {
     const path = resolve(process.cwd(), file);
     if (!existsSync(path)) continue;
     const content = readFileSync(path, "utf8");
@@ -120,7 +120,7 @@ async function ensureAdminUserRow(authUserId) {
   if (existing) {
     const updates = {};
     if (existing.role !== "super_admin") updates.role = "super_admin";
-    if (existing.lodge_id !== null) updates.lodge_id = null;
+    if (existing.church_id !== null) updates.church_id = null;
     if (existing.active !== true) updates.active = true;
     if (existing.full_name !== FULL_NAME) updates.full_name = FULL_NAME;
     if (existing.auth_user_id !== authUserId) updates.auth_user_id = authUserId;
@@ -146,7 +146,7 @@ async function ensureAdminUserRow(authUserId) {
       email: EMAIL,
       full_name: FULL_NAME,
       role: "super_admin",
-      lodge_id: null,
+      church_id: null,
       active: true,
       permissions: [],
       auth_user_id: authUserId,
@@ -165,7 +165,7 @@ async function main() {
   console.log("Platform owner ready.");
   console.log(`  Email:          ${adminRow.email}`);
   console.log(`  Role:           ${adminRow.role}`);
-  console.log(`  Lodge scope:    ${adminRow.lodge_id ?? "(global)"}`);
+  console.log(`  Church scope:    ${adminRow.church_id ?? "(global)"}`);
   console.log(`  Auth user id:   ${user.id}`);
   console.log(`  Login at:       /admin/login`);
 }

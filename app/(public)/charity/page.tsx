@@ -1,19 +1,19 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Heart, HandHeart, TrendingUp, Gift, CheckCircle2 } from "lucide-react";
-import { getDefaultLodgeSlug, resolveLodgeSlug } from "@/lib/tenant";
+import { getDefaultChurchSlug, resolveChurchSlug } from "@/lib/tenant";
 import { marketingMetadata } from "@/lib/seo";
 
 export const metadata = marketingMetadata({
-  title: "Masonic Charity, Donations, and Gift Aid | LodgePay",
+  title: "Church Charity, Donations, and Gift Aid | ChurchPay",
   description:
-    "See how LodgePay and lodge websites support Masonic charity work, online donations, Gift Aid declarations, GASDS records, fundraising campaigns, event donations, and transparent charitable reporting.",
+    "See how ChurchPay and church websites support Church charity work, online donations, Gift Aid declarations, GASDS records, fundraising campaigns, event donations, and transparent charitable reporting.",
   path: "/charity",
   keywords: [
-    "Masonic charity donations",
-    "Gift Aid for lodges",
-    "GASDS for lodges",
-    "lodge fundraising software",
+    "Church charity donations",
+    "Gift Aid for churches",
+    "GASDS for churches",
+    "church fundraising software",
   ],
 });
 
@@ -28,14 +28,14 @@ const causes = [
   {
     title: "Community Charities",
     description:
-      "We support a range of local and national charities chosen by the lodge and its members throughout the year.",
+      "We support a range of local and national charities chosen by the church and its members throughout the year.",
     icon: <HandHeart className="h-6 w-6" />,
     raised: "£1,800",
   },
   {
-    title: "Masonic Charities",
+    title: "Church Charities",
     description:
-      "Freemasonry is one of the largest charitable givers in the UK, supporting healthcare, education, and welfare.",
+      "church life is one of the largest charitable givers in the UK, supporting healthcare, education, and pastoral.",
     icon: <Gift className="h-6 w-6" />,
     raised: "£3,200",
   },
@@ -52,13 +52,13 @@ const giftAidFacts = [
 export default async function CharityPage({
   searchParams,
 }: {
-  searchParams: Promise<{ lodge?: string }>;
+  searchParams: Promise<{ church?: string }>;
 }) {
-  const { lodge } = await searchParams;
-  const lodgeSlug = resolveLodgeSlug(lodge);
-  const defaultSlug = getDefaultLodgeSlug();
-  const withLodgeQuery = (href: string) =>
-    lodgeSlug === defaultSlug ? href : `${href}?lodge=${encodeURIComponent(lodgeSlug)}`;
+  const { church } = await searchParams;
+  const churchSlug = resolveChurchSlug(church);
+  const defaultSlug = getDefaultChurchSlug();
+  const withChurchQuery = (href: string) =>
+    churchSlug === defaultSlug ? href : `${href}?church=${encodeURIComponent(churchSlug)}`;
 
   return (
     <div className="public-page">
@@ -71,8 +71,8 @@ export default async function CharityPage({
               Service is part of the culture, not an add-on.
             </h1>
             <p className="public-hero-body">
-              Freemasonry has a long tradition of charitable giving and community service.
-              Covenant Lodge contributes through fundraising, donations, and practical
+              church life has a long tradition of charitable giving and community service.
+              St Mary's Church contributes through fundraising, donations, and practical
               support for causes that matter.
             </p>
           </div>
@@ -82,7 +82,7 @@ export default async function CharityPage({
             </p>
             <div className="mt-6 space-y-4">
               {[
-                "£48M+ donated annually in the UK by Freemasons",
+                "£48M+ donated annually in the UK by church members",
                 "Local and national causes supported throughout the year",
                 "A practical expectation that membership includes service",
               ].map((item) => (
@@ -105,8 +105,8 @@ export default async function CharityPage({
             <p className="section-label">Our focus</p>
             <h2 className="section-title">Causes and communities we support.</h2>
             <p className="section-description">
-              Every lodge meeting, every social gathering, and every event is an opportunity
-              to give back. Here are some of the causes closest to our lodge.
+              Every church service, every social gathering, and every event is an opportunity
+              to give back. Here are some of the causes closest to our church.
             </p>
           </div>
 
@@ -140,8 +140,8 @@ export default async function CharityPage({
               <h2 className="section-title">Your contribution makes a real difference.</h2>
               <div className="mt-6 space-y-4 text-lg leading-relaxed text-slate-600">
                 <p>
-                  Donations can be made at lodge events, through our online payment system,
-                  or by contacting the lodge secretary directly.
+                  Donations can be made at church events, through our online payment system,
+                  or by contacting the church secretary directly.
                 </p>
                 <p>
                   Many of our dining events include optional charitable donation add-ons at
@@ -150,13 +150,13 @@ export default async function CharityPage({
               </div>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Button asChild className="bg-slate-950 text-white hover:bg-slate-800">
-                  <Link href={withLodgeQuery("/events")}>
+                  <Link href={withChurchQuery("/events")}>
                     Upcoming Events
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
                 <Button asChild variant="outline">
-                  <Link href={withLodgeQuery("/contact")}>Contact Secretary</Link>
+                  <Link href={withChurchQuery("/contact")}>Contact Secretary</Link>
                 </Button>
               </div>
             </div>
@@ -231,7 +231,7 @@ export default async function CharityPage({
             <p className="section-label">Impact</p>
             <h2 className="section-title">Stories from the community.</h2>
             <p className="section-description">
-              Real examples of how lodge giving has made a difference to people and
+              Real examples of how church giving has made a difference to people and
               organisations across London and beyond.
             </p>
           </div>
@@ -245,13 +245,13 @@ export default async function CharityPage({
               },
               {
                 title: "Youth Mentorship Programme",
-                body: "Lodge members volunteered over 200 hours mentoring young people through a local career readiness scheme.",
+                body: "Church members volunteered over 200 hours mentoring young people through a local career readiness scheme.",
                 tag: "Education",
               },
               {
                 title: "Winter Shelter Support",
                 body: "Through combined fundraising, we provided hot meals and supplies to a local homeless shelter during winter months.",
-                tag: "Welfare",
+                tag: "Pastoral care",
               },
             ].map((story) => (
               <div key={story.title} className="public-grid-card h-full">
@@ -284,7 +284,7 @@ export default async function CharityPage({
               size="lg"
               className="rounded-xl bg-white text-slate-950 hover:bg-white/90"
             >
-              <Link href={withLodgeQuery("/contact")}>
+              <Link href={withChurchQuery("/contact")}>
                 Contact Us
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
@@ -295,7 +295,7 @@ export default async function CharityPage({
               variant="secondary"
               className="rounded-xl border-white/10 bg-white/10 text-white hover:bg-white/20 hover:text-white"
             >
-              <Link href={withLodgeQuery("/events")}>View Events</Link>
+              <Link href={withChurchQuery("/events")}>View Events</Link>
             </Button>
           </div>
         </div>

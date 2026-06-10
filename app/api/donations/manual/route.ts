@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -19,12 +19,12 @@ export async function POST(request: NextRequest) {
       { status: 503 }
     );
   }
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("charity:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("charity:write", churchId);
   if (forbidden) return forbidden;
 
   const body = await request.json();
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     | "declared"
     | "declined";
 
-  const donation = await db.addDonation(lodgeId, {
+  const donation = await db.addDonation(churchId, {
     event_id: body.event_id ?? null,
     payment_id: body.payment_id ?? null,
     donor_name: body.donor_name?.toString().trim() || null,
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
   });
 
   await writeAuditLog({
-    lodgeId,
+    churchId,
     action: "donation_created",
     entityType: "donation",
     entityId: donation.id,

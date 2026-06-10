@@ -76,11 +76,11 @@ type EventLite = {
 
 type CommunicationCategory =
   | "members_newsletter"
-  | "post_meeting_recap"
+  | "post_service_recap"
   | "event_reminder"
-  | "candidate_follow_up"
-  | "dues_reminder"
-  | "welfare_check_in"
+  | "newcomer_follow_up"
+  | "giving_reminder"
+  | "pastoral_check_in"
   | "charity_appeal";
 
 type MarketplaceTemplate = {
@@ -88,11 +88,11 @@ type MarketplaceTemplate = {
   name: string;
   category:
     | "newsletter"
-    | "summons"
-    | "dues"
+    | "notice"
+    | "giving"
     | "events"
     | "milestones"
-    | "welfare";
+    | "pastoral";
   description: string;
   subject: string;
   html_body: string;
@@ -109,11 +109,11 @@ const statusColor: Record<string, "success" | "warning" | "destructive" | "secon
 
 const AI_CATEGORIES: Array<{ value: CommunicationCategory; label: string }> = [
   { value: "members_newsletter", label: "Members newsletter" },
-  { value: "post_meeting_recap", label: "Post-meeting recap" },
+  { value: "post_service_recap", label: "Post-service recap" },
   { value: "event_reminder", label: "Event reminder" },
-  { value: "candidate_follow_up", label: "Candidate follow-up" },
-  { value: "dues_reminder", label: "Dues reminder" },
-  { value: "welfare_check_in", label: "Welfare check-in" },
+  { value: "newcomer_follow_up", label: "Newcomer follow-up" },
+  { value: "giving_reminder", label: "Giving reminder" },
+  { value: "pastoral_check_in", label: "PastoralCare check-in" },
   { value: "charity_appeal", label: "Charity appeal" },
 ];
 
@@ -144,7 +144,7 @@ export function CommunicationsClient({
     template_key: blank?.template_key ?? "",
     subject: blank?.subject ?? "",
     html_body: blank?.html_body ?? "",
-    audience: "active_members" as "active_members" | "all_members" | "leads",
+    audience: "active_members" as "active_members" | "all_members" | "newcomers",
   });
   const [editor, setEditor] = useState<{
     mode: "create" | "edit";
@@ -172,7 +172,7 @@ export function CommunicationsClient({
       template_key: "custom.",
       name: "",
       subject: "",
-      html_body: "<p>Hello {{first_name}},</p><p></p><p>Yours fraternally,<br/>{{lodge_name}}</p>",
+      html_body: "<p>Hello {{first_name}},</p><p></p><p>With every blessing,<br/>{{church_name}}</p>",
     });
   }
 
@@ -295,7 +295,7 @@ export function CommunicationsClient({
           event_id: aiEventId,
           notes:
             aiNotes ||
-            "Draft a reusable communications template. Keep merge tags and make it suitable for lodge admins to adapt later.",
+            "Draft a reusable communications template. Keep merge tags and make it suitable for church admins to adapt later.",
         }),
       });
       const body = await res.json();
@@ -428,7 +428,7 @@ export function CommunicationsClient({
         <h1 className="text-2xl font-bold text-slate-900">Communications</h1>
         <p className="mt-1 text-sm text-slate-500">
           Send newsletters, manage templates, and toggle automations like
-          birthdays and post-meeting thank-yous.
+          birthdays and post-service thank-yous.
         </p>
       </div>
 
@@ -479,7 +479,7 @@ export function CommunicationsClient({
                     ))}
                   </select>
                 </Field>
-                <Field label="Related meeting or event">
+                <Field label="Related service or event">
                   <select
                     value={aiEventId}
                     onChange={(e) => setAiEventId(e.target.value)}
@@ -539,7 +539,7 @@ export function CommunicationsClient({
                   review and save into the template library.
                 </p>
                 <p>
-                  <strong>Automations:</strong> automated birthday and post-meeting sends
+                  <strong>Automations:</strong> automated birthday and post-service sends
                   still use the template library, so improving templates improves automation
                   output too.
                 </p>
@@ -605,7 +605,7 @@ export function CommunicationsClient({
                           audience: e.target.value as
                             | "active_members"
                             | "all_members"
-                            | "leads",
+                            | "newcomers",
                         }))
                       }
                       className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"
@@ -614,7 +614,7 @@ export function CommunicationsClient({
                         Active members ({audienceCounts.active_members})
                       </option>
                       <option value="all_members">All members</option>
-                      <option value="leads">Leads</option>
+                      <option value="newcomers">Newcomers</option>
                     </select>
                   </Field>
                 </div>
@@ -810,7 +810,7 @@ export function CommunicationsClient({
                   </code>{" "}
                   and{" "}
                   <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">
-                    {`{{lodge_name}}`}
+                    {`{{church_name}}`}
                   </code>
                   . System templates can be edited but not deleted.
                 </div>
@@ -967,7 +967,7 @@ export function CommunicationsClient({
         open={deleteTemplateId !== null}
         onOpenChange={(open) => !open && setDeleteTemplateId(null)}
         title="Delete template?"
-        description="This removes the custom template for this lodge. System templates cannot be deleted."
+        description="This removes the custom template for this church. System templates cannot be deleted."
         confirmLabel="Delete template"
         tone="danger"
         loading={deleteTemplateId ? busy === `del-${deleteTemplateId}` : false}

@@ -3,11 +3,11 @@ import type { Event } from "@/lib/db/types";
 import {
   buildMemberFeeBreakdown,
   resolveGuestDining,
-  type LodgeFeeDefaults,
+  type ChurchFeeDefaults,
 } from "@/lib/fees/resolve";
 
 export async function resolveCheckoutFeesForMember(args: {
-  lodgeId: string;
+  churchId: string;
   event: Event;
   memberEmail: string;
   attendingCeremony: boolean;
@@ -15,9 +15,9 @@ export async function resolveCheckoutFeesForMember(args: {
   guests: Array<{ guest_name: string }>;
 }) {
   const [member, defaults, overrides] = await Promise.all([
-    db.getMemberByEmail(args.memberEmail, args.lodgeId),
-    db.getLodgeFeeDefaults(args.lodgeId),
-    db.listEventFeeOverrides(args.lodgeId, args.event.id),
+    db.getMemberByEmail(args.memberEmail, args.churchId),
+    db.getChurchFeeDefaults(args.churchId),
+    db.listEventFeeOverrides(args.churchId, args.event.id),
   ]);
 
   const memberOverride = member
@@ -34,14 +34,14 @@ export async function resolveCheckoutFeesForMember(args: {
   const breakdown = buildMemberFeeBreakdown({
     member: member ?? undefined,
     event: args.event,
-    defaults: defaults as LodgeFeeDefaults | null,
+    defaults: defaults as ChurchFeeDefaults | null,
     attendingCeremony: args.attendingCeremony,
     attendingDining: args.attendingDining,
     memberOverride,
     guests: args.attendingCeremony ? guestProfiles : [],
   });
 
-  const meetingFee = breakdown.items.find((i) => i.key === "levy")?.amount ?? 0;
+  const serviceFee = breakdown.items.find((i) => i.key === "levy")?.amount ?? 0;
   const diningItem = breakdown.items.find((i) => i.key === "dining");
   const diningTotal = diningItem?.amount ?? 0;
   const guestTotal = breakdown.items
@@ -49,7 +49,7 @@ export async function resolveCheckoutFeesForMember(args: {
     .reduce((s, i) => s + i.amount, 0);
 
   return {
-    meetingFee,
+    serviceFee,
     diningTotal,
     guestTotal,
     total: breakdown.total,

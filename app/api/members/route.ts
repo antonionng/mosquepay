@@ -3,7 +3,7 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
 import { isRank, RANK_CODES } from "@/lib/members/rank";
@@ -16,22 +16,22 @@ export async function GET(request: NextRequest) {
     const unauthorized = await requireAdminApiAuth();
     if (unauthorized) return unauthorized;
 
-    const lodgeSlug = getLodgeSlugFromRequest(request);
+    const churchSlug = getChurchSlugFromRequest(request);
     const search = request.nextUrl.searchParams.get("search") ?? undefined;
     const status = request.nextUrl.searchParams.get("status") ?? undefined;
 
     if (isSupabaseConfigured()) {
-      const lodgeId = await db.resolveLodgeId(lodgeSlug);
-      if (!lodgeId) {
-        return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+      const churchId = await db.resolveChurchId(churchSlug);
+      if (!churchId) {
+        return NextResponse.json({ error: "Church not found." }, { status: 404 });
       }
-      const forbidden = await requireAdminApiPermission("members:read", lodgeId);
+      const forbidden = await requireAdminApiPermission("members:read", churchId);
       if (forbidden) return forbidden;
-      const members = await db.getMembers(lodgeId, { search, status });
+      const members = await db.getMembers(churchId, { search, status });
       return NextResponse.json({ members });
     }
 
-    const members = mockDb.getMembers({ lodge_slug: lodgeSlug, search, status });
+    const members = mockDb.getMembers({ church_slug: churchSlug, search, status });
     return NextResponse.json({ members });
   } catch (e) {
     console.error("Members GET error:", e);
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     const unauthorized = await requireAdminApiAuth();
     if (unauthorized) return unauthorized;
 
-    const lodgeSlug = getLodgeSlugFromRequest(request);
+    const churchSlug = getChurchSlugFromRequest(request);
     const body = await request.json();
     const {
       email,
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       directory_sort_order,
       rank,
       dietary_requirements,
-      date_of_initiation,
+      date_of_membership,
       membership_status,
     } = body;
 
@@ -88,19 +88,19 @@ export async function POST(request: NextRequest) {
     }
 
     if (isSupabaseConfigured()) {
-      const lodgeId = await db.resolveLodgeId(lodgeSlug);
-      if (!lodgeId) {
-        return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+      const churchId = await db.resolveChurchId(churchSlug);
+      if (!churchId) {
+        return NextResponse.json({ error: "Church not found." }, { status: 404 });
       }
-      const forbidden = await requireAdminApiPermission("members:write", lodgeId);
+      const forbidden = await requireAdminApiPermission("members:write", churchId);
       if (forbidden) return forbidden;
 
-      const existing = await db.getMemberByEmail(email, lodgeId);
+      const existing = await db.getMemberByEmail(email, churchId);
       if (existing) {
         return NextResponse.json({ error: "A member with this email already exists." }, { status: 409 });
       }
 
-      const member = await db.createMember(lodgeId, {
+      const member = await db.createMember(churchId, {
         auth_user_id: null,
         email: email.trim().toLowerCase(),
         full_name,
@@ -119,28 +119,28 @@ export async function POST(request: NextRequest) {
         directory_sort_order: directory_sort_order ?? null,
         rank: rank ?? null,
         dietary_requirements: dietary_requirements ?? null,
-        date_of_initiation: date_of_initiation ?? null,
-        initiation_email_sent: false,
+        date_of_membership: date_of_membership ?? null,
+        membership_email_sent: false,
         membership_status: membership_status ?? "active",
         stripe_customer_id: null,
       });
 
-      const activeDues = await db.getLodgeDues(lodgeId);
-      if (activeDues.length > 0) {
-        const dues = activeDues[0];
+      const activeGiving = await db.getChurchGiving(churchId);
+      if (activeGiving.length > 0) {
+        const giving = activeGiving[0];
         const now = new Date();
-        const periodStart = date_of_initiation ?? now.toISOString().split("T")[0];
+        const periodStart = date_of_membership ?? now.toISOString().split("T")[0];
         const periodEnd = new Date(new Date(periodStart).getTime() + 365 * 86400000)
           .toISOString()
           .split("T")[0];
 
-        await db.createMemberDues(lodgeId, {
+        await db.createMemberGiving(churchId, {
           member_email: member.email,
           member_name: member.full_name,
           member_id: member.id,
-          dues_id: dues.id,
-          amount: dues.amount,
-          currency: dues.currency,
+          giving_id: giving.id,
+          amount: giving.amount,
+          currency: giving.currency,
           period_start: periodStart,
           period_end: periodEnd,
           status: "outstanding",
@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
       }
 
       await writeAuditLog({
-        lodgeId,
+        churchId,
         action: "created",
         entityType: "member",
         entityId: member.id,
@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ member }, { status: 201 });
     }
 
-    const existing = mockDb.getMemberByEmail(email, { lodge_slug: lodgeSlug });
+    const existing = mockDb.getMemberByEmail(email, { church_slug: churchSlug });
     if (existing) {
       return NextResponse.json({ error: "A member with this email already exists." }, { status: 409 });
     }
@@ -185,11 +185,11 @@ export async function POST(request: NextRequest) {
       directory_sort_order: directory_sort_order ?? null,
       rank: rank ?? null,
       dietary_requirements: dietary_requirements ?? null,
-      date_of_initiation: date_of_initiation ?? null,
-      initiation_email_sent: false,
+      date_of_membership: date_of_membership ?? null,
+      membership_email_sent: false,
       membership_status: membership_status ?? "active",
       stripe_customer_id: null,
-      lodge_slug: lodgeSlug,
+      church_slug: churchSlug,
     });
 
     return NextResponse.json({ member }, { status: 201 });

@@ -22,12 +22,12 @@ export default async function MemberCardPage() {
 
   const member =
     (await db.getMemberByAuthUserId(user.id)) ??
-    (await db.getMemberByEmailAcrossLodges(user.email));
+    (await db.getMemberByEmailAcrossChurches(user.email));
   if (!member) {
     redirect("/member");
   }
 
-  const lodge = await db.getLodgeById(member.lodge_id);
+  const church = await db.getChurchById(member.church_id);
 
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
@@ -50,16 +50,16 @@ export default async function MemberCardPage() {
         rank: member.rank,
         office_title: member.office_title,
         membership_status: member.membership_status,
-        date_of_initiation: member.date_of_initiation,
+        date_of_membership: member.date_of_membership,
       }}
-      lodge={
-        lodge
+      church={
+        church
           ? {
-              name: lodge.name,
-              lodge_number: lodge.lodge_number,
-              city: lodge.city,
-              primary_color: lodge.primary_color,
-              logo_url: lodge.logo_url,
+              name: church.name,
+              church_number: church.church_number,
+              city: church.city,
+              primary_color: church.primary_color,
+              logo_url: church.logo_url,
             }
           : null
       }

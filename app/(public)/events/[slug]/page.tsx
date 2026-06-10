@@ -7,9 +7,9 @@ import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { EventRsvpForm } from "@/components/forms/event-rsvp-form";
 import { ArrowLeft, Calendar, MapPin, Clock, Users } from "lucide-react";
-import { getDefaultLodgeSlug, resolveLodgeSlug } from "@/lib/tenant";
+import { getDefaultChurchSlug, resolveChurchSlug } from "@/lib/tenant";
 import { SOCIAL_SHARE_IMAGE, SITE_ORIGIN } from "@/lib/seo";
-import { lodgeScopedEventPath, lodgeScopedEventsPath } from "@/lib/public-links";
+import { churchScopedEventPath, churchScopedEventsPath } from "@/lib/public-links";
 import { isPubliclyVisible } from "@/lib/events/public-visibility";
 
 function siteUrl(): string {
@@ -20,13 +20,13 @@ function siteUrl(): string {
   return url.startsWith("http") ? url : `https://${url}`;
 }
 
-async function loadEvent(slug: string, lodgeSlug: string) {
+async function loadEvent(slug: string, churchSlug: string) {
   if (isSupabaseConfigured()) {
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    return lodgeId ? await db.getEventBySlug(slug, lodgeId) : null;
+    const churchId = await db.resolveChurchId(churchSlug);
+    return churchId ? await db.getEventBySlug(slug, churchId) : null;
   }
   if (shouldUseInMemoryMock()) {
-    return mockDb.getEventBySlug(slug, { lodge_slug: lodgeSlug });
+    return mockDb.getEventBySlug(slug, { church_slug: churchSlug });
   }
   return null;
 }
@@ -36,17 +36,17 @@ export async function generateMetadata({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ lodge?: string }>;
+  searchParams: Promise<{ church?: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const { lodge } = await searchParams;
-  const lodgeSlug = resolveLodgeSlug(lodge);
-  const event = await loadEvent(slug, lodgeSlug);
+  const { church } = await searchParams;
+  const churchSlug = resolveChurchSlug(church);
+  const event = await loadEvent(slug, churchSlug);
   if (!event || !isPubliclyVisible(event)) return { title: "Event not found" };
   const description = (event.description ?? "").slice(0, 200) ||
     `${event.title} - ${formatDate(event.event_date)}`;
   const canonical = `${siteUrl()}/events/${slug}${
-    lodgeSlug !== getDefaultLodgeSlug() ? `?lodge=${encodeURIComponent(lodgeSlug)}` : ""
+    churchSlug !== getDefaultChurchSlug() ? `?church=${encodeURIComponent(churchSlug)}` : ""
   }`;
   const imageUrl = event.featured_image_url || SOCIAL_SHARE_IMAGE.url;
   return {
@@ -78,18 +78,18 @@ type LinkMode = "query" | "scoped";
 
 export async function EventPageContent({
   slug,
-  lodge,
+  church,
   linkMode = "query",
   bypassVisibility = false,
   adminPreviewBackHref,
 }: {
   slug: string;
-  lodge?: string;
+  church?: string;
   linkMode?: LinkMode;
   /**
    * Skip the `isPubliclyVisible` gate. The caller is responsible for
    * authorisation (e.g. the admin preview route, which uses
-   * `getAdminReadContext` to ensure only signed-in admins of this lodge can
+   * `getAdminReadContext` to ensure only signed-in admins of this church can
    * reach it). When true, a banner is rendered so the previewer knows the
    * page is not currently public.
    */
@@ -97,16 +97,16 @@ export async function EventPageContent({
   /** When previewing, where the back link should send the admin. */
   adminPreviewBackHref?: string;
 }) {
-  const lodgeSlug = resolveLodgeSlug(lodge);
-  const defaultSlug = getDefaultLodgeSlug();
-  const withLodgeLink = (href: string) => {
+  const churchSlug = resolveChurchSlug(church);
+  const defaultSlug = getDefaultChurchSlug();
+  const withChurchLink = (href: string) => {
     if (linkMode === "scoped" && href === "/events") {
-      return lodgeScopedEventsPath(lodgeSlug);
+      return churchScopedEventsPath(churchSlug);
     }
-    return lodgeSlug === defaultSlug ? href : `${href}?lodge=${encodeURIComponent(lodgeSlug)}`;
+    return churchSlug === defaultSlug ? href : `${href}?church=${encodeURIComponent(churchSlug)}`;
   };
 
-  const event = await loadEvent(slug, lodgeSlug);
+  const event = await loadEvent(slug, churchSlug);
   if (!event) notFound();
   const visibleToPublic = isPubliclyVisible(event);
   if (!visibleToPublic && !bypassVisibility) notFound();
@@ -129,7 +129,7 @@ export async function EventPageContent({
     image: event.featured_image_url ? [event.featured_image_url] : undefined,
     url:
       linkMode === "scoped"
-        ? `${siteUrl()}${lodgeScopedEventPath(lodgeSlug, slug)}`
+        ? `${siteUrl()}${churchScopedEventPath(churchSlug, slug)}`
         : `${siteUrl()}/events/${slug}`,
   };
 
@@ -138,7 +138,7 @@ export async function EventPageContent({
     (event.enable_dining_rsvp ||
       event.enable_charity_donation ||
       event.enable_raffle_donation ||
-      event.enable_meeting_fee ||
+      event.enable_service_fee ||
       event.enable_guest_tickets);
 
   return (
@@ -149,8 +149,8 @@ export async function EventPageContent({
             <div className="flex flex-col gap-2 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
               <p>
                 <span className="font-semibold">Admin preview.</span>{" "}
-                This meeting is not visible on the public site yet. Members
-                and visitors will see a 404 if they open this URL.
+                This service is not visible on the public site yet. Members
+                and newcomers will see a 404 if they open this URL.
               </p>
               {adminPreviewBackHref && (
                 <Link
@@ -171,7 +171,7 @@ export async function EventPageContent({
       <section className="public-hero">
         <div className="container-full relative z-10 max-w-4xl px-6 pb-16 pt-32 md:pb-20 md:pt-40">
           <Link 
-            href={withLodgeLink("/events")}
+            href={withChurchLink("/events")}
             className="mb-8 inline-flex items-center gap-2 text-sm text-white/60 transition-colors hover:text-blue-200"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -228,7 +228,7 @@ export async function EventPageContent({
               </div>
               <div>
                 <p className="mb-1 text-sm font-medium uppercase tracking-wider text-slate-500">Location</p>
-                <p className="font-medium text-slate-950">{event.location ?? "Mark Masons' Hall"}</p>
+                <p className="font-medium text-slate-950">{event.location ?? "Mark members' Hall"}</p>
               </div>
               {event.dress_code && (
                 <div>
@@ -253,7 +253,7 @@ export async function EventPageContent({
               
               <EventRsvpForm
                 eventId={event.id}
-                lodgeSlug={lodgeSlug}
+                churchSlug={churchSlug}
                 enableDining={event.enable_dining_rsvp}
                 diningPrice={event.dining_price}
                 diningDescription={event.dining_description}
@@ -264,9 +264,9 @@ export async function EventPageContent({
                 enableRaffle={event.enable_raffle_donation}
                 raffleSuggestedAmounts={event.raffle_suggested_amounts ?? [5, 10, 20, 50]}
                 raffleAllowCustom={event.raffle_allow_custom}
-                enableMeetingFee={event.enable_meeting_fee}
-                meetingFeeAmount={event.meeting_fee_amount}
-                meetingFeeDescription={event.meeting_fee_description}
+                enableServiceFee={event.enable_service_fee}
+                serviceFeeAmount={event.service_fee_amount}
+                serviceFeeDescription={event.service_fee_description}
                 enableGuestTickets={event.enable_guest_tickets}
                 guestTicketPrice={event.guest_ticket_price}
                 guestTicketDescription={event.guest_ticket_description}
@@ -285,9 +285,9 @@ export default async function EventPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ lodge?: string }>;
+  searchParams: Promise<{ church?: string }>;
 }) {
   const { slug } = await params;
-  const { lodge } = await searchParams;
-  return <EventPageContent slug={slug} lodge={lodge} />;
+  const { church } = await searchParams;
+  return <EventPageContent slug={slug} church={church} />;
 }

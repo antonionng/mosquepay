@@ -22,12 +22,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const lodgeId = request.nextUrl.searchParams.get("lodge_id");
-  if (!lodgeId) {
-    return NextResponse.json({ error: "lodge_id is required." }, { status: 400 });
+  const churchId = request.nextUrl.searchParams.get("church_id");
+  if (!churchId) {
+    return NextResponse.json({ error: "church_id is required." }, { status: 400 });
   }
 
-  const flags = await db.listLodgeFeatureFlags(lodgeId);
+  const flags = await db.listChurchFeatureFlags(churchId);
   return NextResponse.json({
     flags: Object.fromEntries(
       Object.entries(FEATURE_FLAGS).map(([key, meta]) => {
@@ -48,23 +48,23 @@ export async function PATCH(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const lodgeId = typeof body.lodge_id === "string" ? body.lodge_id : "";
+  const churchId = typeof body.church_id === "string" ? body.church_id : "";
   const flagKey = typeof body.flag_key === "string" ? body.flag_key : "";
-  if (!lodgeId || !flagKey || !isValidKey(flagKey)) {
+  if (!churchId || !flagKey || !isValidKey(flagKey)) {
     return NextResponse.json(
-      { error: "lodge_id and a valid flag_key are required." },
+      { error: "church_id and a valid flag_key are required." },
       { status: 400 }
     );
   }
   const enabled = Boolean(body.enabled);
 
-  const updated = await db.setLodgeFeatureFlag(lodgeId, flagKey, enabled, {
+  const updated = await db.setChurchFeatureFlag(churchId, flagKey, enabled, {
     updated_by_email: scope.email,
   });
-  clearFeatureFlagCache(lodgeId);
+  clearFeatureFlagCache(churchId);
 
   await writeAuditLog({
-    lodgeId,
+    churchId,
     action: enabled ? "feature_flag_enabled" : "feature_flag_disabled",
     entityType: "feature_flag",
     entityId: updated.id,

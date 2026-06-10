@@ -22,7 +22,7 @@ export function generateBackupCodes(count = 10): string[] {
 export function buildOtpAuthUrl(
   secret: string,
   email: string,
-  issuer = "Lodge Payments"
+  issuer = "Church Payments"
 ): string {
   return authenticator.keyuri(email, issuer, secret);
 }

@@ -1,7 +1,7 @@
-// LodgePay helper for Mooov Connect.
+// ChurchPay helper for Mooov Connect.
 //
 // Outbound API calls use the single platform credential, plus Mooov-Merchant
-// for per-lodge on-behalf-of routing. Lodge admins never see per-lodge API keys.
+// for per-church on-behalf-of routing. Church admins never see per-church API keys.
 //
 // AUTH SCHEME (do not regress to Bearer): Mooov's gateway is HMAC-only and
 // 401s anything else (verified end-to-end with Mooov on 2026-05-21). The
@@ -116,8 +116,8 @@ export function getMooovConnectConfig(): MooovConnectConfig {
   }
 
   return {
-    platformSlug: process.env.MOOOV_PLATFORM_SLUG ?? "lodgepay",
-    platformId: process.env.MOOOV_PLATFORM_ID ?? "plat_lodgepay",
+    platformSlug: process.env.MOOOV_PLATFORM_SLUG ?? "churchpay",
+    platformId: process.env.MOOOV_PLATFORM_ID ?? "plat_churchpay",
     connectBaseUrl:
       process.env.MOOOV_CONNECT_BASE ?? "https://staging.connect.mooov.money",
     apiBaseUrl,

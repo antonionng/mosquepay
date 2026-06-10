@@ -21,16 +21,16 @@ export async function GET(
     return new NextResponse("Calendar not found", { status: 404 });
   }
 
-  const lodge = await db.getLodgeById(member.lodge_id);
-  const events = await db.getEvents(member.lodge_id, { published: true });
+  const church = await db.getChurchById(member.church_id);
+  const events = await db.getEvents(member.church_id, { published: true });
 
   const url = new URL(request.url);
   const origin = `${url.protocol}//${url.host}`;
   const ics = eventsToIcs({
-    calendarName: lodge?.name ?? "Lodge calendar",
+    calendarName: church?.name ?? "Church calendar",
     events,
     origin,
-    lodgeSlug: lodge?.slug ?? null,
+    churchSlug: church?.slug ?? null,
   });
 
   return new NextResponse(ics, {
@@ -38,7 +38,7 @@ export async function GET(
     headers: {
       "Content-Type": "text/calendar; charset=utf-8",
       "Cache-Control": "private, max-age=600",
-      "Content-Disposition": `inline; filename="lodge-${member.lodge_id}.ics"`,
+      "Content-Disposition": `inline; filename="church-${member.church_id}.ics"`,
     },
   });
 }

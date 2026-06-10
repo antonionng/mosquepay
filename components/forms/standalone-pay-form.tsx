@@ -11,7 +11,7 @@ type GuestEntry = { guest_name: string; dietary_requirements: string };
 
 type Props = {
   eventId: string;
-  lodgeSlug?: string;
+  churchSlug?: string;
   enableDining: boolean;
   diningPrice: number | null;
   diningDescription: string | null;
@@ -22,9 +22,9 @@ type Props = {
   enableRaffle: boolean;
   raffleSuggestedAmounts: number[];
   raffleAllowCustom: boolean;
-  enableMeetingFee: boolean;
-  meetingFeeAmount: number | null;
-  meetingFeeDescription: string | null;
+  enableServiceFee: boolean;
+  serviceFeeAmount: number | null;
+  serviceFeeDescription: string | null;
   enableGuestTickets: boolean;
   guestTicketPrice: number | null;
   guestTicketDescription: string | null;
@@ -32,7 +32,7 @@ type Props = {
 
 export function StandalonePayForm({
   eventId,
-  lodgeSlug,
+  churchSlug,
   enableDining,
   diningPrice,
   diningDescription,
@@ -43,17 +43,17 @@ export function StandalonePayForm({
   enableRaffle,
   raffleSuggestedAmounts,
   raffleAllowCustom,
-  enableMeetingFee,
-  meetingFeeAmount,
-  meetingFeeDescription,
+  enableServiceFee,
+  serviceFeeAmount,
+  serviceFeeDescription,
   enableGuestTickets,
   guestTicketPrice,
   guestTicketDescription,
 }: Props) {
   const searchParams = useSearchParams();
-  const lodgeFromQuery = searchParams.get("lodge");
-  const effectiveLodge = lodgeSlug ?? lodgeFromQuery ?? undefined;
-  const lodgeQuery = effectiveLodge ? `?lodge=${encodeURIComponent(effectiveLodge)}` : "";
+  const churchFromQuery = searchParams.get("church");
+  const effectiveChurch = churchSlug ?? churchFromQuery ?? undefined;
+  const churchQuery = effectiveChurch ? `?church=${encodeURIComponent(effectiveChurch)}` : "";
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -64,10 +64,10 @@ export function StandalonePayForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const meetingFee = enableMeetingFee && meetingFeeAmount ? meetingFeeAmount : 0;
+  const serviceFee = enableServiceFee && serviceFeeAmount ? serviceFeeAmount : 0;
   const diningTotal = enableDining && diningPrice && includeDining ? diningPrice : 0;
   const guestTotal = enableGuestTickets && guestTicketPrice ? guests.length * guestTicketPrice : 0;
-  const total = meetingFee + diningTotal + guestTotal + charityAmount + raffleAmount;
+  const total = serviceFee + diningTotal + guestTotal + charityAmount + raffleAmount;
 
   function addGuest() {
     if (guests.length >= 10) return;
@@ -103,7 +103,7 @@ export function StandalonePayForm({
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/payments/create-checkout-session${lodgeQuery}`, {
+      const res = await fetch(`/api/payments/create-checkout-session${churchQuery}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -113,7 +113,7 @@ export function StandalonePayForm({
           standalone: true,
           attending_dining: includeDining,
           dining_total: diningTotal,
-          meeting_fee: meetingFee,
+          service_fee: serviceFee,
           guest_total: guestTotal,
           guests: enableGuestTickets ? guests : [],
           number_of_guests: guests.length,
@@ -154,9 +154,9 @@ export function StandalonePayForm({
       <div className="space-y-4 rounded-[1.25rem] border border-slate-200 bg-slate-50 p-5">
         <h4 className="font-semibold text-slate-950">Select items</h4>
 
-        {meetingFee > 0 && (
+        {serviceFee > 0 && (
           <p className="text-sm">
-            {meetingFeeDescription ?? "Meeting fee"}: £{meetingFee.toFixed(2)}
+            {serviceFeeDescription ?? "Service fee"}: £{serviceFee.toFixed(2)}
           </p>
         )}
 

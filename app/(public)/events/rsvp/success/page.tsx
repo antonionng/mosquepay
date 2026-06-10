@@ -1,18 +1,18 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, ArrowRight } from "lucide-react";
-import { getDefaultLodgeSlug, resolveLodgeSlug } from "@/lib/tenant";
+import { getDefaultChurchSlug, resolveChurchSlug } from "@/lib/tenant";
 
 export default async function RsvpSuccessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ lodge?: string }>;
+  searchParams: Promise<{ church?: string }>;
 }) {
-  const { lodge } = await searchParams;
-  const lodgeSlug = resolveLodgeSlug(lodge);
-  const defaultSlug = getDefaultLodgeSlug();
-  const withLodgeQuery = (href: string) =>
-    lodgeSlug === defaultSlug ? href : `${href}?lodge=${encodeURIComponent(lodgeSlug)}`;
+  const { church } = await searchParams;
+  const churchSlug = resolveChurchSlug(church);
+  const defaultSlug = getDefaultChurchSlug();
+  const withChurchQuery = (href: string) =>
+    churchSlug === defaultSlug ? href : `${href}?church=${encodeURIComponent(churchSlug)}`;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 px-6 py-24">
@@ -26,13 +26,13 @@ export default async function RsvpSuccessPage({
         </p>
         <div className="mt-10 flex flex-wrap justify-center gap-4">
           <Button asChild variant="primary">
-            <Link href={withLodgeQuery("/events")}>
+            <Link href={withChurchQuery("/events")}>
               View Events
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
           <Button asChild variant="secondary" className="border-white/10 bg-white/10 text-white hover:bg-white/10 hover:text-white">
-            <Link href={withLodgeQuery("/")}>Return Home</Link>
+            <Link href={withChurchQuery("/")}>Return Home</Link>
           </Button>
         </div>
       </div>

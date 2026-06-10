@@ -33,7 +33,7 @@ type ArchiveStrategy = "soft_delete" | "anonymise" | "hard_delete";
 type Settings = {
   resigned_member_retention_months: number;
   deceased_member_retention_months: number;
-  lead_inactive_retention_months: number;
+  newcomer_inactive_retention_months: number;
   audit_log_retention_months: number;
   archive_strategy: ArchiveStrategy;
   notes: string | null;
@@ -70,8 +70,8 @@ export function ComplianceClient({
       settings?.resigned_member_retention_months ?? 84,
     deceased_member_retention_months:
       settings?.deceased_member_retention_months ?? 240,
-    lead_inactive_retention_months:
-      settings?.lead_inactive_retention_months ?? 24,
+    newcomer_inactive_retention_months:
+      settings?.newcomer_inactive_retention_months ?? 24,
     audit_log_retention_months: settings?.audit_log_retention_months ?? 84,
     archive_strategy: settings?.archive_strategy ?? "soft_delete",
     notes: settings?.notes ?? "",
@@ -206,11 +206,11 @@ export function ComplianceClient({
                   }
                 />
               </Field>
-              <Field label="Inactive lead retention (months)">
+              <Field label="Inactive newcomer retention (months)">
                 <NumberInput
-                  value={form.lead_inactive_retention_months}
+                  value={form.newcomer_inactive_retention_months}
                   onChange={(v) =>
-                    setForm((f) => ({ ...f, lead_inactive_retention_months: v }))
+                    setForm((f) => ({ ...f, newcomer_inactive_retention_months: v }))
                   }
                 />
               </Field>

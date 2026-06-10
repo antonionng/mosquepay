@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -31,16 +31,16 @@ export async function GET(request: NextRequest) {
       { status: 503 }
     );
   }
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("payments:write", churchId);
   if (forbidden) return forbidden;
 
   const format = request.nextUrl.searchParams.get("format") ?? "generic";
-  const ledger = await db.getTreasurerLedger(lodgeId);
+  const ledger = await db.getTreasurerLedger(churchId);
 
   let csv = "";
   if (format === "xero") {

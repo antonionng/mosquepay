@@ -65,7 +65,7 @@ export function CookieConsent() {
     >
       <div className="mx-auto flex max-w-6xl flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="max-w-3xl">
-          <p className="text-sm font-semibold text-dash-text">Cookies on LodgePay</p>
+          <p className="text-sm font-semibold text-dash-text">Cookies on ChurchPay</p>
           <p className="mt-1 text-sm leading-relaxed text-dash-muted">
             We use strictly necessary cookies to run login, security, and account features.
             With your consent, we also use analytics cookies to understand page views and

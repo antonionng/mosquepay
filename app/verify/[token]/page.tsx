@@ -17,7 +17,7 @@ export default async function VerifyMemberPage({
 
   if (!member) notFound();
 
-  const lodge = await db.getLodgeById(member.lodge_id);
+  const church = await db.getChurchById(member.church_id);
   const isCurrent = member.membership_status === "active";
 
   return (
@@ -51,15 +51,15 @@ export default async function VerifyMemberPage({
               <p className="text-xs text-slate-500">{rankLabel(member.rank)}</p>
             )}
           </div>
-          {lodge && (
+          {church && (
             <div>
-              <p className="text-xs uppercase tracking-wider text-slate-500">Lodge</p>
+              <p className="text-xs uppercase tracking-wider text-slate-500">Church</p>
               <p className="text-base font-medium text-slate-900">
-                {lodge.name}
-                {lodge.lodge_number ? ` · No. ${lodge.lodge_number}` : ""}
+                {church.name}
+                {church.church_number ? ` · No. ${church.church_number}` : ""}
               </p>
-              {lodge.city && (
-                <p className="text-xs text-slate-500">{lodge.city}</p>
+              {church.city && (
+                <p className="text-xs text-slate-500">{church.city}</p>
               )}
             </div>
           )}
@@ -74,7 +74,7 @@ export default async function VerifyMemberPage({
             </p>
           </div>
           <p className="border-t border-slate-100 pt-4 text-xs text-slate-400">
-            Verified by LodgePay at{" "}
+            Verified by ChurchPay at{" "}
             {new Date().toLocaleString("en-GB", {
               dateStyle: "medium",
               timeStyle: "short",

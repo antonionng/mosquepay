@@ -11,23 +11,23 @@ export const dynamic = "force-dynamic";
 
 export default async function CompliancePage() {
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.lodgeId) {
+  if (ctx.mode !== "database" || !ctx.churchId) {
     redirect("/admin");
   }
-  const lodgeId = ctx.lodgeId;
-  const adminCtx = await getCurrentAdminContextAny(lodgeId);
+  const churchId = ctx.churchId;
+  const adminCtx = await getCurrentAdminContextAny(churchId);
   const scope = await getCurrentAdminScope();
   const adminEmail =
-    scope.kind === "platform" || scope.kind === "lodge" || scope.kind === "dummy"
+    scope.kind === "platform" || scope.kind === "church" || scope.kind === "dummy"
       ? scope.email
       : null;
   const adminUser = adminEmail
-    ? await db.getAdminUserByEmail(adminEmail, lodgeId)
+    ? await db.getAdminUserByEmail(adminEmail, churchId)
     : null;
 
   const [settings, sars] = await Promise.all([
-    db.getDataRetentionSettings(lodgeId),
-    db.listSubjectAccessRequests(lodgeId),
+    db.getDataRetentionSettings(churchId),
+    db.listSubjectAccessRequests(churchId),
   ]);
 
   return (

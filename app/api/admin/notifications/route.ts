@@ -4,28 +4,28 @@ import { getAdminReadContext } from "@/lib/admin/read-context";
 import {
   ADMIN_NOTIFICATION_EVENTS,
   ADMIN_NOTIFICATION_ROLES,
-  listLodgeNotificationSettings,
-  setLodgeNotificationSetting,
+  listChurchNotificationSettings,
+  setChurchNotificationSetting,
 } from "@/lib/email/preferences";
 import { writeAuditLog } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
-async function selectedLodgeId() {
+async function selectedChurchId() {
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.lodgeId) return null;
-  return ctx.lodgeId;
+  if (ctx.mode !== "database" || !ctx.churchId) return null;
+  return ctx.churchId;
 }
 
 export async function GET() {
-  const lodgeId = await selectedLodgeId();
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchId = await selectedChurchId();
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("admin:all", lodgeId);
+  const forbidden = await requireAdminApiPermission("admin:all", churchId);
   if (forbidden) return forbidden;
 
-  const map = await listLodgeNotificationSettings(lodgeId);
+  const map = await listChurchNotificationSettings(churchId);
 
   // Render the matrix the UI expects: for each event x role, true
   // unless an explicit row says otherwise.
@@ -47,11 +47,11 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const lodgeId = await selectedLodgeId();
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchId = await selectedChurchId();
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("admin:all", lodgeId);
+  const forbidden = await requireAdminApiPermission("admin:all", churchId);
   if (forbidden) return forbidden;
 
   let body: { role?: unknown; event_type?: unknown; enabled?: unknown } = {};
@@ -76,11 +76,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  await setLodgeNotificationSetting(lodgeId, role, eventType, enabled);
+  await setChurchNotificationSetting(churchId, role, eventType, enabled);
   await writeAuditLog({
-    lodgeId,
+    churchId,
     action: enabled ? "notification_enable" : "notification_disable",
-    entityType: "lodge_notification_setting",
+    entityType: "church_notification_setting",
     entityId: `${role}::${eventType}`,
     summary: `Set ${role} notification for ${eventType} to ${enabled ? "on" : "off"}`,
     metadata: { role, event_type: eventType, enabled },

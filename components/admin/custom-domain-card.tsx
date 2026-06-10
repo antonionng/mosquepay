@@ -104,8 +104,8 @@ export function CustomDomainCard() {
         )}
       </div>
       <p className="mt-1 text-sm text-slate-500">
-        Point a lodge-owned domain at LodgePay and we will serve this lodge&apos;s
-        public site from it. The platform app stays on <code>lodgepayments.co.uk</code>.
+        Point a church-owned domain at ChurchPay and we will serve this church&apos;s
+        public site from it. The platform app stays on <code>churchpay.co.uk</code>.
       </p>
 
       <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
@@ -114,7 +114,7 @@ export function CustomDomainCard() {
           <Input
             id="custom-domain"
             value={draft}
-            placeholder="lodge.your-domain.org"
+            placeholder="church.your-domain.org"
             onChange={(e) => setDraft(e.target.value)}
           />
         </div>
@@ -195,12 +195,12 @@ export function CustomDomainCard() {
               Add the verification record (TXT) below if your DNS provider
               requires it. Some providers can verify the CNAME alone.
               <pre className="mt-1 overflow-auto rounded bg-white p-2 text-xs text-slate-600">
-                TXT _lodgepay-verify.{savedDomain} = {state.custom_domain_verification_token ?? "(generated on save)"}
+                TXT _churchpay-verify.{savedDomain} = {state.custom_domain_verification_token ?? "(generated on save)"}
               </pre>
             </li>
             <li>
               Wait 5-10 minutes for DNS to propagate, then click <em>Verify</em>.
-              Once verified and added to the live hosting project, visitors can use
+              Once verified and added to the live hosting project, newcomers can use
               the new domain.
             </li>
           </ol>

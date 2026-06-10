@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
-import { getDefaultLodgeSlug } from "@/lib/tenant";
+import { getDefaultChurchSlug } from "@/lib/tenant";
 import { cn } from "@/lib/utils";
 import {
   Users,
@@ -31,9 +31,9 @@ function toRow(guest: {
   id: string;
   full_name: string;
   email: string | null;
-  mother_lodge_name: string | null;
-  mother_lodge_number: string | null;
-  is_mason: boolean;
+  mother_church_name: string | null;
+  mother_church_number: string | null;
+  is_member: boolean;
   visit_count: number;
   archived_at: string | null;
   created_at: string;
@@ -43,9 +43,9 @@ function toRow(guest: {
     id: guest.id,
     full_name: guest.full_name,
     email: guest.email,
-    mother_lodge_name: guest.mother_lodge_name,
-    mother_lodge_number: guest.mother_lodge_number,
-    is_mason: guest.is_mason,
+    mother_church_name: guest.mother_church_name,
+    mother_church_number: guest.mother_church_number,
+    is_member: guest.is_member,
     visit_count: guest.visit_count,
     archived_at: guest.archived_at,
     created_at: guest.created_at,
@@ -83,27 +83,27 @@ export default async function AdminGuestsDirectoryPage({
   let guests: GuestRow[] = [];
   let schemaMissing = false;
   let acceptsSelfRegistration = false;
-  let lodgeSlug = getDefaultLodgeSlug();
+  let churchSlug = getDefaultChurchSlug();
 
   if (ctx.mode === "mock") {
     guests = mockDb
       .listGuests({ search, includeArchived: showArchived })
       .map(toRow);
-    const lodge = mockDb.getLodgeBySlug(getDefaultLodgeSlug());
-    if (lodge) {
-      acceptsSelfRegistration = lodge.accepts_self_registration ?? false;
-      lodgeSlug = lodge.slug;
+    const church = mockDb.getChurchBySlug(getDefaultChurchSlug());
+    if (church) {
+      acceptsSelfRegistration = church.accepts_self_registration ?? false;
+      churchSlug = church.slug;
     }
-  } else if (ctx.lodgeId) {
-    lodgeSlug = ctx.lodgeSlug;
+  } else if (ctx.churchId) {
+    churchSlug = ctx.churchSlug;
     try {
-      const rows = await db.listGuests(ctx.lodgeId, {
+      const rows = await db.listGuests(ctx.churchId, {
         search,
         includeArchived: showArchived,
       });
       guests = rows.map(toRow);
-      const lodge = await db.getLodgeById(ctx.lodgeId);
-      acceptsSelfRegistration = lodge?.accepts_self_registration ?? false;
+      const church = await db.getChurchById(ctx.churchId);
+      acceptsSelfRegistration = church?.accepts_self_registration ?? false;
     } catch (error) {
       if (detectSchemaMissing(error)) {
         schemaMissing = true;
@@ -114,7 +114,7 @@ export default async function AdminGuestsDirectoryPage({
   }
 
   const total = guests.filter((g) => !g.archived_at).length;
-  const masons = guests.filter((g) => g.is_mason && !g.archived_at).length;
+  const members = guests.filter((g) => g.is_member && !g.archived_at).length;
   const repeatGuests = guests.filter(
     (g) => g.visit_count > 1 && !g.archived_at
   ).length;
@@ -141,9 +141,9 @@ export default async function AdminGuestsDirectoryPage({
       accent: "blue",
     },
     {
-      label: "Visiting brethren",
-      value: String(masons),
-      hint: "Guests recorded as Masons",
+      label: "Newcomer members",
+      value: String(members),
+      hint: "Guests recorded as members",
       icon: Building2,
       accent: "cyan",
     },
@@ -169,15 +169,15 @@ export default async function AdminGuestsDirectoryPage({
         <div>
           <h1 className="admin-page-title">Guests directory</h1>
           <p className="admin-page-copy">
-            Visiting brethren and other guests who have ever booked into a
-            lodge event.
+            Newcomer members and other guests who have ever booked into a
+            church event.
           </p>
         </div>
       </div>
 
       {!schemaMissing ? (
         <GuestSelfRegistrationCard
-          lodgeSlug={lodgeSlug}
+          churchSlug={churchSlug}
           initialEnabled={acceptsSelfRegistration}
         />
       ) : null}

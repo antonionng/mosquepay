@@ -29,7 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { LodgeSiteSection } from "@/lib/db/types";
+import type { ChurchSiteSection } from "@/lib/db/types";
 import { SitePreview } from "./site-preview";
 import { PuckEditor } from "./puck-editor";
 import { ImageUploadField } from "./image-upload-field";
@@ -39,9 +39,9 @@ import {
   TEMPLATES,
 } from "@/lib/site-builder/templates";
 import type {
-  LodgeSiteCustomPage,
-  LodgeSiteFooterSettings,
-  LodgeSiteHeaderSettings,
+  ChurchSiteCustomPage,
+  ChurchSiteFooterSettings,
+  ChurchSiteHeaderSettings,
 } from "@/lib/db/types";
 
 type Step = "template" | "edit" | "preview" | "publish";
@@ -49,16 +49,16 @@ type WebsiteAiMode = "full" | "improve" | "add";
 type WebsiteAiDraft = {
   page_title: string;
   page_description: string | null;
-  sections: LodgeSiteSection[];
+  sections: ChurchSiteSection[];
 };
 
-const SECTION_LABELS: Record<LodgeSiteSection["type"], string> = {
+const SECTION_LABELS: Record<ChurchSiteSection["type"], string> = {
   hero: "Hero",
   about: "About",
-  meeting_details: "Meeting times",
+  service_details: "Service times",
   officers: "Officers",
   charity: "Charity",
-  events: "Upcoming meetings",
+  events: "Upcoming services",
   faq: "FAQ",
   join: "Join",
   contact: "Contact",
@@ -76,7 +76,7 @@ const LAUNCH_GUIDE = [
     id: "template" as const,
     icon: LayoutTemplate,
     title: "Pick a complete site",
-    body: "Start from a polished lodge website with pages, header, footer, images, and forms already wired.",
+    body: "Start from a polished church website with pages, header, footer, images, and forms already wired.",
   },
   {
     id: "edit" as const,
@@ -94,7 +94,7 @@ const LAUNCH_GUIDE = [
     id: "publish" as const,
     icon: Rocket,
     title: "Go live",
-    body: "Save, publish, and then connect the lodge domain from the launch checklist.",
+    body: "Save, publish, and then connect the church domain from the launch checklist.",
   },
 ];
 
@@ -108,19 +108,19 @@ const FORM_FIELD_OPTIONS = [
 ] as const;
 
 export function SimpleSiteBuilder({
-  lodgeSlug,
+  churchSlug,
   initialSections,
   pageTitle: initialPageTitle,
   pageDescription: initialPageDescription,
   primaryColor = "#3b82f6",
   initiallyPublished,
   publicHref,
-  title = "Lodge website builder",
+  title = "Church website builder",
   description = "Pick a template, edit sections in friendly forms, preview, and publish when ready.",
   onPersist,
 }: {
-  lodgeSlug: string;
-  initialSections: LodgeSiteSection[];
+  churchSlug: string;
+  initialSections: ChurchSiteSection[];
   pageTitle: string;
   pageDescription: string | null;
   primaryColor?: string;
@@ -131,10 +131,10 @@ export function SimpleSiteBuilder({
   onPersist?: (payload: {
     page_title: string;
     page_description: string | null;
-    sections: LodgeSiteSection[];
-    custom_pages?: LodgeSiteCustomPage[];
-    header_settings?: LodgeSiteHeaderSettings;
-    footer_settings?: LodgeSiteFooterSettings;
+    sections: ChurchSiteSection[];
+    custom_pages?: ChurchSiteCustomPage[];
+    header_settings?: ChurchSiteHeaderSettings;
+    footer_settings?: ChurchSiteFooterSettings;
     published?: boolean;
   }) => Promise<void>;
 }) {
@@ -147,14 +147,14 @@ export function SimpleSiteBuilder({
   const [pageDescription, setPageDescription] = useState(
     initialPageDescription ?? ""
   );
-  const [sections, setSections] = useState<LodgeSiteSection[]>(initialSections);
+  const [sections, setSections] = useState<ChurchSiteSection[]>(initialSections);
   const [published, setPublished] = useState(initiallyPublished);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddPanel, setShowAddPanel] = useState(false);
   const [websiteAiMode, setWebsiteAiMode] = useState<WebsiteAiMode>("full");
   const [websiteAiSectionId, setWebsiteAiSectionId] = useState("");
   const [websiteAiSectionType, setWebsiteAiSectionType] =
-    useState<LodgeSiteSection["type"]>("about");
+    useState<ChurchSiteSection["type"]>("about");
   const [websiteAiTone, setWebsiteAiTone] = useState("welcoming");
   const [websiteAiAudience, setWebsiteAiAudience] = useState("prospective members");
   const [websiteAiBrief, setWebsiteAiBrief] = useState("");
@@ -185,10 +185,10 @@ export function SimpleSiteBuilder({
     payload: {
       page_title: string;
       page_description: string | null;
-      sections: LodgeSiteSection[];
-      custom_pages?: LodgeSiteCustomPage[];
-      header_settings?: LodgeSiteHeaderSettings;
-      footer_settings?: LodgeSiteFooterSettings;
+      sections: ChurchSiteSection[];
+      custom_pages?: ChurchSiteCustomPage[];
+      header_settings?: ChurchSiteHeaderSettings;
+      footer_settings?: ChurchSiteFooterSettings;
       published?: boolean;
     },
     message = "Saved."
@@ -198,7 +198,7 @@ export function SimpleSiteBuilder({
       if (onPersist) {
         await onPersist(payload);
       } else {
-        const res = await fetch(`/api/lodges/${lodgeSlug}/site`, {
+        const res = await fetch(`/api/churches/${churchSlug}/site`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -239,7 +239,7 @@ export function SimpleSiteBuilder({
     );
   }
 
-  function updateSection(id: string, patch: Partial<LodgeSiteSection>) {
+  function updateSection(id: string, patch: Partial<ChurchSiteSection>) {
     setSections((prev) =>
       prev.map((s) => (s.id === id ? { ...s, ...patch } : s))
     );
@@ -247,7 +247,7 @@ export function SimpleSiteBuilder({
 
   function updateSectionStyle(
     id: string,
-    patch: NonNullable<LodgeSiteSection["style"]>
+    patch: NonNullable<ChurchSiteSection["style"]>
   ) {
     setSections((prev) =>
       prev.map((s) => {
@@ -365,7 +365,7 @@ export function SimpleSiteBuilder({
           : websiteAiMode === "improve"
             ? selectedSection?.type
             : websiteAiSectionType;
-      const res = await fetch(`/api/lodges/${lodgeSlug}/ai-draft`, {
+      const res = await fetch(`/api/churches/${churchSlug}/ai-draft`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -471,7 +471,7 @@ export function SimpleSiteBuilder({
 
   function updateWebsiteAiDraftSection(
     index: number,
-    patch: Partial<LodgeSiteSection>
+    patch: Partial<ChurchSiteSection>
   ) {
     setWebsiteAiDraft((draft) =>
       draft
@@ -525,7 +525,7 @@ export function SimpleSiteBuilder({
                 Website launch assistant
               </span>
               <h3 className="mt-4 max-w-2xl text-2xl font-semibold tracking-tight md:text-3xl">
-                Build a lodge website in minutes, then only tweak what matters.
+                Build a church website in minutes, then only tweak what matters.
               </h3>
               <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-300">
                 The builder now starts from complete site packs. Non-technical admins can choose a design, replace a few words and images, preview it, and publish with confidence.
@@ -639,7 +639,7 @@ export function SimpleSiteBuilder({
                   value={websiteAiSectionType}
                   onChange={(event) =>
                     setWebsiteAiSectionType(
-                      event.target.value as LodgeSiteSection["type"]
+                      event.target.value as ChurchSiteSection["type"]
                     )
                   }
                   className="h-10 w-full rounded-lg border border-dash-border bg-dash-surface px-3 text-sm text-dash-text"
@@ -697,7 +697,7 @@ export function SimpleSiteBuilder({
                 <Input
                   value={websiteAiFocus}
                   onChange={(event) => setWebsiteAiFocus(event.target.value)}
-                  placeholder="e.g. visiting officers, charity, joining, dining"
+                  placeholder="e.g. newcomer officers, charity, joining, dining"
                 />
               </div>
             </div>
@@ -707,7 +707,7 @@ export function SimpleSiteBuilder({
               <Input
                 value={websiteAiFocus}
                 onChange={(event) => setWebsiteAiFocus(event.target.value)}
-                placeholder="e.g. visiting officers, charity, joining, dining"
+                placeholder="e.g. newcomer officers, charity, joining, dining"
               />
             </div>
           )}
@@ -717,7 +717,7 @@ export function SimpleSiteBuilder({
               rows={3}
               value={websiteAiBrief}
               onChange={(event) => setWebsiteAiBrief(event.target.value)}
-              placeholder="Tell AI what the lodge wants to say publicly."
+              placeholder="Tell AI what the church wants to say publicly."
             />
           </div>
           <div className="flex flex-wrap gap-2">
@@ -970,8 +970,8 @@ export function SimpleSiteBuilder({
                         <div className="grid gap-2 rounded-xl border border-dash-border bg-white/80 p-3 text-xs text-dash-muted sm:grid-cols-2">
                           <span>Includes homepage and 4 pages</span>
                           <span>Pre-built header and footer</span>
-                          <span>Contact form to lodge admins</span>
-                          <span>Join form to lead pipeline</span>
+                          <span>Contact form to church admins</span>
+                          <span>Join form to newcomer pipeline</span>
                         </div>
                       ) : null}
                       <div className="flex flex-wrap gap-1.5">
@@ -1064,7 +1064,7 @@ export function SimpleSiteBuilder({
                 <Input
                   value={pageTitle}
                   onChange={(e) => setPageTitle(e.target.value)}
-                  placeholder="e.g. Covenant Lodge No. 4344"
+                  placeholder="e.g. St Mary's Church"
                 />
               </div>
               <div className="space-y-1.5">
@@ -1091,7 +1091,7 @@ export function SimpleSiteBuilder({
                 </div>
               </div>
               <PuckEditor
-                lodgeSlug={lodgeSlug}
+                churchSlug={churchSlug}
                 initialSections={orderedSections}
                 pageTitle={pageTitle}
                 pageDescription={pageDescription}
@@ -1324,7 +1324,7 @@ export function SimpleSiteBuilder({
                                       onChange={(e) =>
                                         updateSectionStyle(s.id, {
                                           image_position: e.target.value as NonNullable<
-                                            LodgeSiteSection["style"]
+                                            ChurchSiteSection["style"]
                                           >["image_position"],
                                         })
                                       }
@@ -1346,7 +1346,7 @@ export function SimpleSiteBuilder({
                                       onChange={(e) =>
                                         updateSectionStyle(s.id, {
                                           image_shape: e.target.value as NonNullable<
-                                            LodgeSiteSection["style"]
+                                            ChurchSiteSection["style"]
                                           >["image_shape"],
                                         })
                                       }
@@ -1369,7 +1369,7 @@ export function SimpleSiteBuilder({
                                       onChange={(e) =>
                                         updateSectionStyle(s.id, {
                                           background_tone: e.target.value as NonNullable<
-                                            LodgeSiteSection["style"]
+                                            ChurchSiteSection["style"]
                                           >["background_tone"],
                                         })
                                       }
@@ -1390,7 +1390,7 @@ export function SimpleSiteBuilder({
                                       onChange={(e) =>
                                         updateSectionStyle(s.id, {
                                           content_width: e.target.value as NonNullable<
-                                            LodgeSiteSection["style"]
+                                            ChurchSiteSection["style"]
                                           >["content_width"],
                                         })
                                       }
@@ -1411,7 +1411,7 @@ export function SimpleSiteBuilder({
                                       onChange={(e) =>
                                         updateSectionStyle(s.id, {
                                           spacing: e.target.value as NonNullable<
-                                            LodgeSiteSection["style"]
+                                            ChurchSiteSection["style"]
                                           >["spacing"],
                                         })
                                       }
@@ -1431,7 +1431,7 @@ export function SimpleSiteBuilder({
                                       onChange={(e) =>
                                         updateSectionStyle(s.id, {
                                           button_variant: e.target.value as NonNullable<
-                                            LodgeSiteSection["style"]
+                                            ChurchSiteSection["style"]
                                           >["button_variant"],
                                         })
                                       }
@@ -1518,8 +1518,8 @@ export function SimpleSiteBuilder({
                                       <option value="/charity">Charity page</option>
                                       <option value="/contact">Contact page</option>
                                       <option value="/news">News page</option>
-                                      <option value="#lead-intake">
-                                        Lead intake form on this page
+                                      <option value="#newcomer-intake">
+                                        Newcomer intake form on this page
                                       </option>
                                       <option value="#contact-form">
                                         Contact form on this page
@@ -1547,7 +1547,7 @@ export function SimpleSiteBuilder({
                                     onChange={(e) =>
                                       updateSectionStyle(s.id, {
                                         form_mode: e.target.value as NonNullable<
-                                          LodgeSiteSection["style"]
+                                          ChurchSiteSection["style"]
                                         >["form_mode"],
                                       })
                                     }
@@ -1555,14 +1555,14 @@ export function SimpleSiteBuilder({
                                   >
                                     <option value="none">No embedded form</option>
                                     <option value="contact">
-                                      Contact form to lodge secretary
+                                      Contact form to church secretary
                                     </option>
-                                    <option value="lead">
-                                      Lead intake form and CRM lead
+                                    <option value="newcomer">
+                                      Newcomer intake form and CRM newcomer
                                     </option>
                                   </select>
                                   <p className="text-xs text-dash-muted">
-                                    Contact submissions email the lodge secretary. Lead intake also creates a CRM lead.
+                                    Contact submissions email the church secretary. Newcomer intake also creates a CRM newcomer.
                                   </p>
                                 </div>
                                 {s.type === "faq" ? (
@@ -1595,7 +1595,7 @@ export function SimpleSiteBuilder({
                                     </div>
                                     {(s.style?.faq_entries ?? []).length === 0 ? (
                                       <p className="mt-4 rounded-lg border border-dashed border-dash-border bg-dash-surface px-3 py-3 text-xs text-dash-muted">
-                                        No FAQs yet. Add the questions visitors
+                                        No FAQs yet. Add the questions newcomers
                                         ask most: dress code, parking, whether
                                         partners are welcome at the dining
                                         table, and how to enquire about
@@ -1627,7 +1627,7 @@ export function SimpleSiteBuilder({
                                               </div>
                                               <Input
                                                 value={entry.question}
-                                                placeholder="What should visitors wear?"
+                                                placeholder="What should newcomers wear?"
                                                 onChange={(e) =>
                                                   updateFaqEntries(s.id, (entries) =>
                                                     entries.map((item, i) =>
@@ -1764,7 +1764,7 @@ export function SimpleSiteBuilder({
                                               form_thank_you: e.target.value || null,
                                             })
                                           }
-                                          placeholder="Thanks. The lodge secretary will be in touch."
+                                          placeholder="Thanks. The church secretary will be in touch."
                                         />
                                       </div>
                                     </div>

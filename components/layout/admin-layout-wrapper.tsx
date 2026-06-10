@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { AdminSidebar } from "@/components/layout/admin-sidebar";
-import { AdminLodgeSwitcher } from "@/components/layout/admin-lodge-switcher";
+import { AdminChurchSwitcher } from "@/components/layout/admin-church-switcher";
 import { ImpersonationBanner } from "@/components/layout/impersonation-banner";
 import { RoleTour } from "@/components/onboarding/role-tour";
 import { cn } from "@/lib/utils";
@@ -14,22 +14,22 @@ type HeaderParent = { label: string; href: string };
 
 function adminHeaderMeta(pathname: string): { title: string; parent?: HeaderParent } {
   if (pathname === "/admin") return { title: "Dashboard" };
-  if (pathname.startsWith("/admin/leads/kanban"))
-    return { title: "Pipeline Board", parent: { label: "Candidates", href: "/admin/leads" } };
-  if (pathname === "/admin/leads/new")
-    return { title: "New candidate", parent: { label: "Candidates", href: "/admin/leads" } };
-  if (pathname.startsWith("/admin/leads/"))
-    return { title: "Candidate", parent: { label: "Candidates", href: "/admin/leads" } };
-  if (pathname === "/admin/leads") return { title: "Candidate Pipeline" };
+  if (pathname.startsWith("/admin/newcomers/kanban"))
+    return { title: "Pipeline Board", parent: { label: "Newcomers", href: "/admin/newcomers" } };
+  if (pathname === "/admin/newcomers/new")
+    return { title: "New newcomer", parent: { label: "Newcomers", href: "/admin/newcomers" } };
+  if (pathname.startsWith("/admin/newcomers/"))
+    return { title: "Newcomer", parent: { label: "Newcomers", href: "/admin/newcomers" } };
+  if (pathname === "/admin/newcomers") return { title: "Newcomer Pipeline" };
   if (pathname.startsWith("/admin/members/"))
     return { title: "Member", parent: { label: "Members", href: "/admin/members" } };
   if (pathname.startsWith("/admin/members")) return { title: "Members" };
   if (pathname === "/admin/events/new")
-    return { title: "New calendar item", parent: { label: "Meetings", href: "/admin/meetings" } };
+    return { title: "New calendar item", parent: { label: "Services", href: "/admin/services" } };
   if (pathname.startsWith("/admin/events/"))
-    return { title: "Calendar item", parent: { label: "Meetings", href: "/admin/meetings" } };
-  if (pathname.startsWith("/admin/events")) return { title: "Calendar", parent: { label: "Meetings", href: "/admin/meetings" } };
-  if (pathname.startsWith("/admin/meetings")) return { title: "Meetings" };
+    return { title: "Calendar item", parent: { label: "Services", href: "/admin/services" } };
+  if (pathname.startsWith("/admin/events")) return { title: "Calendar", parent: { label: "Services", href: "/admin/services" } };
+  if (pathname.startsWith("/admin/services")) return { title: "Services" };
   if (pathname === "/admin/blog/new")
     return { title: "New post", parent: { label: "Website", href: "/admin/website" } };
   if (pathname.startsWith("/admin/blog/"))
@@ -62,10 +62,10 @@ function adminHeaderMeta(pathname: string): { title: string; parent?: HeaderPare
     return { title: "Gift Aid Declaration", parent: { label: "Gift Aid", href: "/admin/gift-aid" } };
   }
   if (pathname.startsWith("/admin/gift-aid")) return { title: "Gift Aid" };
-  if (pathname.startsWith("/admin/almoner/cases/")) {
-    return { title: "Welfare Case", parent: { label: "Almoner", href: "/admin/almoner" } };
+  if (pathname.startsWith("/admin/pastoral_care/cases/")) {
+    return { title: "PastoralCare Case", parent: { label: "PastoralCare", href: "/admin/pastoral_care" } };
   }
-  if (pathname.startsWith("/admin/almoner")) return { title: "Almoner" };
+  if (pathname.startsWith("/admin/pastoral_care")) return { title: "PastoralCare" };
   if (pathname.startsWith("/admin/communications")) return { title: "Communications" };
   if (pathname.startsWith("/admin/templates"))
     return { title: "Template library", parent: { label: "Communications", href: "/admin/communications" } };
@@ -77,10 +77,10 @@ function adminHeaderMeta(pathname: string): { title: string; parent?: HeaderPare
   if (pathname.startsWith("/admin/compliance"))
     return { title: "Compliance", parent: { label: "Audit & Compliance", href: "/admin/audit-compliance" } };
   if (pathname.startsWith("/admin/platform")) return { title: "Platform overview" };
-  if (pathname.startsWith("/admin/provinces/")) {
-    return { title: "Province", parent: { label: "Provinces", href: "/admin/provinces" } };
+  if (pathname.startsWith("/admin/networks/")) {
+    return { title: "Network", parent: { label: "Networks", href: "/admin/networks" } };
   }
-  if (pathname.startsWith("/admin/provinces")) return { title: "Provinces" };
+  if (pathname.startsWith("/admin/networks")) return { title: "Networks" };
   if (pathname.startsWith("/admin/settings")) return { title: "Settings" };
   return { title: "Admin" };
 }
@@ -203,7 +203,7 @@ export function AdminLayoutWrapper({ children }: { children: React.ReactNode }) 
                   </nav>
                 ) : (
                   <p className="mb-0.5 hidden text-xs font-medium uppercase tracking-[0.14em] text-dash-faint sm:block">
-                    Lodge admin
+                    Church admin
                   </p>
                 )}
                 <h1 className="truncate text-base font-semibold tracking-tight text-dash-text sm:text-lg lg:text-xl">
@@ -212,7 +212,7 @@ export function AdminLayoutWrapper({ children }: { children: React.ReactNode }) 
               </div>
             </div>
             <div className="hidden shrink-0 items-center gap-2 sm:flex">
-              <AdminLodgeSwitcher />
+              <AdminChurchSwitcher />
             </div>
           </div>
         </header>
@@ -225,7 +225,7 @@ export function AdminLayoutWrapper({ children }: { children: React.ReactNode }) 
             "flex-1 overflow-auto bg-dash-surface p-4 outline-none sm:p-6 lg:p-8",
             // On kiosk routes the inner main is the only scrollable region.
             // overscroll-behavior:contain stops iOS rubber-banding past the
-            // edges from dragging the lodge header chrome on or off-screen.
+            // edges from dragging the church header chrome on or off-screen.
             isKioskRoute && "overscroll-contain",
           )}
         >

@@ -1,18 +1,18 @@
 import type {
-  LodgeSiteCustomPage,
-  LodgeSiteFooterLink,
-  LodgeSiteFooterLinkGroup,
-  LodgeSiteFooterSettings,
-  LodgeSiteHeaderNavItem,
-  LodgeSiteHeaderSettings,
-  LodgeSiteSection,
-  LodgeSiteSectionStyle,
+  ChurchSiteCustomPage,
+  ChurchSiteFooterLink,
+  ChurchSiteFooterLinkGroup,
+  ChurchSiteFooterSettings,
+  ChurchSiteHeaderNavItem,
+  ChurchSiteHeaderSettings,
+  ChurchSiteSection,
+  ChurchSiteSectionStyle,
 } from "@/lib/db/types";
 
-const SECTION_TYPES: LodgeSiteSection["type"][] = [
+const SECTION_TYPES: ChurchSiteSection["type"][] = [
   "hero",
   "about",
-  "meeting_details",
+  "service_details",
   "officers",
   "charity",
   "events",
@@ -28,9 +28,9 @@ const HEX_6 = /^#[0-9A-Fa-f]{6}$/;
 const HEX_3 = /^#[0-9A-Fa-f]{3}$/;
 const TEMPLATE_IMAGE_PREFIX = "/site-template-images/";
 const LEGACY_TEMPLATE_IMAGE_REPLACEMENTS: Record<string, string> = {
-  "/site-template-images/website-portal-feature.png": "/site-template-images/visitor-contact.png",
-  "/site-template-images/meetings-summons-feature.png": "/site-template-images/officers-formal.png",
-  "/site-template-images/gift-aid-giving.png": "/site-template-images/charity-welfare.png",
+  "/site-template-images/website-portal-feature.png": "/site-template-images/newcomersor-contact.png",
+  "/site-template-images/services-notice-feature.png": "/site-template-images/officers-formal.png",
+  "/site-template-images/gift-aid-giving.png": "/site-template-images/charity-pastoral.png",
 };
 
 /** Allowed CSS background-position keywords (single or two-token subset). */
@@ -52,7 +52,7 @@ const BG_POS = new Set([
 
 const IMAGE_POS = new Set(["left", "right", "top", "bottom", "full"]);
 const IMAGE_SHAPE = new Set(["rounded", "square", "circle", "arch"]);
-const FORM_MODES = new Set(["none", "contact", "lead"]);
+const FORM_MODES = new Set(["none", "contact", "newcomer"]);
 const BACKGROUND_TONES = new Set(["default", "soft", "brand", "dark"]);
 const CONTENT_WIDTHS = new Set(["narrow", "standard", "wide", "full"]);
 const SPACING_OPTIONS = new Set(["compact", "normal", "spacious"]);
@@ -178,22 +178,22 @@ function sanitizeFieldList(value: unknown): string[] | null {
   return fields.length > 0 ? fields : null;
 }
 
-function sanitizeImagePosition(value: string | null | undefined): LodgeSiteSectionStyle["image_position"] {
+function sanitizeImagePosition(value: string | null | undefined): ChurchSiteSectionStyle["image_position"] {
   if (!value || typeof value !== "string") return null;
   const t = value.trim().toLowerCase();
-  return IMAGE_POS.has(t) ? (t as NonNullable<LodgeSiteSectionStyle["image_position"]>) : null;
+  return IMAGE_POS.has(t) ? (t as NonNullable<ChurchSiteSectionStyle["image_position"]>) : null;
 }
 
-function sanitizeImageShape(value: string | null | undefined): LodgeSiteSectionStyle["image_shape"] {
+function sanitizeImageShape(value: string | null | undefined): ChurchSiteSectionStyle["image_shape"] {
   if (!value || typeof value !== "string") return null;
   const t = value.trim().toLowerCase();
-  return IMAGE_SHAPE.has(t) ? (t as NonNullable<LodgeSiteSectionStyle["image_shape"]>) : null;
+  return IMAGE_SHAPE.has(t) ? (t as NonNullable<ChurchSiteSectionStyle["image_shape"]>) : null;
 }
 
-function sanitizeFormMode(value: string | null | undefined): LodgeSiteSectionStyle["form_mode"] {
+function sanitizeFormMode(value: string | null | undefined): ChurchSiteSectionStyle["form_mode"] {
   if (!value || typeof value !== "string") return null;
   const t = value.trim().toLowerCase();
-  return FORM_MODES.has(t) ? (t as NonNullable<LodgeSiteSectionStyle["form_mode"]>) : null;
+  return FORM_MODES.has(t) ? (t as NonNullable<ChurchSiteSectionStyle["form_mode"]>) : null;
 }
 
 function sanitizeToken<T extends string>(
@@ -208,10 +208,10 @@ function sanitizeToken<T extends string>(
 /** Server-safe normalization for persisted section.style */
 export function sanitizeSectionStyle(
   raw: unknown
-): LodgeSiteSectionStyle | undefined {
+): ChurchSiteSectionStyle | undefined {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
   const o = raw as Record<string, unknown>;
-  const out: LodgeSiteSectionStyle = {};
+  const out: ChurchSiteSectionStyle = {};
 
   const primary = normalizeHex(typeof o.primary_color === "string" ? o.primary_color : null);
   if (primary) out.primary_color = primary;
@@ -246,25 +246,25 @@ export function sanitizeSectionStyle(
   const formMode = sanitizeFormMode(typeof o.form_mode === "string" ? o.form_mode : null);
   if (formMode) out.form_mode = formMode;
 
-  const backgroundTone = sanitizeToken<NonNullable<LodgeSiteSectionStyle["background_tone"]>>(
+  const backgroundTone = sanitizeToken<NonNullable<ChurchSiteSectionStyle["background_tone"]>>(
     typeof o.background_tone === "string" ? o.background_tone : null,
     BACKGROUND_TONES
   );
   if (backgroundTone) out.background_tone = backgroundTone;
 
-  const contentWidth = sanitizeToken<NonNullable<LodgeSiteSectionStyle["content_width"]>>(
+  const contentWidth = sanitizeToken<NonNullable<ChurchSiteSectionStyle["content_width"]>>(
     typeof o.content_width === "string" ? o.content_width : null,
     CONTENT_WIDTHS
   );
   if (contentWidth) out.content_width = contentWidth;
 
-  const spacing = sanitizeToken<NonNullable<LodgeSiteSectionStyle["spacing"]>>(
+  const spacing = sanitizeToken<NonNullable<ChurchSiteSectionStyle["spacing"]>>(
     typeof o.spacing === "string" ? o.spacing : null,
     SPACING_OPTIONS
   );
   if (spacing) out.spacing = spacing;
 
-  const buttonVariant = sanitizeToken<NonNullable<LodgeSiteSectionStyle["button_variant"]>>(
+  const buttonVariant = sanitizeToken<NonNullable<ChurchSiteSectionStyle["button_variant"]>>(
     typeof o.button_variant === "string" ? o.button_variant : null,
     BUTTON_VARIANTS
   );
@@ -336,17 +336,17 @@ export function sanitizeSectionStyle(
 }
 
 export type SiteSectionLike = {
-  style?: LodgeSiteSectionStyle | null;
+  style?: ChurchSiteSectionStyle | null;
 };
 
 export function mergeHeroPrimaryColor(
   section: SiteSectionLike | null | undefined,
-  lodgePrimaryColor: string | null | undefined
+  churchPrimaryColor: string | null | undefined
 ): string {
   const fromSection = normalizeHex(section?.style?.primary_color ?? null);
   if (fromSection) return fromSection;
-  const fromLodge = normalizeHex(lodgePrimaryColor ?? null);
-  if (fromLodge) return fromLodge;
+  const fromChurch = normalizeHex(churchPrimaryColor ?? null);
+  if (fromChurch) return fromChurch;
   return DEFAULT_HERO_PRIMARY;
 }
 
@@ -430,20 +430,20 @@ export function sectionContentWidthStyle(section: SiteSectionLike | null | undef
   return {};
 }
 
-function parseSectionType(v: unknown): LodgeSiteSection["type"] {
+function parseSectionType(v: unknown): ChurchSiteSection["type"] {
   if (typeof v !== "string") return "about";
-  return SECTION_TYPES.includes(v as LodgeSiteSection["type"])
-    ? (v as LodgeSiteSection["type"])
+  return SECTION_TYPES.includes(v as ChurchSiteSection["type"])
+    ? (v as ChurchSiteSection["type"])
     : "about";
 }
 
 /** Normalize and sanitize sections from PATCH body before persistence. */
-export function sanitizeSiteSections(input: unknown): LodgeSiteSection[] | undefined {
+export function sanitizeSiteSections(input: unknown): ChurchSiteSection[] | undefined {
   if (!Array.isArray(input)) return undefined;
   return input.map((item, idx) => {
     const o = item && typeof item === "object" && !Array.isArray(item) ? (item as Record<string, unknown>) : {};
     const style = sanitizeSectionStyle(o.style);
-    const section: LodgeSiteSection = {
+    const section: ChurchSiteSection = {
       id: typeof o.id === "string" && o.id.length > 0 ? o.id : `section-${idx}`,
       type: parseSectionType(o.type),
       heading: typeof o.heading === "string" ? o.heading : "",
@@ -460,9 +460,9 @@ export function sanitizeSiteSections(input: unknown): LodgeSiteSection[] | undef
 
 /** Preserve per-section style for non-hero blocks when the editor payload omits `style`. */
 export function mergeSectionStylesPreserve(
-  incoming: LodgeSiteSection[],
-  previous: LodgeSiteSection[] | undefined | null
-): LodgeSiteSection[] {
+  incoming: ChurchSiteSection[],
+  previous: ChurchSiteSection[] | undefined | null
+): ChurchSiteSection[] {
   if (!previous?.length) return incoming;
   return incoming.map((s) => {
     const prev = previous.find((p) => p.id === s.id);
@@ -475,10 +475,10 @@ export function mergeSectionStylesPreserve(
   });
 }
 
-export function sanitizeCustomPages(input: unknown): LodgeSiteCustomPage[] | undefined {
+export function sanitizeCustomPages(input: unknown): ChurchSiteCustomPage[] | undefined {
   if (!Array.isArray(input)) return undefined;
   const seen = new Set<string>();
-  const pages: LodgeSiteCustomPage[] = [];
+  const pages: ChurchSiteCustomPage[] = [];
 
   input.slice(0, 24).forEach((item, idx) => {
     const o =
@@ -520,7 +520,7 @@ export function sanitizeCustomPages(input: unknown): LodgeSiteCustomPage[] | und
     .map((page, idx) => ({ ...page, order: idx + 1 }));
 }
 
-export function defaultHeaderNavItems(): LodgeSiteHeaderNavItem[] {
+export function defaultHeaderNavItems(): ChurchSiteHeaderNavItem[] {
   return [
     { id: "home", label: "Home", href: "/", visible: true, order: 1 },
     { id: "events", label: "Events", href: "/events", visible: true, order: 2 },
@@ -530,25 +530,25 @@ export function defaultHeaderNavItems(): LodgeSiteHeaderNavItem[] {
   ];
 }
 
-export function defaultHeaderSettings(): LodgeSiteHeaderSettings {
+export function defaultHeaderSettings(): ChurchSiteHeaderSettings {
   return {
     show_logo: true,
-    show_lodge_name: true,
-    show_lodge_number: true,
+    show_church_name: true,
+    show_church_number: true,
     nav_items: defaultHeaderNavItems(),
     cta_label: "Join Us",
     cta_href: "/join",
   };
 }
 
-export function sanitizeHeaderSettings(input: unknown): LodgeSiteHeaderSettings | undefined {
+export function sanitizeHeaderSettings(input: unknown): ChurchSiteHeaderSettings | undefined {
   if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
   const o = input as Record<string, unknown>;
   const defaults = defaultHeaderSettings();
   const rawItems = Array.isArray(o.nav_items) ? o.nav_items : defaults.nav_items;
   const navItems = rawItems
     .slice(0, 12)
-    .map((item, idx): LodgeSiteHeaderNavItem | null => {
+    .map((item, idx): ChurchSiteHeaderNavItem | null => {
       const row =
         item && typeof item === "object" && !Array.isArray(item)
           ? (item as Record<string, unknown>)
@@ -567,14 +567,14 @@ export function sanitizeHeaderSettings(input: unknown): LodgeSiteHeaderSettings 
         order: typeof row.order === "number" && row.order >= 0 ? row.order : idx + 1,
       };
     })
-    .filter((item): item is LodgeSiteHeaderNavItem => Boolean(item))
+    .filter((item): item is ChurchSiteHeaderNavItem => Boolean(item))
     .sort((a, b) => a.order - b.order)
     .map((item, idx) => ({ ...item, order: idx + 1 }));
 
   return {
     show_logo: o.show_logo !== false,
-    show_lodge_name: o.show_lodge_name !== false,
-    show_lodge_number: o.show_lodge_number !== false,
+    show_church_name: o.show_church_name !== false,
+    show_church_number: o.show_church_number !== false,
     nav_items: navItems.length ? navItems : defaults.nav_items,
     cta_label:
       sanitizeShortText(typeof o.cta_label === "string" ? o.cta_label : null) ??
@@ -583,11 +583,11 @@ export function sanitizeHeaderSettings(input: unknown): LodgeSiteHeaderSettings 
   };
 }
 
-function sanitizeFooterLinks(input: unknown): LodgeSiteFooterLink[] {
+function sanitizeFooterLinks(input: unknown): ChurchSiteFooterLink[] {
   const rawLinks = Array.isArray(input) ? input : [];
   return rawLinks
     .slice(0, 12)
-    .map((item, idx): LodgeSiteFooterLink | null => {
+    .map((item, idx): ChurchSiteFooterLink | null => {
       const row =
         item && typeof item === "object" && !Array.isArray(item)
           ? (item as Record<string, unknown>)
@@ -606,16 +606,16 @@ function sanitizeFooterLinks(input: unknown): LodgeSiteFooterLink[] {
         order: typeof row.order === "number" && row.order >= 0 ? row.order : idx + 1,
       };
     })
-    .filter((item): item is LodgeSiteFooterLink => Boolean(item))
+    .filter((item): item is ChurchSiteFooterLink => Boolean(item))
     .sort((a, b) => a.order - b.order)
     .map((item, idx) => ({ ...item, order: idx + 1 }));
 }
 
-export function defaultFooterSettings(): LodgeSiteFooterSettings {
+export function defaultFooterSettings(): ChurchSiteFooterSettings {
   return {
     show_logo: true,
-    show_lodge_name: true,
-    show_lodge_number: true,
+    show_church_name: true,
+    show_church_number: true,
     show_contact_details: true,
     tagline: null,
     badge_text: "Member website",
@@ -647,14 +647,14 @@ export function defaultFooterSettings(): LodgeSiteFooterSettings {
   };
 }
 
-export function sanitizeFooterSettings(input: unknown): LodgeSiteFooterSettings | undefined {
+export function sanitizeFooterSettings(input: unknown): ChurchSiteFooterSettings | undefined {
   if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
   const o = input as Record<string, unknown>;
   const defaults = defaultFooterSettings();
   const rawGroups = Array.isArray(o.link_groups) ? o.link_groups : defaults.link_groups;
   const linkGroups = rawGroups
     .slice(0, 4)
-    .map((item, idx): LodgeSiteFooterLinkGroup | null => {
+    .map((item, idx): ChurchSiteFooterLinkGroup | null => {
       const row =
         item && typeof item === "object" && !Array.isArray(item)
           ? (item as Record<string, unknown>)
@@ -672,14 +672,14 @@ export function sanitizeFooterSettings(input: unknown): LodgeSiteFooterSettings 
         order: typeof row.order === "number" && row.order >= 0 ? row.order : idx + 1,
       };
     })
-    .filter((item): item is LodgeSiteFooterLinkGroup => Boolean(item))
+    .filter((item): item is ChurchSiteFooterLinkGroup => Boolean(item))
     .sort((a, b) => a.order - b.order)
     .map((item, idx) => ({ ...item, order: idx + 1 }));
 
   return {
     show_logo: o.show_logo !== false,
-    show_lodge_name: o.show_lodge_name !== false,
-    show_lodge_number: o.show_lodge_number !== false,
+    show_church_name: o.show_church_name !== false,
+    show_church_number: o.show_church_number !== false,
     show_contact_details: o.show_contact_details !== false,
     tagline:
       sanitizeLongText(typeof o.tagline === "string" ? o.tagline : null, 360) ?? null,

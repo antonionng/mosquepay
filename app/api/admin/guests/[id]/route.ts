@@ -6,7 +6,7 @@ import {
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -18,16 +18,17 @@ const EDITABLE_KEYS = [
   "full_name",
   "email",
   "phone",
-  "mother_lodge_name",
-  "mother_lodge_number",
+  "mother_church_name",
+  "mother_church_number",
   "constitution",
   "rank",
   "dietary_requirements",
-  "is_mason",
+  "is_member",
   "notes",
   "guest_category",
   "guest_dining_amount",
   "dining_waived",
+  "gift_aid_consent_status",
 ] as const;
 
 type EditableKey = (typeof EDITABLE_KEYS)[number];
@@ -42,14 +43,19 @@ function pickPatch(body: Record<string, unknown>) {
   const patch: Record<string, unknown> = {};
   for (const key of EDITABLE_KEYS) {
     if (!(key in body)) continue;
-    if (key === "is_mason") {
-      patch.is_mason = Boolean(body.is_mason);
+    if (key === "is_member") {
+      patch.is_member = Boolean(body.is_member);
     } else if (key === "dining_waived") {
       patch.dining_waived = Boolean(body.dining_waived);
     } else if (key === "guest_category") {
       const cat = body.guest_category;
       if (cat === "guest" || cat === "honorary_guest") {
         patch.guest_category = cat;
+      }
+    } else if (key === "gift_aid_consent_status") {
+      const status = body.gift_aid_consent_status;
+      if (status === "unknown" || status === "declared" || status === "declined") {
+        patch.gift_aid_consent_status = status;
       }
     } else if (key === "guest_dining_amount") {
       if (body.guest_dining_amount === null || body.guest_dining_amount === "") {
@@ -67,11 +73,11 @@ function pickPatch(body: Record<string, unknown>) {
   return patch;
 }
 
-async function ensureFlag(lodgeId: string | null) {
-  const enabled = await isFeatureEnabled(lodgeId, "guest_links");
+async function ensureFlag(churchId: string | null) {
+  const enabled = await isFeatureEnabled(churchId, "guest_links");
   if (enabled) return null;
   return NextResponse.json(
-    { error: "Guest links are disabled for this lodge." },
+    { error: "Guest links are disabled for this church." },
     { status: 403 }
   );
 }
@@ -84,18 +90,18 @@ export async function GET(
   if (unauthorized) return unauthorized;
 
   const { id } = await params;
-  const lodgeSlug = getLodgeSlugFromRequest(request);
+  const churchSlug = getChurchSlugFromRequest(request);
 
   if (isSupabaseConfigured()) {
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    if (!lodgeId) {
-      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    const churchId = await db.resolveChurchId(churchSlug);
+    if (!churchId) {
+      return NextResponse.json({ error: "Church not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("members:read", lodgeId);
+    const forbidden = await requireAdminApiPermission("members:read", churchId);
     if (forbidden) return forbidden;
-    const flagBlocked = await ensureFlag(lodgeId);
+    const flagBlocked = await ensureFlag(churchId);
     if (flagBlocked) return flagBlocked;
-    const guest = await db.getGuestById(id, lodgeId);
+    const guest = await db.getGuestById(id, churchId);
     if (!guest) {
       return NextResponse.json({ error: "Guest not found." }, { status: 404 });
     }
@@ -105,7 +111,7 @@ export async function GET(
   if (!shouldUseInMemoryMock()) {
     return NextResponse.json({ error: "Guest not found." }, { status: 404 });
   }
-  const guest = mockDb.getGuestById(id, { lodge_slug: lodgeSlug });
+  const guest = mockDb.getGuestById(id, { church_slug: churchSlug });
   if (!guest) {
     return NextResponse.json({ error: "Guest not found." }, { status: 404 });
   }
@@ -123,7 +129,7 @@ export async function PATCH(
   if (unauthorized) return unauthorized;
 
   const { id } = await params;
-  const lodgeSlug = getLodgeSlugFromRequest(request);
+  const churchSlug = getChurchSlugFromRequest(request);
   let body: Record<string, unknown> = {};
   try {
     body = await request.json();
@@ -133,22 +139,22 @@ export async function PATCH(
   const patch = pickPatch(body);
 
   if (isSupabaseConfigured()) {
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    if (!lodgeId) {
-      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    const churchId = await db.resolveChurchId(churchSlug);
+    if (!churchId) {
+      return NextResponse.json({ error: "Church not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("members:write", lodgeId);
+    const forbidden = await requireAdminApiPermission("members:write", churchId);
     if (forbidden) return forbidden;
-    const flagBlocked = await ensureFlag(lodgeId);
+    const flagBlocked = await ensureFlag(churchId);
     if (flagBlocked) return flagBlocked;
 
-    const existing = await db.getGuestById(id, lodgeId);
+    const existing = await db.getGuestById(id, churchId);
     if (!existing) {
       return NextResponse.json({ error: "Guest not found." }, { status: 404 });
     }
-    const guest = await db.updateGuest(id, lodgeId, patch);
+    const guest = await db.updateGuest(id, churchId, patch);
     await writeAuditLog({
-      lodgeId,
+      churchId,
       action: "updated",
       entityType: "guest",
       entityId: guest.id,
@@ -158,7 +164,7 @@ export async function PATCH(
     return NextResponse.json({ guest });
   }
 
-  const guest = mockDb.updateGuestRecord(id, patch, { lodge_slug: lodgeSlug });
+  const guest = mockDb.updateGuestRecord(id, patch, { church_slug: churchSlug });
   if (!guest) {
     return NextResponse.json({ error: "Guest not found." }, { status: 404 });
   }
@@ -176,27 +182,27 @@ export async function DELETE(
   if (unauthorized) return unauthorized;
 
   const { id } = await params;
-  const lodgeSlug = getLodgeSlugFromRequest(request);
+  const churchSlug = getChurchSlugFromRequest(request);
   const url = new URL(request.url);
   const action = url.searchParams.get("action") ?? "archive";
 
   if (isSupabaseConfigured()) {
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    if (!lodgeId) {
-      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    const churchId = await db.resolveChurchId(churchSlug);
+    if (!churchId) {
+      return NextResponse.json({ error: "Church not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("members:write", lodgeId);
+    const forbidden = await requireAdminApiPermission("members:write", churchId);
     if (forbidden) return forbidden;
-    const flagBlocked = await ensureFlag(lodgeId);
+    const flagBlocked = await ensureFlag(churchId);
     if (flagBlocked) return flagBlocked;
 
-    const existing = await db.getGuestById(id, lodgeId);
+    const existing = await db.getGuestById(id, churchId);
     if (!existing) {
       return NextResponse.json({ error: "Guest not found." }, { status: 404 });
     }
 
     if (action === "purge") {
-      const result = await db.hardDeleteGuestIfUnused(id, lodgeId);
+      const result = await db.hardDeleteGuestIfUnused(id, churchId);
       if (!result.deleted) {
         return NextResponse.json(
           {
@@ -207,7 +213,7 @@ export async function DELETE(
         );
       }
       await writeAuditLog({
-        lodgeId,
+        churchId,
         action: "deleted",
         entityType: "guest",
         entityId: id,
@@ -217,9 +223,9 @@ export async function DELETE(
     }
 
     if (action === "restore") {
-      const guest = await db.restoreGuest(id, lodgeId);
+      const guest = await db.restoreGuest(id, churchId);
       await writeAuditLog({
-        lodgeId,
+        churchId,
         action: "restored",
         entityType: "guest",
         entityId: id,
@@ -228,9 +234,9 @@ export async function DELETE(
       return NextResponse.json({ guest, mode: "restore" });
     }
 
-    const guest = await db.archiveGuest(id, lodgeId);
+    const guest = await db.archiveGuest(id, churchId);
     await writeAuditLog({
-      lodgeId,
+      churchId,
       action: "archived",
       entityType: "guest",
       entityId: id,
@@ -241,7 +247,7 @@ export async function DELETE(
 
   if (action === "purge") {
     const ok = mockDb.hardDeleteGuestRecordIfUnused(id, {
-      lodge_slug: lodgeSlug,
+      church_slug: churchSlug,
     });
     if (!ok) {
       return NextResponse.json(
@@ -255,9 +261,9 @@ export async function DELETE(
     return NextResponse.json({ success: true, mode: "purge" });
   }
   if (action === "restore") {
-    const guest = mockDb.restoreGuestRecord(id, { lodge_slug: lodgeSlug });
+    const guest = mockDb.restoreGuestRecord(id, { church_slug: churchSlug });
     return NextResponse.json({ guest, mode: "restore" });
   }
-  const guest = mockDb.archiveGuestRecord(id, { lodge_slug: lodgeSlug });
+  const guest = mockDb.archiveGuestRecord(id, { church_slug: churchSlug });
   return NextResponse.json({ guest, mode: "archive" });
 }

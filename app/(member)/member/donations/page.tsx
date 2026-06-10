@@ -36,19 +36,19 @@ interface MemberSummary {
 
 /**
  * Builds a donate-page URL that pre-fills the member's email/name and
- * optionally opens the Gift Aid section. The lodge slug is passed when
+ * optionally opens the Gift Aid section. The church slug is passed when
  * known so cross-tenant resolution works whether the member is on the
- * lodge subdomain or the bare host. When lodge slug isn't known we fall
+ * church subdomain or the bare host. When church slug isn't known we fall
  * back to host/cookie resolution on the donate page itself.
  */
 function buildDonateHref(opts: {
-  lodgeSlug?: string | null;
+  churchSlug?: string | null;
   email?: string;
   name?: string;
   giftAid?: boolean;
 }) {
   const params = new URLSearchParams();
-  if (opts.lodgeSlug) params.set("lodge", opts.lodgeSlug);
+  if (opts.churchSlug) params.set("church", opts.churchSlug);
   if (opts.email) params.set("email", opts.email);
   if (opts.name) params.set("name", opts.name);
   if (opts.giftAid) params.set("gift_aid", "1");
@@ -69,7 +69,7 @@ function SkeletonCard() {
 export default function MemberDonationsPage() {
   const [data, setData] = useState<DonationData | null>(null);
   const [member, setMember] = useState<MemberSummary | null>(null);
-  const [lodgeSlug, setLodgeSlug] = useState<string | null>(null);
+  const [churchSlug, setChurchSlug] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -86,7 +86,7 @@ export default function MemberDonationsPage() {
             }
           );
           setMember(d.user ?? null);
-          setLodgeSlug(d.lodgeSlug ?? null);
+          setChurchSlug(d.churchSlug ?? null);
         }
       } catch {
         setData({ totalThisYear: 0, giftAidDeclared: false, donations: [] });
@@ -100,21 +100,21 @@ export default function MemberDonationsPage() {
   const donateHref = useMemo(
     () =>
       buildDonateHref({
-        lodgeSlug,
+        churchSlug,
         email: member?.email,
         name: member?.full_name,
       }),
-    [lodgeSlug, member?.email, member?.full_name]
+    [churchSlug, member?.email, member?.full_name]
   );
   const giftAidHref = useMemo(
     () =>
       buildDonateHref({
-        lodgeSlug,
+        churchSlug,
         email: member?.email,
         name: member?.full_name,
         giftAid: true,
       }),
-    [lodgeSlug, member?.email, member?.full_name]
+    [churchSlug, member?.email, member?.full_name]
   );
 
   return (
@@ -264,7 +264,7 @@ export default function MemberDonationsPage() {
                   </div>
                   <p className="text-sm font-medium text-slate-500">No donations yet</p>
                   <p className="text-xs text-slate-400 mt-1">
-                    Make your first donation to support the lodge
+                    Make your first donation to support the church
                   </p>
                   <Button variant="primary" size="sm" className="mt-4" asChild>
                     <Link href={donateHref}>

@@ -4,7 +4,7 @@ import type {
   Guest,
   Member,
 } from "@/lib/db/types";
-import type { LodgeFeeDefaults } from "@/lib/fees/resolve";
+import type { ChurchFeeDefaults } from "@/lib/fees/resolve";
 import {
   resolveGuestDining,
   resolveMemberDining,
@@ -48,7 +48,7 @@ export function buildRecipientsPreview(args: {
   members: Member[];
   honoraryGuests: Guest[];
   event: Event;
-  defaults: LodgeFeeDefaults | null;
+  defaults: ChurchFeeDefaults | null;
   includeMembers: boolean;
   includeHonoraryGuests: boolean;
   overrides?: EventFeeOverride[];
@@ -151,13 +151,13 @@ export function buildRecipientsPreview(args: {
   };
 }
 
-export function meetingFormFromLodgeDefaults(fees: {
+export function serviceFormFromChurchDefaults(fees: {
   default_member_levy_amount?: number | null;
   default_member_dining_amount?: number | null;
   default_guest_dining_amount?: number | null;
 }): {
-  enable_meeting_fee: boolean;
-  meeting_fee_amount: string;
+  enable_service_fee: boolean;
+  service_fee_amount: string;
   enable_guest_tickets: boolean;
   guest_ticket_price: string;
   enable_dining_rsvp: boolean;
@@ -172,8 +172,8 @@ export function meetingFormFromLodgeDefaults(fees: {
   const hasDining = fees.default_member_dining_amount != null;
 
   return {
-    enable_meeting_fee: hasLevy,
-    meeting_fee_amount: fmt(fees.default_member_levy_amount),
+    enable_service_fee: hasLevy,
+    service_fee_amount: fmt(fees.default_member_levy_amount),
     enable_guest_tickets: hasGuest,
     guest_ticket_price: fmt(fees.default_guest_dining_amount),
     enable_dining_rsvp: hasDining,

@@ -18,7 +18,7 @@ export const FEATURE_FLAGS: Record<
   ai: {
     key: "ai",
     label: "AI assistant",
-    description: "Summons drafting, post-meeting summaries, members at risk.",
+    description: "Notice drafting, post-service summaries, members at risk.",
     default: true,
   },
   integrations: {
@@ -45,22 +45,22 @@ export const FEATURE_FLAGS: Record<
     description: "Raised totals, consent gaps and Gift Aid reclaimable.",
     default: true,
   },
-  almoner: {
-    key: "almoner",
-    label: "Almoner welfare",
-    description: "Welfare cases, visits log, bereavement register, alerts.",
+  pastoral_care: {
+    key: "pastoral_care",
+    label: "PastoralCare",
+    description: "Pastoral cases, visits log, bereavement register, and care alerts.",
     default: true,
   },
   mentor: {
     key: "mentor",
-    label: "Mentor & progression",
-    description: "Mentor assignments, progression sign-off, officer ladder.",
+    label: "Discipleship mentoring",
+    description: "Mentor assignments, contact logs, and discipleship follow-up.",
     default: true,
   },
   site_builder: {
     key: "site_builder",
     label: "Public site builder",
-    description: "Drag-and-drop public site builder for the lodge.",
+    description: "Drag-and-drop public site builder for the church.",
     default: true,
   },
   member_portal: {
@@ -69,10 +69,10 @@ export const FEATURE_FLAGS: Record<
     description: "Member self-serve portal and installable app.",
     default: true,
   },
-  digital_lodge_card: {
-    key: "digital_lodge_card",
-    label: "Digital lodge card",
-    description: "Member lodge card always to hand.",
+  digital_church_card: {
+    key: "digital_church_card",
+    label: "Digital church card",
+    description: "Member church card always to hand.",
     default: true,
   },
   payments: {
@@ -81,10 +81,10 @@ export const FEATURE_FLAGS: Record<
     description: "Mooov-backed checkout and reconciliation.",
     default: true,
   },
-  dues: {
-    key: "dues",
-    label: "Dues",
-    description: "Dues modelling, runs and reminders.",
+  giving: {
+    key: "giving",
+    label: "Giving",
+    description: "Giving modelling, runs and reminders.",
     default: true,
   },
   gift_aid: {
@@ -99,16 +99,16 @@ export const FEATURE_FLAGS: Record<
     description: "Small cash donation tracking and annual allowance reporting.",
     default: true,
   },
-  meetings: {
-    key: "meetings",
-    label: "Meetings",
-    description: "Meeting records and attendance.",
+  services: {
+    key: "services",
+    label: "Services",
+    description: "Service records and attendance.",
     default: true,
   },
-  summons: {
-    key: "summons",
-    label: "Summons",
-    description: "Summons workflow, links, print, send and history.",
+  notice: {
+    key: "notice",
+    label: "Notice",
+    description: "Notice workflow, links, print, send and history.",
     default: true,
   },
   events: {
@@ -120,19 +120,19 @@ export const FEATURE_FLAGS: Record<
   treasurer_reports: {
     key: "treasurer_reports",
     label: "Treasurer reports",
-    description: "Income breakdowns, dues posture and reclaimable Gift Aid.",
+    description: "Income breakdowns, giving posture and reclaimable Gift Aid.",
     default: true,
   },
   secretary_reports: {
     key: "secretary_reports",
     label: "Secretary reports",
-    description: "Summons coverage, RSVP health and data gaps.",
+    description: "Notice coverage, RSVP health and data gaps.",
     default: true,
   },
-  candidate_crm: {
-    key: "candidate_crm",
-    label: "Candidate CRM",
-    description: "Pipeline, proposer assignment, ballot and initiation stages.",
+  newcomer_crm: {
+    key: "newcomer_crm",
+    label: "Newcomer CRM",
+    description: "Pipeline, visit follow-up, membership class, and welcome stages.",
     default: true,
   },
   recruitment_reports: {
@@ -156,31 +156,31 @@ export const FEATURE_FLAGS: Record<
   advanced_members: {
     key: "advanced_members",
     label: "Advanced member records",
-    description: "Advanced fields, ranks and lifecycle tracking.",
+    description: "Advanced member fields, leadership roles, and lifecycle tracking.",
     default: true,
   },
-  multi_lodge: {
-    key: "multi_lodge",
-    label: "Multiple lodges",
-    description: "Separate records for connected lodges.",
+  multi_church: {
+    key: "multi_church",
+    label: "Multiple churches",
+    description: "Separate records for connected churches.",
     default: true,
   },
-  cross_lodge_reporting: {
-    key: "cross_lodge_reporting",
-    label: "Cross-lodge reporting",
-    description: "Roll-up reporting across lodges.",
+  cross_church_reporting: {
+    key: "cross_church_reporting",
+    label: "Cross-church reporting",
+    description: "Roll-up reporting across churches.",
     default: true,
   },
   central_billing: {
     key: "central_billing",
     label: "Central billing",
-    description: "One invoice for connected lodges.",
+    description: "One invoice for connected churches.",
     default: true,
   },
-  province_dashboards: {
-    key: "province_dashboards",
-    label: "Provincial dashboards",
-    description: "Province-wide rollout and portfolio dashboards.",
+  network_dashboards: {
+    key: "network_dashboards",
+    label: "Network dashboards",
+    description: "Network-wide rollout and portfolio dashboards.",
     default: true,
   },
   migration_planning: {
@@ -192,13 +192,13 @@ export const FEATURE_FLAGS: Record<
   named_support: {
     key: "named_support",
     label: "Named support",
-    description: "Provincial support desk and named contact.",
+    description: "Network support desk and named contact.",
     default: true,
   },
   guest_links: {
     key: "guest_links",
     label: "Guest links",
-    description: "Guest directory, member self-invite links, visitor portal.",
+    description: "Guest directory, member self-invite links, newcomer portal.",
     default: true,
   },
 };
@@ -208,31 +208,31 @@ export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
 const cache = new Map<string, { ts: number; value: Record<string, boolean> }>();
 const TTL_MS = 30_000;
 
-async function loadFlags(lodgeId: string): Promise<Record<string, boolean>> {
+async function loadFlags(churchId: string): Promise<Record<string, boolean>> {
   if (!isSupabaseConfigured()) return {};
   const now = Date.now();
-  const cached = cache.get(lodgeId);
+  const cached = cache.get(churchId);
   if (cached && now - cached.ts < TTL_MS) return cached.value;
-  const rows = await db.listLodgeFeatureFlags(lodgeId);
-  const subscription = await db.getLodgeSubscription(lodgeId).catch(() => null);
+  const rows = await db.listChurchFeatureFlags(churchId);
+  const subscription = await db.getChurchSubscription(churchId).catch(() => null);
   const value: Record<string, boolean> = entitlementsForPlan(
     subscription?.plan_code
   );
   value.charity =
     value.charity_campaigns || value.gift_aid || value.gasds || false;
   for (const row of rows) value[row.flag_key] = row.enabled;
-  cache.set(lodgeId, { ts: now, value });
+  cache.set(churchId, { ts: now, value });
   return value;
 }
 
 export async function isFeatureEnabled(
-  lodgeId: string | null | undefined,
+  churchId: string | null | undefined,
   flagKey: FeatureFlagKey
 ): Promise<boolean> {
   const meta = FEATURE_FLAGS[flagKey];
-  if (!lodgeId) return meta.default;
+  if (!churchId) return meta.default;
   try {
-    const flags = await loadFlags(lodgeId);
+    const flags = await loadFlags(churchId);
     if (flagKey in flags) return flags[flagKey];
     return meta.default;
   } catch {
@@ -240,10 +240,10 @@ export async function isFeatureEnabled(
   }
 }
 
-export async function getAllFlagsForLodge(
-  lodgeId: string
+export async function getAllFlagsForChurch(
+  churchId: string
 ): Promise<Record<FeatureFlagKey, boolean>> {
-  const flags = await loadFlags(lodgeId);
+  const flags = await loadFlags(churchId);
   const out = {} as Record<FeatureFlagKey, boolean>;
   for (const key of ENTITLEMENT_KEYS) {
     out[key] = key in flags ? flags[key] : FEATURE_FLAGS[key].default;
@@ -254,7 +254,7 @@ export async function getAllFlagsForLodge(
   return out;
 }
 
-export function clearFeatureFlagCache(lodgeId?: string) {
-  if (lodgeId) cache.delete(lodgeId);
+export function clearFeatureFlagCache(churchId?: string) {
+  if (churchId) cache.delete(churchId);
   else cache.clear();
 }

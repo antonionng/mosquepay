@@ -12,63 +12,63 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const full_name = body.full_name?.trim();
     const work_email = body.work_email?.trim();
-    const lodge_name = body.lodge_name?.trim();
+    const church_name = body.church_name?.trim();
     const role = body.role?.trim();
-    const lodge_count = Number(body.lodge_count ?? 1);
+    const church_count = Number(body.church_count ?? 1);
     const priorities = body.priorities?.trim();
 
-    if (!full_name || !work_email || !lodge_name || !role) {
+    if (!full_name || !work_email || !church_name || !role) {
       return NextResponse.json(
-        { error: "Name, work email, lodge name, and role are required." },
+        { error: "Name, work email, church name, and role are required." },
         { status: 400 }
       );
     }
 
     if (process.env.RESEND_API_KEY) {
-      const safeLodgeCount = String(Number.isFinite(lodge_count) ? lodge_count : 1);
+      const safeChurchCount = String(Number.isFinite(church_count) ? church_count : 1);
 
       await Promise.all([
         sendWithLog({
-          lodgeId: null,
+          churchId: null,
           toEmail: CONTACT_NOTIFICATION_EMAIL,
           emailType: "demo_request_team",
           entityType: "demo_request",
           entityId: null,
           dedupeKey: null,
           replyTo: work_email,
-          subject: `[LodgePay demo request] ${lodge_name}`,
+          subject: `[ChurchPay demo request] ${church_name}`,
           html: renderNotificationEmail({
             eyebrow: "Demo request",
             title: "New demo request",
             preview: `New demo request from ${full_name}.`,
-            intro: "A new LodgePay demo request has been submitted.",
+            intro: "A new ChurchPay demo request has been submitted.",
             rows: [
               { label: "Name", value: full_name },
               { label: "Email", value: work_email },
-              { label: "Lodge", value: lodge_name },
+              { label: "Church", value: church_name },
               { label: "Role", value: role },
-              { label: "Lodges managed", value: safeLodgeCount },
+              { label: "Churches managed", value: safeChurchCount },
             ],
             message: priorities || "No priorities provided.",
           }),
           text: [
             `Name: ${full_name}`,
             `Email: ${work_email}`,
-            `Lodge: ${lodge_name}`,
+            `Church: ${church_name}`,
             `Role: ${role}`,
-            `Lodges managed: ${safeLodgeCount}`,
+            `Churches managed: ${safeChurchCount}`,
             "",
             "Priorities:",
             priorities || "Not provided",
           ].join("\n"),
           metadata: {
-            lodge_name,
+            church_name,
             role,
-            lodge_count: safeLodgeCount,
+            church_count: safeChurchCount,
           },
         }),
         sendWithLog({
-          lodgeId: null,
+          churchId: null,
           toEmail: work_email,
           toName: full_name,
           emailType: "demo_request_autoresponder",
@@ -76,24 +76,24 @@ export async function POST(request: NextRequest) {
           entityId: null,
           dedupeKey: null,
           replyTo: CONTACT_NOTIFICATION_EMAIL,
-          subject: "We have received your LodgePay demo request",
+          subject: "We have received your ChurchPay demo request",
           html: renderSimpleMessageEmail({
             eyebrow: "Demo request received",
-            title: "Thanks for booking time with LodgePay",
+            title: "Thanks for booking time with ChurchPay",
             preview: "We have received your walkthrough request.",
             greeting: `Hello ${full_name},`,
             paragraphs: [
-              "Thank you for requesting a LodgePay walkthrough. We have your details and will reply with the next step shortly.",
-              "The session will focus on your lodge or group, including the website, meetings, payments, candidates, reporting, and the officer workflows that matter most.",
+              "Thank you for requesting a ChurchPay walkthrough. We have your details and will reply with the next step shortly.",
+              "The session will focus on your church or group, including the website, services, payments, newcomers, reporting, and the officer workflows that matter most.",
             ],
-            note: `Request received for ${lodge_name}. Role: ${role}. Lodges managed: ${safeLodgeCount}.`,
+            note: `Request received for ${church_name}. Role: ${role}. Churches managed: ${safeChurchCount}.`,
           }),
           text: [
             `Hello ${full_name},`,
             "",
-            "Thank you for requesting a LodgePay walkthrough. We have your details and will reply with the next step shortly.",
+            "Thank you for requesting a ChurchPay walkthrough. We have your details and will reply with the next step shortly.",
             "",
-            `Request received for ${lodge_name}.`,
+            `Request received for ${church_name}.`,
           ].join("\n"),
         }),
       ]);

@@ -1,13 +1,13 @@
 // "What declarations should this claim pack include?"
 //
-// Used by both the per-meeting close endpoint and the period-based claims
+// Used by both the per-service close endpoint and the period-based claims
 // endpoint so both surfaces compute the bundle the same way:
 //
-//   1. Anything created since the previous batch for this lodge
+//   1. Anything created since the previous batch for this church
 //      (inclusion_reason='new_in_window').
 //   2. Anything not already covered by (1) that backs a donation in this
 //      batch (inclusion_reason='donor_in_batch') -- belt and braces, in
-//      case a Brother's declaration was filed years ago and his donation
+//      case a Member's declaration was filed years ago and his donation
 //      only got attributed now.
 //
 // We deliberately do NOT filter out revoked declarations here: if a row
@@ -31,7 +31,7 @@ export type NewDeclarationLink = {
  * inclusion reason correctly.
  */
 export async function resolveDeclarationsForBatch(opts: {
-  lodgeId: string;
+  churchId: string;
   newBatch: Pick<GiftAidClaimBatch, "created_at" | "id">;
   /** Declaration ids already linked to donations in this batch. */
   donorDeclarationIds: string[];
@@ -40,17 +40,17 @@ export async function resolveDeclarationsForBatch(opts: {
   declarations: GiftAidDeclaration[];
 }> {
   const previous = await db.getMostRecentClaimBatchBefore(
-    opts.lodgeId,
+    opts.churchId,
     opts.newBatch.created_at,
   );
   // First-ever batch: sweep window starts at the unix epoch so we pick up
-  // every existing declaration on the lodge's books. This matters for a
-  // lodge that has been on LP for months before they hit Close for the
+  // every existing declaration on the church's books. This matters for a
+  // church that has been on LP for months before they hit Close for the
   // first time -- UGLE still needs the back-catalogue.
   const startIso = previous?.created_at ?? "1970-01-01T00:00:00.000Z";
 
   const newInWindow = await db.getDeclarationsCreatedBetween(
-    opts.lodgeId,
+    opts.churchId,
     startIso,
     opts.newBatch.created_at,
   );
@@ -73,7 +73,7 @@ export async function resolveDeclarationsForBatch(opts: {
   );
   if (missingDonorDeclIds.length > 0) {
     const extras = await db.getGiftAidDeclarationsByIds(
-      opts.lodgeId,
+      opts.churchId,
       missingDonorDeclIds,
     );
     for (const d of extras) {

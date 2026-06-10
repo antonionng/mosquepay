@@ -18,20 +18,20 @@ import { ImageUploadField } from "@/components/site-builder/image-upload-field";
 import { HeaderSettingsManager } from "@/components/site-builder/header-settings-manager";
 import { FooterSettingsManager } from "@/components/site-builder/footer-settings-manager";
 import { WebsiteReadinessPanel } from "@/components/site-builder/website-readiness-panel";
-import type { Lodge, LodgeSitePage } from "@/lib/db/types";
+import type { Church, ChurchSitePage } from "@/lib/db/types";
 
 const THEME_PRESETS = [
   {
     id: "classic-blue",
     name: "Classic blue",
-    description: "Crisp, formal, and familiar for most lodge sites.",
+    description: "Crisp, formal, and familiar for most church sites.",
     primary: "#0b43b8",
     secondary: "#082e7d",
   },
   {
     id: "heritage-gold",
     name: "Heritage gold",
-    description: "Warm heritage tone for history-led lodges.",
+    description: "Warm heritage tone for history-led churches.",
     primary: "#92400e",
     secondary: "#111827",
   },
@@ -94,16 +94,16 @@ function ColorInput({
 }
 
 export function AdminWebsiteManager({
-  lodge,
+  church,
   site,
 }: {
-  lodge: Lodge;
-  site: LodgeSitePage | null;
+  church: Church;
+  site: ChurchSitePage | null;
 }) {
   const [brand, setBrand] = useState({
-    primary_color: lodge.primary_color ?? "",
-    secondary_color: lodge.secondary_color ?? "",
-    logo_url: lodge.logo_url ?? "",
+    primary_color: church.primary_color ?? "",
+    secondary_color: church.secondary_color ?? "",
+    logo_url: church.logo_url ?? "",
   });
   const [savingBrand, setSavingBrand] = useState(false);
   const [brandMessage, setBrandMessage] = useState<string | null>(null);
@@ -112,31 +112,31 @@ export function AdminWebsiteManager({
     setSavingBrand(true);
     setBrandMessage(null);
     try {
-      const response = await fetch("/api/lodges", {
+      const response = await fetch("/api/churches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          slug: lodge.slug,
-          name: lodge.name,
-          city: lodge.city,
-          country: lodge.country,
-          tagline: lodge.tagline,
-          support_email: lodge.support_email,
-          support_phone: lodge.support_phone,
+          slug: church.slug,
+          name: church.name,
+          city: church.city,
+          country: church.country,
+          tagline: church.tagline,
+          support_email: church.support_email,
+          support_phone: church.support_phone,
           logo_url: brand.logo_url.trim() || null,
-          lodge_number: lodge.lodge_number,
-          consecrated_at: lodge.consecrated_at,
-          governing_body: lodge.governing_body,
-          meeting_schedule: lodge.meeting_schedule,
-          secretary_name: lodge.secretary_name,
-          secretary_address: lodge.secretary_address,
-          secretary_phone: lodge.secretary_phone,
-          data_protection_notice: lodge.data_protection_notice,
-          visiting_notice: lodge.visiting_notice,
-          loi_contact: lodge.loi_contact,
+          church_number: church.church_number,
+          consecrated_at: church.consecrated_at,
+          governing_body: church.governing_body,
+          service_schedule: church.service_schedule,
+          secretary_name: church.secretary_name,
+          secretary_address: church.secretary_address,
+          secretary_phone: church.secretary_phone,
+          data_protection_notice: church.data_protection_notice,
+          newcomer_notice: church.newcomer_notice,
+          loi_contact: church.loi_contact,
           primary_color: brand.primary_color.trim() || null,
           secondary_color: brand.secondary_color.trim() || null,
-          is_active: lodge.is_active,
+          is_active: church.is_active,
         }),
       });
       if (!response.ok) throw new Error("Could not save brand settings.");
@@ -152,10 +152,10 @@ export function AdminWebsiteManager({
 
   const siteDraft = site ?? {
     id: "draft",
-    lodge_id: lodge.id,
+    church_id: church.id,
     page_key: "home",
-    page_title: lodge.name,
-    page_description: lodge.tagline,
+    page_title: church.name,
+    page_description: church.tagline,
     sections: [],
     custom_pages: [],
     header_settings: null,
@@ -173,7 +173,7 @@ export function AdminWebsiteManager({
               Start here
             </p>
             <h2 className="mt-1 text-xl font-semibold tracking-tight text-dash-text">
-              Launch a beautiful lodge site with the fewest possible decisions.
+              Launch a beautiful church site with the fewest possible decisions.
             </h2>
             <p className="mt-2 max-w-3xl text-sm leading-relaxed text-dash-muted">
               Choose a complete site pack in Builder, add logo and colours in Brand, then use Go live to publish and connect the domain.
@@ -200,7 +200,7 @@ export function AdminWebsiteManager({
             Not sure what changed? Open the site in a new tab before sharing it.
           </p>
           <Button asChild type="button" variant="primary" className="rounded-xl">
-            <a href={`/?lodge=${lodge.slug}`} target="_blank" rel="noreferrer">
+            <a href={`/?church=${church.slug}`} target="_blank" rel="noreferrer">
               <Eye className="mr-2 h-4 w-4" />
               Preview website
             </a>
@@ -222,45 +222,45 @@ export function AdminWebsiteManager({
       <TabsContent value="builder">
         <div className="admin-surface overflow-hidden p-6">
           <SimpleSiteBuilder
-            lodgeSlug={lodge.slug}
+            churchSlug={church.slug}
             initialSections={siteDraft.sections}
             pageTitle={siteDraft.page_title}
             pageDescription={siteDraft.page_description}
             primaryColor={brand.primary_color || "#3b82f6"}
             initiallyPublished={siteDraft.published}
-            publicHref={`/?lodge=${lodge.slug}`}
+            publicHref={`/?church=${church.slug}`}
           />
         </div>
       </TabsContent>
 
       <TabsContent value="header">
         <HeaderSettingsManager
-          lodgeSlug={lodge.slug}
+          churchSlug={church.slug}
           initialSettings={siteDraft.header_settings}
-          lodgeName={lodge.name}
-          lodgeNumber={lodge.lodge_number}
-          logoUrl={brand.logo_url || lodge.logo_url}
+          churchName={church.name}
+          churchNumber={church.church_number}
+          logoUrl={brand.logo_url || church.logo_url}
           primaryColor={brand.primary_color || "#3b82f6"}
         />
       </TabsContent>
 
       <TabsContent value="footer">
         <FooterSettingsManager
-          lodgeSlug={lodge.slug}
+          churchSlug={church.slug}
           initialSettings={siteDraft.footer_settings}
-          lodgeName={lodge.name}
-          lodgeNumber={lodge.lodge_number}
-          city={lodge.city}
-          tagline={lodge.tagline}
-          supportEmail={lodge.support_email}
-          supportPhone={lodge.support_phone}
-          logoUrl={brand.logo_url || lodge.logo_url}
+          churchName={church.name}
+          churchNumber={church.church_number}
+          city={church.city}
+          tagline={church.tagline}
+          supportEmail={church.support_email}
+          supportPhone={church.support_phone}
+          logoUrl={brand.logo_url || church.logo_url}
         />
       </TabsContent>
 
       <TabsContent value="pages">
         <SitePagesManager
-          lodgeSlug={lodge.slug}
+          churchSlug={church.slug}
           site={siteDraft}
           primaryColor={brand.primary_color || "#3b82f6"}
         />
@@ -274,7 +274,7 @@ export function AdminWebsiteManager({
         <div className="admin-surface p-6">
           <h2 className="text-lg font-semibold text-dash-text">Website brand</h2>
           <p className="mt-1 text-sm text-dash-muted">
-            Set the colours and logo used by the public lodge website.
+            Set the colours and logo used by the public church website.
           </p>
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
@@ -327,7 +327,7 @@ export function AdminWebsiteManager({
             />
             <div className="md:col-span-2">
               <ImageUploadField
-                label="Lodge logo"
+                label="Church logo"
                 value={brand.logo_url}
                 onChange={(value) =>
                   setBrand((current) => ({ ...current, logo_url: value }))
@@ -335,7 +335,7 @@ export function AdminWebsiteManager({
                 onClear={() =>
                   setBrand((current) => ({ ...current, logo_url: "" }))
                 }
-                help="This logo is used on the public lodge website header, digital member card, and formal summons."
+                help="This logo is used on the public church website header, digital member card, and formal notice."
               />
             </div>
           </div>
@@ -369,12 +369,12 @@ export function AdminWebsiteManager({
           </p>
           <div className="mt-5 grid gap-3 md:grid-cols-2">
             {[
-              "Confirm lodge name, city, email, phone, and logo.",
-              "Set brand colours that match lodge or province guidance.",
-              "Review hero, meeting details, charity, join, and contact sections.",
+              "Confirm church name, city, email, phone, and logo.",
+              "Set brand colours that match church or network guidance.",
+              "Review hero, service details, charity, join, and contact sections.",
               "Use the AI draft panel for a first pass, then edit wording manually.",
-              "Preview the public lodge site before sharing links.",
-              "Keep member-only details inside the member portal and summons.",
+              "Preview the public church site before sharing links.",
+              "Keep member-only details inside the member portal and notice.",
             ].map((item) => (
               <div
                 key={item}

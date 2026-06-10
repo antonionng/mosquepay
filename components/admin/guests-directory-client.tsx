@@ -12,9 +12,9 @@ export type GuestRow = {
   id: string;
   full_name: string;
   email: string | null;
-  mother_lodge_name: string | null;
-  mother_lodge_number: string | null;
-  is_mason: boolean;
+  mother_church_name: string | null;
+  mother_church_number: string | null;
+  is_member: boolean;
   guest_category?: "guest" | "honorary_guest";
   dining_waived?: boolean;
   guest_dining_amount?: number | null;
@@ -82,7 +82,7 @@ export function GuestsDirectoryClient({
               <input
                 value={searchValue}
                 onChange={(event) => setSearchValue(event.target.value)}
-                placeholder="Search by name, email, or mother lodge..."
+                placeholder="Search by name, email, or mother church..."
                 className="w-full rounded-md border border-dash-border bg-white py-1.5 pl-8 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-dash-ring/30"
               />
             </div>
@@ -131,7 +131,7 @@ export function GuestsDirectoryClient({
                 <th className="px-5 py-3 text-left font-medium">Name</th>
                 <th className="px-5 py-3 text-left font-medium">Email</th>
                 <th className="px-5 py-3 text-left font-medium">
-                  Mother lodge
+                  Mother church
                 </th>
                 <th className="px-5 py-3 text-left font-medium">Visits</th>
                 <th className="px-5 py-3 text-left font-medium">Added</th>
@@ -164,9 +164,9 @@ export function GuestsDirectoryClient({
                         Comp dining
                       </span>
                     ) : null}
-                    {guest.is_mason ? (
+                    {guest.is_member ? (
                       <span className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-700">
-                        Mason
+                        member
                       </span>
                     ) : null}
                     {guest.source === "self_register" ? (
@@ -191,11 +191,11 @@ export function GuestsDirectoryClient({
                     )}
                   </td>
                   <td className="px-5 py-3">
-                    {guest.mother_lodge_name ? (
+                    {guest.mother_church_name ? (
                       <>
-                        {guest.mother_lodge_name}
-                        {guest.mother_lodge_number
-                          ? ` No. ${guest.mother_lodge_number}`
+                        {guest.mother_church_name}
+                        {guest.mother_church_number
+                          ? ` No. ${guest.mother_church_number}`
                           : ""}
                       </>
                     ) : (

@@ -1,29 +1,29 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import type {
-  Lodge,
-  LodgeSitePage,
+  Church,
+  ChurchSitePage,
   AdminUser,
   AuditLog,
-  Lead,
-  LeadActivity,
+  Newcomer,
+  NewcomerActivity,
   Event,
   Rsvp,
   Payment,
   Donation,
   GiftAidDeclaration,
   GiftAidDeclarationEvent,
-  LodgeSubscription,
+  ChurchSubscription,
   BlogPost,
   CharityCampaign,
-  LodgeDues,
-  LodgeFeeDefaults,
-  LodgeMasonicYear,
-  MemberDues,
-  MemberDuesInstalment,
-  DuesSchedule,
-  DuesScheduleStatus,
-  DuesSplitStrategy,
-  MeetingCollection,
+  ChurchGiving,
+  ChurchFeeDefaults,
+  ChurchGivingYear,
+  MemberGiving,
+  MemberGivingInstalment,
+  GivingSchedule,
+  GivingScheduleStatus,
+  GivingSplitStrategy,
+  ServiceCollection,
   GasdsClaim,
   GiftAidClaimBatch,
   GiftAidClaimDeclaration,
@@ -31,10 +31,10 @@ import type {
   LedgerEntry,
   BankStatementImport,
   BankTransaction,
-  WelfareCase,
-  WelfareVisit,
-  WelfareRegisterEntry,
-  WelfareAlert,
+  PastoralCareCase,
+  PastoralCareVisit,
+  PastoralCareRegisterEntry,
+  PastoralCareAlert,
   MessageTemplate,
   Message,
   AutomationSetting,
@@ -47,17 +47,17 @@ import type {
   Guest,
   GuestInvitation,
   Member,
-  EventSummons,
-  EventSummonsSend,
-  EventSummonsAccessLink,
+  ServiceNotice,
+  ServiceNoticeSend,
+  ServiceNoticeAccessLink,
   EventFeeOverride,
-  MeetingSequence,
-  SummonsStatus,
-  Province,
+  ServiceSequence,
+  NoticeStatus,
+  Network,
   MemberRank,
-  LodgeVisit,
-  ProvinceOfficerDirectoryEntry,
-  LodgeAnnualReturn,
+  ChurchVisit,
+  NetworkOfficerDirectoryEntry,
+  ChurchAnnualReturn,
   MemberConsent,
   DataRetentionSettings,
   SubjectAccessRequest,
@@ -65,114 +65,114 @@ import type {
   JobStatus,
   IntegrationCredentials,
   IntegrationProvider,
-  LodgeFeatureFlag,
+  ChurchFeatureFlag,
   EmailLog,
-  LodgeNotificationSetting,
+  ChurchNotificationSetting,
 } from "./types";
 
 export * from "./types";
-export { resolveLodgeId, getDefaultLodgeId } from "./helpers";
+export { resolveChurchId, getDefaultChurchId } from "./helpers";
 
 function db() {
   return createServiceClient();
 }
 
 // ---------------------------------------------------------------------------
-// Lodges
+// Churches
 // ---------------------------------------------------------------------------
 
-export async function listLodges(): Promise<Lodge[]> {
+export async function listChurches(): Promise<Church[]> {
   const { data, error } = await db()
-    .from("lodges")
+    .from("churches")
     .select("*")
     .order("name");
   if (error) throw error;
-  return data as Lodge[];
+  return data as Church[];
 }
 
-export async function getLodgeBySlug(slug: string): Promise<Lodge | null> {
+export async function getChurchBySlug(slug: string): Promise<Church | null> {
   const { data, error } = await db()
-    .from("lodges")
+    .from("churches")
     .select("*")
     .eq("slug", slug.trim().toLowerCase())
     .eq("is_active", true)
     .maybeSingle();
   if (error) throw error;
-  return data as Lodge | null;
+  return data as Church | null;
 }
 
-export async function getLodgeByCustomDomain(
+export async function getChurchByCustomDomain(
   domain: string
-): Promise<Lodge | null> {
+): Promise<Church | null> {
   const { data, error } = await db()
-    .from("lodges")
+    .from("churches")
     .select("*")
     .eq("custom_domain", domain.trim().toLowerCase())
     .eq("is_active", true)
     .maybeSingle();
   if (error) throw error;
-  return data as Lodge | null;
+  return data as Church | null;
 }
 
-export async function updateLodge(
+export async function updateChurch(
   id: string,
-  updates: Partial<Omit<Lodge, "id" | "created_at" | "updated_at">>
-): Promise<Lodge | null> {
+  updates: Partial<Omit<Church, "id" | "created_at" | "updated_at">>
+): Promise<Church | null> {
   const { data, error } = await db()
-    .from("lodges")
+    .from("churches")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
     .select("*")
     .maybeSingle();
   if (error) throw error;
-  return data as Lodge | null;
+  return data as Church | null;
 }
 
-export async function createLodge(
+export async function createChurch(
   data: {
     slug: string;
     name: string;
-    province_id?: string | null;
-  } & Partial<Omit<Lodge, "id" | "created_at" | "updated_at" | "slug" | "name">>
-): Promise<Lodge> {
+    network_id?: string | null;
+  } & Partial<Omit<Church, "id" | "created_at" | "updated_at" | "slug" | "name">>
+): Promise<Church> {
   const insert = {
     is_active: true,
     ...data,
     slug: data.slug.trim().toLowerCase(),
   };
   const { data: row, error } = await db()
-    .from("lodges")
+    .from("churches")
     .insert(insert)
     .select("*")
     .single();
   if (error) throw error;
-  return row as Lodge;
+  return row as Church;
 }
 
-export async function getLodgeById(id: string): Promise<Lodge | null> {
+export async function getChurchById(id: string): Promise<Church | null> {
   const { data, error } = await db()
-    .from("lodges")
+    .from("churches")
     .select("*")
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
-  return data as Lodge | null;
+  return data as Church | null;
 }
 
 export async function getAdminUserByEmail(
   email: string,
-  lodgeId?: string | null
+  churchId?: string | null
 ): Promise<AdminUser | null> {
   let query = db()
     .from("admin_users")
     .select("*")
     .eq("email", email.trim().toLowerCase())
     .eq("active", true);
-  if (lodgeId) {
-    query = query.or(`lodge_id.eq.${lodgeId},lodge_id.is.null`);
+  if (churchId) {
+    query = query.or(`church_id.eq.${churchId},church_id.is.null`);
   }
   const { data, error } = await query
-    .order("lodge_id", { ascending: false })
+    .order("church_id", { ascending: false })
     .limit(1);
   if (error) throw error;
   return (data?.[0] as AdminUser | undefined) ?? null;
@@ -184,7 +184,7 @@ export async function listAdminUsersByEmail(email: string): Promise<AdminUser[]>
     .select("*")
     .eq("email", email.trim().toLowerCase())
     .eq("active", true)
-    .order("lodge_id", { ascending: true })
+    .order("church_id", { ascending: true })
     .order("role");
   if (error) throw error;
   return data as AdminUser[];
@@ -192,16 +192,16 @@ export async function listAdminUsersByEmail(email: string): Promise<AdminUser[]>
 
 export async function getAdminUserForScope(
   email: string,
-  lodgeId: string | null
+  churchId: string | null
 ): Promise<AdminUser | null> {
   let query = db()
     .from("admin_users")
     .select("*")
     .eq("email", email.trim().toLowerCase());
   query =
-    lodgeId === null
-      ? query.is("lodge_id", null)
-      : query.eq("lodge_id", lodgeId);
+    churchId === null
+      ? query.is("church_id", null)
+      : query.eq("church_id", churchId);
   const { data, error } = await query.maybeSingle();
   if (error) throw error;
   return data as AdminUser | null;
@@ -211,7 +211,7 @@ export async function listPlatformAdminUsers(): Promise<AdminUser[]> {
   const { data, error } = await db()
     .from("admin_users")
     .select("*")
-    .is("lodge_id", null)
+    .is("church_id", null)
     .order("role")
     .order("full_name");
   if (error) throw error;
@@ -222,21 +222,21 @@ export async function listTenantAdminUsers(): Promise<AdminUser[]> {
   const { data, error } = await db()
     .from("admin_users")
     .select("*")
-    .not("lodge_id", "is", null)
-    .order("lodge_id")
+    .not("church_id", "is", null)
+    .order("church_id")
     .order("role")
     .order("full_name");
   if (error) throw error;
   return data as AdminUser[];
 }
 
-export async function listAdminUsersForLodge(
-  lodgeId: string
+export async function listAdminUsersForChurch(
+  churchId: string
 ): Promise<AdminUser[]> {
   const { data, error } = await db()
     .from("admin_users")
     .select("*")
-    .or(`lodge_id.eq.${lodgeId},lodge_id.is.null`)
+    .or(`church_id.eq.${churchId},church_id.is.null`)
     .order("role")
     .order("full_name");
   if (error) throw error;
@@ -245,7 +245,7 @@ export async function listAdminUsersForLodge(
 
 export async function createAdminUser(
   data: Pick<AdminUser, "email" | "full_name" | "role" | "active"> & {
-    lodge_id: string | null;
+    church_id: string | null;
     permissions?: string[];
   }
 ): Promise<AdminUser> {
@@ -266,7 +266,7 @@ export async function updateAdminUser(
   id: string,
   data: Partial<
     Pick<AdminUser, "auth_user_id" | "full_name" | "role" | "active" | "permissions"> & {
-      lodge_id: string | null;
+      church_id: string | null;
     }
   >
 ): Promise<AdminUser | null> {
@@ -281,13 +281,13 @@ export async function updateAdminUser(
 }
 
 export async function listAuditLogs(
-  lodgeId: string,
+  churchId: string,
   limit = 100
 ): Promise<AuditLog[]> {
   const { data, error } = await db()
     .from("audit_logs")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
@@ -340,12 +340,12 @@ export async function recordEmailLog(
 }
 
 /**
- * Returns true when a row already exists for (lodge_id, email_type,
+ * Returns true when a row already exists for (church_id, email_type,
  * dedupe_key). Used by webhook senders as a pre-check so we don't
  * even render the email when Mooov redelivers an event.
  */
 export async function emailAlreadySent(
-  lodgeId: string | null,
+  churchId: string | null,
   emailType: string,
   dedupeKey: string,
 ): Promise<boolean> {
@@ -354,7 +354,7 @@ export async function emailAlreadySent(
     .select("id", { count: "exact", head: true })
     .eq("email_type", emailType)
     .eq("dedupe_key", dedupeKey);
-  query = lodgeId ? query.eq("lodge_id", lodgeId) : query.is("lodge_id", null);
+  query = churchId ? query.eq("church_id", churchId) : query.is("church_id", null);
   const { count, error } = await query;
   if (error) {
     // Conservative: failing open lets the email try; the unique index
@@ -370,14 +370,14 @@ export async function emailAlreadySent(
  * panel on /admin/members/[id].
  */
 export async function listEmailLogForMember(
-  lodgeId: string,
+  churchId: string,
   memberEmail: string,
   limit = 10,
 ): Promise<EmailLog[]> {
   const { data, error } = await db()
     .from("email_log")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("to_email", memberEmail.trim().toLowerCase())
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -386,42 +386,42 @@ export async function listEmailLogForMember(
 }
 
 // ---------------------------------------------------------------------------
-// lodge_notification_settings
+// church_notification_settings
 // ---------------------------------------------------------------------------
 
 /**
- * Returns true when this (lodge, role, event_type) is allowed to
+ * Returns true when this (church, role, event_type) is allowed to
  * send. Default is "send" — only an explicit row with enabled=false
- * suppresses. Also honours the lodge-wide kill-switch row stored
+ * suppresses. Also honours the church-wide kill-switch row stored
  * with role='__all__'.
  */
 export async function notificationEnabled(
-  lodgeId: string,
+  churchId: string,
   role: string,
   eventType: string,
 ): Promise<boolean> {
   const { data, error } = await db()
-    .from("lodge_notification_settings")
+    .from("church_notification_settings")
     .select("role, enabled")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .in("role", [role, "__all__"])
     .eq("event_type", eventType);
   if (error) {
     console.error("notificationEnabled: query failed", error);
     return true;
   }
-  for (const row of (data ?? []) as Array<Pick<LodgeNotificationSetting, "role" | "enabled">>) {
+  for (const row of (data ?? []) as Array<Pick<ChurchNotificationSetting, "role" | "enabled">>) {
     if (row.enabled === false) return false;
   }
   return true;
 }
 
-export async function upsertLodge(
-  input: Partial<Omit<Lodge, "id" | "created_at" | "updated_at">> &
-    Pick<Lodge, "slug" | "name">
-): Promise<Lodge> {
+export async function upsertChurch(
+  input: Partial<Omit<Church, "id" | "created_at" | "updated_at">> &
+    Pick<Church, "slug" | "name">
+): Promise<Church> {
   const { data, error } = await db()
-    .from("lodges")
+    .from("churches")
     .upsert(
       { ...input, slug: input.slug.trim().toLowerCase() },
       { onConflict: "slug" }
@@ -429,31 +429,31 @@ export async function upsertLodge(
     .select("*")
     .single();
   if (error) throw error;
-  return data as Lodge;
+  return data as Church;
 }
 
 // ---------------------------------------------------------------------------
-// Lodge Sites
+// Church Sites
 // ---------------------------------------------------------------------------
 
-export async function getLodgeSite(
-  lodgeId: string
-): Promise<LodgeSitePage | null> {
+export async function getChurchSite(
+  churchId: string
+): Promise<ChurchSitePage | null> {
   const { data, error } = await db()
-    .from("lodge_site_pages")
+    .from("church_site_pages")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("page_key", "home")
     .maybeSingle();
   if (error) throw error;
-  return data as LodgeSitePage | null;
+  return data as ChurchSitePage | null;
 }
 
-export async function updateLodgeSite(
-  lodgeId: string,
+export async function updateChurchSite(
+  churchId: string,
   updates: Partial<
     Pick<
-      LodgeSitePage,
+      ChurchSitePage,
       | "page_title"
       | "page_description"
       | "sections"
@@ -463,31 +463,31 @@ export async function updateLodgeSite(
       | "published"
     >
   >
-): Promise<LodgeSitePage> {
+): Promise<ChurchSitePage> {
   const { data, error } = await db()
-    .from("lodge_site_pages")
+    .from("church_site_pages")
     .upsert(
-      { lodge_id: lodgeId, page_key: "home", ...updates },
-      { onConflict: "lodge_id,page_key" }
+      { church_id: churchId, page_key: "home", ...updates },
+      { onConflict: "church_id,page_key" }
     )
     .select("*")
     .single();
   if (error) throw error;
-  return data as LodgeSitePage;
+  return data as ChurchSitePage;
 }
 
 // ---------------------------------------------------------------------------
-// Leads
+// Newcomers
 // ---------------------------------------------------------------------------
 
-export async function getLeads(
-  lodgeId: string,
+export async function getNewcomers(
+  churchId: string,
   opts?: { stage?: string }
-): Promise<Lead[]> {
+): Promise<Newcomer[]> {
   let query = db()
-    .from("leads")
+    .from("newcomers")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false });
 
   if (opts?.stage) {
@@ -496,42 +496,42 @@ export async function getLeads(
 
   const { data, error } = await query;
   if (error) throw error;
-  return data as Lead[];
+  return data as Newcomer[];
 }
 
-export async function getLeadById(
+export async function getNewcomerById(
   id: string,
-  lodgeId: string
-): Promise<Lead | null> {
+  churchId: string
+): Promise<Newcomer | null> {
   const { data, error } = await db()
-    .from("leads")
+    .from("newcomers")
     .select("*")
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .maybeSingle();
   if (error) throw error;
-  return data as Lead | null;
+  return data as Newcomer | null;
 }
 
-export async function addLead(
-  lodgeId: string,
-  data: Omit<Lead, "id" | "lodge_id" | "created_at" | "updated_at" | "stage_changed_at">
-): Promise<Lead> {
+export async function addNewcomer(
+  churchId: string,
+  data: Omit<Newcomer, "id" | "church_id" | "created_at" | "updated_at" | "stage_changed_at">
+): Promise<Newcomer> {
   const { data: row, error } = await db()
-    .from("leads")
-    .insert({ ...data, lodge_id: lodgeId })
+    .from("newcomers")
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
-  return row as Lead;
+  return row as Newcomer;
 }
 
-export async function updateLead(
+export async function updateNewcomer(
   id: string,
-  lodgeId: string,
+  churchId: string,
   updates: Partial<
     Pick<
-      Lead,
+      Newcomer,
       | "stage"
       | "assigned_to"
       | "proposer_member_id"
@@ -541,7 +541,7 @@ export async function updateLead(
       | "next_step"
       | "next_step_due_date"
       | "proposal_date"
-      | "ballot_date"
+      | "membership_decision_date"
       | "interview_completed_at"
       | "consent_given_at"
       | "notes"
@@ -553,7 +553,7 @@ export async function updateLead(
       | "location"
     >
   >
-): Promise<Lead | null> {
+): Promise<Newcomer | null> {
   const patch: Record<string, unknown> = {
     ...updates,
     updated_at: new Date().toISOString(),
@@ -563,99 +563,99 @@ export async function updateLead(
   }
 
   const { data, error } = await db()
-    .from("leads")
+    .from("newcomers")
     .update(patch)
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
-  return data as Lead | null;
+  return data as Newcomer | null;
 }
 
-export async function deleteLead(
+export async function deleteNewcomer(
   id: string,
-  lodgeId: string
+  churchId: string
 ): Promise<{ deleted: boolean }> {
   const { error, count } = await db()
-    .from("leads")
+    .from("newcomers")
     .delete({ count: "exact" })
     .eq("id", id)
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
   return { deleted: (count ?? 0) > 0 };
 }
 
 // ---------------------------------------------------------------------------
-// Lead Activities
+// Newcomer Activities
 // ---------------------------------------------------------------------------
 
-export async function getLeadActivities(
-  leadId: string,
-  lodgeId: string
-): Promise<LeadActivity[]> {
+export async function getNewcomerActivities(
+  newcomerId: string,
+  churchId: string
+): Promise<NewcomerActivity[]> {
   const { data, error } = await db()
-    .from("lead_activities")
+    .from("newcomer_activities")
     .select("*")
-    .eq("lead_id", leadId)
-    .eq("lodge_id", lodgeId)
+    .eq("newcomer_id", newcomerId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return data as LeadActivity[];
+  return data as NewcomerActivity[];
 }
 
-export async function addLeadActivity(
-  lodgeId: string,
-  data: Omit<LeadActivity, "id" | "lodge_id" | "created_at">
-): Promise<LeadActivity> {
+export async function addNewcomerActivity(
+  churchId: string,
+  data: Omit<NewcomerActivity, "id" | "church_id" | "created_at">
+): Promise<NewcomerActivity> {
   const { data: row, error } = await db()
-    .from("lead_activities")
-    .insert({ ...data, lodge_id: lodgeId })
+    .from("newcomer_activities")
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
-  return row as LeadActivity;
+  return row as NewcomerActivity;
 }
 
-export async function updateLeadActivity(
+export async function updateNewcomerActivity(
   id: string,
-  lodgeId: string,
+  churchId: string,
   updates: Partial<
     Pick<
-      LeadActivity,
+      NewcomerActivity,
       | "title"
       | "description"
-      | "meeting_date"
+      | "service_date"
       | "attendees"
       | "due_date"
       | "completed"
     >
   >
-): Promise<LeadActivity | null> {
+): Promise<NewcomerActivity | null> {
   const { data, error } = await db()
-    .from("lead_activities")
+    .from("newcomer_activities")
     .update(updates)
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
-  return data as LeadActivity | null;
+  return data as NewcomerActivity | null;
 }
 
-export async function getLatestLeadActivity(
-  leadId: string,
-  lodgeId: string
-): Promise<LeadActivity | null> {
+export async function getLatestNewcomerActivity(
+  newcomerId: string,
+  churchId: string
+): Promise<NewcomerActivity | null> {
   const { data, error } = await db()
-    .from("lead_activities")
+    .from("newcomer_activities")
     .select("*")
-    .eq("lead_id", leadId)
-    .eq("lodge_id", lodgeId)
+    .eq("newcomer_id", newcomerId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false })
     .limit(1);
   if (error) throw error;
-  return (data?.[0] as LeadActivity | undefined) ?? null;
+  return (data?.[0] as NewcomerActivity | undefined) ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -663,13 +663,13 @@ export async function getLatestLeadActivity(
 // ---------------------------------------------------------------------------
 
 export async function getEvents(
-  lodgeId: string,
+  churchId: string,
   opts?: { published?: boolean; upcoming?: boolean }
 ): Promise<Event[]> {
   let query = db()
     .from("events")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("event_date", { ascending: true });
 
   if (opts?.published !== undefined) {
@@ -686,13 +686,13 @@ export async function getEvents(
 
 export async function getEventById(
   id: string,
-  lodgeId: string
+  churchId: string
 ): Promise<Event | null> {
   const { data, error } = await db()
     .from("events")
     .select("*")
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .maybeSingle();
   if (error) throw error;
   return data as Event | null;
@@ -700,13 +700,13 @@ export async function getEventById(
 
 export async function getEventBySlug(
   slug: string,
-  lodgeId: string
+  churchId: string
 ): Promise<Event | null> {
   const { data, error } = await db()
     .from("events")
     .select("*")
     .eq("slug", slug)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("published", true)
     .maybeSingle();
   if (error) throw error;
@@ -718,25 +718,25 @@ type AddEventOptional =
   | "sequence_position"
   | "enable_raffle_wine_pledge"
   | "raffle_wine_description"
-  | "summons_status"
-  | "summons_auto_drafted_at"
-  | "summons_approved_at"
-  | "summons_approved_by_email"
-  | "summons_last_sent_at"
+  | "notice_status"
+  | "notice_auto_drafted_at"
+  | "notice_approved_at"
+  | "notice_approved_by_email"
+  | "notice_last_sent_at"
   | "dining_waived_for_all"
-  // Per-meeting close (migration 059). Defaulted in DB; callers don't set.
-  | "meeting_closed_at"
-  | "meeting_closed_by_email"
-  | "meeting_close_notes";
+  // Per-service close (migration 059). Defaulted in DB; callers don't set.
+  | "service_closed_at"
+  | "service_closed_by_email"
+  | "service_close_notes";
 
 export async function addEvent(
-  lodgeId: string,
-  data: Omit<Event, "id" | "lodge_id" | "created_at" | "updated_at" | AddEventOptional> &
+  churchId: string,
+  data: Omit<Event, "id" | "church_id" | "created_at" | "updated_at" | AddEventOptional> &
     Partial<Pick<Event, AddEventOptional>>
 ): Promise<Event> {
   const { data: row, error } = await db()
     .from("events")
-    .insert({ ...data, lodge_id: lodgeId })
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
@@ -745,14 +745,14 @@ export async function addEvent(
 
 export async function updateEvent(
   id: string,
-  lodgeId: string,
-  updates: Partial<Omit<Event, "id" | "lodge_id" | "created_at">>
+  churchId: string,
+  updates: Partial<Omit<Event, "id" | "church_id" | "created_at">>
 ): Promise<Event | null> {
   const { data, error } = await db()
     .from("events")
     .update(updates)
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -760,30 +760,30 @@ export async function updateEvent(
 }
 
 /**
- * Permanently remove a meeting. RSVPs, summons, guests, and other
+ * Permanently remove a service. RSVPs, notice, guests, and other
  * event-scoped rows cascade away. Payments and donations stay in the ledger
- * but are detached from the meeting first so the FK on payments does not
+ * but are detached from the service first so the FK on payments does not
  * block the delete.
  */
 export async function deleteEvent(
   id: string,
-  lodgeId: string,
+  churchId: string,
 ): Promise<{ title: string } | null> {
-  const event = await getEventById(id, lodgeId);
+  const event = await getEventById(id, churchId);
   if (!event) return null;
 
   const { error: detachError } = await db()
     .from("payments")
     .update({ event_id: null })
     .eq("event_id", id)
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (detachError) throw detachError;
 
   const { error } = await db()
     .from("events")
     .delete()
     .eq("id", id)
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
 
   return { title: event.title };
@@ -795,26 +795,26 @@ export async function deleteEvent(
 
 export async function getRsvpsByEventId(
   eventId: string,
-  lodgeId: string
+  churchId: string
 ): Promise<Rsvp[]> {
   const { data, error } = await db()
     .from("rsvps")
     .select("*")
     .eq("event_id", eventId)
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
   return data as Rsvp[];
 }
 
 export async function getRsvpById(
   id: string,
-  lodgeId: string
+  churchId: string
 ): Promise<Rsvp | null> {
   const { data, error } = await db()
     .from("rsvps")
     .select("*")
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .maybeSingle();
   if (error) throw error;
   return data as Rsvp | null;
@@ -826,13 +826,13 @@ type RsvpWineFields =
   | "raffle_wine_note";
 
 export async function addRsvp(
-  lodgeId: string,
-  data: Omit<Rsvp, "id" | "lodge_id" | "created_at" | "updated_at" | RsvpWineFields> &
+  churchId: string,
+  data: Omit<Rsvp, "id" | "church_id" | "created_at" | "updated_at" | RsvpWineFields> &
     Partial<Pick<Rsvp, RsvpWineFields>>
 ): Promise<Rsvp> {
   const { data: row, error } = await db()
     .from("rsvps")
-    .insert({ ...data, lodge_id: lodgeId })
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
@@ -841,7 +841,7 @@ export async function addRsvp(
 
 export async function updateRsvp(
   id: string,
-  lodgeId: string,
+  churchId: string,
   updates: Partial<
     Pick<
       Rsvp,
@@ -863,7 +863,7 @@ export async function updateRsvp(
     .from("rsvps")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -873,14 +873,14 @@ export async function updateRsvp(
 export async function getRsvpByEventAndEmail(
   eventId: string,
   email: string,
-  lodgeId: string
+  churchId: string
 ): Promise<Rsvp | null> {
   const { data, error } = await db()
     .from("rsvps")
     .select("*")
     .eq("event_id", eventId)
     .eq("user_email", email.trim().toLowerCase())
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false })
     .limit(1);
   if (error) throw error;
@@ -891,30 +891,30 @@ export async function getRsvpByEventAndEmail(
 // Payments
 // ---------------------------------------------------------------------------
 
-export async function getPayments(lodgeId: string): Promise<Payment[]> {
+export async function getPayments(churchId: string): Promise<Payment[]> {
   const { data, error } = await db()
     .from("payments")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as Payment[];
 }
 
 /**
- * Payments linked to a specific meeting. Used by the admin meeting detail
+ * Payments linked to a specific service. Used by the admin service detail
  * page's "Money raised" panel — pulls every row whose `event_id` matches,
  * regardless of `status`, so the caller can decide which buckets (succeeded,
  * pending, refunded) to surface.
  */
 export async function getPaymentsByEventId(
   eventId: string,
-  lodgeId: string,
+  churchId: string,
 ): Promise<Payment[]> {
   const { data, error } = await db()
     .from("payments")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("event_id", eventId)
     .order("created_at", { ascending: false });
   if (error) throw error;
@@ -933,7 +933,7 @@ export async function getPaymentByStripeId(
   return data as Payment | null;
 }
 
-// Lookup by Mooov-side payment id (e.g. don_<lodge>_<rand>). The Mooov webhook
+// Lookup by Mooov-side payment id (e.g. don_<church>_<rand>). The Mooov webhook
 // handler uses this for idempotency when projecting payment.succeeded /
 // payment.captured into public.payments, the same way getPaymentByStripeId
 // is used in the legacy Stripe webhook path.
@@ -951,13 +951,13 @@ export async function getPaymentByMooovId(
 
 export async function getPaymentById(
   id: string,
-  lodgeId: string
+  churchId: string
 ): Promise<Payment | null> {
   const { data, error } = await db()
     .from("payments")
     .select("*")
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .maybeSingle();
   if (error) throw error;
   return data as Payment | null;
@@ -965,25 +965,25 @@ export async function getPaymentById(
 
 export async function getDonationById(
   id: string,
-  lodgeId: string
+  churchId: string
 ): Promise<Donation | null> {
   const { data, error } = await db()
     .from("donations")
     .select("*")
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .maybeSingle();
   if (error) throw error;
   return data as Donation | null;
 }
 
 export async function addPayment(
-  lodgeId: string,
-  data: Omit<Payment, "id" | "lodge_id" | "created_at" | "updated_at">
+  churchId: string,
+  data: Omit<Payment, "id" | "church_id" | "created_at" | "updated_at">
 ): Promise<Payment> {
   const { data: row, error } = await db()
     .from("payments")
-    .insert({ ...data, lodge_id: lodgeId })
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
@@ -992,16 +992,16 @@ export async function addPayment(
 
 export async function updatePayment(
   id: string,
-  lodgeId: string,
+  churchId: string,
   updates: Partial<
-    Omit<Payment, "id" | "lodge_id" | "created_at">
+    Omit<Payment, "id" | "church_id" | "created_at">
   >
 ): Promise<Payment | null> {
   const { data, error } = await db()
     .from("payments")
     .update(updates)
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -1012,22 +1012,22 @@ export async function updatePayment(
 // Donations
 // ---------------------------------------------------------------------------
 
-export async function getDonations(lodgeId: string): Promise<Donation[]> {
+export async function getDonations(churchId: string): Promise<Donation[]> {
   const { data, error } = await db()
     .from("donations")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as Donation[];
 }
 
 export async function addDonation(
-  lodgeId: string,
+  churchId: string,
   data: Omit<
     Donation,
     | "id"
-    | "lodge_id"
+    | "church_id"
     | "created_at"
     | "campaign_id"
     | "gift_aid_status"
@@ -1054,7 +1054,7 @@ export async function addDonation(
 ): Promise<Donation> {
   const { data: row, error } = await db()
     .from("donations")
-    .insert({ ...data, lodge_id: lodgeId })
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
@@ -1063,7 +1063,7 @@ export async function addDonation(
 
 export async function updateDonation(
   id: string,
-  lodgeId: string,
+  churchId: string,
   updates: Partial<
     Pick<
       Donation,
@@ -1086,7 +1086,7 @@ export async function updateDonation(
     .from("donations")
     .update(updates)
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -1095,12 +1095,12 @@ export async function updateDonation(
 
 export async function getDonationsByPaymentId(
   paymentId: string,
-  lodgeId: string
+  churchId: string
 ): Promise<Donation[]> {
   const { data, error } = await db()
     .from("donations")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("payment_id", paymentId)
     .order("created_at", { ascending: true });
   if (error) throw error;
@@ -1109,34 +1109,34 @@ export async function getDonationsByPaymentId(
 
 export async function deleteDonation(
   id: string,
-  lodgeId: string
+  churchId: string
 ): Promise<void> {
   const { error } = await db()
     .from("donations")
     .delete()
     .eq("id", id)
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
 }
 
 export async function getGiftAidClaimBatches(
-  lodgeId: string
+  churchId: string
 ): Promise<GiftAidClaimBatch[]> {
   const { data, error } = await db()
     .from("gift_aid_claim_batches")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as GiftAidClaimBatch[];
 }
 
 export async function createGiftAidClaimBatch(
-  lodgeId: string,
+  churchId: string,
   data: Omit<
     GiftAidClaimBatch,
     | "id"
-    | "lodge_id"
+    | "church_id"
     | "created_at"
     | "updated_at"
     | "declarations_count"
@@ -1152,7 +1152,7 @@ export async function createGiftAidClaimBatch(
 ): Promise<GiftAidClaimBatch> {
   const { data: row, error } = await db()
     .from("gift_aid_claim_batches")
-    .insert({ ...data, lodge_id: lodgeId })
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
@@ -1161,7 +1161,7 @@ export async function createGiftAidClaimBatch(
 
 export async function setClaimBatchDeclarationsCount(
   id: string,
-  lodgeId: string,
+  churchId: string,
   count: number
 ): Promise<void> {
   const { error } = await db()
@@ -1171,13 +1171,13 @@ export async function setClaimBatchDeclarationsCount(
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
 }
 
 export async function markClaimBatchPackGenerated(
   id: string,
-  lodgeId: string,
+  churchId: string,
   actorEmail: string | null
 ): Promise<void> {
   const { error } = await db()
@@ -1188,13 +1188,13 @@ export async function markClaimBatchPackGenerated(
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
 }
 
 export async function updateGiftAidClaimBatch(
   id: string,
-  lodgeId: string,
+  churchId: string,
   updates: Partial<
     Pick<
       GiftAidClaimBatch,
@@ -1206,7 +1206,7 @@ export async function updateGiftAidClaimBatch(
     .from("gift_aid_claim_batches")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -1214,13 +1214,13 @@ export async function updateGiftAidClaimBatch(
 }
 
 export async function getGiftAidClaimItems(
-  lodgeId: string,
+  churchId: string,
   claimBatchId: string
 ): Promise<GiftAidClaimItem[]> {
   const { data, error } = await db()
     .from("gift_aid_claim_items")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("claim_batch_id", claimBatchId)
     .order("donation_date", { ascending: true });
   if (error) throw error;
@@ -1228,15 +1228,15 @@ export async function getGiftAidClaimItems(
 }
 
 export async function createGiftAidClaimItems(
-  lodgeId: string,
+  churchId: string,
   rows: Array<
-    Omit<GiftAidClaimItem, "id" | "lodge_id" | "created_at">
+    Omit<GiftAidClaimItem, "id" | "church_id" | "created_at">
   >
 ): Promise<GiftAidClaimItem[]> {
   if (rows.length === 0) return [];
   const { data, error } = await db()
     .from("gift_aid_claim_items")
-    .insert(rows.map((row) => ({ ...row, lodge_id: lodgeId })))
+    .insert(rows.map((row) => ({ ...row, church_id: churchId })))
     .select("*");
   if (error) throw error;
   return data as GiftAidClaimItem[];
@@ -1247,18 +1247,18 @@ export async function createGiftAidClaimItems(
 // ---------------------------------------------------------------------------
 
 /**
- * Find the previously-created claim batch for this lodge. Used by the
+ * Find the previously-created claim batch for this church. Used by the
  * close flow to compute "what declarations are new since the last pack".
- * Returns null if this is the lodge's first batch.
+ * Returns null if this is the church's first batch.
  */
 export async function getMostRecentClaimBatchBefore(
-  lodgeId: string,
+  churchId: string,
   beforeIso: string
 ): Promise<GiftAidClaimBatch | null> {
   const { data, error } = await db()
     .from("gift_aid_claim_batches")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .lt("created_at", beforeIso)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -1273,14 +1273,14 @@ export async function getMostRecentClaimBatchBefore(
  * the window, UGLE still wants to know it existed.
  */
 export async function getDeclarationsCreatedBetween(
-  lodgeId: string,
+  churchId: string,
   startIso: string,
   endIso: string
 ): Promise<GiftAidDeclaration[]> {
   const { data, error } = await db()
     .from("gift_aid_declarations")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .gt("created_at", startIso)
     .lte("created_at", endIso)
     .order("created_at", { ascending: true });
@@ -1289,21 +1289,21 @@ export async function getDeclarationsCreatedBetween(
 }
 
 export async function getGiftAidDeclarationsByIds(
-  lodgeId: string,
+  churchId: string,
   ids: string[]
 ): Promise<GiftAidDeclaration[]> {
   if (ids.length === 0) return [];
   const { data, error } = await db()
     .from("gift_aid_declarations")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .in("id", ids);
   if (error) throw error;
   return data as GiftAidDeclaration[];
 }
 
 export async function linkDeclarationsToClaimBatch(
-  lodgeId: string,
+  churchId: string,
   claimBatchId: string,
   links: Array<{
     gift_aid_declaration_id: string;
@@ -1313,7 +1313,7 @@ export async function linkDeclarationsToClaimBatch(
   if (links.length === 0) return [];
   const payload = links.map((row) => ({
     ...row,
-    lodge_id: lodgeId,
+    church_id: churchId,
     claim_batch_id: claimBatchId,
   }));
   // Best-effort insert. The unique index on
@@ -1332,13 +1332,13 @@ export async function linkDeclarationsToClaimBatch(
 }
 
 export async function listClaimBatchDeclarations(
-  lodgeId: string,
+  churchId: string,
   claimBatchId: string
 ): Promise<GiftAidClaimDeclaration[]> {
   const { data, error } = await db()
     .from("gift_aid_claim_declarations")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("claim_batch_id", claimBatchId)
     .order("created_at", { ascending: true });
   if (error) throw error;
@@ -1350,12 +1350,12 @@ export async function listClaimBatchDeclarations(
 // ---------------------------------------------------------------------------
 
 export async function getGiftAidDeclarations(
-  lodgeId: string
+  churchId: string
 ): Promise<GiftAidDeclaration[]> {
   const { data, error } = await db()
     .from("gift_aid_declarations")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as GiftAidDeclaration[];
@@ -1363,26 +1363,26 @@ export async function getGiftAidDeclarations(
 
 export async function getGiftAidDeclarationById(
   id: string,
-  lodgeId: string
+  churchId: string
 ): Promise<GiftAidDeclaration | null> {
   const { data, error } = await db()
     .from("gift_aid_declarations")
     .select("*")
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .maybeSingle();
   if (error) throw error;
   return data as GiftAidDeclaration | null;
 }
 
 export async function getActiveGiftAidDeclarationByEmail(
-  lodgeId: string,
+  churchId: string,
   email: string
 ): Promise<GiftAidDeclaration | null> {
   const { data, error } = await db()
     .from("gift_aid_declarations")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .ilike("donor_email", email)
     .is("revoked_at", null)
     .eq("declaration_confirmed", true)
@@ -1396,16 +1396,16 @@ export async function getActiveGiftAidDeclarationByEmail(
 
 export async function updateGiftAidDeclaration(
   id: string,
-  lodgeId: string,
+  churchId: string,
   updates: Partial<
-    Omit<GiftAidDeclaration, "id" | "lodge_id" | "created_at">
+    Omit<GiftAidDeclaration, "id" | "church_id" | "created_at">
   >
 ): Promise<GiftAidDeclaration | null> {
   const { data, error } = await db()
     .from("gift_aid_declarations")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -1414,14 +1414,14 @@ export async function updateGiftAidDeclaration(
 
 export async function getDonationsByGiftAidDeclaration(
   declarationId: string,
-  lodgeId: string
+  churchId: string
 ): Promise<Donation[]> {
   // Donations linked to this declaration explicitly.
   const { data: linked, error } = await db()
     .from("donations")
     .select("*")
     .eq("gift_aid_declaration_id", declarationId)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false });
   if (error) throw error;
 
@@ -1435,7 +1435,7 @@ export async function getDonationsByGiftAidDeclaration(
     .from("gift_aid_declarations")
     .select("donor_email")
     .eq("id", declarationId)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .maybeSingle<{ donor_email: string | null }>();
   const email = decl?.donor_email?.trim().toLowerCase() ?? null;
   if (!email) return linked as Donation[];
@@ -1443,7 +1443,7 @@ export async function getDonationsByGiftAidDeclaration(
   const { data: unlinked, error: unlinkedError } = await db()
     .from("donations")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .is("gift_aid_declaration_id", null)
     .order("created_at", { ascending: false });
   if (unlinkedError) throw unlinkedError;
@@ -1455,14 +1455,14 @@ export async function getDonationsByGiftAidDeclaration(
 }
 
 export async function listAuditLogsByEntity(
-  lodgeId: string,
+  churchId: string,
   entityType: string,
   entityId: string
 ): Promise<AuditLog[]> {
   const { data, error } = await db()
     .from("audit_logs")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("entity_type", entityType)
     .eq("entity_id", entityId)
     .order("created_at", { ascending: false })
@@ -1506,12 +1506,12 @@ export type AddGiftAidDeclarationInput = {
 };
 
 export async function addGiftAidDeclaration(
-  lodgeId: string,
+  churchId: string,
   data: AddGiftAidDeclarationInput
 ): Promise<GiftAidDeclaration> {
   const { data: row, error } = await db()
     .from("gift_aid_declarations")
-    .insert({ ...data, lodge_id: lodgeId })
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
@@ -1526,7 +1526,7 @@ export async function addGiftAidDeclaration(
  */
 export async function updateGiftAidDeclarationEvidence(
   id: string,
-  lodgeId: string,
+  churchId: string,
   evidence: {
     evidence_source: GiftAidDeclaration["evidence_source"];
     evidence_storage_bucket: string;
@@ -1542,7 +1542,7 @@ export async function updateGiftAidDeclarationEvidence(
     .from("gift_aid_declarations")
     .update({ ...evidence, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -1551,7 +1551,7 @@ export async function updateGiftAidDeclarationEvidence(
 
 export async function revokeGiftAidDeclaration(
   id: string,
-  lodgeId: string,
+  churchId: string,
   opts?: { reason?: string | null }
 ): Promise<GiftAidDeclaration | null> {
   const { data, error } = await db()
@@ -1561,7 +1561,7 @@ export async function revokeGiftAidDeclaration(
       revoked_reason: opts?.reason ?? null,
     })
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -1574,13 +1574,13 @@ export async function revokeGiftAidDeclaration(
  * recorded before the link existed.
  */
 export async function getActiveGiftAidDeclarationByMember(
-  lodgeId: string,
+  churchId: string,
   member: { id: string; email: string }
 ): Promise<GiftAidDeclaration | null> {
   const { data: linked, error: linkedError } = await db()
     .from("gift_aid_declarations")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("member_id", member.id)
     .is("revoked_at", null)
     .eq("declaration_confirmed", true)
@@ -1590,7 +1590,7 @@ export async function getActiveGiftAidDeclarationByMember(
     .maybeSingle();
   if (linkedError) throw linkedError;
   if (linked) return linked as GiftAidDeclaration;
-  return getActiveGiftAidDeclarationByEmail(lodgeId, member.email);
+  return getActiveGiftAidDeclarationByEmail(churchId, member.email);
 }
 
 // ---------------------------------------------------------------------------
@@ -1599,18 +1599,18 @@ export async function getActiveGiftAidDeclarationByMember(
 
 export type InsertGiftAidDeclarationEventInput = Omit<
   GiftAidDeclarationEvent,
-  "id" | "lodge_id" | "declaration_id" | "created_at"
+  "id" | "church_id" | "declaration_id" | "created_at"
 > & {
   declaration_id: string;
 };
 
 export async function insertGiftAidDeclarationEvent(
-  lodgeId: string,
+  churchId: string,
   input: InsertGiftAidDeclarationEventInput
 ): Promise<GiftAidDeclarationEvent> {
   const { data, error } = await db()
     .from("gift_aid_declaration_events")
-    .insert({ ...input, lodge_id: lodgeId })
+    .insert({ ...input, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
@@ -1618,13 +1618,13 @@ export async function insertGiftAidDeclarationEvent(
 }
 
 export async function listGiftAidDeclarationEvents(
-  lodgeId: string,
+  churchId: string,
   declarationId: string
 ): Promise<GiftAidDeclarationEvent[]> {
   const { data, error } = await db()
     .from("gift_aid_declaration_events")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("declaration_id", declarationId)
     .order("created_at", { ascending: true });
   if (error) throw error;
@@ -1637,7 +1637,7 @@ export async function listGiftAidDeclarationEvents(
 
 export async function updateMemberGiftAidPosture(
   memberId: string,
-  lodgeId: string,
+  churchId: string,
   patch: {
     gift_aid_consent_status?: "unknown" | "declared" | "declined";
     gift_aid_prompted_at?: string | null;
@@ -1647,116 +1647,116 @@ export async function updateMemberGiftAidPosture(
     .from("members")
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq("id", memberId)
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
 }
 
 // ---------------------------------------------------------------------------
-// Meeting close helpers (migration 059)
+// Service close helpers (migration 059)
 // ---------------------------------------------------------------------------
 
-export async function markEventMeetingClosed(
+export async function markEventServiceClosed(
   eventId: string,
-  lodgeId: string,
+  churchId: string,
   patch: {
-    meeting_closed_at: string;
-    meeting_closed_by_email: string | null;
-    meeting_close_notes: string | null;
+    service_closed_at: string;
+    service_closed_by_email: string | null;
+    service_close_notes: string | null;
   }
 ): Promise<void> {
   const { error } = await db()
     .from("events")
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq("id", eventId)
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
 }
 
-export async function attachClaimBatchToMeetingCollection(
+export async function attachClaimBatchToServiceCollection(
   collectionId: string,
-  lodgeId: string,
+  churchId: string,
   patch: {
     gift_aid_claim_batch_id: string;
-    relief_chest_delivered_at?: string | null;
-    relief_chest_delivered_to?: string | null;
+    gift_aid_pack_delivered_at?: string | null;
+    gift_aid_pack_delivered_to?: string | null;
   }
 ): Promise<void> {
   const { error } = await db()
-    .from("meeting_collections")
+    .from("service_collections")
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq("id", collectionId)
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
 }
 
-// Stamp (or clear) the Relief Chest delivery on the meeting collection(s)
-// for an event. Used by the meeting close panel so the treasurer can record
+// Stamp (or clear) the Gift Aid pack delivery on the service collection(s)
+// for an event. Used by the service close panel so the treasurer can record
 // that the Gift Aid pack has actually been forwarded to UGLE.
 export async function markReliefChestDeliveredForEvent(
-  lodgeId: string,
+  churchId: string,
   eventId: string,
   opts: { deliveredAt?: string | null; deliveredTo?: string | null }
 ): Promise<void> {
   const { error } = await db()
-    .from("meeting_collections")
+    .from("service_collections")
     .update({
-      relief_chest_delivered_at:
+      gift_aid_pack_delivered_at:
         opts.deliveredAt === undefined
           ? new Date().toISOString()
           : opts.deliveredAt,
-      relief_chest_delivered_to: opts.deliveredTo ?? null,
+      gift_aid_pack_delivered_to: opts.deliveredTo ?? null,
       updated_at: new Date().toISOString(),
     })
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("event_id", eventId);
   if (error) throw error;
 }
 
 // ---------------------------------------------------------------------------
-// Lodge Subscriptions
+// Church Subscriptions
 // ---------------------------------------------------------------------------
 
-export async function getLodgeSubscription(
-  lodgeId: string
-): Promise<LodgeSubscription | null> {
+export async function getChurchSubscription(
+  churchId: string
+): Promise<ChurchSubscription | null> {
   const { data, error } = await db()
-    .from("lodge_subscriptions")
+    .from("church_subscriptions")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .maybeSingle();
   if (error) throw error;
-  return data as LodgeSubscription | null;
+  return data as ChurchSubscription | null;
 }
 
-export async function upsertLodgeSubscription(
-  lodgeId: string,
+export async function upsertChurchSubscription(
+  churchId: string,
   data: Omit<
-    LodgeSubscription,
+    ChurchSubscription,
     | "id"
-    | "lodge_id"
+    | "church_id"
     | "created_at"
     | "updated_at"
     | "requested_plan_code"
     | "last_upgrade_requested_at"
-    | "lodge_limit"
+    | "church_limit"
   > &
     Partial<
       Pick<
-        LodgeSubscription,
-        "requested_plan_code" | "last_upgrade_requested_at" | "lodge_limit"
+        ChurchSubscription,
+        "requested_plan_code" | "last_upgrade_requested_at" | "church_limit"
       >
     >
-): Promise<LodgeSubscription> {
+): Promise<ChurchSubscription> {
   const { data: row, error } = await db()
-    .from("lodge_subscriptions")
+    .from("church_subscriptions")
     .upsert(
-      { ...data, lodge_id: lodgeId },
-      { onConflict: "lodge_id" }
+      { ...data, church_id: churchId },
+      { onConflict: "church_id" }
     )
     .select("*")
     .single();
   if (error) throw error;
-  return row as LodgeSubscription;
+  return row as ChurchSubscription;
 }
 
 // ---------------------------------------------------------------------------
@@ -1764,13 +1764,13 @@ export async function upsertLodgeSubscription(
 // ---------------------------------------------------------------------------
 
 export async function getBlogPosts(
-  lodgeId: string,
+  churchId: string,
   opts?: { published?: boolean }
 ): Promise<BlogPost[]> {
   let query = db()
     .from("blog_posts")
     .select("*")
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
 
   if (opts?.published !== undefined) {
     query = query
@@ -1790,13 +1790,13 @@ export async function getBlogPosts(
 
 export async function getBlogPostById(
   id: string,
-  lodgeId: string
+  churchId: string
 ): Promise<BlogPost | null> {
   const { data, error } = await db()
     .from("blog_posts")
     .select("*")
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .maybeSingle();
   if (error) throw error;
   return data as BlogPost | null;
@@ -1804,13 +1804,13 @@ export async function getBlogPostById(
 
 export async function getBlogPostBySlug(
   slug: string,
-  lodgeId: string
+  churchId: string
 ): Promise<BlogPost | null> {
   const { data, error } = await db()
     .from("blog_posts")
     .select("*")
     .eq("slug", slug)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("published", true)
     .maybeSingle();
   if (error) throw error;
@@ -1818,12 +1818,12 @@ export async function getBlogPostBySlug(
 }
 
 export async function addBlogPost(
-  lodgeId: string,
-  data: Omit<BlogPost, "id" | "lodge_id" | "created_at" | "updated_at">
+  churchId: string,
+  data: Omit<BlogPost, "id" | "church_id" | "created_at" | "updated_at">
 ): Promise<BlogPost> {
   const { data: row, error } = await db()
     .from("blog_posts")
-    .insert({ ...data, lodge_id: lodgeId })
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
@@ -1832,14 +1832,14 @@ export async function addBlogPost(
 
 export async function updateBlogPost(
   id: string,
-  lodgeId: string,
-  updates: Partial<Omit<BlogPost, "id" | "lodge_id" | "created_at">>
+  churchId: string,
+  updates: Partial<Omit<BlogPost, "id" | "church_id" | "created_at">>
 ): Promise<BlogPost | null> {
   const { data, error } = await db()
     .from("blog_posts")
     .update(updates)
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -1851,12 +1851,12 @@ export async function updateBlogPost(
 // ---------------------------------------------------------------------------
 
 export async function getCharityCampaigns(
-  lodgeId: string
+  churchId: string
 ): Promise<CharityCampaign[]> {
   const { data, error } = await db()
     .from("charity_campaigns")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as CharityCampaign[];
@@ -1864,25 +1864,25 @@ export async function getCharityCampaigns(
 
 export async function getCharityCampaignById(
   id: string,
-  lodgeId: string
+  churchId: string
 ): Promise<CharityCampaign | null> {
   const { data, error } = await db()
     .from("charity_campaigns")
     .select("*")
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .maybeSingle();
   if (error) throw error;
   return data as CharityCampaign | null;
 }
 
 export async function addCharityCampaign(
-  lodgeId: string,
-  data: Omit<CharityCampaign, "id" | "lodge_id" | "created_at" | "updated_at">
+  churchId: string,
+  data: Omit<CharityCampaign, "id" | "church_id" | "created_at" | "updated_at">
 ): Promise<CharityCampaign> {
   const { data: row, error } = await db()
     .from("charity_campaigns")
-    .insert({ ...data, lodge_id: lodgeId })
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
@@ -1891,7 +1891,7 @@ export async function addCharityCampaign(
 
 export async function updateCharityCampaign(
   id: string,
-  lodgeId: string,
+  churchId: string,
   updates: Partial<
     Pick<CharityCampaign, "name" | "description" | "target_amount" | "raised_amount" | "status" | "end_date">
   >
@@ -1900,7 +1900,7 @@ export async function updateCharityCampaign(
     .from("charity_campaigns")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -1909,13 +1909,13 @@ export async function updateCharityCampaign(
 
 export async function getDonationsByCampaign(
   campaignId: string,
-  lodgeId: string
+  churchId: string
 ): Promise<Donation[]> {
   const { data, error } = await db()
     .from("donations")
     .select("*")
     .eq("campaign_id", campaignId)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as Donation[];
@@ -1923,41 +1923,41 @@ export async function getDonationsByCampaign(
 
 export async function getDonationsByEvent(
   eventId: string,
-  lodgeId: string
+  churchId: string
 ): Promise<Donation[]> {
   const { data, error } = await db()
     .from("donations")
     .select("*")
     .eq("event_id", eventId)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as Donation[];
 }
 
 // ---------------------------------------------------------------------------
-// Lodge Dues
+// Church Giving
 // ---------------------------------------------------------------------------
 
-export async function getLodgeDues(lodgeId: string): Promise<LodgeDues[]> {
+export async function getChurchGiving(churchId: string): Promise<ChurchGiving[]> {
   const { data, error } = await db()
-    .from("lodge_dues")
+    .from("church_giving")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("active", true)
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return data as LodgeDues[];
+  return data as ChurchGiving[];
 }
 
-export async function getMemberDues(
-  lodgeId: string,
+export async function getMemberGiving(
+  churchId: string,
   opts?: { memberEmail?: string; status?: string }
-): Promise<MemberDues[]> {
+): Promise<MemberGiving[]> {
   let query = db()
-    .from("member_dues")
+    .from("member_giving")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("period_start", { ascending: false });
 
   if (opts?.memberEmail) {
@@ -1969,15 +1969,15 @@ export async function getMemberDues(
 
   const { data, error } = await query;
   if (error) throw error;
-  return data as MemberDues[];
+  return data as MemberGiving[];
 }
 
-export async function createMemberDues(
-  lodgeId: string,
+export async function createMemberGiving(
+  churchId: string,
   data: Omit<
-    MemberDues,
+    MemberGiving,
     | "id"
-    | "lodge_id"
+    | "church_id"
     | "created_at"
     | "updated_at"
     | "reminder_sent_at"
@@ -1991,7 +1991,7 @@ export async function createMemberDues(
     | "waiver_reason"
     | "is_advance"
     | "advance_for_year_id"
-    | "dues_payment_method"
+    | "giving_payment_method"
     | "bacs_monthly_amount"
     | "bacs_reference"
     | "payment_method_set_by"
@@ -1999,7 +1999,7 @@ export async function createMemberDues(
   > &
     Partial<
       Pick<
-        MemberDues,
+        MemberGiving,
         | "reminder_sent_at"
         | "reminder_count"
         | "is_pro_rata"
@@ -2011,29 +2011,29 @@ export async function createMemberDues(
         | "waiver_reason"
         | "is_advance"
         | "advance_for_year_id"
-        | "dues_payment_method"
+        | "giving_payment_method"
         | "bacs_monthly_amount"
         | "bacs_reference"
         | "payment_method_set_by"
         | "payment_method_set_at"
       >
     >
-): Promise<MemberDues> {
+): Promise<MemberGiving> {
   const { data: row, error } = await db()
-    .from("member_dues")
-    .insert({ ...data, lodge_id: lodgeId })
+    .from("member_giving")
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
-  return row as MemberDues;
+  return row as MemberGiving;
 }
 
-export async function updateMemberDuesStatus(
+export async function updateMemberGivingStatus(
   id: string,
-  lodgeId: string,
+  churchId: string,
   updates: Partial<
     Pick<
-      MemberDues,
+      MemberGiving,
       | "status"
       | "payment_id"
       | "stripe_payment_intent_id"
@@ -2044,30 +2044,30 @@ export async function updateMemberDuesStatus(
       | "gift_aid_status"
       | "gift_aid_eligible_amount"
       | "waiver_reason"
-      | "dues_payment_method"
+      | "giving_payment_method"
       | "bacs_monthly_amount"
       | "bacs_reference"
       | "payment_method_set_by"
       | "payment_method_set_at"
     >
   >
-): Promise<MemberDues | null> {
+): Promise<MemberGiving | null> {
   const { data, error } = await db()
-    .from("member_dues")
+    .from("member_giving")
     .update(updates)
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
-  return data as MemberDues | null;
+  return data as MemberGiving | null;
 }
 
 // ---------------------------------------------------------------------------
-// Dues payment method (per-year admin tagging)
+// Giving payment method (per-year admin tagging)
 // ---------------------------------------------------------------------------
 
-export type SetDuesPaymentMethodInput =
+export type SetGivingPaymentMethodInput =
   | { method: "online_subscription"; setBy: string }
   | {
       method: "bacs";
@@ -2080,37 +2080,37 @@ export type SetDuesPaymentMethodInput =
   | { method: null; setBy: string };
 
 /**
- * Apply an admin-driven payment-method change to a single member_dues
+ * Apply an admin-driven payment-method change to a single member_giving
  * row. Encapsulates the side-effects each method implies (e.g.
  * paid_in_full also flips status + paid_at; fee_waived flips status +
  * waiver_reason). The caller is responsible for audit logging.
  *
  * Designed to be the single mutation point for the new admin
- * /api/admin/members/[id]/dues-method route, the treasurer dashboard's
+ * /api/admin/members/[id]/giving-method route, the treasurer dashboard's
  * inline actions, and any future automation (e.g. webhook auto-tagging
  * 'online_subscription' when a schedule activates).
  */
-export async function setMemberDuesPaymentMethod(
-  memberDuesId: string,
-  lodgeId: string,
-  input: SetDuesPaymentMethodInput,
-): Promise<MemberDues | null> {
+export async function setMemberGivingPaymentMethod(
+  memberGivingId: string,
+  churchId: string,
+  input: SetGivingPaymentMethodInput,
+): Promise<MemberGiving | null> {
   const now = new Date().toISOString();
 
-  type Updates = Parameters<typeof updateMemberDuesStatus>[2];
+  type Updates = Parameters<typeof updateMemberGivingStatus>[2];
   const updates: Updates = {
     payment_method_set_by: input.setBy,
     payment_method_set_at: now,
   };
 
   if (input.method === null) {
-    updates.dues_payment_method = null;
+    updates.giving_payment_method = null;
     updates.bacs_monthly_amount = null;
     updates.bacs_reference = null;
-    return updateMemberDuesStatus(memberDuesId, lodgeId, updates);
+    return updateMemberGivingStatus(memberGivingId, churchId, updates);
   }
 
-  updates.dues_payment_method = input.method;
+  updates.giving_payment_method = input.method;
 
   if (input.method === "bacs") {
     updates.bacs_monthly_amount = input.bacsMonthlyAmount;
@@ -2129,19 +2129,19 @@ export async function setMemberDuesPaymentMethod(
     updates.paid_at = null;
   }
 
-  return updateMemberDuesStatus(memberDuesId, lodgeId, updates);
+  return updateMemberGivingStatus(memberGivingId, churchId, updates);
 }
 
 /**
- * Lodge-wide breakdown of dues payment methods for the dashboard tile.
- * Counts ALL non-advance member_dues rows for the lodge by method,
+ * Church-wide breakdown of giving payment methods for the dashboard tile.
+ * Counts ALL non-advance member_giving rows for the church by method,
  * including a synthetic "unset" bucket for NULL.
  *
- * Optional yearId narrows to a specific masonic year when the caller
+ * Optional yearId narrows to a specific giving year when the caller
  * has resolved one (treasurer dashboard scopes to current year).
  */
-export async function countMemberDuesByPaymentMethod(
-  lodgeId: string,
+export async function countMemberGivingByPaymentMethod(
+  churchId: string,
   opts: { yearStart?: string; yearEnd?: string } = {},
 ): Promise<{
   online_subscription: number;
@@ -2152,9 +2152,9 @@ export async function countMemberDuesByPaymentMethod(
   bacs_monthly_total: number;
 }> {
   let query = db()
-    .from("member_dues")
-    .select("dues_payment_method, bacs_monthly_amount, period_start, period_end, is_advance")
-    .eq("lodge_id", lodgeId)
+    .from("member_giving")
+    .select("giving_payment_method, bacs_monthly_amount, period_start, period_end, is_advance")
+    .eq("church_id", churchId)
     .eq("is_advance", false);
 
   if (opts.yearStart) query = query.gte("period_end", opts.yearStart);
@@ -2171,8 +2171,8 @@ export async function countMemberDuesByPaymentMethod(
     unset: 0,
     bacs_monthly_total: 0,
   };
-  for (const row of (data as Array<Pick<MemberDues, "dues_payment_method" | "bacs_monthly_amount">>) ?? []) {
-    const method = row.dues_payment_method;
+  for (const row of (data as Array<Pick<MemberGiving, "giving_payment_method" | "bacs_monthly_amount">>) ?? []) {
+    const method = row.giving_payment_method;
     if (method == null) {
       counts.unset += 1;
     } else {
@@ -2186,51 +2186,51 @@ export async function countMemberDuesByPaymentMethod(
 }
 
 // ---------------------------------------------------------------------------
-// Member dues instalments
+// Member giving instalments
 // ---------------------------------------------------------------------------
 
-export async function createMemberDuesInstalments(
-  lodgeId: string,
+export async function createMemberGivingInstalments(
+  churchId: string,
   rows: Array<
     Omit<
-      MemberDuesInstalment,
-      "id" | "lodge_id" | "created_at" | "updated_at" | "mooov_payment_id" | "schedule_id"
+      MemberGivingInstalment,
+      "id" | "church_id" | "created_at" | "updated_at" | "mooov_payment_id" | "schedule_id"
     > &
-      Partial<Pick<MemberDuesInstalment, "mooov_payment_id" | "schedule_id">>
+      Partial<Pick<MemberGivingInstalment, "mooov_payment_id" | "schedule_id">>
   >
-): Promise<MemberDuesInstalment[]> {
+): Promise<MemberGivingInstalment[]> {
   if (rows.length === 0) return [];
-  const payload = rows.map((row) => ({ ...row, lodge_id: lodgeId }));
+  const payload = rows.map((row) => ({ ...row, church_id: churchId }));
   const { data, error } = await db()
-    .from("member_dues_instalments")
+    .from("member_giving_instalments")
     .insert(payload)
     .select("*");
   if (error) throw error;
-  return data as MemberDuesInstalment[];
+  return data as MemberGivingInstalment[];
 }
 
-export async function getInstalmentsForDues(
-  memberDuesId: string,
-  lodgeId: string
-): Promise<MemberDuesInstalment[]> {
+export async function getInstalmentsForGiving(
+  memberGivingId: string,
+  churchId: string
+): Promise<MemberGivingInstalment[]> {
   const { data, error } = await db()
-    .from("member_dues_instalments")
+    .from("member_giving_instalments")
     .select("*")
-    .eq("member_dues_id", memberDuesId)
-    .eq("lodge_id", lodgeId)
+    .eq("member_giving_id", memberGivingId)
+    .eq("church_id", churchId)
     .order("sequence", { ascending: true });
   if (error) throw error;
-  return data as MemberDuesInstalment[];
+  return data as MemberGivingInstalment[];
 }
 
 export async function getOutstandingInstalments(
-  lodgeId: string,
+  churchId: string,
   opts?: { onOrBefore?: string }
-): Promise<MemberDuesInstalment[]> {
+): Promise<MemberGivingInstalment[]> {
   let query = db()
-    .from("member_dues_instalments")
+    .from("member_giving_instalments")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .in("status", ["outstanding", "overdue"])
     .order("due_date", { ascending: true });
   if (opts?.onOrBefore) {
@@ -2238,33 +2238,33 @@ export async function getOutstandingInstalments(
   }
   const { data, error } = await query;
   if (error) throw error;
-  return data as MemberDuesInstalment[];
+  return data as MemberGivingInstalment[];
 }
 
 export async function updateInstalment(
   id: string,
-  lodgeId: string,
+  churchId: string,
   updates: Partial<
     Pick<
-      MemberDuesInstalment,
+      MemberGivingInstalment,
       "status" | "paid_at" | "reminder_sent_at" | "payment_reference" | "amount"
     >
   >
-): Promise<MemberDuesInstalment | null> {
+): Promise<MemberGivingInstalment | null> {
   const { data, error } = await db()
-    .from("member_dues_instalments")
+    .from("member_giving_instalments")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
-  return data as MemberDuesInstalment | null;
+  return data as MemberGivingInstalment | null;
 }
 
 /**
  * Hard-delete instalments that were pre-created for a schedule that
- * never made it past pending. Used by the dues subscription enrolment
+ * never made it past pending. Used by the giving subscription enrolment
  * code path when the previous attempt left orphan rows (Mooov call
  * failed, hosted_url missing, member abandoned the redirect, etc.).
  * Only callable while the parent schedule is still pending; we never
@@ -2272,51 +2272,51 @@ export async function updateInstalment(
  */
 export async function deleteInstalmentsForSchedule(
   scheduleId: string,
-  lodgeId: string
+  churchId: string
 ): Promise<number> {
   const { error, count } = await db()
-    .from("member_dues_instalments")
+    .from("member_giving_instalments")
     .delete({ count: "exact" })
     .eq("schedule_id", scheduleId)
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
   return count ?? 0;
 }
 
 // ---------------------------------------------------------------------------
-// Dues schedules (saved-charge subscription state)
+// Giving schedules (saved-charge subscription state)
 // ---------------------------------------------------------------------------
 
-export type CreateDuesScheduleInput = {
+export type CreateGivingScheduleInput = {
   member_id: string | null;
-  member_dues_id: string;
+  member_giving_id: string;
   member_email: string;
   customer_ref: string;
   cadence: "monthly" | "quarterly";
-  split_strategy: DuesSplitStrategy;
+  split_strategy: GivingSplitStrategy;
   auto_renew: boolean;
-  status?: DuesScheduleStatus;
+  status?: GivingScheduleStatus;
   next_charge_at?: string | null;
   metadata?: Record<string, unknown>;
   /**
    * Pre-stamped Stripe Subscription identifier for the Mooov-branded
-   * subscription_checkouts flow. Set to `sub_dues_<schedule_uuid>` so
+   * subscription_checkouts flow. Set to `sub_giving_<schedule_uuid>` so
    * the LP-side schedule and the Stripe Subscription share an idempotent
    * key. Null on saved-charge schedules.
    */
   mooov_subscription_id?: string | null;
 };
 
-export async function createDuesSchedule(
-  lodgeId: string,
-  input: CreateDuesScheduleInput
-): Promise<DuesSchedule> {
+export async function createGivingSchedule(
+  churchId: string,
+  input: CreateGivingScheduleInput
+): Promise<GivingSchedule> {
   const { data, error } = await db()
-    .from("dues_schedules")
+    .from("giving_schedules")
     .insert({
-      lodge_id: lodgeId,
+      church_id: churchId,
       member_id: input.member_id,
-      member_dues_id: input.member_dues_id,
+      member_giving_id: input.member_giving_id,
       member_email: input.member_email,
       customer_ref: input.customer_ref,
       cadence: input.cadence,
@@ -2330,63 +2330,63 @@ export async function createDuesSchedule(
     .select("*")
     .single();
   if (error) throw error;
-  return data as DuesSchedule;
+  return data as GivingSchedule;
 }
 
 /**
- * Look up a dues schedule by its Mooov-side subscription_id (the one we
+ * Look up a giving schedule by its Mooov-side subscription_id (the one we
  * stamp on /v1/subscription_checkouts). Used by the Mooov webhook to
  * route subscription.* events back to the LP schedule. Cross-tenant by
  * design — the subscription_id is unique platform-wide.
  */
-export async function getDuesScheduleByMooovSubscriptionId(
+export async function getGivingScheduleByMooovSubscriptionId(
   mooovSubscriptionId: string
-): Promise<DuesSchedule | null> {
+): Promise<GivingSchedule | null> {
   const { data, error } = await db()
-    .from("dues_schedules")
+    .from("giving_schedules")
     .select("*")
     .eq("mooov_subscription_id", mooovSubscriptionId)
     .maybeSingle();
   if (error) throw error;
-  return (data as DuesSchedule | null) ?? null;
+  return (data as GivingSchedule | null) ?? null;
 }
 
-export async function getDuesSchedule(
+export async function getGivingSchedule(
   id: string,
-  lodgeId: string
-): Promise<DuesSchedule | null> {
+  churchId: string
+): Promise<GivingSchedule | null> {
   const { data, error } = await db()
-    .from("dues_schedules")
+    .from("giving_schedules")
     .select("*")
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .maybeSingle();
   if (error) throw error;
-  return (data as DuesSchedule | null) ?? null;
+  return (data as GivingSchedule | null) ?? null;
 }
 
-export async function getDuesSchedulesForMember(
-  lodgeId: string,
+export async function getGivingSchedulesForMember(
+  churchId: string,
   memberEmail: string
-): Promise<DuesSchedule[]> {
+): Promise<GivingSchedule[]> {
   const { data, error } = await db()
-    .from("dues_schedules")
+    .from("giving_schedules")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("member_email", memberEmail)
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as DuesSchedule[];
+  return (data ?? []) as GivingSchedule[];
 }
 
-export async function getDuesSchedulesDue(
+export async function getGivingSchedulesDue(
   onOrBefore: string,
   limit = 100
-): Promise<DuesSchedule[]> {
+): Promise<GivingSchedule[]> {
   // The cron retry path must never re-pick a cancelled schedule, even
   // if a late Mooov webhook clobbered its status back to `past_due`.
   const { data, error } = await db()
-    .from("dues_schedules")
+    .from("giving_schedules")
     .select("*")
     .in("status", ["active", "past_due"])
     .is("cancelled_at", null)
@@ -2394,21 +2394,21 @@ export async function getDuesSchedulesDue(
     .order("next_charge_at", { ascending: true })
     .limit(limit);
   if (error) throw error;
-  return (data ?? []) as DuesSchedule[];
+  return (data ?? []) as GivingSchedule[];
 }
 
-export async function listDuesSchedules(
-  lodgeId: string,
+export async function listGivingSchedules(
+  churchId: string,
   opts?: {
-    status?: DuesScheduleStatus | DuesScheduleStatus[];
+    status?: GivingScheduleStatus | GivingScheduleStatus[];
     memberEmail?: string;
     limit?: number;
   }
-): Promise<DuesSchedule[]> {
+): Promise<GivingSchedule[]> {
   let query = db()
-    .from("dues_schedules")
+    .from("giving_schedules")
     .select("*")
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
 
   if (opts?.status) {
     if (Array.isArray(opts.status)) {
@@ -2425,22 +2425,22 @@ export async function listDuesSchedules(
     .order("created_at", { ascending: false })
     .limit(opts?.limit ?? 500);
   if (error) throw error;
-  return (data ?? []) as DuesSchedule[];
+  return (data ?? []) as GivingSchedule[];
 }
 
 // Treasurer dashboard: count of schedules grouped by status. Returned
-// as a record keyed on DuesScheduleStatus with 0-fill for missing
+// as a record keyed on GivingScheduleStatus with 0-fill for missing
 // statuses so callers can index without checks.
-export async function countDuesSchedulesByStatus(
-  lodgeId: string
-): Promise<Record<DuesScheduleStatus, number>> {
+export async function countGivingSchedulesByStatus(
+  churchId: string
+): Promise<Record<GivingScheduleStatus, number>> {
   const { data, error } = await db()
-    .from("dues_schedules")
+    .from("giving_schedules")
     .select("status, cancelled_at")
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
 
-  const counts: Record<DuesScheduleStatus, number> = {
+  const counts: Record<GivingScheduleStatus, number> = {
     pending: 0,
     active: 0,
     action_required: 0,
@@ -2455,10 +2455,10 @@ export async function countDuesSchedulesByStatus(
   // to be able to clobber a cancelled row's status back to past_due
   // and skew the treasurer dashboard counts.
   for (const row of (data ?? []) as {
-    status: DuesScheduleStatus;
+    status: GivingScheduleStatus;
     cancelled_at: string | null;
   }[]) {
-    const effective: DuesScheduleStatus =
+    const effective: GivingScheduleStatus =
       row.cancelled_at != null ? "cancelled" : row.status;
     if (effective in counts) {
       counts[effective] += 1;
@@ -2467,12 +2467,12 @@ export async function countDuesSchedulesByStatus(
   return counts;
 }
 
-export async function updateDuesSchedule(
+export async function updateGivingSchedule(
   id: string,
-  lodgeId: string,
+  churchId: string,
   updates: Partial<
     Pick<
-      DuesSchedule,
+      GivingSchedule,
       | "status"
       | "mooov_payment_method_id"
       | "stripe_customer_id"
@@ -2492,44 +2492,44 @@ export async function updateDuesSchedule(
       | "metadata"
     >
   >
-): Promise<DuesSchedule | null> {
+): Promise<GivingSchedule | null> {
   const { data, error } = await db()
-    .from("dues_schedules")
+    .from("giving_schedules")
     .update(updates)
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
-  return (data as DuesSchedule | null) ?? null;
+  return (data as GivingSchedule | null) ?? null;
 }
 
-export async function getMemberDuesById(
+export async function getMemberGivingById(
   id: string,
-  lodgeId: string
-): Promise<MemberDues | null> {
+  churchId: string
+): Promise<MemberGiving | null> {
   const { data, error } = await db()
-    .from("member_dues")
+    .from("member_giving")
     .select("*")
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .maybeSingle();
   if (error) throw error;
-  return (data as MemberDues | null) ?? null;
+  return (data as MemberGiving | null) ?? null;
 }
 
 // ---------------------------------------------------------------------------
-// Meeting collections and GASDS
+// Service collections and GASDS
 // ---------------------------------------------------------------------------
 
-export async function getMeetingCollections(
-  lodgeId: string,
+export async function getServiceCollections(
+  churchId: string,
   opts?: { eventId?: string; taxYear?: string }
-): Promise<MeetingCollection[]> {
+): Promise<ServiceCollection[]> {
   let query = db()
-    .from("meeting_collections")
+    .from("service_collections")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("collection_date", { ascending: false });
 
   if (opts?.eventId) query = query.eq("event_id", opts.eventId);
@@ -2537,56 +2537,56 @@ export async function getMeetingCollections(
 
   const { data, error } = await query;
   if (error) throw error;
-  return data as MeetingCollection[];
+  return data as ServiceCollection[];
 }
 
-export async function createMeetingCollection(
-  lodgeId: string,
+export async function createServiceCollection(
+  churchId: string,
   data: Omit<
-    MeetingCollection,
+    ServiceCollection,
     | "id"
-    | "lodge_id"
+    | "church_id"
     | "created_at"
     | "updated_at"
     | "gift_aid_claim_batch_id"
-    | "relief_chest_delivered_at"
-    | "relief_chest_delivered_to"
+    | "gift_aid_pack_delivered_at"
+    | "gift_aid_pack_delivered_to"
   > &
     Partial<
       Pick<
-        MeetingCollection,
+        ServiceCollection,
         | "gift_aid_claim_batch_id"
-        | "relief_chest_delivered_at"
-        | "relief_chest_delivered_to"
+        | "gift_aid_pack_delivered_at"
+        | "gift_aid_pack_delivered_to"
       >
     >
-): Promise<MeetingCollection> {
+): Promise<ServiceCollection> {
   const { data: row, error } = await db()
-    .from("meeting_collections")
-    .insert({ ...data, lodge_id: lodgeId })
+    .from("service_collections")
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
-  return row as MeetingCollection;
+  return row as ServiceCollection;
 }
 
-export async function getGasdsClaims(lodgeId: string): Promise<GasdsClaim[]> {
+export async function getGasdsClaims(churchId: string): Promise<GasdsClaim[]> {
   const { data, error } = await db()
     .from("gasds_claims")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("tax_year", { ascending: false });
   if (error) throw error;
   return data as GasdsClaim[];
 }
 
 export async function upsertGasdsClaim(
-  lodgeId: string,
-  data: Omit<GasdsClaim, "id" | "lodge_id" | "created_at" | "updated_at">
+  churchId: string,
+  data: Omit<GasdsClaim, "id" | "church_id" | "created_at" | "updated_at">
 ): Promise<GasdsClaim> {
   const { data: row, error } = await db()
     .from("gasds_claims")
-    .upsert({ ...data, lodge_id: lodgeId }, { onConflict: "lodge_id,tax_year" })
+    .upsert({ ...data, church_id: churchId }, { onConflict: "church_id,tax_year" })
     .select("*")
     .single();
   if (error) throw error;
@@ -2598,18 +2598,18 @@ export async function upsertGasdsClaim(
 // ---------------------------------------------------------------------------
 
 export async function getTreasurerLedger(
-  lodgeId: string,
+  churchId: string,
   opts?: {
     from?: string;
     to?: string;
-    sourceTypes?: Array<"payment" | "dues" | "donation">;
+    sourceTypes?: Array<"payment" | "giving" | "donation">;
     statuses?: string[];
   }
 ): Promise<LedgerEntry[]> {
   let query = db()
     .from("treasurer_ledger")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("occurred_at", { ascending: false });
   if (opts?.from) query = query.gte("occurred_at", opts.from);
   if (opts?.to) query = query.lte("occurred_at", opts.to);
@@ -2629,11 +2629,11 @@ export async function getTreasurerLedger(
 // ---------------------------------------------------------------------------
 
 export async function addEventGuests(
-  lodgeId: string,
-  guests: Omit<EventGuest, "id" | "lodge_id" | "created_at">[]
+  churchId: string,
+  guests: Omit<EventGuest, "id" | "church_id" | "created_at">[]
 ): Promise<EventGuest[]> {
   if (guests.length === 0) return [];
-  const rows = guests.map((g) => ({ ...g, lodge_id: lodgeId }));
+  const rows = guests.map((g) => ({ ...g, church_id: churchId }));
   const { data, error } = await db()
     .from("event_guests")
     .insert(rows)
@@ -2644,13 +2644,13 @@ export async function addEventGuests(
 
 export async function getGuestsByRsvp(
   rsvpId: string,
-  lodgeId: string
+  churchId: string
 ): Promise<EventGuest[]> {
   const { data, error } = await db()
     .from("event_guests")
     .select("*")
     .eq("rsvp_id", rsvpId)
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
   return data as EventGuest[];
 }
@@ -2663,25 +2663,25 @@ export async function getGuestsByRsvp(
  */
 export async function deleteEventGuestsByRsvp(
   rsvpId: string,
-  lodgeId: string
+  churchId: string
 ): Promise<void> {
   const { error } = await db()
     .from("event_guests")
     .delete()
     .eq("rsvp_id", rsvpId)
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
 }
 
 export async function getGuestsByEvent(
   eventId: string,
-  lodgeId: string
+  churchId: string
 ): Promise<EventGuest[]> {
   const { data, error } = await db()
     .from("event_guests")
     .select("*")
     .eq("event_id", eventId)
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
   return data as EventGuest[];
 }
@@ -2691,13 +2691,13 @@ export async function getGuestsByEvent(
 // ---------------------------------------------------------------------------
 
 export async function getMembers(
-  lodgeId: string,
+  churchId: string,
   opts?: { status?: string; search?: string }
 ): Promise<Member[]> {
   let query = db()
     .from("members")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("full_name");
 
   if (opts?.status) {
@@ -2716,13 +2716,13 @@ export async function getMembers(
 
 export async function getMemberById(
   id: string,
-  lodgeId: string
+  churchId: string
 ): Promise<Member | null> {
   const { data, error } = await db()
     .from("members")
     .select("*")
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .maybeSingle();
   if (error) throw error;
   return data as Member | null;
@@ -2730,13 +2730,13 @@ export async function getMemberById(
 
 export async function getMemberByEmail(
   email: string,
-  lodgeId: string
+  churchId: string
 ): Promise<Member | null> {
   const { data, error } = await db()
     .from("members")
     .select("*")
     .eq("email", email.trim().toLowerCase())
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .maybeSingle();
   if (error) throw error;
   return data as Member | null;
@@ -2755,7 +2755,7 @@ export async function getMemberByAuthUserId(
   return (data?.[0] as Member | undefined) ?? null;
 }
 
-export async function getMemberByEmailAcrossLodges(
+export async function getMemberByEmailAcrossChurches(
   email: string
 ): Promise<Member | null> {
   const { data, error } = await db()
@@ -2782,20 +2782,20 @@ export async function getMemberByPortalToken(
 }
 
 export async function createMember(
-  lodgeId: string,
+  churchId: string,
   data: Omit<
     Member,
     | "id"
-    | "lodge_id"
+    | "church_id"
     | "created_at"
     | "updated_at"
     | "portal_token"
     | "date_of_birth"
     | "date_of_passing"
     | "date_of_raising"
-    | "progression_signed_off_initiation"
-    | "progression_signed_off_passing"
-    | "progression_signed_off_raising"
+    | "discipleship_signed_off_membership"
+    | "discipleship_signed_off_passing"
+    | "discipleship_signed_off_raising"
     | "archived_at"
     | "archived_reason"
     | "member_levy_amount"
@@ -2803,8 +2803,8 @@ export async function createMember(
     | "levy_waived"
     | "dining_waived"
     | "fee_use_custom"
-    | "annual_dues_waived"
-    | "annual_dues_waiver_reason"
+    | "annual_giving_waived"
+    | "annual_giving_waiver_reason"
     | "show_on_website"
     | "public_bio"
     | "gift_aid_prompted_at"
@@ -2817,9 +2817,9 @@ export async function createMember(
         | "date_of_birth"
         | "date_of_passing"
         | "date_of_raising"
-        | "progression_signed_off_initiation"
-        | "progression_signed_off_passing"
-        | "progression_signed_off_raising"
+        | "discipleship_signed_off_membership"
+        | "discipleship_signed_off_passing"
+        | "discipleship_signed_off_raising"
         | "archived_at"
         | "archived_reason"
         | "member_levy_amount"
@@ -2827,8 +2827,8 @@ export async function createMember(
         | "levy_waived"
         | "dining_waived"
         | "fee_use_custom"
-        | "annual_dues_waived"
-        | "annual_dues_waiver_reason"
+        | "annual_giving_waived"
+        | "annual_giving_waiver_reason"
         | "show_on_website"
         | "public_bio"
         | "gift_aid_prompted_at"
@@ -2838,7 +2838,7 @@ export async function createMember(
 ): Promise<Member> {
   const { data: row, error } = await db()
     .from("members")
-    .insert({ ...data, lodge_id: lodgeId })
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
@@ -2847,14 +2847,14 @@ export async function createMember(
 
 export async function updateMember(
   id: string,
-  lodgeId: string,
-  updates: Partial<Omit<Member, "id" | "lodge_id" | "created_at">>
+  churchId: string,
+  updates: Partial<Omit<Member, "id" | "church_id" | "created_at">>
 ): Promise<Member | null> {
   const { data, error } = await db()
     .from("members")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -2863,7 +2863,7 @@ export async function updateMember(
 
 /**
  * Rewrite a member's email everywhere it is used as a join key. Email is the
- * de-facto link between the members row and historical payments / RSVPs / dues
+ * de-facto link between the members row and historical payments / RSVPs / giving
  * (instead of member_id), so changing it without backfilling these tables
  * would orphan the member's history in the admin detail view.
  *
@@ -2872,26 +2872,26 @@ export async function updateMember(
  */
 export async function changeMemberEmail(
   id: string,
-  lodgeId: string,
+  churchId: string,
   newEmail: string
 ): Promise<{
   member: Member | null;
   oldEmail: string;
   paymentsUpdated: number;
   rsvpsUpdated: number;
-  duesUpdated: number;
+  givingUpdated: number;
 }> {
   const supabase = db();
   const normalised = newEmail.trim().toLowerCase();
 
-  const existing = await getMemberById(id, lodgeId);
+  const existing = await getMemberById(id, churchId);
   if (!existing) {
     return {
       member: null,
       oldEmail: "",
       paymentsUpdated: 0,
       rsvpsUpdated: 0,
-      duesUpdated: 0,
+      givingUpdated: 0,
     };
   }
   const oldEmail = existing.email;
@@ -2902,7 +2902,7 @@ export async function changeMemberEmail(
       oldEmail,
       paymentsUpdated: 0,
       rsvpsUpdated: 0,
-      duesUpdated: 0,
+      givingUpdated: 0,
     };
   }
 
@@ -2910,7 +2910,7 @@ export async function changeMemberEmail(
     .from("members")
     .update({ email: normalised, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (memberError) throw memberError;
@@ -2918,7 +2918,7 @@ export async function changeMemberEmail(
   const { data: paymentsRows, error: paymentsError } = await supabase
     .from("payments")
     .update({ user_email: normalised, updated_at: new Date().toISOString() })
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("user_email", oldEmail)
     .select("id");
   if (paymentsError) throw paymentsError;
@@ -2926,237 +2926,237 @@ export async function changeMemberEmail(
   const { data: rsvpRows, error: rsvpError } = await supabase
     .from("rsvps")
     .update({ user_email: normalised, updated_at: new Date().toISOString() })
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("user_email", oldEmail)
     .select("id");
   if (rsvpError) throw rsvpError;
 
-  const { data: duesRows, error: duesError } = await supabase
-    .from("member_dues")
+  const { data: givingRows, error: givingError } = await supabase
+    .from("member_giving")
     .update({ member_email: normalised, updated_at: new Date().toISOString() })
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("member_email", oldEmail)
     .select("id");
-  if (duesError) throw duesError;
+  if (givingError) throw givingError;
 
   return {
     member: updated as Member | null,
     oldEmail,
     paymentsUpdated: paymentsRows?.length ?? 0,
     rsvpsUpdated: rsvpRows?.length ?? 0,
-    duesUpdated: duesRows?.length ?? 0,
+    givingUpdated: givingRows?.length ?? 0,
   };
 }
 
 // ---------------------------------------------------------------------------
-// Summons
+// Notice
 // ---------------------------------------------------------------------------
 
-export async function getEventSummons(
+export async function getServiceNotice(
   eventId: string,
-  lodgeId: string
-): Promise<EventSummons | null> {
+  churchId: string
+): Promise<ServiceNotice | null> {
   const { data, error } = await db()
-    .from("event_summons")
+    .from("service_notices")
     .select("*")
     .eq("event_id", eventId)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .maybeSingle();
   if (error) throw error;
-  return data as EventSummons | null;
+  return data as ServiceNotice | null;
 }
 
-export async function upsertEventSummons(
-  lodgeId: string,
+export async function upsertServiceNotice(
+  churchId: string,
   eventId: string,
   data: Partial<
     Omit<
-      EventSummons,
-      "id" | "lodge_id" | "event_id" | "created_at" | "updated_at"
+      ServiceNotice,
+      "id" | "church_id" | "event_id" | "created_at" | "updated_at"
     >
   >
-): Promise<EventSummons> {
+): Promise<ServiceNotice> {
   const { data: row, error } = await db()
-    .from("event_summons")
+    .from("service_notices")
     .upsert(
       {
         ...data,
-        lodge_id: lodgeId,
+        church_id: churchId,
         event_id: eventId,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "lodge_id,event_id" }
+      { onConflict: "church_id,event_id" }
     )
     .select("*")
     .single();
   if (error) throw error;
-  return row as EventSummons;
+  return row as ServiceNotice;
 }
 
-export async function listEventSummonsSends(
-  lodgeId: string,
+export async function listServiceNoticeSends(
+  churchId: string,
   eventId: string,
   limit = 5
-): Promise<EventSummonsSend[]> {
+): Promise<ServiceNoticeSend[]> {
   const { data, error } = await db()
-    .from("event_summons_sends")
+    .from("service_notice_sends")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("event_id", eventId)
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return data as EventSummonsSend[];
+  return data as ServiceNoticeSend[];
 }
 
-export async function createEventSummonsSend(
-  lodgeId: string,
-  data: Omit<EventSummonsSend, "id" | "lodge_id" | "created_at">
-): Promise<EventSummonsSend> {
+export async function createServiceNoticeSend(
+  churchId: string,
+  data: Omit<ServiceNoticeSend, "id" | "church_id" | "created_at">
+): Promise<ServiceNoticeSend> {
   const { data: row, error } = await db()
-    .from("event_summons_sends")
-    .insert({ ...data, lodge_id: lodgeId })
+    .from("service_notice_sends")
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
-  return row as EventSummonsSend;
+  return row as ServiceNoticeSend;
 }
 
-export async function createEventSummonsAccessLink(
-  lodgeId: string,
-  data: Omit<EventSummonsAccessLink, "id" | "lodge_id" | "created_at" | "accessed_at" | "access_count">
-): Promise<EventSummonsAccessLink> {
+export async function createServiceNoticeAccessLink(
+  churchId: string,
+  data: Omit<ServiceNoticeAccessLink, "id" | "church_id" | "created_at" | "accessed_at" | "access_count">
+): Promise<ServiceNoticeAccessLink> {
   const { data: row, error } = await db()
-    .from("event_summons_access_links")
-    .insert({ ...data, lodge_id: lodgeId })
+    .from("service_notice_access_links")
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
-  return row as EventSummonsAccessLink;
+  return row as ServiceNoticeAccessLink;
 }
 
-export async function getEventSummonsAccessLinkByTokenHash(
+export async function getServiceNoticeAccessLinkByTokenHash(
   tokenHash: string
-): Promise<EventSummonsAccessLink | null> {
+): Promise<ServiceNoticeAccessLink | null> {
   const { data, error } = await db()
-    .from("event_summons_access_links")
+    .from("service_notice_access_links")
     .select("*")
     .eq("token_hash", tokenHash)
     .maybeSingle();
   if (error) throw error;
-  return data as EventSummonsAccessLink | null;
+  return data as ServiceNoticeAccessLink | null;
 }
 
 // ---------------------------------------------------------------------------
-// Meeting sequences (recurring schedule recipes)
+// Service sequences (recurring schedule recipes)
 // ---------------------------------------------------------------------------
 
-export async function listMeetingSequences(
-  lodgeId: string
-): Promise<MeetingSequence[]> {
+export async function listServiceSequences(
+  churchId: string
+): Promise<ServiceSequence[]> {
   const { data, error } = await db()
-    .from("meeting_sequences")
+    .from("service_sequences")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as MeetingSequence[];
+  return (data ?? []) as ServiceSequence[];
 }
 
-export async function getMeetingSequenceById(
+export async function getServiceSequenceById(
   id: string,
-  lodgeId: string
-): Promise<MeetingSequence | null> {
+  churchId: string
+): Promise<ServiceSequence | null> {
   const { data, error } = await db()
-    .from("meeting_sequences")
+    .from("service_sequences")
     .select("*")
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .maybeSingle();
   if (error) throw error;
-  return data as MeetingSequence | null;
+  return data as ServiceSequence | null;
 }
 
-export async function listActiveMeetingSequencesForAllLodges(): Promise<
-  MeetingSequence[]
+export async function listActiveServiceSequencesForAllChurches(): Promise<
+  ServiceSequence[]
 > {
   const { data, error } = await db()
-    .from("meeting_sequences")
+    .from("service_sequences")
     .select("*")
     .eq("active", true)
-    .eq("auto_draft_summons", true);
+    .eq("auto_draft_notice", true);
   if (error) throw error;
-  return (data ?? []) as MeetingSequence[];
+  return (data ?? []) as ServiceSequence[];
 }
 
-export async function createMeetingSequence(
-  lodgeId: string,
-  data: Omit<MeetingSequence, "id" | "lodge_id" | "created_at" | "updated_at">
-): Promise<MeetingSequence> {
+export async function createServiceSequence(
+  churchId: string,
+  data: Omit<ServiceSequence, "id" | "church_id" | "created_at" | "updated_at">
+): Promise<ServiceSequence> {
   const { data: row, error } = await db()
-    .from("meeting_sequences")
-    .insert({ ...data, lodge_id: lodgeId })
+    .from("service_sequences")
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
-  return row as MeetingSequence;
+  return row as ServiceSequence;
 }
 
-export async function updateMeetingSequence(
+export async function updateServiceSequence(
   id: string,
-  lodgeId: string,
+  churchId: string,
   updates: Partial<
-    Omit<MeetingSequence, "id" | "lodge_id" | "created_at" | "updated_at">
+    Omit<ServiceSequence, "id" | "church_id" | "created_at" | "updated_at">
   >
-): Promise<MeetingSequence | null> {
+): Promise<ServiceSequence | null> {
   const { data, error } = await db()
-    .from("meeting_sequences")
+    .from("service_sequences")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
-  return data as MeetingSequence | null;
+  return data as ServiceSequence | null;
 }
 
-export async function deleteMeetingSequence(
+export async function deleteServiceSequence(
   id: string,
-  lodgeId: string
+  churchId: string
 ): Promise<boolean> {
   const { error } = await db()
-    .from("meeting_sequences")
+    .from("service_sequences")
     .delete()
     .eq("id", id)
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
   return true;
 }
 
 export async function getEventsBySequenceId(
   sequenceId: string,
-  lodgeId: string
+  churchId: string
 ): Promise<Event[]> {
   const { data, error } = await db()
     .from("events")
     .select("*")
     .eq("sequence_id", sequenceId)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("event_date", { ascending: true });
   if (error) throw error;
   return (data ?? []) as Event[];
 }
 
-export async function getEventsAwaitingSummonsDraft(
-  lodgeId: string,
+export async function getEventsAwaitingNoticeDraft(
+  churchId: string,
   windowEndIso: string
 ): Promise<Event[]> {
   const nowIso = new Date().toISOString();
   const { data, error } = await db()
     .from("events")
     .select("*")
-    .eq("lodge_id", lodgeId)
-    .eq("summons_status", "none")
+    .eq("church_id", churchId)
+    .eq("notice_status", "none")
     .gte("event_date", nowIso)
     .lte("event_date", windowEndIso)
     .order("event_date", { ascending: true });
@@ -3164,25 +3164,25 @@ export async function getEventsAwaitingSummonsDraft(
   return (data ?? []) as Event[];
 }
 
-export async function setEventSummonsStatus(
+export async function setServiceNoticeStatus(
   eventId: string,
-  lodgeId: string,
-  status: SummonsStatus,
+  churchId: string,
+  status: NoticeStatus,
   extra?: Partial<
     Pick<
       Event,
-      | "summons_auto_drafted_at"
-      | "summons_approved_at"
-      | "summons_approved_by_email"
-      | "summons_last_sent_at"
+      | "notice_auto_drafted_at"
+      | "notice_approved_at"
+      | "notice_approved_by_email"
+      | "notice_last_sent_at"
     >
   >
 ): Promise<Event | null> {
   const { data, error } = await db()
     .from("events")
-    .update({ summons_status: status, ...(extra ?? {}) })
+    .update({ notice_status: status, ...(extra ?? {}) })
     .eq("id", eventId)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -3193,29 +3193,29 @@ export async function setEventSummonsStatus(
 // Event fee overrides
 //
 // Per-recipient overrides of levy/dining for a single event. Used by the
-// recipients panel to mark "complimentary at this meeting only" for an
+// recipients panel to mark "complimentary at this service only" for an
 // individual member or honorary guest, without changing their profile
 // defaults.
 // ---------------------------------------------------------------------------
 
 export async function listEventFeeOverrides(
-  lodgeId: string,
+  churchId: string,
   eventId: string
 ): Promise<EventFeeOverride[]> {
   const { data, error } = await db()
     .from("event_fee_overrides")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("event_id", eventId);
   if (error) throw error;
   return (data ?? []) as EventFeeOverride[];
 }
 
 export async function upsertEventFeeOverride(
-  lodgeId: string,
+  churchId: string,
   data: Omit<
     EventFeeOverride,
-    "id" | "lodge_id" | "created_at" | "updated_at"
+    "id" | "church_id" | "created_at" | "updated_at"
   >
 ): Promise<EventFeeOverride> {
   const { data: row, error } = await db()
@@ -3223,7 +3223,7 @@ export async function upsertEventFeeOverride(
     .upsert(
       {
         ...data,
-        lodge_id: lodgeId,
+        church_id: churchId,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "event_id,subject_type,subject_id" }
@@ -3235,7 +3235,7 @@ export async function upsertEventFeeOverride(
 }
 
 export async function deleteEventFeeOverride(
-  lodgeId: string,
+  churchId: string,
   eventId: string,
   subjectType: "member" | "guest",
   subjectId: string
@@ -3243,19 +3243,19 @@ export async function deleteEventFeeOverride(
   const { error } = await db()
     .from("event_fee_overrides")
     .delete()
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("event_id", eventId)
     .eq("subject_type", subjectType)
     .eq("subject_id", subjectId);
   if (error) throw error;
 }
 
-export async function recordEventSummonsAccess(
+export async function recordServiceNoticeAccess(
   id: string,
   currentAccessCount: number
-): Promise<EventSummonsAccessLink | null> {
+): Promise<ServiceNoticeAccessLink | null> {
   const { data, error } = await db()
-    .from("event_summons_access_links")
+    .from("service_notice_access_links")
     .update({
       accessed_at: new Date().toISOString(),
       access_count: currentAccessCount + 1,
@@ -3264,18 +3264,18 @@ export async function recordEventSummonsAccess(
     .select("*")
     .maybeSingle();
   if (error) throw error;
-  return data as EventSummonsAccessLink | null;
+  return data as ServiceNoticeAccessLink | null;
 }
 
 export async function getRsvpDietaryByEmail(
   email: string,
-  lodgeId: string
+  churchId: string
 ): Promise<Array<{ event_id: string; dietary_requirements: string | null; created_at: string }>> {
   const { data, error } = await db()
     .from("rsvps")
     .select("event_id, dietary_requirements, created_at")
     .eq("user_email", email)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .not("dietary_requirements", "is", null)
     .order("created_at", { ascending: false });
   if (error) throw error;
@@ -3284,41 +3284,41 @@ export async function getRsvpDietaryByEmail(
 
 export async function getRsvpsByEmail(
   email: string,
-  lodgeId: string
+  churchId: string
 ): Promise<Rsvp[]> {
   const { data, error } = await db()
     .from("rsvps")
     .select("*")
     .eq("user_email", email)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as Rsvp[];
 }
 
-export async function getSummonsAccessLinksByEmail(
+export async function getNoticeAccessLinksByEmail(
   email: string,
-  lodgeId: string
-): Promise<EventSummonsAccessLink[]> {
+  churchId: string
+): Promise<ServiceNoticeAccessLink[]> {
   const { data, error } = await db()
-    .from("event_summons_access_links")
+    .from("service_notice_access_links")
     .select("*")
     .eq("recipient_email", email)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return data as EventSummonsAccessLink[];
+  return data as ServiceNoticeAccessLink[];
 }
 
 export async function getPaymentsByEmail(
   email: string,
-  lodgeId: string
+  churchId: string
 ): Promise<Payment[]> {
   const { data, error } = await db()
     .from("payments")
     .select("*")
     .eq("user_email", email)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as Payment[];
@@ -3326,24 +3326,24 @@ export async function getPaymentsByEmail(
 
 export async function getDonationsByEmail(
   email: string,
-  lodgeId: string
+  churchId: string
 ): Promise<Donation[]> {
   const { data, error } = await db()
     .from("donations")
     .select("*")
     .eq("donor_email", email)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as Donation[];
 }
 
-export async function upsertLodgeDues(
-  lodgeId: string,
+export async function upsertChurchGiving(
+  churchId: string,
   data: Omit<
-    LodgeDues,
+    ChurchGiving,
     | "id"
-    | "lodge_id"
+    | "church_id"
     | "created_at"
     | "updated_at"
     | "enable_strategy_catch_up_lump"
@@ -3356,7 +3356,7 @@ export async function upsertLodgeDues(
   > &
     Partial<
       Pick<
-        LodgeDues,
+        ChurchGiving,
         | "enable_strategy_catch_up_lump"
         | "enable_strategy_balloon"
         | "enable_strategy_reslice"
@@ -3366,43 +3366,43 @@ export async function upsertLodgeDues(
         | "advance_discount_percent"
       >
     >
-): Promise<LodgeDues> {
-  const existing = await getLodgeDues(lodgeId);
+): Promise<ChurchGiving> {
+  const existing = await getChurchGiving(churchId);
   if (existing.length > 0) {
     const { data: row, error } = await db()
-      .from("lodge_dues")
+      .from("church_giving")
       .update({ ...data, updated_at: new Date().toISOString() })
       .eq("id", existing[0].id)
-      .eq("lodge_id", lodgeId)
+      .eq("church_id", churchId)
       .select("*")
       .single();
     if (error) throw error;
-    return row as LodgeDues;
+    return row as ChurchGiving;
   }
   const { data: row, error } = await db()
-    .from("lodge_dues")
-    .insert({ ...data, lodge_id: lodgeId })
+    .from("church_giving")
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
-  return row as LodgeDues;
+  return row as ChurchGiving;
 }
 
 export async function getMembersForInitiation(
   today: string
-): Promise<Array<Member & { lodge_slug: string }>> {
+): Promise<Array<Member & { church_slug: string }>> {
   const { data, error } = await db()
     .from("members")
-    .select("*, lodges!inner(slug)")
-    .eq("date_of_initiation", today)
-    .eq("initiation_email_sent", false);
+    .select("*, churches!inner(slug)")
+    .eq("date_of_membership", today)
+    .eq("membership_email_sent", false);
   if (error) throw error;
   return (data ?? []).map((row: Record<string, unknown>) => {
-    const lodges = row.lodges as { slug: string } | undefined;
+    const churches = row.churches as { slug: string } | undefined;
     return {
       ...row,
-      lodge_slug: lodges?.slug ?? "",
-    } as Member & { lodge_slug: string };
+      church_slug: churches?.slug ?? "",
+    } as Member & { church_slug: string };
   });
 }
 
@@ -3411,10 +3411,10 @@ export async function getMembersForInitiation(
 // ---------------------------------------------------------------------------
 
 export async function createBankImport(
-  lodgeId: string,
+  churchId: string,
   data: Omit<
     BankStatementImport,
-    "id" | "lodge_id" | "created_at" | "matched_rows" | "total_rows"
+    "id" | "church_id" | "created_at" | "matched_rows" | "total_rows"
   > &
     Partial<Pick<BankStatementImport, "matched_rows" | "total_rows">>
 ): Promise<BankStatementImport> {
@@ -3422,7 +3422,7 @@ export async function createBankImport(
     .from("bank_statement_imports")
     .insert({
       ...data,
-      lodge_id: lodgeId,
+      church_id: churchId,
       total_rows: data.total_rows ?? 0,
       matched_rows: data.matched_rows ?? 0,
     })
@@ -3434,7 +3434,7 @@ export async function createBankImport(
 
 export async function updateBankImport(
   id: string,
-  lodgeId: string,
+  churchId: string,
   updates: Partial<
     Pick<BankStatementImport, "total_rows" | "matched_rows" | "notes" | "account_label">
   >
@@ -3443,7 +3443,7 @@ export async function updateBankImport(
     .from("bank_statement_imports")
     .update(updates)
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -3451,23 +3451,23 @@ export async function updateBankImport(
 }
 
 export async function listBankImports(
-  lodgeId: string
+  churchId: string
 ): Promise<BankStatementImport[]> {
   const { data, error } = await db()
     .from("bank_statement_imports")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as BankStatementImport[];
 }
 
 export async function insertBankTransactions(
-  lodgeId: string,
+  churchId: string,
   rows: Array<
     Omit<
       BankTransaction,
-      "id" | "lodge_id" | "created_at" | "updated_at" | "matched_at" | "matched_by_admin_user_id" | "matched_confidence" | "matched_source_id" | "matched_source_type" | "status" | "notes"
+      "id" | "church_id" | "created_at" | "updated_at" | "matched_at" | "matched_by_admin_user_id" | "matched_confidence" | "matched_source_id" | "matched_source_type" | "status" | "notes"
     > &
       Partial<
         Pick<
@@ -3484,7 +3484,7 @@ export async function insertBankTransactions(
   >
 ): Promise<BankTransaction[]> {
   if (rows.length === 0) return [];
-  const payload = rows.map((row) => ({ ...row, lodge_id: lodgeId }));
+  const payload = rows.map((row) => ({ ...row, church_id: churchId }));
   const { data, error } = await db()
     .from("bank_transactions")
     .insert(payload)
@@ -3494,13 +3494,13 @@ export async function insertBankTransactions(
 }
 
 export async function listBankTransactions(
-  lodgeId: string,
+  churchId: string,
   opts?: { importId?: string; status?: BankTransaction["status"] }
 ): Promise<BankTransaction[]> {
   let query = db()
     .from("bank_transactions")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("posted_date", { ascending: false });
   if (opts?.importId) query = query.eq("import_id", opts.importId);
   if (opts?.status) query = query.eq("status", opts.status);
@@ -3511,7 +3511,7 @@ export async function listBankTransactions(
 
 export async function updateBankTransaction(
   id: string,
-  lodgeId: string,
+  churchId: string,
   updates: Partial<
     Pick<
       BankTransaction,
@@ -3529,7 +3529,7 @@ export async function updateBankTransaction(
     .from("bank_transactions")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -3537,58 +3537,58 @@ export async function updateBankTransaction(
 }
 
 // ---------------------------------------------------------------------------
-// Welfare / Almoner module
+// PastoralCare / PastoralCare module
 // ---------------------------------------------------------------------------
 
-export async function listWelfareCases(
-  lodgeId: string,
-  opts?: { status?: WelfareCase["status"] }
-): Promise<WelfareCase[]> {
+export async function listPastoralCareCases(
+  churchId: string,
+  opts?: { status?: PastoralCareCase["status"] }
+): Promise<PastoralCareCase[]> {
   let query = db()
-    .from("welfare_cases")
+    .from("pastoral_cases")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("opened_at", { ascending: false });
   if (opts?.status) query = query.eq("status", opts.status);
   const { data, error } = await query;
   if (error) throw error;
-  return data as WelfareCase[];
+  return data as PastoralCareCase[];
 }
 
-export async function getWelfareCaseById(
+export async function getPastoralCareCaseById(
   id: string,
-  lodgeId: string
-): Promise<WelfareCase | null> {
+  churchId: string
+): Promise<PastoralCareCase | null> {
   const { data, error } = await db()
-    .from("welfare_cases")
+    .from("pastoral_cases")
     .select("*")
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .maybeSingle();
   if (error) throw error;
-  return data as WelfareCase | null;
+  return data as PastoralCareCase | null;
 }
 
-export async function createWelfareCase(
-  lodgeId: string,
-  data: Omit<WelfareCase, "id" | "lodge_id" | "created_at" | "updated_at" | "opened_at" | "closed_at"> &
-    Partial<Pick<WelfareCase, "opened_at" | "closed_at">>
-): Promise<WelfareCase> {
+export async function createPastoralCareCase(
+  churchId: string,
+  data: Omit<PastoralCareCase, "id" | "church_id" | "created_at" | "updated_at" | "opened_at" | "closed_at"> &
+    Partial<Pick<PastoralCareCase, "opened_at" | "closed_at">>
+): Promise<PastoralCareCase> {
   const { data: row, error } = await db()
-    .from("welfare_cases")
-    .insert({ ...data, lodge_id: lodgeId })
+    .from("pastoral_cases")
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
-  return row as WelfareCase;
+  return row as PastoralCareCase;
 }
 
-export async function updateWelfareCase(
+export async function updatePastoralCareCase(
   id: string,
-  lodgeId: string,
+  churchId: string,
   updates: Partial<
     Pick<
-      WelfareCase,
+      PastoralCareCase,
       | "status"
       | "severity"
       | "summary"
@@ -3600,79 +3600,79 @@ export async function updateWelfareCase(
       | "closed_at"
     >
   >
-): Promise<WelfareCase | null> {
+): Promise<PastoralCareCase | null> {
   const { data, error } = await db()
-    .from("welfare_cases")
+    .from("pastoral_cases")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
-  return data as WelfareCase | null;
+  return data as PastoralCareCase | null;
 }
 
-export async function listWelfareVisits(
+export async function listPastoralCareVisits(
   caseId: string,
-  lodgeId: string
-): Promise<WelfareVisit[]> {
+  churchId: string
+): Promise<PastoralCareVisit[]> {
   const { data, error } = await db()
-    .from("welfare_visits")
+    .from("pastoral_visits")
     .select("*")
     .eq("case_id", caseId)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("visited_at", { ascending: false });
   if (error) throw error;
-  return data as WelfareVisit[];
+  return data as PastoralCareVisit[];
 }
 
-export async function createWelfareVisit(
-  lodgeId: string,
-  data: Omit<WelfareVisit, "id" | "lodge_id" | "created_at">
-): Promise<WelfareVisit> {
+export async function createPastoralCareVisit(
+  churchId: string,
+  data: Omit<PastoralCareVisit, "id" | "church_id" | "created_at">
+): Promise<PastoralCareVisit> {
   const { data: row, error } = await db()
-    .from("welfare_visits")
-    .insert({ ...data, lodge_id: lodgeId })
+    .from("pastoral_visits")
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
-  return row as WelfareVisit;
+  return row as PastoralCareVisit;
 }
 
-export async function listWelfareRegister(
-  lodgeId: string,
-  registerType?: WelfareRegisterEntry["register_type"]
-): Promise<WelfareRegisterEntry[]> {
+export async function listPastoralCareRegister(
+  churchId: string,
+  registerType?: PastoralCareRegisterEntry["register_type"]
+): Promise<PastoralCareRegisterEntry[]> {
   let query = db()
-    .from("welfare_register_entries")
+    .from("pastoral_register_entries")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("date_of_event", { ascending: false });
   if (registerType) query = query.eq("register_type", registerType);
   const { data, error } = await query;
   if (error) throw error;
-  return data as WelfareRegisterEntry[];
+  return data as PastoralCareRegisterEntry[];
 }
 
-export async function createWelfareRegister(
-  lodgeId: string,
-  data: Omit<WelfareRegisterEntry, "id" | "lodge_id" | "created_at" | "updated_at">
-): Promise<WelfareRegisterEntry> {
+export async function createPastoralCareRegister(
+  churchId: string,
+  data: Omit<PastoralCareRegisterEntry, "id" | "church_id" | "created_at" | "updated_at">
+): Promise<PastoralCareRegisterEntry> {
   const { data: row, error } = await db()
-    .from("welfare_register_entries")
-    .insert({ ...data, lodge_id: lodgeId })
+    .from("pastoral_register_entries")
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
-  return row as WelfareRegisterEntry;
+  return row as PastoralCareRegisterEntry;
 }
 
-export async function updateWelfareRegister(
+export async function updatePastoralCareRegister(
   id: string,
-  lodgeId: string,
+  churchId: string,
   updates: Partial<
     Pick<
-      WelfareRegisterEntry,
+      PastoralCareRegisterEntry,
       | "full_name"
       | "relationship"
       | "contact_email"
@@ -3682,69 +3682,69 @@ export async function updateWelfareRegister(
       | "notes"
     >
   >
-): Promise<WelfareRegisterEntry | null> {
+): Promise<PastoralCareRegisterEntry | null> {
   const { data, error } = await db()
-    .from("welfare_register_entries")
+    .from("pastoral_register_entries")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
-  return data as WelfareRegisterEntry | null;
+  return data as PastoralCareRegisterEntry | null;
 }
 
-export async function listWelfareAlerts(
-  lodgeId: string,
-  opts?: { status?: WelfareAlert["status"] }
-): Promise<WelfareAlert[]> {
+export async function listPastoralCareAlerts(
+  churchId: string,
+  opts?: { status?: PastoralCareAlert["status"] }
+): Promise<PastoralCareAlert[]> {
   let query = db()
-    .from("welfare_alerts")
+    .from("pastoral_alerts")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false });
   if (opts?.status) query = query.eq("status", opts.status);
   const { data, error } = await query;
   if (error) throw error;
-  return data as WelfareAlert[];
+  return data as PastoralCareAlert[];
 }
 
-export async function upsertWelfareAlert(
-  lodgeId: string,
-  data: Omit<WelfareAlert, "id" | "lodge_id" | "created_at" | "updated_at"> &
-    Partial<Pick<WelfareAlert, "id">>
-): Promise<WelfareAlert> {
+export async function upsertPastoralCareAlert(
+  churchId: string,
+  data: Omit<PastoralCareAlert, "id" | "church_id" | "created_at" | "updated_at"> &
+    Partial<Pick<PastoralCareAlert, "id">>
+): Promise<PastoralCareAlert> {
   const { data: row, error } = await db()
-    .from("welfare_alerts")
+    .from("pastoral_alerts")
     .upsert(
-      { ...data, lodge_id: lodgeId, updated_at: new Date().toISOString() },
-      { onConflict: "lodge_id,member_id,alert_type" }
+      { ...data, church_id: churchId, updated_at: new Date().toISOString() },
+      { onConflict: "church_id,member_id,alert_type" }
     )
     .select("*")
     .single();
   if (error) throw error;
-  return row as WelfareAlert;
+  return row as PastoralCareAlert;
 }
 
-export async function updateWelfareAlert(
+export async function updatePastoralCareAlert(
   id: string,
-  lodgeId: string,
+  churchId: string,
   updates: Partial<
     Pick<
-      WelfareAlert,
+      PastoralCareAlert,
       "status" | "acknowledged_by_admin_user_id" | "acknowledged_at" | "case_id" | "severity"
     >
   >
-): Promise<WelfareAlert | null> {
+): Promise<PastoralCareAlert | null> {
   const { data, error } = await db()
-    .from("welfare_alerts")
+    .from("pastoral_alerts")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
-  return data as WelfareAlert | null;
+  return data as PastoralCareAlert | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -3752,12 +3752,12 @@ export async function updateWelfareAlert(
 // ---------------------------------------------------------------------------
 
 export async function listMessageTemplates(
-  lodgeId: string
+  churchId: string
 ): Promise<MessageTemplate[]> {
   const { data, error } = await db()
     .from("message_templates")
     .select("*")
-    .or(`lodge_id.eq.${lodgeId},lodge_id.is.null`)
+    .or(`church_id.eq.${churchId},church_id.is.null`)
     .order("is_system", { ascending: false })
     .order("name", { ascending: true });
   if (error) throw error;
@@ -3765,29 +3765,29 @@ export async function listMessageTemplates(
 }
 
 export async function getMessageTemplateByKey(
-  lodgeId: string,
+  churchId: string,
   templateKey: string
 ): Promise<MessageTemplate | null> {
   const { data, error } = await db()
     .from("message_templates")
     .select("*")
     .eq("template_key", templateKey)
-    .or(`lodge_id.eq.${lodgeId},lodge_id.is.null`)
-    .order("lodge_id", { ascending: true, nullsFirst: false })
+    .or(`church_id.eq.${churchId},church_id.is.null`)
+    .order("church_id", { ascending: true, nullsFirst: false })
     .limit(1);
   if (error) throw error;
   return (data?.[0] as MessageTemplate | undefined) ?? null;
 }
 
 export async function upsertMessageTemplate(
-  lodgeId: string | null,
-  data: Omit<MessageTemplate, "id" | "lodge_id" | "created_at" | "updated_at">
+  churchId: string | null,
+  data: Omit<MessageTemplate, "id" | "church_id" | "created_at" | "updated_at">
 ): Promise<MessageTemplate> {
   const { data: row, error } = await db()
     .from("message_templates")
     .upsert(
-      { ...data, lodge_id: lodgeId, updated_at: new Date().toISOString() },
-      { onConflict: "lodge_id,template_key" }
+      { ...data, church_id: churchId, updated_at: new Date().toISOString() },
+      { onConflict: "church_id,template_key" }
     )
     .select("*")
     .single();
@@ -3796,30 +3796,30 @@ export async function upsertMessageTemplate(
 }
 
 export async function deleteMessageTemplate(
-  lodgeId: string,
+  churchId: string,
   id: string
 ): Promise<{ deleted: boolean }> {
   const { error, count } = await db()
     .from("message_templates")
     .delete({ count: "exact" })
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("is_system", false);
   if (error) throw error;
   return { deleted: (count ?? 0) > 0 };
 }
 
 export async function listMessages(
-  lodgeId: string,
-  opts?: { memberId?: string; leadId?: string; templateKey?: string; limit?: number }
+  churchId: string,
+  opts?: { memberId?: string; newcomerId?: string; templateKey?: string; limit?: number }
 ): Promise<Message[]> {
   let query = db()
     .from("messages")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false });
   if (opts?.memberId) query = query.eq("recipient_member_id", opts.memberId);
-  if (opts?.leadId) query = query.eq("recipient_lead_id", opts.leadId);
+  if (opts?.newcomerId) query = query.eq("recipient_newcomer_id", opts.newcomerId);
   if (opts?.templateKey) query = query.eq("template_key", opts.templateKey);
   if (opts?.limit) query = query.limit(opts.limit);
   const { data, error } = await query;
@@ -3828,14 +3828,14 @@ export async function listMessages(
 }
 
 export async function logMessages(
-  lodgeId: string,
+  churchId: string,
   rows: Array<
-    Omit<Message, "id" | "lodge_id" | "created_at"> &
+    Omit<Message, "id" | "church_id" | "created_at"> &
       Partial<Pick<Message, "metadata" | "status">>
   >
 ): Promise<Message[]> {
   if (rows.length === 0) return [];
-  const payload = rows.map((row) => ({ ...row, lodge_id: lodgeId }));
+  const payload = rows.map((row) => ({ ...row, church_id: churchId }));
   const { data, error } = await db()
     .from("messages")
     .insert(payload)
@@ -3845,18 +3845,18 @@ export async function logMessages(
 }
 
 export async function listAutomationSettings(
-  lodgeId: string
+  churchId: string
 ): Promise<AutomationSetting[]> {
   const { data, error } = await db()
     .from("automation_settings")
     .select("*")
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
   return data as AutomationSetting[];
 }
 
 export async function upsertAutomationSetting(
-  lodgeId: string,
+  churchId: string,
   automationKey: string,
   enabled: boolean,
   config?: Record<string, unknown>
@@ -3865,13 +3865,13 @@ export async function upsertAutomationSetting(
     .from("automation_settings")
     .upsert(
       {
-        lodge_id: lodgeId,
+        church_id: churchId,
         automation_key: automationKey,
         enabled,
         config: config ?? {},
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "lodge_id,automation_key" }
+      { onConflict: "church_id,automation_key" }
     )
     .select("*")
     .single();
@@ -3884,12 +3884,12 @@ export async function upsertAutomationSetting(
 // ---------------------------------------------------------------------------
 
 export async function recordProgressionSignoff(
-  lodgeId: string,
-  data: Omit<ProgressionSignoff, "id" | "lodge_id" | "created_at">
+  churchId: string,
+  data: Omit<ProgressionSignoff, "id" | "church_id" | "created_at">
 ): Promise<ProgressionSignoff> {
   const { data: row, error } = await db()
-    .from("progression_signoffs")
-    .insert({ ...data, lodge_id: lodgeId })
+    .from("discipleship_signoffs")
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
@@ -3897,13 +3897,13 @@ export async function recordProgressionSignoff(
 }
 
 export async function listProgressionSignoffs(
-  lodgeId: string,
+  churchId: string,
   memberId: string
 ): Promise<ProgressionSignoff[]> {
   const { data, error } = await db()
-    .from("progression_signoffs")
+    .from("discipleship_signoffs")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("member_id", memberId)
     .order("created_at", { ascending: false });
   if (error) throw error;
@@ -3911,13 +3911,13 @@ export async function listProgressionSignoffs(
 }
 
 export async function listMentorAssignments(
-  lodgeId: string,
+  churchId: string,
   opts?: { active?: boolean }
 ): Promise<MentorAssignment[]> {
   let query = db()
     .from("mentor_assignments")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("started_at", { ascending: false });
   if (opts?.active) {
     query = query.is("ended_at", null);
@@ -3928,12 +3928,12 @@ export async function listMentorAssignments(
 }
 
 export async function createMentorAssignment(
-  lodgeId: string,
-  data: Omit<MentorAssignment, "id" | "lodge_id" | "created_at" | "updated_at">
+  churchId: string,
+  data: Omit<MentorAssignment, "id" | "church_id" | "created_at" | "updated_at">
 ): Promise<MentorAssignment> {
   const { data: row, error } = await db()
     .from("mentor_assignments")
-    .insert({ ...data, lodge_id: lodgeId })
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
@@ -3942,14 +3942,14 @@ export async function createMentorAssignment(
 
 export async function updateMentorAssignment(
   id: string,
-  lodgeId: string,
+  churchId: string,
   updates: Partial<Pick<MentorAssignment, "ended_at" | "notes">>
 ): Promise<MentorAssignment | null> {
   const { data, error } = await db()
     .from("mentor_assignments")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -3957,13 +3957,13 @@ export async function updateMentorAssignment(
 }
 
 export async function listMentorContacts(
-  lodgeId: string,
+  churchId: string,
   opts?: { assignmentId?: string }
 ): Promise<MentorContact[]> {
   let query = db()
     .from("mentor_contact_log")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("contacted_at", { ascending: false });
   if (opts?.assignmentId) {
     query = query.eq("assignment_id", opts.assignmentId);
@@ -3974,12 +3974,12 @@ export async function listMentorContacts(
 }
 
 export async function createMentorContact(
-  lodgeId: string,
-  data: Omit<MentorContact, "id" | "lodge_id" | "created_at">
+  churchId: string,
+  data: Omit<MentorContact, "id" | "church_id" | "created_at">
 ): Promise<MentorContact> {
   const { data: row, error } = await db()
     .from("mentor_contact_log")
-    .insert({ ...data, lodge_id: lodgeId })
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
@@ -3988,28 +3988,28 @@ export async function createMentorContact(
 
 export async function listEventRitualRoles(
   eventId: string,
-  lodgeId: string
+  churchId: string
 ): Promise<EventRitualRole[]> {
   const { data, error } = await db()
     .from("event_ritual_roles")
     .select("*")
     .eq("event_id", eventId)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("sort_order", { ascending: true });
   if (error) throw error;
   return data as EventRitualRole[];
 }
 
 export async function upsertEventRitualRoles(
-  lodgeId: string,
+  churchId: string,
   rows: Array<
-    Omit<EventRitualRole, "id" | "lodge_id" | "created_at" | "updated_at">
+    Omit<EventRitualRole, "id" | "church_id" | "created_at" | "updated_at">
   >
 ): Promise<EventRitualRole[]> {
   if (rows.length === 0) return [];
   const payload = rows.map((row) => ({
     ...row,
-    lodge_id: lodgeId,
+    church_id: churchId,
     updated_at: new Date().toISOString(),
   }));
   const { data, error } = await db()
@@ -4021,26 +4021,26 @@ export async function upsertEventRitualRoles(
 }
 
 export async function listOfficerLadder(
-  lodgeId: string
+  churchId: string
 ): Promise<OfficerLadderRung[]> {
   const { data, error } = await db()
     .from("officer_ladder")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("sort_order", { ascending: true });
   if (error) throw error;
   return data as OfficerLadderRung[];
 }
 
 export async function upsertOfficerLadderRung(
-  lodgeId: string,
-  data: Omit<OfficerLadderRung, "id" | "lodge_id" | "created_at" | "updated_at">
+  churchId: string,
+  data: Omit<OfficerLadderRung, "id" | "church_id" | "created_at" | "updated_at">
 ): Promise<OfficerLadderRung> {
   const { data: row, error } = await db()
     .from("officer_ladder")
     .upsert(
-      { ...data, lodge_id: lodgeId, updated_at: new Date().toISOString() },
-      { onConflict: "lodge_id,rung_label" }
+      { ...data, church_id: churchId, updated_at: new Date().toISOString() },
+      { onConflict: "church_id,rung_label" }
     )
     .select("*")
     .single();
@@ -4050,7 +4050,7 @@ export async function upsertOfficerLadderRung(
 
 export async function patchOfficerLadderRung(
   id: string,
-  lodgeId: string,
+  churchId: string,
   patch: Partial<Pick<OfficerLadderRung,
     "current_member_id" | "successor_member_id" | "notes" | "rung_label" | "sort_order"
   >>
@@ -4059,7 +4059,7 @@ export async function patchOfficerLadderRung(
     .from("officer_ladder")
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .single();
   if (error) throw error;
@@ -4068,13 +4068,13 @@ export async function patchOfficerLadderRung(
 
 export async function deleteOfficerLadderRung(
   id: string,
-  lodgeId: string
+  churchId: string
 ): Promise<void> {
   const { error } = await db()
     .from("officer_ladder")
     .delete()
     .eq("id", id)
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
 }
 
@@ -4086,7 +4086,7 @@ export async function deleteOfficerLadderRung(
  * public website Officers section.
  *
  * Successors are intentionally excluded; the public site only ever
- * shows the current officer, never the line of progression.
+ * shows the current officer, never the line of discipleship.
  */
 export type PublicOfficer = {
   rung_id: string;
@@ -4099,7 +4099,7 @@ export type PublicOfficer = {
 };
 
 export async function listPublicOfficers(
-  lodgeId: string
+  churchId: string
 ): Promise<PublicOfficer[]> {
   const { data, error } = await db()
     .from("officer_ladder")
@@ -4107,7 +4107,7 @@ export async function listPublicOfficers(
       `id, rung_label, sort_order, current_member_id,
        members:current_member_id(id, full_name, rank, public_bio, show_on_website, membership_status)`
     )
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .not("current_member_id", "is", null)
     .order("sort_order", { ascending: true });
   if (error) throw error;
@@ -4155,93 +4155,93 @@ export async function listPublicOfficers(
 }
 
 // ---------------------------------------------------------------------------
-// Provincial layer
+// Network layer
 // ---------------------------------------------------------------------------
 
-export async function listProvinces(): Promise<Province[]> {
+export async function listNetworks(): Promise<Network[]> {
   const { data, error } = await db()
-    .from("provinces")
+    .from("networks")
     .select("*")
     .order("name", { ascending: true });
   if (error) throw error;
-  return data as Province[];
+  return data as Network[];
 }
 
-export async function getProvinceById(id: string): Promise<Province | null> {
+export async function getNetworkById(id: string): Promise<Network | null> {
   const { data, error } = await db()
-    .from("provinces")
+    .from("networks")
     .select("*")
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
-  return data as Province | null;
+  return data as Network | null;
 }
 
-export async function getProvinceBySlug(slug: string): Promise<Province | null> {
+export async function getNetworkBySlug(slug: string): Promise<Network | null> {
   const { data, error } = await db()
-    .from("provinces")
+    .from("networks")
     .select("*")
     .eq("slug", slug)
     .maybeSingle();
   if (error) throw error;
-  return data as Province | null;
+  return data as Network | null;
 }
 
-export async function createProvince(
-  data: Omit<Province, "id" | "created_at" | "updated_at">
-): Promise<Province> {
+export async function createNetwork(
+  data: Omit<Network, "id" | "created_at" | "updated_at">
+): Promise<Network> {
   const { data: row, error } = await db()
-    .from("provinces")
+    .from("networks")
     .insert(data)
     .select("*")
     .single();
   if (error) throw error;
-  return row as Province;
+  return row as Network;
 }
 
-export async function updateProvince(
+export async function updateNetwork(
   id: string,
-  updates: Partial<Omit<Province, "id" | "created_at" | "updated_at">>
-): Promise<Province | null> {
+  updates: Partial<Omit<Network, "id" | "created_at" | "updated_at">>
+): Promise<Network | null> {
   const { data, error } = await db()
-    .from("provinces")
+    .from("networks")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
     .select("*")
     .maybeSingle();
   if (error) throw error;
-  return data as Province | null;
+  return data as Network | null;
 }
 
-export async function listLodgesByProvince(provinceId: string): Promise<Lodge[]> {
+export async function listChurchesByNetwork(networkId: string): Promise<Church[]> {
   const { data, error } = await db()
-    .from("lodges")
+    .from("churches")
     .select("*")
-    .eq("province_id", provinceId)
+    .eq("network_id", networkId)
     .order("name", { ascending: true });
   if (error) throw error;
-  return data as Lodge[];
+  return data as Church[];
 }
 
-export async function setLodgeProvince(
-  lodgeId: string,
-  provinceId: string | null
+export async function setChurchNetwork(
+  churchId: string,
+  networkId: string | null
 ): Promise<void> {
   const { error } = await db()
-    .from("lodges")
-    .update({ province_id: provinceId })
-    .eq("id", lodgeId);
+    .from("churches")
+    .update({ network_id: networkId })
+    .eq("id", churchId);
   if (error) throw error;
 }
 
 export async function listMemberRanks(
-  lodgeId: string,
+  churchId: string,
   opts?: { memberId?: string; scope?: MemberRank["scope"] }
 ): Promise<MemberRank[]> {
   let query = db()
     .from("member_ranks")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("conferred_on", { ascending: false, nullsFirst: false });
   if (opts?.memberId) query = query.eq("member_id", opts.memberId);
   if (opts?.scope) query = query.eq("scope", opts.scope);
@@ -4251,86 +4251,86 @@ export async function listMemberRanks(
 }
 
 export async function createMemberRank(
-  lodgeId: string,
-  data: Omit<MemberRank, "id" | "lodge_id" | "created_at" | "updated_at">
+  churchId: string,
+  data: Omit<MemberRank, "id" | "church_id" | "created_at" | "updated_at">
 ): Promise<MemberRank> {
   const { data: row, error } = await db()
     .from("member_ranks")
-    .insert({ ...data, lodge_id: lodgeId })
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
   return row as MemberRank;
 }
 
-export async function deleteMemberRank(id: string, lodgeId: string): Promise<void> {
+export async function deleteMemberRank(id: string, churchId: string): Promise<void> {
   const { error } = await db()
     .from("member_ranks")
     .delete()
     .eq("id", id)
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
 }
 
-export async function listLodgeVisits(
-  visitingLodgeId: string,
+export async function listChurchVisits(
+  newcomerChurchId: string,
   opts?: { limit?: number }
-): Promise<LodgeVisit[]> {
+): Promise<ChurchVisit[]> {
   let query = db()
-    .from("lodge_visits")
+    .from("church_visits")
     .select("*")
-    .eq("visiting_lodge_id", visitingLodgeId)
+    .eq("newcomer_church_id", newcomerChurchId)
     .order("visit_date", { ascending: false });
   if (opts?.limit) query = query.limit(opts.limit);
   const { data, error } = await query;
   if (error) throw error;
-  return data as LodgeVisit[];
+  return data as ChurchVisit[];
 }
 
-export async function createLodgeVisit(
-  data: Omit<LodgeVisit, "id" | "created_at">
-): Promise<LodgeVisit> {
+export async function createChurchVisit(
+  data: Omit<ChurchVisit, "id" | "created_at">
+): Promise<ChurchVisit> {
   const { data: row, error } = await db()
-    .from("lodge_visits")
+    .from("church_visits")
     .insert(data)
     .select("*")
     .single();
   if (error) throw error;
-  return row as LodgeVisit;
+  return row as ChurchVisit;
 }
 
-export async function deleteLodgeVisit(id: string, lodgeId: string): Promise<void> {
+export async function deleteChurchVisit(id: string, churchId: string): Promise<void> {
   const { error } = await db()
-    .from("lodge_visits")
+    .from("church_visits")
     .delete()
     .eq("id", id)
-    .eq("visiting_lodge_id", lodgeId);
+    .eq("newcomer_church_id", churchId);
   if (error) throw error;
 }
 
-export async function listProvinceOfficers(
-  provinceId: string
-): Promise<ProvinceOfficerDirectoryEntry[]> {
+export async function listNetworkOfficers(
+  networkId: string
+): Promise<NetworkOfficerDirectoryEntry[]> {
   const { data, error } = await db()
-    .from("province_officer_directory")
+    .from("network_officer_directory")
     .select("*")
-    .eq("province_id", provinceId)
+    .eq("network_id", networkId)
     .order("officer_sort_order", { ascending: true, nullsFirst: false });
   if (error) throw error;
-  return data as ProvinceOfficerDirectoryEntry[];
+  return data as NetworkOfficerDirectoryEntry[];
 }
 
-export async function listLodgeAnnualReturns(
-  provinceId?: string
-): Promise<LodgeAnnualReturn[]> {
+export async function listChurchAnnualReturns(
+  networkId?: string
+): Promise<ChurchAnnualReturn[]> {
   let query = db()
-    .from("lodge_annual_returns")
+    .from("church_annual_returns")
     .select("*")
-    .order("lodge_name", { ascending: true });
-  if (provinceId) query = query.eq("province_id", provinceId);
+    .order("church_name", { ascending: true });
+  if (networkId) query = query.eq("network_id", networkId);
   const { data, error } = await query;
   if (error) throw error;
-  return data as LodgeAnnualReturn[];
+  return data as ChurchAnnualReturn[];
 }
 
 // ---------------------------------------------------------------------------
@@ -4338,13 +4338,13 @@ export async function listLodgeAnnualReturns(
 // ---------------------------------------------------------------------------
 
 export async function listMemberConsents(
-  lodgeId: string,
+  churchId: string,
   memberId?: string
 ): Promise<MemberConsent[]> {
   let query = db()
     .from("member_consents")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("granted_at", { ascending: false });
   if (memberId) query = query.eq("member_id", memberId);
   const { data, error } = await query;
@@ -4353,20 +4353,20 @@ export async function listMemberConsents(
 }
 
 export async function recordMemberConsent(
-  lodgeId: string,
-  data: Omit<MemberConsent, "id" | "lodge_id" | "created_at" | "updated_at">
+  churchId: string,
+  data: Omit<MemberConsent, "id" | "church_id" | "created_at" | "updated_at">
 ): Promise<MemberConsent> {
   // Revoke any active consent of the same key for this member first.
   await db()
     .from("member_consents")
     .update({ revoked_at: new Date().toISOString() })
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("member_id", data.member_id)
     .eq("consent_key", data.consent_key)
     .is("revoked_at", null);
   const { data: row, error } = await db()
     .from("member_consents")
-    .insert({ ...data, lodge_id: lodgeId })
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
@@ -4375,43 +4375,43 @@ export async function recordMemberConsent(
 
 export async function revokeMemberConsent(
   id: string,
-  lodgeId: string
+  churchId: string
 ): Promise<void> {
   const { error } = await db()
     .from("member_consents")
     .update({ revoked_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
 }
 
 export async function getDataRetentionSettings(
-  lodgeId: string
+  churchId: string
 ): Promise<DataRetentionSettings | null> {
   const { data, error } = await db()
     .from("data_retention_settings")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .maybeSingle();
   if (error) throw error;
   return data as DataRetentionSettings | null;
 }
 
 export async function upsertDataRetentionSettings(
-  lodgeId: string,
+  churchId: string,
   data: Partial<
-    Omit<DataRetentionSettings, "id" | "lodge_id" | "created_at" | "updated_at">
+    Omit<DataRetentionSettings, "id" | "church_id" | "created_at" | "updated_at">
   >
 ): Promise<DataRetentionSettings> {
   const { data: row, error } = await db()
     .from("data_retention_settings")
     .upsert(
       {
-        lodge_id: lodgeId,
+        church_id: churchId,
         ...data,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "lodge_id" }
+      { onConflict: "church_id" }
     )
     .select("*")
     .single();
@@ -4420,27 +4420,27 @@ export async function upsertDataRetentionSettings(
 }
 
 export async function listSubjectAccessRequests(
-  lodgeId: string
+  churchId: string
 ): Promise<SubjectAccessRequest[]> {
   const { data, error } = await db()
     .from("subject_access_requests")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as SubjectAccessRequest[];
 }
 
 export async function createSubjectAccessRequest(
-  lodgeId: string,
+  churchId: string,
   data: Omit<
     SubjectAccessRequest,
-    "id" | "lodge_id" | "created_at" | "updated_at"
+    "id" | "church_id" | "created_at" | "updated_at"
   >
 ): Promise<SubjectAccessRequest> {
   const { data: row, error } = await db()
     .from("subject_access_requests")
-    .insert({ ...data, lodge_id: lodgeId })
+    .insert({ ...data, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
@@ -4449,16 +4449,16 @@ export async function createSubjectAccessRequest(
 
 export async function updateSubjectAccessRequest(
   id: string,
-  lodgeId: string,
+  churchId: string,
   updates: Partial<
-    Omit<SubjectAccessRequest, "id" | "lodge_id" | "created_at" | "updated_at">
+    Omit<SubjectAccessRequest, "id" | "church_id" | "created_at" | "updated_at">
   >
 ): Promise<SubjectAccessRequest | null> {
   const { data, error } = await db()
     .from("subject_access_requests")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -4467,7 +4467,7 @@ export async function updateSubjectAccessRequest(
 
 export async function archiveMember(
   memberId: string,
-  lodgeId: string,
+  churchId: string,
   reason: string
 ): Promise<Member | null> {
   const { data, error } = await db()
@@ -4478,7 +4478,7 @@ export async function archiveMember(
       updated_at: new Date().toISOString(),
     })
     .eq("id", memberId)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -4520,29 +4520,29 @@ export async function updateAdminUserMfa(
  */
 export async function buildSubjectAccessExport(
   memberId: string,
-  lodgeId: string
+  churchId: string
 ): Promise<Record<string, unknown>> {
   const supabase = db();
   const tables = [
     "members",
-    "member_dues",
-    "member_dues_instalments",
+    "member_giving",
+    "member_giving_instalments",
     "rsvps",
     "payments",
     "donations",
     "gift_aid_declarations",
     "member_consents",
     "member_ranks",
-    "progression_signoffs",
+    "discipleship_signoffs",
     "mentor_assignments",
     "mentor_contact_log",
     "messages",
-    "welfare_cases",
-    "welfare_visits",
+    "pastoral_cases",
+    "pastoral_visits",
   ];
   const result: Record<string, unknown> = {
     generated_at: new Date().toISOString(),
-    lodge_id: lodgeId,
+    church_id: churchId,
     member_id: memberId,
   };
   for (const table of tables) {
@@ -4554,7 +4554,7 @@ export async function buildSubjectAccessExport(
           : table === "mentor_assignments" || table === "mentor_contact_log"
             ? "mentor_member_id"
             : "member_id";
-    let query = supabase.from(table).select("*").eq("lodge_id", lodgeId);
+    let query = supabase.from(table).select("*").eq("church_id", churchId);
     if (filterField === "user_email") {
       const { data: m } = await supabase
         .from("members")
@@ -4612,16 +4612,16 @@ export async function enqueueJob(
 }
 
 export async function listJobs(
-  opts?: { lodgeId?: string | null; status?: JobStatus; limit?: number }
+  opts?: { churchId?: string | null; status?: JobStatus; limit?: number }
 ): Promise<Job[]> {
   let query = db()
     .from("jobs")
     .select("*")
     .order("created_at", { ascending: false });
-  if (opts && opts.lodgeId === null) {
-    query = query.is("lodge_id", null);
-  } else if (opts?.lodgeId) {
-    query = query.eq("lodge_id", opts.lodgeId);
+  if (opts && opts.churchId === null) {
+    query = query.is("church_id", null);
+  } else if (opts?.churchId) {
+    query = query.eq("church_id", opts.churchId);
   }
   if (opts?.status) query = query.eq("status", opts.status);
   if (opts?.limit) query = query.limit(opts.limit);
@@ -4632,7 +4632,7 @@ export async function listJobs(
 
 export async function claimNextJobs(limit = 5): Promise<Job[]> {
   const nowIso = new Date().toISOString();
-  const { data: candidates, error: pickError } = await db()
+  const { data: newcomers, error: pickError } = await db()
     .from("jobs")
     .select("*")
     .eq("status", "queued")
@@ -4640,9 +4640,9 @@ export async function claimNextJobs(limit = 5): Promise<Job[]> {
     .order("scheduled_at", { ascending: true })
     .limit(limit);
   if (pickError) throw pickError;
-  if (!candidates || candidates.length === 0) return [];
+  if (!newcomers || newcomers.length === 0) return [];
 
-  const ids = candidates.map((c) => c.id);
+  const ids = newcomers.map((c) => c.id);
   const { data: claimed, error: claimError } = await db()
     .from("jobs")
     .update({
@@ -4700,23 +4700,23 @@ export async function completeJob(
 // ---------------------------------------------------------------------------
 
 export async function listIntegrationCredentials(
-  lodgeId: string
+  churchId: string
 ): Promise<IntegrationCredentials[]> {
   const { data, error } = await db()
     .from("integration_credentials")
     .select("*")
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
   return data as IntegrationCredentials[];
 }
 
 export async function upsertIntegrationCredentials(
-  lodgeId: string,
+  churchId: string,
   provider: IntegrationProvider,
   data: Partial<
     Omit<
       IntegrationCredentials,
-      "id" | "lodge_id" | "provider" | "created_at" | "updated_at"
+      "id" | "church_id" | "provider" | "created_at" | "updated_at"
     >
   >
 ): Promise<IntegrationCredentials> {
@@ -4724,12 +4724,12 @@ export async function upsertIntegrationCredentials(
     .from("integration_credentials")
     .upsert(
       {
-        lodge_id: lodgeId,
+        church_id: churchId,
         provider,
         ...data,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "lodge_id,provider" }
+      { onConflict: "church_id,provider" }
     )
     .select("*")
     .single();
@@ -4738,13 +4738,13 @@ export async function upsertIntegrationCredentials(
 }
 
 export async function deleteIntegrationCredentials(
-  lodgeId: string,
+  churchId: string,
   provider: IntegrationProvider
 ): Promise<void> {
   const { error } = await db()
     .from("integration_credentials")
     .delete()
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("provider", provider);
   if (error) throw error;
 }
@@ -4753,69 +4753,69 @@ export async function deleteIntegrationCredentials(
 // Platform-wide aggregates (operator console)
 // ---------------------------------------------------------------------------
 
-export type PlatformLodgeStats = {
-  lodge_id: string;
-  lodge_slug: string;
-  lodge_name: string;
-  province_id: string | null;
+export type PlatformChurchStats = {
+  church_id: string;
+  church_slug: string;
+  church_name: string;
+  network_id: string | null;
   members: number;
   active_members: number;
   upcoming_events: number;
-  outstanding_dues: number;
-  paid_dues_amount: number;
+  outstanding_giving: number;
+  paid_giving_amount: number;
   donations_amount: number;
-  last_meeting_at: string | null;
+  last_service_at: string | null;
 };
 
 // ---------------------------------------------------------------------------
-// Lodge feature flags
+// Church feature flags
 // ---------------------------------------------------------------------------
 
-export async function listLodgeFeatureFlags(
-  lodgeId: string
-): Promise<LodgeFeatureFlag[]> {
+export async function listChurchFeatureFlags(
+  churchId: string
+): Promise<ChurchFeatureFlag[]> {
   const { data, error } = await db()
-    .from("lodge_feature_flags")
+    .from("church_feature_flags")
     .select("*")
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
-  return (data ?? []) as LodgeFeatureFlag[];
+  return (data ?? []) as ChurchFeatureFlag[];
 }
 
-export async function setLodgeFeatureFlag(
-  lodgeId: string,
+export async function setChurchFeatureFlag(
+  churchId: string,
   flagKey: string,
   enabled: boolean,
   opts?: { notes?: string | null; updated_by_email?: string | null }
-): Promise<LodgeFeatureFlag> {
+): Promise<ChurchFeatureFlag> {
   const { data, error } = await db()
-    .from("lodge_feature_flags")
+    .from("church_feature_flags")
     .upsert(
       {
-        lodge_id: lodgeId,
+        church_id: churchId,
         flag_key: flagKey,
         enabled,
         notes: opts?.notes ?? null,
         updated_by_email: opts?.updated_by_email ?? null,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "lodge_id,flag_key" }
+      { onConflict: "church_id,flag_key" }
     )
     .select("*")
     .single();
   if (error) throw error;
-  return data as LodgeFeatureFlag;
+  return data as ChurchFeatureFlag;
 }
 
-export async function getPlatformLodgeStats(): Promise<PlatformLodgeStats[]> {
-  const lodges = await listLodges();
-  const stats: PlatformLodgeStats[] = [];
-  for (const lodge of lodges) {
-    const [members, events, dues, donations] = await Promise.all([
-      getMembers(lodge.id, {}),
-      getEvents(lodge.id, {}),
-      getMemberDues(lodge.id, {}),
-      getDonations(lodge.id),
+export async function getPlatformChurchStats(): Promise<PlatformChurchStats[]> {
+  const churches = await listChurches();
+  const stats: PlatformChurchStats[] = [];
+  for (const church of churches) {
+    const [members, events, giving, donations] = await Promise.all([
+      getMembers(church.id, {}),
+      getEvents(church.id, {}),
+      getMemberGiving(church.id, {}),
+      getDonations(church.id),
     ]);
     const now = new Date();
     const upcoming = events.filter((e) => new Date(e.event_date) >= now);
@@ -4824,19 +4824,19 @@ export async function getPlatformLodgeStats(): Promise<PlatformLodgeStats[]> {
       .sort((a, b) => +new Date(b.event_date) - +new Date(a.event_date));
 
     stats.push({
-      lodge_id: lodge.id,
-      lodge_slug: lodge.slug,
-      lodge_name: lodge.name,
-      province_id: lodge.province_id,
+      church_id: church.id,
+      church_slug: church.slug,
+      church_name: church.name,
+      network_id: church.network_id,
       members: members.length,
       active_members: members.filter((m) => m.membership_status === "active").length,
       upcoming_events: upcoming.length,
-      outstanding_dues: dues.filter((d) => d.status === "outstanding" || d.status === "overdue").length,
-      paid_dues_amount: dues
+      outstanding_giving: giving.filter((d) => d.status === "outstanding" || d.status === "overdue").length,
+      paid_giving_amount: giving
         .filter((d) => d.status === "paid")
         .reduce((sum, d) => sum + Number(d.amount ?? 0), 0),
       donations_amount: donations.reduce((sum, d) => sum + Number(d.amount ?? 0), 0),
-      last_meeting_at: past[0]?.event_date ?? null,
+      last_service_at: past[0]?.event_date ?? null,
     });
   }
   return stats;
@@ -4847,7 +4847,7 @@ export async function getPlatformLodgeStats(): Promise<PlatformLodgeStats[]> {
 // ---------------------------------------------------------------------------
 
 export async function listGuests(
-  lodgeId: string,
+  churchId: string,
   opts?: {
     search?: string;
     includeArchived?: boolean;
@@ -4857,7 +4857,7 @@ export async function listGuests(
   let query = db()
     .from("guests")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("last_seen_event_id", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
   if (!opts?.includeArchived) {
@@ -4869,7 +4869,7 @@ export async function listGuests(
   if (opts?.search) {
     const term = `%${opts.search}%`;
     query = query.or(
-      `full_name.ilike.${term},email.ilike.${term},mother_lodge_name.ilike.${term}`
+      `full_name.ilike.${term},email.ilike.${term},mother_church_name.ilike.${term}`
     );
   }
   const { data, error } = await query;
@@ -4879,47 +4879,47 @@ export async function listGuests(
 
 export async function getGuestById(
   id: string,
-  lodgeId: string
+  churchId: string
 ): Promise<Guest | null> {
   const { data, error } = await db()
     .from("guests")
     .select("*")
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .maybeSingle();
   if (error) throw error;
   return (data as Guest | null) ?? null;
 }
 
 export async function findGuestByEmail(
-  lodgeId: string,
+  churchId: string,
   email: string
 ): Promise<Guest | null> {
   const { data, error } = await db()
     .from("guests")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .ilike("email", email)
     .maybeSingle();
   if (error) throw error;
   return (data as Guest | null) ?? null;
 }
 
-export async function findGuestByNameAndLodge(
-  lodgeId: string,
+export async function findGuestByNameAndChurch(
+  churchId: string,
   fullName: string,
-  motherLodgeName: string | null
+  motherChurchName: string | null
 ): Promise<Guest | null> {
   let query = db()
     .from("guests")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .ilike("full_name", fullName)
     .limit(1);
-  if (motherLodgeName) {
-    query = query.ilike("mother_lodge_name", motherLodgeName);
+  if (motherChurchName) {
+    query = query.ilike("mother_church_name", motherChurchName);
   } else {
-    query = query.is("mother_lodge_name", null);
+    query = query.is("mother_church_name", null);
   }
   const { data, error } = await query.maybeSingle();
   if (error) throw error;
@@ -4927,14 +4927,14 @@ export async function findGuestByNameAndLodge(
 }
 
 export async function createGuest(
-  lodgeId: string,
-  guest: Partial<Omit<Guest, "id" | "lodge_id" | "created_at" | "updated_at">> & {
+  churchId: string,
+  guest: Partial<Omit<Guest, "id" | "church_id" | "created_at" | "updated_at">> & {
     full_name: string;
   }
 ): Promise<Guest> {
   const { data, error } = await db()
     .from("guests")
-    .insert({ ...guest, lodge_id: lodgeId })
+    .insert({ ...guest, church_id: churchId })
     .select("*")
     .single();
   if (error) throw error;
@@ -4943,14 +4943,14 @@ export async function createGuest(
 
 export async function updateGuest(
   id: string,
-  lodgeId: string,
-  patch: Partial<Omit<Guest, "id" | "lodge_id" | "created_at">>
+  churchId: string,
+  patch: Partial<Omit<Guest, "id" | "church_id" | "created_at">>
 ): Promise<Guest> {
   const { data, error } = await db()
     .from("guests")
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .select("*")
     .single();
   if (error) throw error;
@@ -4959,68 +4959,68 @@ export async function updateGuest(
 
 export async function archiveGuest(
   id: string,
-  lodgeId: string
+  churchId: string
 ): Promise<Guest> {
-  return updateGuest(id, lodgeId, {
+  return updateGuest(id, churchId, {
     archived_at: new Date().toISOString(),
   });
 }
 
 export async function restoreGuest(
   id: string,
-  lodgeId: string
+  churchId: string
 ): Promise<Guest> {
-  return updateGuest(id, lodgeId, { archived_at: null });
+  return updateGuest(id, churchId, { archived_at: null });
 }
 
 export async function hardDeleteGuestIfUnused(
   id: string,
-  lodgeId: string
+  churchId: string
 ): Promise<{ deleted: boolean }> {
-  const guest = await getGuestById(id, lodgeId);
+  const guest = await getGuestById(id, churchId);
   if (!guest) return { deleted: false };
   if ((guest.visit_count ?? 0) > 0) return { deleted: false };
   const { error } = await db()
     .from("guests")
     .delete()
     .eq("id", id)
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
   return { deleted: true };
 }
 
-export async function setGuestVisitorTokenHash(
+export async function setGuestNewcomerTokenHash(
   id: string,
-  lodgeId: string,
+  churchId: string,
   tokenHash: string
 ): Promise<Guest> {
-  return updateGuest(id, lodgeId, { visitor_token_hash: tokenHash });
+  return updateGuest(id, churchId, { newcomer_token_hash: tokenHash });
 }
 
-export async function getGuestByVisitorTokenHash(
+export async function getGuestByNewcomerTokenHash(
   tokenHash: string
 ): Promise<Guest | null> {
   const { data, error } = await db()
     .from("guests")
     .select("*")
-    .eq("visitor_token_hash", tokenHash)
+    .eq("newcomer_token_hash", tokenHash)
     .maybeSingle();
   if (error) throw error;
   return (data as Guest | null) ?? null;
 }
 
 export async function upsertGuest(
-  lodgeId: string,
+  churchId: string,
   input: {
     full_name: string;
     email?: string | null;
     phone?: string | null;
-    mother_lodge_name?: string | null;
-    mother_lodge_number?: string | null;
+    mother_church_name?: string | null;
+    mother_church_number?: string | null;
     constitution?: string | null;
     rank?: string | null;
     dietary_requirements?: string | null;
-    is_mason?: boolean;
+    is_member?: boolean;
     event_id?: string | null;
     source?:
       | "admin"
@@ -5033,26 +5033,26 @@ export async function upsertGuest(
 ): Promise<Guest> {
   const email = input.email?.trim() || null;
   const fullName = input.full_name.trim();
-  const motherLodgeName = input.mother_lodge_name?.trim() || null;
+  const motherChurchName = input.mother_church_name?.trim() || null;
   const recordVisit = input.recordVisit !== false;
 
   const existing = email
-    ? await findGuestByEmail(lodgeId, email)
-    : await findGuestByNameAndLodge(lodgeId, fullName, motherLodgeName);
+    ? await findGuestByEmail(churchId, email)
+    : await findGuestByNameAndChurch(churchId, fullName, motherChurchName);
 
   if (existing) {
-    return updateGuest(existing.id, lodgeId, {
+    return updateGuest(existing.id, churchId, {
       full_name: fullName || existing.full_name,
       email: email ?? existing.email,
       phone: input.phone?.trim() ?? existing.phone,
-      mother_lodge_name: motherLodgeName ?? existing.mother_lodge_name,
-      mother_lodge_number:
-        input.mother_lodge_number?.trim() ?? existing.mother_lodge_number,
+      mother_church_name: motherChurchName ?? existing.mother_church_name,
+      mother_church_number:
+        input.mother_church_number?.trim() ?? existing.mother_church_number,
       constitution: input.constitution?.trim() ?? existing.constitution,
       rank: input.rank?.trim() ?? existing.rank,
       dietary_requirements:
         input.dietary_requirements?.trim() ?? existing.dietary_requirements,
-      is_mason: input.is_mason ?? existing.is_mason,
+      is_member: input.is_member ?? existing.is_member,
       visit_count: recordVisit ? existing.visit_count + 1 : existing.visit_count,
       last_seen_event_id: recordVisit
         ? (input.event_id ?? existing.last_seen_event_id)
@@ -5062,16 +5062,16 @@ export async function upsertGuest(
     });
   }
 
-  return createGuest(lodgeId, {
+  return createGuest(churchId, {
     full_name: fullName,
     email,
     phone: input.phone?.trim() || null,
-    mother_lodge_name: motherLodgeName,
-    mother_lodge_number: input.mother_lodge_number?.trim() || null,
+    mother_church_name: motherChurchName,
+    mother_church_number: input.mother_church_number?.trim() || null,
     constitution: input.constitution?.trim() || null,
     rank: input.rank?.trim() || null,
     dietary_requirements: input.dietary_requirements?.trim() || null,
-    is_mason: input.is_mason ?? true,
+    is_member: input.is_member ?? true,
     visit_count: recordVisit ? 1 : 0,
     first_seen_event_id: input.event_id ?? null,
     last_seen_event_id: recordVisit ? (input.event_id ?? null) : null,
@@ -5082,11 +5082,11 @@ export async function upsertGuest(
 }
 
 export async function createGuestInvitation(
-  lodgeId: string,
+  churchId: string,
   data: Omit<
     GuestInvitation,
     | "id"
-    | "lodge_id"
+    | "church_id"
     | "uses"
     | "created_at"
     | "last_used_at"
@@ -5096,7 +5096,7 @@ export async function createGuestInvitation(
 ): Promise<GuestInvitation> {
   const { data: row, error } = await db()
     .from("guest_invitations")
-    .insert({ ...data, lodge_id: lodgeId, uses: data.uses ?? 0 })
+    .insert({ ...data, church_id: churchId, uses: data.uses ?? 0 })
     .select("*")
     .single();
   if (error) throw error;
@@ -5117,13 +5117,13 @@ export async function getGuestInvitationByTokenHash(
 
 export async function getGuestInvitationById(
   id: string,
-  lodgeId: string
+  churchId: string
 ): Promise<GuestInvitation | null> {
   const { data, error } = await db()
     .from("guest_invitations")
     .select("*")
     .eq("id", id)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .maybeSingle();
   if (error) throw error;
   return (data as GuestInvitation | null) ?? null;
@@ -5131,13 +5131,13 @@ export async function getGuestInvitationById(
 
 export async function listGuestInvitationsForGuest(
   guestId: string,
-  lodgeId: string
+  churchId: string
 ): Promise<GuestInvitation[]> {
   const { data, error } = await db()
     .from("guest_invitations")
     .select("*")
     .eq("guest_id", guestId)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as GuestInvitation[];
@@ -5145,13 +5145,13 @@ export async function listGuestInvitationsForGuest(
 
 export async function listGuestInvitationsForEvent(
   eventId: string,
-  lodgeId: string
+  churchId: string
 ): Promise<GuestInvitation[]> {
   const { data, error } = await db()
     .from("guest_invitations")
     .select("*")
     .eq("event_id", eventId)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as GuestInvitation[];
@@ -5159,13 +5159,13 @@ export async function listGuestInvitationsForEvent(
 
 export async function listGuestInvitationsForMember(
   memberId: string,
-  lodgeId: string
+  churchId: string
 ): Promise<GuestInvitation[]> {
   const { data, error } = await db()
     .from("guest_invitations")
     .select("*")
     .eq("inviter_member_id", memberId)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as GuestInvitation[];
@@ -5190,24 +5190,24 @@ export async function recordGuestInvitationUse(
 
 export async function revokeGuestInvitation(
   id: string,
-  lodgeId: string
+  churchId: string
 ): Promise<void> {
   const { error } = await db()
     .from("guest_invitations")
     .update({ revoked_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
 }
 
-export async function listEventGuestsForLodge(
-  lodgeId: string,
+export async function listEventGuestsForChurch(
+  churchId: string,
   opts?: { eventId?: string; guestId?: string }
 ): Promise<EventGuest[]> {
   let query = db()
     .from("event_guests")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("created_at", { ascending: false });
   if (opts?.eventId) query = query.eq("event_id", opts.eventId);
   if (opts?.guestId) query = query.eq("guest_id", opts.guestId);
@@ -5218,123 +5218,123 @@ export async function listEventGuestsForLodge(
 
 export async function markEventGuestWelcomeSent(
   ids: string[],
-  lodgeId: string
+  churchId: string
 ): Promise<void> {
   if (ids.length === 0) return;
   const { error } = await db()
     .from("event_guests")
     .update({ welcome_email_sent_at: new Date().toISOString() })
     .in("id", ids)
-    .eq("lodge_id", lodgeId);
+    .eq("church_id", churchId);
   if (error) throw error;
 }
 
 // ---------------------------------------------------------------------------
-// Lodge fee defaults & masonic year
+// Church fee defaults & giving year
 // ---------------------------------------------------------------------------
 
-export async function getLodgeFeeDefaults(
-  lodgeId: string
-): Promise<LodgeFeeDefaults | null> {
+export async function getChurchFeeDefaults(
+  churchId: string
+): Promise<ChurchFeeDefaults | null> {
   const { data, error } = await db()
-    .from("lodge_fee_defaults")
+    .from("church_fee_defaults")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .maybeSingle();
   if (error) throw error;
-  return (data as LodgeFeeDefaults | null) ?? null;
+  return (data as ChurchFeeDefaults | null) ?? null;
 }
 
-export async function upsertLodgeFeeDefaults(
-  lodgeId: string,
-  input: Omit<LodgeFeeDefaults, "lodge_id" | "updated_at">
-): Promise<LodgeFeeDefaults> {
+export async function upsertChurchFeeDefaults(
+  churchId: string,
+  input: Omit<ChurchFeeDefaults, "church_id" | "updated_at">
+): Promise<ChurchFeeDefaults> {
   const { data, error } = await db()
-    .from("lodge_fee_defaults")
+    .from("church_fee_defaults")
     .upsert(
       {
-        lodge_id: lodgeId,
+        church_id: churchId,
         ...input,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "lodge_id" }
+      { onConflict: "church_id" }
     )
     .select("*")
     .single();
   if (error) throw error;
-  return data as LodgeFeeDefaults;
+  return data as ChurchFeeDefaults;
 }
 
-export async function listLodgeMasonicYears(
-  lodgeId: string
-): Promise<LodgeMasonicYear[]> {
+export async function listChurchGivingYears(
+  churchId: string
+): Promise<ChurchGivingYear[]> {
   const { data, error } = await db()
-    .from("lodge_masonic_years")
+    .from("church_giving_years")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .order("start_date", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as LodgeMasonicYear[];
+  return (data ?? []) as ChurchGivingYear[];
 }
 
-export async function getCurrentMasonicYear(
-  lodgeId: string
-): Promise<LodgeMasonicYear | null> {
+export async function getCurrentChurchYear(
+  churchId: string
+): Promise<ChurchGivingYear | null> {
   const { data, error } = await db()
-    .from("lodge_masonic_years")
+    .from("church_giving_years")
     .select("*")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("is_current", true)
     .maybeSingle();
   if (error) throw error;
-  return (data as LodgeMasonicYear | null) ?? null;
+  return (data as ChurchGivingYear | null) ?? null;
 }
 
-export async function upsertLodgeMasonicYear(
-  lodgeId: string,
-  input: Omit<LodgeMasonicYear, "id" | "lodge_id" | "created_at" | "updated_at"> & {
+export async function upsertChurchGivingYear(
+  churchId: string,
+  input: Omit<ChurchGivingYear, "id" | "church_id" | "created_at" | "updated_at"> & {
     id?: string;
   }
-): Promise<LodgeMasonicYear> {
+): Promise<ChurchGivingYear> {
   if (input.is_current) {
     await db()
-      .from("lodge_masonic_years")
+      .from("church_giving_years")
       .update({ is_current: false, updated_at: new Date().toISOString() })
-      .eq("lodge_id", lodgeId)
+      .eq("church_id", churchId)
       .eq("is_current", true);
   }
 
   const payload = {
-    lodge_id: lodgeId,
+    church_id: churchId,
     label: input.label,
     start_date: input.start_date,
     end_date: input.end_date,
-    annual_dues_amount: input.annual_dues_amount,
+    annual_giving_amount: input.annual_giving_amount,
     is_current: input.is_current,
     updated_at: new Date().toISOString(),
   };
 
   if (input.id) {
     const { data, error } = await db()
-      .from("lodge_masonic_years")
+      .from("church_giving_years")
       .update(payload)
       .eq("id", input.id)
-      .eq("lodge_id", lodgeId)
+      .eq("church_id", churchId)
       .select("*")
       .single();
     if (error) throw error;
-    return data as LodgeMasonicYear;
+    return data as ChurchGivingYear;
   }
 
   const { data, error } = await db()
-    .from("lodge_masonic_years")
+    .from("church_giving_years")
     .insert(payload)
     .select("*")
     .single();
   if (error) throw error;
-  return data as LodgeMasonicYear;
+  return data as ChurchGivingYear;
 }
 
-export async function listHonoraryGuests(lodgeId: string): Promise<Guest[]> {
-  return listGuests(lodgeId, { guestCategory: "honorary_guest" });
+export async function listHonoraryGuests(churchId: string): Promise<Guest[]> {
+  return listGuests(churchId, { guestCategory: "honorary_guest" });
 }

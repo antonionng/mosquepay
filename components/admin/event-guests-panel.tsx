@@ -37,7 +37,7 @@ type Props = {
 };
 
 function formatPolicy(p: GuestPolicy) {
-  if (p === "blue_table") return "Blue table (Masons only)";
+  if (p === "blue_table") return "Blue table (members only)";
   if (p === "white_table") return "White table (open to guests)";
   return "Closed (no guest links)";
 }
@@ -196,7 +196,7 @@ export function EventGuestsPanel({
                   type="email"
                   value={recipientEmail}
                   onChange={(event) => setRecipientEmail(event.target.value)}
-                  placeholder="brother@example.com"
+                  placeholder="member@example.com"
                 />
               </div>
             </div>

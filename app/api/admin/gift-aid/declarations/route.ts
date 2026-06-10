@@ -4,15 +4,15 @@
 //         can upload the scanned wet-ink slip in the same request. Writes
 //         the declaration row, uploads the scan to the private evidence
 //         bucket (hashed), and stamps the row + the append-only event
-//         log. This is Lester's path: he comes home from lodge night with
+//         log. This is Lester's path: he comes home from church night with
 //         a stack of forms and uploads them in one sitting.
 //
-// Auth: admin with `charity:write` on the active lodge.
+// Auth: admin with `charity:write` on the active church.
 
 import { NextRequest, NextResponse } from "next/server";
 import * as db from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -50,12 +50,12 @@ export async function POST(request: NextRequest) {
       { status: 503 }
     );
   }
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("charity:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("charity:write", churchId);
   if (forbidden) return forbidden;
 
   let form: FormData;
@@ -126,10 +126,10 @@ export async function POST(request: NextRequest) {
   // too (member_id omitted), so absence is fine; presence means we'll
   // light up the dashboard banner correctly.
   if (memberId) {
-    const member = await db.getMemberById(memberId, lodgeId);
+    const member = await db.getMemberById(memberId, churchId);
     if (!member) {
       return NextResponse.json(
-        { error: "Member not found in this lodge." },
+        { error: "Member not found in this church." },
         { status: 400 }
       );
     }
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
 
   let actorEmail: string | null = null;
   try {
-    const admin = await getCurrentAdminContextAny(lodgeId);
+    const admin = await getCurrentAdminContextAny(churchId);
     actorEmail = admin?.email ?? null;
   } catch {
     /* non-fatal */
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
   // confirmed-but-unevidenced declaration on file.
   let declaration;
   try {
-    declaration = await db.addGiftAidDeclaration(lodgeId, {
+    declaration = await db.addGiftAidDeclaration(churchId, {
       donor_name: donorName,
       donor_email: donorEmail,
       donor_address_line_1: addressLine1,
@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     console.error("admin gift-aid paper POST: insert failed", {
-      lodge_id: lodgeId,
+      church_id: churchId,
       message: err instanceof Error ? err.message : String(err),
     });
     return NextResponse.json(
@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
   try {
     const bytes = Buffer.from(await file.arrayBuffer());
     evidence = await uploadEvidence({
-      lodgeId,
+      churchId,
       declarationId: declaration.id,
       bytes,
       mimeType: file.type,
@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
     // Don't leave an unbacked declaration around. Revoke immediately so the
     // claim batches won't pick it up.
     try {
-      await db.revokeGiftAidDeclaration(declaration.id, lodgeId, {
+      await db.revokeGiftAidDeclaration(declaration.id, churchId, {
         reason: "evidence_upload_failed",
       });
     } catch {
@@ -208,7 +208,7 @@ export async function POST(request: NextRequest) {
 
   const nowIso = new Date().toISOString();
   try {
-    await db.updateGiftAidDeclarationEvidence(declaration.id, lodgeId, {
+    await db.updateGiftAidDeclarationEvidence(declaration.id, churchId, {
       evidence_source: "paper",
       evidence_storage_bucket: evidence.bucket,
       evidence_storage_path: evidence.path,
@@ -226,7 +226,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await db.insertGiftAidDeclarationEvent(lodgeId, {
+    await db.insertGiftAidDeclarationEvent(churchId, {
       declaration_id: declaration.id,
       event_type: "created_paper",
       actor_kind: "admin",
@@ -252,7 +252,7 @@ export async function POST(request: NextRequest) {
 
   if (memberId) {
     try {
-      await db.updateMemberGiftAidPosture(memberId, lodgeId, {
+      await db.updateMemberGiftAidPosture(memberId, churchId, {
         gift_aid_consent_status: "declared",
         gift_aid_prompted_at: nowIso,
       });
@@ -265,7 +265,7 @@ export async function POST(request: NextRequest) {
   }
 
   await writeAuditLog({
-    lodgeId,
+    churchId,
     action: "gift_aid_declaration_created_paper",
     entityType: "gift_aid_declaration",
     entityId: declaration.id,

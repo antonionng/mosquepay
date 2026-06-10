@@ -75,7 +75,7 @@ function Kpi({
 }
 
 export function ReportsClient({
-  lodgeName,
+  churchName,
   secretary,
   treasurer,
   charity,
@@ -83,7 +83,7 @@ export function ReportsClient({
   annualReturn,
   operator,
 }: {
-  lodgeName: string;
+  churchName: string;
   secretary: SecretaryReport;
   treasurer: TreasurerReport;
   charity: CharityReport;
@@ -99,7 +99,7 @@ export function ReportsClient({
         <div>
           <h1 className="admin-page-title">Reports</h1>
           <p className="admin-page-copy">
-            Role-focused operational reports for {lodgeName}.
+            Role-focused operational reports for {churchName}.
           </p>
         </div>
       </div>
@@ -139,18 +139,18 @@ export function ReportsClient({
 }
 
 function SecretaryView({ r }: { r: SecretaryReport }) {
-  function exportMeetings() {
+  function exportServices() {
     downloadCsv(
-      "secretary-meetings.csv",
-      ["Title", "Date", "Published", "RSVPs", "Ceremony", "Dining", "Summons sent"],
-      r.meetingTable.map((m) => [
+      "secretary-services.csv",
+      ["Title", "Date", "Published", "RSVPs", "Ceremony", "Dining", "Notice sent"],
+      r.serviceTable.map((m) => [
         m.title,
         m.date,
         m.published ? "yes" : "no",
         m.rsvpCount,
         m.ceremonyCount,
         m.diningCount,
-        m.summonsSent,
+        m.noticeSent,
       ])
     );
   }
@@ -159,14 +159,14 @@ function SecretaryView({ r }: { r: SecretaryReport }) {
     <div className="space-y-4 sm:space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi
-          label="Meetings"
-          value={`${r.totalMeetings}`}
-          hint={`${r.upcomingMeetings} upcoming · ${r.publishedMeetings} published`}
+          label="Services"
+          value={`${r.totalServices}`}
+          hint={`${r.upcomingServices} upcoming · ${r.publishedServices} published`}
         />
         <Kpi
-          label="Summons"
-          value={`${r.meetingsWithSummons}/${r.totalMeetings}`}
-          hint={`${r.totalSummonsSends} sends recorded`}
+          label="Notice"
+          value={`${r.servicesWithNotice}/${r.totalServices}`}
+          hint={`${r.totalNoticeSends} sends recorded`}
         />
         <Kpi
           label="RSVPs"
@@ -183,39 +183,39 @@ function SecretaryView({ r }: { r: SecretaryReport }) {
       <Card variant="panel" className="overflow-hidden p-0">
         <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
           <div>
-            <h2 className="dash-panel-header-title">Meeting readiness &amp; attendance</h2>
+            <h2 className="dash-panel-header-title">Service readiness &amp; attendance</h2>
             <p className="dash-panel-header-description">
-              Last 30 meetings, sorted by date.
+              Last 30 services, sorted by date.
             </p>
           </div>
-          <Button variant="dashboard" size="sm" onClick={exportMeetings}>
+          <Button variant="dashboard" size="sm" onClick={exportServices}>
             <Download className="mr-1.5 h-4 w-4" /> CSV
           </Button>
         </div>
         <CardContent className="admin-table-scroll border-t border-dash-border bg-dash-surface p-0">
-          {r.meetingTable.length === 0 ? (
+          {r.serviceTable.length === 0 ? (
             <p className="px-5 py-8 text-center text-sm text-dash-muted">
-              No meetings yet.
+              No services yet.
             </p>
           ) : (
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-dash-border bg-dash-surface-subtle text-left text-xs uppercase tracking-wider text-dash-muted">
-                  <th className="px-4 py-3">Meeting</th>
+                  <th className="px-4 py-3">Service</th>
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3 text-right">RSVPs</th>
                   <th className="px-4 py-3 text-right">Ceremony</th>
                   <th className="px-4 py-3 text-right">Dining</th>
-                  <th className="px-4 py-3 text-right">Summons sent</th>
+                  <th className="px-4 py-3 text-right">Notice sent</th>
                   <th className="px-4 py-3">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-dash-border">
-                {r.meetingTable.map((m) => (
+                {r.serviceTable.map((m) => (
                   <tr key={m.id} className="hover:bg-dash-surface-subtle/40">
                     <td className="px-4 py-3 font-medium text-dash-text">
                       <Link
-                        href={`/admin/meetings/${m.id}`}
+                        href={`/admin/services/${m.id}`}
                         className="hover:text-dash-ring"
                       >
                         {m.title}
@@ -225,7 +225,7 @@ function SecretaryView({ r }: { r: SecretaryReport }) {
                     <td className="px-4 py-3 text-right tabular-nums">{m.rsvpCount}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{m.ceremonyCount}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{m.diningCount}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{m.summonsSent}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{m.noticeSent}</td>
                     <td className="px-4 py-3">
                       {m.published ? (
                         <Badge variant="success" className="capitalize">Published</Badge>
@@ -247,7 +247,7 @@ function SecretaryView({ r }: { r: SecretaryReport }) {
 function TreasurerView({ r }: { r: TreasurerReport }) {
   function exportOutstanding() {
     downloadCsv(
-      "treasurer-outstanding-dues.csv",
+      "treasurer-outstanding-giving.csv",
       [
         "Member",
         "Email",
@@ -257,13 +257,13 @@ function TreasurerView({ r }: { r: TreasurerReport }) {
         "Payment method",
         "BACS monthly",
       ],
-      r.outstandingDues.map((d) => [
+      r.outstandingGiving.map((d) => [
         d.member_name ?? "",
         d.member_email,
         d.amount,
         d.period_end,
         d.status,
-        methodLabelText(d.dues_payment_method),
+        methodLabelText(d.giving_payment_method),
         d.bacs_monthly_amount ?? "",
       ])
     );
@@ -284,20 +284,20 @@ function TreasurerView({ r }: { r: TreasurerReport }) {
     );
   }
 
-  const breakdown = r.duesPaymentMethodBreakdown;
+  const breakdown = r.givingPaymentMethodBreakdown;
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi label="Total paid" value={`£${r.totalPaid.toFixed(2)}`} hint={`£${r.totalRefunded.toFixed(2)} refunded`} />
-        <Kpi label="Dues outstanding" value={`£${r.unpaidDuesTotal.toFixed(2)}`} hint={`${r.outstandingDues.length} members`} />
-        <Kpi label="Dues paid" value={`£${r.paidDuesTotal.toFixed(2)}`} />
-        <Kpi label="Dues Gift Aid" value={`£${r.duesGiftAidReclaimable.toFixed(2)}`} hint={`£${r.duesGiftAidEligible.toFixed(2)} eligible`} />
+        <Kpi label="Giving outstanding" value={`£${r.unpaidGivingTotal.toFixed(2)}`} hint={`${r.outstandingGiving.length} members`} />
+        <Kpi label="Giving paid" value={`£${r.paidGivingTotal.toFixed(2)}`} />
+        <Kpi label="Giving Gift Aid" value={`£${r.givingGiftAidReclaimable.toFixed(2)}`} hint={`£${r.givingGiftAidEligible.toFixed(2)} eligible`} />
       </div>
 
       <Card variant="panel" className="overflow-hidden p-0">
         <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
           <div>
-            <h2 className="dash-panel-header-title">Dues by payment method</h2>
+            <h2 className="dash-panel-header-title">Giving by payment method</h2>
             <p className="dash-panel-header-description">
               How members are paying this year, with expected amounts per
               bucket.
@@ -346,16 +346,16 @@ function TreasurerView({ r }: { r: TreasurerReport }) {
         <Card variant="panel" className="overflow-hidden p-0">
           <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
             <div>
-              <h2 className="dash-panel-header-title">Outstanding dues</h2>
+              <h2 className="dash-panel-header-title">Outstanding giving</h2>
               <p className="dash-panel-header-description">Unpaid balances by member.</p>
             </div>
-            <Button variant="dashboard" size="sm" onClick={exportOutstanding} disabled={r.outstandingDues.length === 0}>
+            <Button variant="dashboard" size="sm" onClick={exportOutstanding} disabled={r.outstandingGiving.length === 0}>
               <Download className="mr-1.5 h-4 w-4" /> CSV
             </Button>
           </div>
           <CardContent className="admin-table-scroll border-t border-dash-border bg-dash-surface p-0">
-            {r.outstandingDues.length === 0 ? (
-              <p className="px-5 py-8 text-center text-sm text-dash-muted">All dues are settled.</p>
+            {r.outstandingGiving.length === 0 ? (
+              <p className="px-5 py-8 text-center text-sm text-dash-muted">All giving are settled.</p>
             ) : (
               <table className="w-full text-sm">
                 <thead>
@@ -368,7 +368,7 @@ function TreasurerView({ r }: { r: TreasurerReport }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-dash-border">
-                  {r.outstandingDues.map((d) => (
+                  {r.outstandingGiving.map((d) => (
                     <tr key={`${d.member_email}-${d.period_end}`} className="hover:bg-dash-surface-subtle/40">
                       <td className="px-4 py-3">
                         <Link
@@ -382,8 +382,8 @@ function TreasurerView({ r }: { r: TreasurerReport }) {
                       <td className="px-4 py-3 text-right font-semibold tabular-nums">£{d.amount.toFixed(2)}</td>
                       <td className="px-4 py-3 text-dash-muted">{formatDate(d.period_end)}</td>
                       <td className="px-4 py-3 text-xs">
-                        {methodLabelText(d.dues_payment_method)}
-                        {d.dues_payment_method === "bacs" && d.bacs_monthly_amount != null
+                        {methodLabelText(d.giving_payment_method)}
+                        {d.giving_payment_method === "bacs" && d.bacs_monthly_amount != null
                           ? ` · £${d.bacs_monthly_amount.toFixed(2)}/mo`
                           : ""}
                       </td>
@@ -464,9 +464,9 @@ function CharityView({ r }: { r: CharityReport }) {
   }
   function exportCollections() {
     downloadCsv(
-      "charity-meeting-collections.csv",
-      ["Meeting", "Donations", "Total"],
-      r.meetingCollections.map((c) => [c.eventTitle, c.count, c.total])
+      "charity-service-collections.csv",
+      ["Service", "Donations", "Total"],
+      r.serviceCollections.map((c) => [c.eventTitle, c.count, c.total])
     );
   }
 
@@ -574,21 +574,21 @@ function CharityView({ r }: { r: CharityReport }) {
         <Card variant="panel" className="overflow-hidden p-0">
           <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
             <div>
-              <h2 className="dash-panel-header-title">Meeting collections</h2>
+              <h2 className="dash-panel-header-title">Service collections</h2>
             </div>
-            <Button variant="dashboard" size="sm" onClick={exportCollections} disabled={r.meetingCollections.length === 0}>
+            <Button variant="dashboard" size="sm" onClick={exportCollections} disabled={r.serviceCollections.length === 0}>
               <Download className="mr-1.5 h-4 w-4" /> CSV
             </Button>
           </div>
           <CardContent className="admin-table-scroll border-t border-dash-border bg-dash-surface p-0">
-            {r.meetingCollections.length === 0 ? (
-              <p className="px-5 py-8 text-center text-sm text-dash-muted">No meeting-linked donations.</p>
+            {r.serviceCollections.length === 0 ? (
+              <p className="px-5 py-8 text-center text-sm text-dash-muted">No service-linked donations.</p>
             ) : (
               <ul className="divide-y divide-dash-border">
-                {r.meetingCollections.map((c) => (
+                {r.serviceCollections.map((c) => (
                   <li key={c.eventId} className="flex items-center justify-between px-4 py-3 text-sm">
                     <Link
-                      href={`/admin/meetings/${c.eventId}`}
+                      href={`/admin/services/${c.eventId}`}
                       className="font-medium text-dash-text hover:text-dash-ring"
                     >
                       {c.eventTitle}
@@ -647,7 +647,7 @@ function RecruitmentView({
   function exportSources() {
     downloadCsv(
       "recruitment-sources.csv",
-      ["Source", "Leads", "Converted"],
+      ["Source", "Newcomers", "Converted"],
       r.bySource.map((s) => [s.source, s.count, s.converted])
     );
   }
@@ -660,7 +660,7 @@ function RecruitmentView({
   }
   function exportStale() {
     downloadCsv(
-      "recruitment-stale-leads.csv",
+      "recruitment-stale-newcomers.csv",
       ["Name", "Email", "Stage", "Days since update"],
       r.staleList.map((s) => [s.name, s.email, s.stage, s.daysSinceUpdate])
     );
@@ -676,7 +676,7 @@ function RecruitmentView({
               Return year {annualReturn.periodLabel} · roll of{" "}
               {annualReturn.totalMembers} member
               {annualReturn.totalMembers === 1 ? "" : "s"} for the UGLE /
-              Provincial annual return.
+              Network annual return.
             </p>
           </div>
           <Button
@@ -707,7 +707,7 @@ function RecruitmentView({
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
             <Kpi
               label="Initiations this year"
-              value={`${annualReturn.initiationsInYear}`}
+              value={`${annualReturn.membershipsInYear}`}
             />
             <Kpi
               label="Passings this year"
@@ -722,10 +722,10 @@ function RecruitmentView({
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi label="Total leads" value={`${r.totalLeads}`} />
+        <Kpi label="Total newcomers" value={`${r.totalNewcomers}`} />
         <Kpi label="New this month" value={`${r.newThisMonth}`} />
         <Kpi label="Conversion rate" value={`${r.conversionRate}%`} />
-        <Kpi label="Stale (30d+)" value={`${r.staleLeads}`} />
+        <Kpi label="Stale (30d+)" value={`${r.staleNewcomers}`} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -743,7 +743,7 @@ function RecruitmentView({
               <thead>
                 <tr className="border-b border-dash-border bg-dash-surface-subtle text-left text-xs uppercase tracking-wider text-dash-muted">
                   <th className="px-4 py-3">Source</th>
-                  <th className="px-4 py-3 text-right">Leads</th>
+                  <th className="px-4 py-3 text-right">Newcomers</th>
                   <th className="px-4 py-3 text-right">Converted</th>
                 </tr>
               </thead>
@@ -795,7 +795,7 @@ function RecruitmentView({
       <Card variant="panel" className="overflow-hidden p-0">
         <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
           <div>
-            <h2 className="dash-panel-header-title">Leads needing attention</h2>
+            <h2 className="dash-panel-header-title">Newcomers needing attention</h2>
             <p className="dash-panel-header-description">No activity in 30+ days.</p>
           </div>
           <Button variant="dashboard" size="sm" onClick={exportStale} disabled={r.staleList.length === 0}>
@@ -804,12 +804,12 @@ function RecruitmentView({
         </div>
         <CardContent className="admin-table-scroll border-t border-dash-border bg-dash-surface p-0">
           {r.staleList.length === 0 ? (
-            <p className="px-5 py-8 text-center text-sm text-dash-muted">All leads have recent activity.</p>
+            <p className="px-5 py-8 text-center text-sm text-dash-muted">All newcomers have recent activity.</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-dash-border bg-dash-surface-subtle text-left text-xs uppercase tracking-wider text-dash-muted">
-                  <th className="px-4 py-3">Lead</th>
+                  <th className="px-4 py-3">Newcomer</th>
                   <th className="px-4 py-3">Stage</th>
                   <th className="px-4 py-3 text-right">Days since update</th>
                 </tr>
@@ -818,7 +818,7 @@ function RecruitmentView({
                 {r.staleList.map((s) => (
                   <tr key={s.id} className="hover:bg-dash-surface-subtle/40">
                     <td className="px-4 py-3">
-                      <Link href={`/admin/leads/${s.id}`} className="hover:text-dash-ring">
+                      <Link href={`/admin/newcomers/church/${s.id}`} className="hover:text-dash-ring">
                         <p className="font-medium text-dash-text">{s.name}</p>
                         <p className="text-xs text-dash-muted">{s.email}</p>
                       </Link>
@@ -837,24 +837,24 @@ function RecruitmentView({
 }
 
 function OperatorView({ r }: { r: OperatorReport }) {
-  function exportLodges() {
+  function exportChurches() {
     downloadCsv(
-      "operator-lodges.csv",
+      "operator-churches.csv",
       [
         "Name",
         "Slug",
         "Health score",
         "Members",
-        "Upcoming meetings",
+        "Upcoming services",
         "Payments (30d)",
         "Risk",
       ],
-      r.lodgeRows.map((l) => [
+      r.churchRows.map((l) => [
         l.name,
         l.slug,
         l.healthScore,
         l.members,
-        l.upcomingMeetings,
+        l.upcomingServices,
         l.paymentsLast30,
         l.risk,
       ])
@@ -864,20 +864,20 @@ function OperatorView({ r }: { r: OperatorReport }) {
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="grid gap-4 sm:grid-cols-3">
-        <Kpi label="Lodges" value={`${r.totalLodges}`} />
-        <Kpi label="Active" value={`${r.activeLodges}`} />
-        <Kpi label="Inactive" value={`${r.inactiveLodges}`} />
+        <Kpi label="Churches" value={`${r.totalChurches}`} />
+        <Kpi label="Active" value={`${r.activeChurches}`} />
+        <Kpi label="Inactive" value={`${r.inactiveChurches}`} />
       </div>
 
       <Card variant="panel" className="overflow-hidden p-0">
         <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
           <div>
-            <h2 className="dash-panel-header-title">Lodge health</h2>
+            <h2 className="dash-panel-header-title">Church health</h2>
             <p className="dash-panel-header-description">
-              Composite score from membership, upcoming meetings, and recent payments.
+              Composite score from membership, upcoming services, and recent payments.
             </p>
           </div>
-          <Button variant="dashboard" size="sm" onClick={exportLodges}>
+          <Button variant="dashboard" size="sm" onClick={exportChurches}>
             <Download className="mr-1.5 h-4 w-4" /> CSV
           </Button>
         </div>
@@ -885,7 +885,7 @@ function OperatorView({ r }: { r: OperatorReport }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-dash-border bg-dash-surface-subtle text-left text-xs uppercase tracking-wider text-dash-muted">
-                <th className="px-4 py-3">Lodge</th>
+                <th className="px-4 py-3">Church</th>
                 <th className="px-4 py-3 text-right">Members</th>
                 <th className="px-4 py-3 text-right">Upcoming</th>
                 <th className="px-4 py-3 text-right">Payments (30d)</th>
@@ -894,16 +894,16 @@ function OperatorView({ r }: { r: OperatorReport }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-dash-border">
-              {r.lodgeRows.map((l) => (
+              {r.churchRows.map((l) => (
                 <tr key={l.id} className="hover:bg-dash-surface-subtle/40">
                   <td className="px-4 py-3">
-                    <Link href={`/operator/lodges/${l.slug}`} className="hover:text-dash-ring">
+                    <Link href={`/operator/churches/${l.slug}`} className="hover:text-dash-ring">
                       <p className="font-medium text-dash-text">{l.name}</p>
                       <p className="text-xs text-dash-muted">{l.slug}</p>
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">{l.members}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{l.upcomingMeetings}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{l.upcomingServices}</td>
                   <td className="px-4 py-3 text-right tabular-nums">£{l.paymentsLast30.toFixed(2)}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{l.healthScore}</td>
                   <td className="px-4 py-3">

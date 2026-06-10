@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { AdminLodgeSwitcher } from "@/components/layout/admin-lodge-switcher";
+import { AdminChurchSwitcher } from "@/components/layout/admin-church-switcher";
 import {
   LayoutDashboard,
   Users,
@@ -40,26 +40,26 @@ import { useEffect, useState } from "react";
 const nav = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/onboarding", label: "Get started", icon: Rocket, permission: "admin:all" },
-  { href: "/admin/leads", label: "Candidates", icon: Users, permission: "meetings:write", flag: "candidate_crm" },
+  { href: "/admin/newcomers", label: "Newcomers", icon: Users, permission: "services:write", flag: "newcomer_crm" },
   { href: "/admin/members", label: "Members", icon: UserCheck, permission: "members:read" },
   { href: "/admin/guests", label: "Guests", icon: UserPlus, permission: "members:read", flag: "guest_links" },
-  { href: "/admin/meetings", label: "Meetings", icon: Clock, permission: "meetings:write" },
-  { href: "/admin/sequences", label: "Sequences", icon: Sparkles, permission: "meetings:write" },
+  { href: "/admin/services", label: "Services", icon: Clock, permission: "services:write" },
+  { href: "/admin/sequences", label: "Sequences", icon: Sparkles, permission: "services:write" },
   { href: "/admin/communications", label: "Communications", icon: Megaphone, permission: "members:write" },
   { href: "/admin/website", label: "Website", icon: Globe, permission: "website:write" },
   { href: "/admin/payments", label: "Payments", icon: CreditCard, permission: "payments:write" },
   { href: "/admin/take-payment", label: "Take payment", icon: ScanLine, permission: "payments:write" },
   { href: "/admin/treasurer", label: "Treasurer", icon: Wallet, permission: "payments:write" },
-  { href: "/admin/dues/schedules", label: "Subscriptions", icon: Repeat, permission: "payments:write" },
+  { href: "/admin/giving/schedules", label: "Subscriptions", icon: Repeat, permission: "payments:write" },
   { href: "/admin/charity", label: "Charity", icon: Heart, permission: "charity:write", flag: "charity_campaigns" },
   { href: "/admin/donations", label: "Donations", icon: Gift, permission: "charity:write", flag: "gift_aid" },
   { href: "/admin/gift-aid", label: "Gift Aid", icon: Shield, permission: "charity:write", flag: "gift_aid" },
-  { href: "/admin/almoner", label: "Almoner", icon: HeartHandshake, permission: "welfare:read", flag: "almoner" },
+  { href: "/admin/pastoral_care", label: "PastoralCare", icon: HeartHandshake, permission: "pastoral:read", flag: "pastoral_care" },
   { href: "/admin/mentoring", label: "Mentoring", icon: GraduationCap, permission: "members:write", flag: "mentor" },
   { href: "/admin/reports", label: "Reports", icon: BarChart3, permission: "audit:read" },
   { href: "/admin/audit-compliance", label: "Audit & Compliance", icon: ShieldCheck, permission: "audit:read", flag: "audit" },
   { href: "/admin/platform", label: "Platform overview", icon: Building2, permission: "admin:all", platformOnly: true },
-  { href: "/admin/provinces", label: "Provinces", icon: MapPin, permission: "admin:all", platformOnly: true },
+  { href: "/admin/networks", label: "Networks", icon: MapPin, permission: "admin:all", platformOnly: true },
   { href: "/admin/integrations", label: "Integrations", icon: Plug, permission: "payments:write", flag: "integrations" },
   { href: "/admin/settings", label: "Settings", icon: Settings, permission: "admin:all" },
 ];
@@ -121,15 +121,15 @@ export function AdminSidebar() {
     [
       "/admin",
       "/admin/onboarding",
-      "/admin/leads",
+      "/admin/newcomers",
       "/admin/members",
       "/admin/guests",
-      "/admin/meetings",
+      "/admin/services",
       "/admin/sequences",
       "/admin/communications",
       "/admin/website",
       "/admin/mentoring",
-      "/admin/almoner",
+      "/admin/pastoral_care",
     ].includes(item.href)
   );
   const financeNav = visibleNav.filter((item) =>
@@ -153,7 +153,7 @@ export function AdminSidebar() {
   const platformNav = visibleNav.filter((item) =>
     [
       "/admin/platform",
-      "/admin/provinces",
+      "/admin/networks",
     ].includes(item.href)
   );
 
@@ -219,11 +219,11 @@ export function AdminSidebar() {
             href="/admin"
             className="flex min-w-0 items-center"
             onClick={() => setMobileOpen(false)}
-            aria-label="LodgePay admin"
+            aria-label="ChurchPay admin"
           >
             <Image
-              src="/brand/lodgepay-sidebar-logo.png"
-              alt="LodgePay"
+              src="/brand/churchpay-sidebar-logo.png"
+              alt="ChurchPay"
               width={1032}
               height={245}
               priority
@@ -232,13 +232,13 @@ export function AdminSidebar() {
           </Link>
         </div>
 
-        {/* Lodge context (working-in selector + view live site).
+        {/* Church context (working-in selector + view live site).
             Sits at the top of the sidebar so it's the first thing users
             see — especially important on phone where this is the only
-            way to switch lodge. Closing the drawer happens after a
+            way to switch church. Closing the drawer happens after a
             successful change so the user lands on the refreshed page. */}
         <div className="shrink-0 border-b border-dash-border bg-dash-surface px-3 py-3">
-          <AdminLodgeSwitcher
+          <AdminChurchSwitcher
             variant="sidebar"
             onAfterChange={() => setMobileOpen(false)}
           />

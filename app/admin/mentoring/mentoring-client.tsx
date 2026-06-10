@@ -37,12 +37,12 @@ type MemberMini = {
   id: string;
   full_name: string;
   rank: string | null;
-  date_of_initiation: string | null;
+  date_of_membership: string | null;
   date_of_passing: string | null;
   date_of_raising: string | null;
-  progression_signed_off_initiation: boolean;
-  progression_signed_off_passing: boolean;
-  progression_signed_off_raising: boolean;
+  discipleship_signed_off_membership: boolean;
+  discipleship_signed_off_passing: boolean;
+  discipleship_signed_off_raising: boolean;
 };
 
 type Assignment = {
@@ -72,10 +72,10 @@ type Rung = {
   notes: string | null;
 };
 
-const DEGREES: Array<{ key: "initiation" | "passing" | "raising"; label: string }> = [
-  { key: "initiation", label: "Initiation (1°)" },
-  { key: "passing", label: "Passing (2°)" },
-  { key: "raising", label: "Raising (3°)" },
+const DEGREES: Array<{ key: "membership" | "passing" | "raising"; label: string }> = [
+  { key: "membership", label: "Membership welcome" },
+  { key: "passing", label: "Discipleship milestone" },
+  { key: "raising", label: "Leadership milestone" },
 ];
 
 export function MentoringClient({
@@ -120,18 +120,18 @@ export function MentoringClient({
 
   async function recordProgression(
     memberId: string,
-    degree: "initiation" | "passing" | "raising",
+    degree: "membership" | "passing" | "raising",
     date: string,
     signed: boolean
   ) {
-    setBusy(`progression:${memberId}:${degree}`);
+    setBusy(`discipleship:${memberId}:${degree}`);
     try {
-      const res = await fetch(`/api/progression/${memberId}`, {
+      const res = await fetch(`/api/mentor/assignments/${memberId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ degree, date, signed_off: signed }),
       });
-      if (!res.ok) throw new Error("Could not record progression.");
+      if (!res.ok) throw new Error("Could not record discipleship.");
       router.refresh();
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "Update failed.");
@@ -194,7 +194,7 @@ export function MentoringClient({
     e.preventDefault();
     setBusy("save-rung");
     try {
-      const res = await fetch("/api/officer-ladder", {
+      const res = await fetch("/api/members", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -242,7 +242,7 @@ export function MentoringClient({
   async function deleteRung(id: string) {
     setBusy(`delete-rung:${id}`);
     try {
-      const res = await fetch(`/api/officer-ladder/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/members/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Could not delete.");
       router.refresh();
     } catch (error) {
@@ -256,10 +256,10 @@ export function MentoringClient({
     <div className="space-y-4 sm:space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">
-          Mentoring &amp; progression
+          Discipleship mentoring
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Track candidate progression through the three degrees, manage mentor
+          Track newcomer discipleship through the discipleship steps, manage mentor
           assignments and contact log, and plan officer succession.
         </p>
       </div>
@@ -270,14 +270,14 @@ export function MentoringClient({
         </div>
       )}
 
-      <Tabs defaultValue="progression">
+      <Tabs defaultValue="discipleship">
         <TabsList>
-          <TabsTrigger value="progression">Progression</TabsTrigger>
+          <TabsTrigger value="discipleship">Progression</TabsTrigger>
           <TabsTrigger value="mentors">Mentors</TabsTrigger>
-          <TabsTrigger value="ladder">Officer ladder</TabsTrigger>
+          <TabsTrigger value="ladder">Leadership roles</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="progression">
+        <TabsContent value="discipleship">
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
             <Table>
               <TableHeader>
@@ -306,17 +306,17 @@ export function MentoringClient({
                     </TableCell>
                     {DEGREES.map((degree) => {
                       const dateField =
-                        degree.key === "initiation"
-                          ? member.date_of_initiation
+                        degree.key === "membership"
+                          ? member.date_of_membership
                           : degree.key === "passing"
                             ? member.date_of_passing
                             : member.date_of_raising;
                       const signed =
-                        degree.key === "initiation"
-                          ? member.progression_signed_off_initiation
+                        degree.key === "membership"
+                          ? member.discipleship_signed_off_membership
                           : degree.key === "passing"
-                            ? member.progression_signed_off_passing
-                            : member.progression_signed_off_raising;
+                            ? member.discipleship_signed_off_passing
+                            : member.discipleship_signed_off_raising;
                       return (
                         <TableCell key={degree.key}>
                           <div className="space-y-1">
@@ -337,7 +337,7 @@ export function MentoringClient({
                             />
                             <button
                               type="button"
-                              disabled={busy === `progression:${member.id}:${degree.key}`}
+                              disabled={busy === `discipleship:${member.id}:${degree.key}`}
                               onClick={() =>
                                 recordProgression(
                                   member.id,
@@ -504,7 +504,7 @@ export function MentoringClient({
                                 onClick={() =>
                                   setNewContact({
                                     assignment_id: a.id,
-                                    contact_method: "meeting",
+                                    contact_method: "service",
                                     topic: "",
                                     notes: "",
                                   })
@@ -547,7 +547,7 @@ export function MentoringClient({
               Add or update succession rung
             </h2>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <Field label="Office (e.g. Worshipful Master)">
+              <Field label="Office (e.g. Lead Pastor)">
                 <input
                   value={newRung.rung_label}
                   onChange={(e) =>
@@ -704,7 +704,7 @@ export function MentoringClient({
                   }
                   className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"
                 >
-                  <option value="meeting">Meeting</option>
+                  <option value="service">Service</option>
                   <option value="phone">Phone</option>
                   <option value="video">Video</option>
                   <option value="email">Email</option>
@@ -767,7 +767,7 @@ export function MentoringClient({
       <ConfirmActionDialog
         open={deletingRungId !== null}
         onOpenChange={(open) => !open && setDeletingRungId(null)}
-        title="Delete officer ladder rung?"
+        title="Delete leadership roles rung?"
         description="This removes the office from the succession ladder. It does not change member records."
         confirmLabel="Delete rung"
         tone="danger"

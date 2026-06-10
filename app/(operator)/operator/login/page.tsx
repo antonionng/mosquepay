@@ -50,7 +50,7 @@ function OperatorLoginForm() {
           Operator Login
         </h1>
         <p className="mt-2 text-sm text-slate-400">
-          Sign in to manage lodges across the platform.
+          Sign in to manage churches across the platform.
         </p>
       </div>
 

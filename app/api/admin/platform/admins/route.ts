@@ -15,7 +15,7 @@ const TENANT_ROLES = new Set([
   "treasurer",
   "charity_steward",
   "membership_officer",
-  "almoner",
+  "pastoral_care",
   "master",
 ]);
 
@@ -41,20 +41,20 @@ async function upsertAdminMembership({
   email,
   fullName,
   role,
-  lodgeId,
+  churchId,
 }: {
   email: string;
   fullName: string;
   role: string;
-  lodgeId: string | null;
+  churchId: string | null;
 }) {
-  const existing = await db.getAdminUserForScope(email, lodgeId);
+  const existing = await db.getAdminUserForScope(email, churchId);
   if (existing) {
     return db.updateAdminUser(existing.id, {
       full_name: fullName,
       role,
       active: true,
-      lodge_id: lodgeId,
+      church_id: churchId,
       permissions: existing.permissions ?? [],
     });
   }
@@ -63,7 +63,7 @@ async function upsertAdminMembership({
     full_name: fullName,
     role,
     active: true,
-    lodge_id: lodgeId,
+    church_id: churchId,
     permissions: [],
   });
 }
@@ -100,10 +100,10 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const scopeType =
     body.scope_type === "platform" ||
-    body.scope_type === "province" ||
-    body.scope_type === "lodge"
+    body.scope_type === "network" ||
+    body.scope_type === "church"
       ? body.scope_type
-      : "lodge";
+      : "church";
 
   const guard =
     scopeType === "platform"
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
       email,
       fullName,
       role,
-      lodgeId: null,
+      churchId: null,
     });
     if (!staff) {
       return NextResponse.json(
@@ -139,11 +139,11 @@ export async function POST(request: NextRequest) {
       ? await sendStaffInvite({
           request,
           staff,
-          lodgeName: "LodgePay platform",
+          churchName: "ChurchPay platform",
         })
       : { sent: false, error: null as string | null };
     await writeAuditLog({
-      lodgeId: null,
+      churchId: null,
       action: sendInvite ? "platform_admin_invited" : "platform_admin_created",
       entityType: "admin_user",
       entityId: staff.id,
@@ -156,41 +156,41 @@ export async function POST(request: NextRequest) {
   }
 
   const role = roleFrom(body.role, TENANT_ROLES, "super_admin");
-  let lodges: db.Lodge[] = [];
+  let churches: db.Church[] = [];
 
-  if (scopeType === "province") {
-    const provinceId = typeof body.province_id === "string" ? body.province_id : "";
-    if (!provinceId) {
+  if (scopeType === "network") {
+    const networkId = typeof body.network_id === "string" ? body.network_id : "";
+    if (!networkId) {
       return NextResponse.json(
-        { error: "Province is required." },
+        { error: "Network is required." },
         { status: 400 }
       );
     }
-    lodges = await db.listLodgesByProvince(provinceId);
+    churches = await db.listChurchesByNetwork(networkId);
   } else {
-    const lodgeId = typeof body.lodge_id === "string" ? body.lodge_id : "";
-    if (!lodgeId) {
-      return NextResponse.json({ error: "Lodge is required." }, { status: 400 });
+    const churchId = typeof body.church_id === "string" ? body.church_id : "";
+    if (!churchId) {
+      return NextResponse.json({ error: "Church is required." }, { status: 400 });
     }
-    const lodge = await db.getLodgeById(lodgeId);
-    lodges = lodge ? [lodge] : [];
+    const church = await db.getChurchById(churchId);
+    churches = church ? [church] : [];
   }
 
-  if (lodges.length === 0) {
+  if (churches.length === 0) {
     return NextResponse.json(
-      { error: "No lodges found for that selection." },
+      { error: "No churches found for that selection." },
       { status: 404 }
     );
   }
 
   const staff = (
     await Promise.all(
-      lodges.map((lodge) =>
+      churches.map((church) =>
         upsertAdminMembership({
           email,
           fullName,
           role,
-          lodgeId: lodge.id,
+          churchId: church.id,
         })
       )
     )
@@ -200,25 +200,25 @@ export async function POST(request: NextRequest) {
     ? await sendStaffInvite({
         request,
         staff: staff[0],
-        lodgeName:
-          scopeType === "province"
-            ? `${lodges.length} lodges on LodgePay`
-            : lodges[0].name,
+        churchName:
+          scopeType === "network"
+            ? `${churches.length} churches on ChurchPay`
+            : churches[0].name,
       })
     : { sent: false, error: null as string | null };
 
   await writeAuditLog({
-    lodgeId: scopeType === "lodge" ? lodges[0].id : null,
+    churchId: scopeType === "church" ? churches[0].id : null,
     action: sendInvite ? "tenant_admin_invited" : "tenant_admin_created",
     entityType: "admin_user",
     entityId: staff[0]?.id ?? null,
     summary: sendInvite
-      ? `${scopeEmail(guard.scope)} invited ${email} to ${lodges.length} tenant(s)`
-      : `${scopeEmail(guard.scope)} assigned ${email} to ${lodges.length} tenant(s) (no invite email)`,
+      ? `${scopeEmail(guard.scope)} invited ${email} to ${churches.length} tenant(s)`
+      : `${scopeEmail(guard.scope)} assigned ${email} to ${churches.length} tenant(s) (no invite email)`,
     metadata: {
       role,
       scope_type: scopeType,
-      lodge_ids: lodges.map((lodge) => lodge.id),
+      church_ids: churches.map((church) => church.id),
       invite_sent: invite.sent,
       invite_error: invite.error,
     },
@@ -266,20 +266,20 @@ export async function PATCH(request: NextRequest) {
   }
 
   if (action === "send_password_reset") {
-    let lodgeName = target.lodge_id ? "your lodge" : "LodgePay platform";
-    if (target.lodge_id) {
+    let churchName = target.church_id ? "your church" : "ChurchPay platform";
+    if (target.church_id) {
       try {
-        const lodge = await db.getLodgeById(target.lodge_id);
-        if (lodge?.name) lodgeName = lodge.name;
+        const church = await db.getChurchById(target.church_id);
+        if (church?.name) churchName = church.name;
       } catch {
-        // Non-fatal: stick with the generic lodge label.
+        // Non-fatal: stick with the generic church label.
       }
     }
 
     const reset = await sendStaffPasswordReset({
       request,
       staff: target,
-      lodgeName,
+      churchName,
     });
     if (!reset.sent) {
       return NextResponse.json(
@@ -289,8 +289,8 @@ export async function PATCH(request: NextRequest) {
     }
 
     await writeAuditLog({
-      lodgeId: target.lodge_id,
-      action: target.lodge_id
+      churchId: target.church_id,
+      action: target.church_id
         ? "tenant_admin_password_reset_sent"
         : "platform_admin_password_reset_sent",
       entityType: "admin_user",

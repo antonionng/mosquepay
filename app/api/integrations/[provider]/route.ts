@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import type { IntegrationProvider } from "@/lib/db/types";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -35,21 +35,21 @@ export async function PATCH(
     return NextResponse.json({ error: "Unknown provider." }, { status: 400 });
   }
   const provider = providerSlug as IntegrationProvider;
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
   // Integrations (Mooov, accounting, calendar, email) are owned by the
-  // lodge treasurer in addition to the secretary. Gating on payments:write
+  // church treasurer in addition to the secretary. Gating on payments:write
   // (which treasurer has, and which admin:all implicitly grants for
   // secretary/super_admin/operator) keeps the API in lockstep with the
   // sidebar visibility gate in components/layout/admin-sidebar.tsx so the
   // treasurer doesn't see the page but get 403s on save.
-  const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("payments:write", churchId);
   if (forbidden) return forbidden;
   const body = await request.json();
-  const cred = await db.upsertIntegrationCredentials(lodgeId, provider, {
+  const cred = await db.upsertIntegrationCredentials(churchId, provider, {
     enabled: body.enabled ?? true,
     access_token: body.access_token ?? null,
     refresh_token: body.refresh_token ?? null,
@@ -57,7 +57,7 @@ export async function PATCH(
     metadata: body.metadata ?? {},
   });
   await writeAuditLog({
-    lodgeId,
+    churchId,
     action: cred.enabled ? "integration_enabled" : "integration_disabled",
     entityType: "integration",
     entityId: cred.id,
@@ -83,13 +83,13 @@ export async function DELETE(
     return NextResponse.json({ error: "Unknown provider." }, { status: 400 });
   }
   const provider = providerSlug as IntegrationProvider;
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("payments:write", churchId);
   if (forbidden) return forbidden;
-  await db.deleteIntegrationCredentials(lodgeId, provider);
+  await db.deleteIntegrationCredentials(churchId, provider);
   return NextResponse.json({ ok: true });
 }

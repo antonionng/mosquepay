@@ -58,7 +58,7 @@ type GiftAidDeclaration = {
   status: string;
 };
 
-type MeetingCollection = {
+type ServiceCollection = {
   id: string;
   title: string;
   collection_date: string;
@@ -114,18 +114,18 @@ export function AdminCharityClient({
   campaigns,
   donations,
   giftAidDeclarations,
-  meetingCollections,
+  serviceCollections,
   gasdsClaims,
   currentCharityCampaignId,
-  lodgeSlug,
+  churchSlug,
 }: {
   campaigns: Campaign[];
   donations: Donation[];
   giftAidDeclarations: GiftAidDeclaration[];
-  meetingCollections: MeetingCollection[];
+  serviceCollections: ServiceCollection[];
   gasdsClaims: GasdsClaim[];
   currentCharityCampaignId?: string | null;
-  lodgeSlug?: string;
+  churchSlug?: string;
 }) {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
@@ -149,8 +149,8 @@ export function AdminCharityClient({
   const totalGiftAid = giftAidDeclarations
     .filter((g) => g.status === "active")
     .reduce((s, g) => s + (g.reclaimable_amount ?? 0), 0);
-  const meetingLinkedDonations = donations.filter((d) => Boolean(d.event_id));
-  const gasdsEligible = meetingCollections.reduce(
+  const serviceLinkedDonations = donations.filter((d) => Boolean(d.event_id));
+  const gasdsEligible = serviceCollections.reduce(
     (sum, collection) => sum + collection.gasds_eligible_amount,
     0
   );
@@ -245,12 +245,12 @@ export function AdminCharityClient({
     }
   }
 
-  async function recordMeetingCollection(e: React.FormEvent<HTMLFormElement>) {
+  async function recordServiceCollection(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setCollectionError(null);
     setSavingCollection(true);
     try {
-      const res = await fetch("/api/meeting-collections", {
+      const res = await fetch("/api/service-collections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -365,11 +365,11 @@ export function AdminCharityClient({
     );
   }
 
-  function exportMeetingCollections() {
+  function exportServiceCollections() {
     downloadCsv(
-      "meeting-linked-charity-collections.csv",
+      "service-linked-charity-collections.csv",
       ["Date", "Donor", "Email", "Amount", "Source", "Event ID", "Gift Aid"],
-      meetingLinkedDonations.map((donation) => [
+      serviceLinkedDonations.map((donation) => [
         donation.created_at,
         donation.donor_name,
         donation.donor_email,
@@ -452,10 +452,10 @@ export function AdminCharityClient({
           <div>
             <h2 className="text-base font-semibold text-dash-text">Charity Reporting</h2>
             <p className="mt-1 text-sm text-dash-muted">
-              Donor records, campaign totals, Gift Aid readiness, and meeting-linked charity collections.
+              Donor records, campaign totals, Gift Aid readiness, and service-linked charity collections.
             </p>
             <p className="mt-2 text-xs text-dash-faint">
-              {donorRows.length} donors · {meetingLinkedDonations.length} meeting collections · £{totalGiftAid.toFixed(2)} Gift Aid reclaimable
+              {donorRows.length} donors · {serviceLinkedDonations.length} service collections · £{totalGiftAid.toFixed(2)} Gift Aid reclaimable
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -467,9 +467,9 @@ export function AdminCharityClient({
               <Download className="mr-1.5 h-4 w-4" />
               Campaign Totals
             </Button>
-            <Button type="button" variant="dashboard" size="sm" onClick={exportMeetingCollections}>
+            <Button type="button" variant="dashboard" size="sm" onClick={exportServiceCollections}>
               <Download className="mr-1.5 h-4 w-4" />
-              Meeting Collections
+              Service Collections
             </Button>
           </div>
         </div>
@@ -504,7 +504,7 @@ export function AdminCharityClient({
               </h2>
             </div>
             <p className="mt-2 text-sm leading-relaxed text-dash-muted">
-              Record small cash collections at the point they happen. LodgePay tracks the annual GASDS allowance separately from Gift Aid declarations.
+              Record small cash collections at the point they happen. ChurchPay tracks the annual GASDS allowance separately from Gift Aid declarations.
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div className="rounded-xl border border-dash-border bg-dash-surface-subtle p-4">
@@ -539,7 +539,7 @@ export function AdminCharityClient({
                   variant="dashboard"
                   size="sm"
                   onClick={createGasdsClaim}
-                  disabled={savingGasds === "create" || meetingCollections.length === 0}
+                  disabled={savingGasds === "create" || serviceCollections.length === 0}
                 >
                   {savingGasds === "create" ? "Creating..." : "Create draft claim"}
                 </Button>
@@ -597,7 +597,7 @@ export function AdminCharityClient({
               ) : null}
             </div>
           </div>
-          <form onSubmit={recordMeetingCollection} className="space-y-3">
+          <form onSubmit={recordServiceCollection} className="space-y-3">
             {collectionError ? (
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                 {collectionError}
@@ -654,7 +654,7 @@ export function AdminCharityClient({
           <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
             <h2 className="dash-panel-header-title">New charity campaign</h2>
             <p className="dash-panel-header-description">
-              Create a target-led campaign for this lodge.
+              Create a target-led campaign for this church.
             </p>
           </div>
           <form
@@ -734,7 +734,7 @@ export function AdminCharityClient({
       <CurrentCampaignPanel
         campaigns={campaigns}
         currentCharityCampaignId={currentCharityCampaignId ?? null}
-        lodgeSlug={lodgeSlug ?? "default"}
+        churchSlug={churchSlug ?? "default"}
         onSaved={() => router.refresh()}
       />
 
@@ -920,12 +920,12 @@ export function AdminCharityClient({
 function CurrentCampaignPanel({
   campaigns,
   currentCharityCampaignId,
-  lodgeSlug,
+  churchSlug,
   onSaved,
 }: {
   campaigns: Campaign[];
   currentCharityCampaignId: string | null;
-  lodgeSlug: string;
+  churchSlug: string;
   onSaved: () => void;
 }) {
   const [selected, setSelected] = useState<string>(
@@ -938,14 +938,14 @@ function CurrentCampaignPanel({
   const activeCampaigns = campaigns.filter((c) => c.status === "active");
   const current = campaigns.find((c) => c.id === currentCharityCampaignId);
   const dirty = (selected || null) !== (currentCharityCampaignId ?? null);
-  const giveUrl = `/give/${lodgeSlug}/charity`;
+  const giveUrl = `/give/${churchSlug}/charity`;
 
   const save = async (campaignId: string | null) => {
     setSaving(true);
     setError(null);
     setFeedback(null);
     try {
-      const res = await fetch("/api/lodges/current-charity-campaign", {
+      const res = await fetch("/api/churches/current-charity-campaign", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ campaign_id: campaignId }),
@@ -957,7 +957,7 @@ function CurrentCampaignPanel({
       }
       setFeedback(
         campaignId
-          ? "Designated as the lodge's current charity campaign."
+          ? "Designated as the church's current charity campaign."
           : "Cleared the designated campaign.",
       );
       onSaved();
@@ -978,8 +978,8 @@ function CurrentCampaignPanel({
           </h2>
           <p className="dash-panel-header-description">
             Pick the campaign that the standing-QR sticker and
-            <code className="mx-1 rounded bg-dash-surface px-1 text-xs">/give/{lodgeSlug}/charity</code>
-            link route to. Change it once a year when the lodge picks a new
+            <code className="mx-1 rounded bg-dash-surface px-1 text-xs">/give/{churchSlug}/charity</code>
+            link route to. Change it once a year when the church picks a new
             featured cause.
           </p>
         </div>

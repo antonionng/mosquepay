@@ -6,7 +6,7 @@ import {
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -14,11 +14,11 @@ import {
 import { writeAuditLog } from "@/lib/audit";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 
-async function ensureFlag(lodgeId: string | null) {
-  const enabled = await isFeatureEnabled(lodgeId, "guest_links");
+async function ensureFlag(churchId: string | null) {
+  const enabled = await isFeatureEnabled(churchId, "guest_links");
   if (enabled) return null;
   return NextResponse.json(
-    { error: "Guest links are disabled for this lodge." },
+    { error: "Guest links are disabled for this church." },
     { status: 403 }
   );
 }
@@ -41,33 +41,33 @@ export async function GET(request: NextRequest) {
   const unauthorized = await requireAdminApiAuth();
   if (unauthorized) return unauthorized;
 
-  const lodgeSlug = getLodgeSlugFromRequest(request);
+  const churchSlug = getChurchSlugFromRequest(request);
 
   if (isSupabaseConfigured()) {
-    const lodge = await db.getLodgeBySlug(lodgeSlug);
-    if (!lodge) {
-      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    const church = await db.getChurchBySlug(churchSlug);
+    if (!church) {
+      return NextResponse.json({ error: "Church not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("members:read", lodge.id);
+    const forbidden = await requireAdminApiPermission("members:read", church.id);
     if (forbidden) return forbidden;
-    const flagBlocked = await ensureFlag(lodge.id);
+    const flagBlocked = await ensureFlag(church.id);
     if (flagBlocked) return flagBlocked;
     return NextResponse.json({
-      accepts_self_registration: lodge.accepts_self_registration ?? false,
-      lodge_slug: lodge.slug,
+      accepts_self_registration: church.accepts_self_registration ?? false,
+      church_slug: church.slug,
     });
   }
 
   if (!shouldUseInMemoryMock()) {
     return NextResponse.json({ error: "Database not configured." }, { status: 503 });
   }
-  const lodge = mockDb.getLodgeBySlug(lodgeSlug);
-  if (!lodge) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const church = mockDb.getChurchBySlug(churchSlug);
+  if (!church) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
   return NextResponse.json({
-    accepts_self_registration: lodge.accepts_self_registration ?? false,
-    lodge_slug: lodge.slug,
+    accepts_self_registration: church.accepts_self_registration ?? false,
+    church_slug: church.slug,
   });
 }
 
@@ -78,29 +78,29 @@ export async function PATCH(request: NextRequest) {
   const unauthorized = await requireAdminApiAuth();
   if (unauthorized) return unauthorized;
 
-  const lodgeSlug = getLodgeSlugFromRequest(request);
+  const churchSlug = getChurchSlugFromRequest(request);
   const body = await request.json().catch(() => ({}));
   const next = Boolean(body.accepts_self_registration);
 
   if (isSupabaseConfigured()) {
-    const lodge = await db.getLodgeBySlug(lodgeSlug);
-    if (!lodge) {
-      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    const church = await db.getChurchBySlug(churchSlug);
+    if (!church) {
+      return NextResponse.json({ error: "Church not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("members:write", lodge.id);
+    const forbidden = await requireAdminApiPermission("members:write", church.id);
     if (forbidden) return forbidden;
-    const flagBlocked = await ensureFlag(lodge.id);
+    const flagBlocked = await ensureFlag(church.id);
     if (flagBlocked) return flagBlocked;
 
     try {
-      const updated = await db.updateLodge(lodge.id, {
+      const updated = await db.updateChurch(church.id, {
         accepts_self_registration: next,
       });
       await writeAuditLog({
-        lodgeId: lodge.id,
+        churchId: church.id,
         action: next ? "enabled" : "disabled",
-        entityType: "lodge",
-        entityId: lodge.id,
+        entityType: "church",
+        entityId: church.id,
         summary: next
           ? "Enabled public guest self-registration"
           : "Disabled public guest self-registration",
@@ -122,13 +122,13 @@ export async function PATCH(request: NextRequest) {
     }
   }
 
-  const lodge = mockDb.getLodgeBySlug(lodgeSlug);
-  if (!lodge) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const church = mockDb.getChurchBySlug(churchSlug);
+  if (!church) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  mockDb.upsertLodge({
-    slug: lodge.slug,
-    name: lodge.name,
+  mockDb.upsertChurch({
+    slug: church.slug,
+    name: church.name,
     accepts_self_registration: next,
   });
   return NextResponse.json({ accepts_self_registration: next });

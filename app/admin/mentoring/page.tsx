@@ -8,44 +8,44 @@ export const dynamic = "force-dynamic";
 
 export default async function MentoringPage() {
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.lodgeId) {
+  if (ctx.mode !== "database" || !ctx.churchId) {
     return (
       <div className="space-y-4 sm:space-y-6">
         <div className="admin-page-head">
           <div>
             <h1 className="admin-page-title">Mentoring</h1>
             <p className="admin-page-copy">
-              Track progression sign-offs, mentor assignments, and the officer ladder.
+              Track discipleship follow-up, mentor assignments, and the leadership roles.
             </p>
           </div>
         </div>
         <EmptyState
           icon={GraduationCap}
           title="Mentoring needs a database"
-          description="Connect Supabase and choose a lodge to manage mentor assignments and officer progression."
+          description="Connect Supabase and choose a church to manage mentor assignments and officer discipleship."
         />
       </div>
     );
   }
-  const lodgeId = ctx.lodgeId;
+  const churchId = ctx.churchId;
 
   const [members, assignments, contacts, rungs] = await Promise.all([
-    db.getMembers(lodgeId, { status: "active" }),
-    db.listMentorAssignments(lodgeId, { active: true }),
-    db.listMentorContacts(lodgeId),
-    db.listOfficerLadder(lodgeId),
+    db.getMembers(churchId, { status: "active" }),
+    db.listMentorAssignments(churchId, { active: true }),
+    db.listMentorContacts(churchId),
+    db.listOfficerLadder(churchId),
   ]);
 
   const memberMini = members.map((m) => ({
     id: m.id,
     full_name: m.full_name,
     rank: m.rank,
-    date_of_initiation: m.date_of_initiation,
+    date_of_membership: m.date_of_membership,
     date_of_passing: m.date_of_passing,
     date_of_raising: m.date_of_raising,
-    progression_signed_off_initiation: m.progression_signed_off_initiation,
-    progression_signed_off_passing: m.progression_signed_off_passing,
-    progression_signed_off_raising: m.progression_signed_off_raising,
+    discipleship_signed_off_membership: m.discipleship_signed_off_membership,
+    discipleship_signed_off_passing: m.discipleship_signed_off_passing,
+    discipleship_signed_off_raising: m.discipleship_signed_off_raising,
   }));
 
   return (

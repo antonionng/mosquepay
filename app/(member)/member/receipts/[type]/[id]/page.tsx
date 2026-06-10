@@ -20,18 +20,18 @@ export default async function ReceiptPage({
 
   const member =
     (await db.getMemberByAuthUserId(user.id)) ??
-    (await db.getMemberByEmailAcrossLodges(user.email));
+    (await db.getMemberByEmailAcrossChurches(user.email));
   if (!member) redirect("/member");
 
   const { type, id } = await params;
-  if (type !== "payment" && type !== "donation" && type !== "dues") {
+  if (type !== "payment" && type !== "donation" && type !== "giving") {
     notFound();
   }
 
-  const lodge = await db.getLodgeById(member.lodge_id);
+  const church = await db.getChurchById(member.church_id);
 
   if (type === "payment") {
-    const payment = await db.getPaymentById(id, member.lodge_id);
+    const payment = await db.getPaymentById(id, member.church_id);
     if (!payment || payment.user_email.toLowerCase() !== member.email.toLowerCase()) {
       notFound();
     }
@@ -46,7 +46,7 @@ export default async function ReceiptPage({
           total: payment.total_amount,
           lines: [
             { label: "Dining", amount: payment.dining_amount },
-            { label: "Meeting fee", amount: payment.meeting_fee_amount },
+            { label: "Service fee", amount: payment.service_fee_amount },
             { label: "Charity collection", amount: payment.charity_amount },
             { label: "Raffle", amount: payment.raffle_amount },
             { label: "Guest ticket", amount: payment.guest_ticket_amount },
@@ -55,13 +55,13 @@ export default async function ReceiptPage({
           reference: payment.stripe_payment_intent_id ?? payment.id,
         }}
         member={{ full_name: member.full_name, email: member.email }}
-        lodge={lodge ? { name: lodge.name, lodge_number: lodge.lodge_number, support_email: lodge.support_email } : null}
+        church={church ? { name: church.name, church_number: church.church_number, support_email: church.support_email } : null}
       />
     );
   }
 
   if (type === "donation") {
-    const donation = await db.getDonationById(id, member.lodge_id);
+    const donation = await db.getDonationById(id, member.church_id);
     if (!donation || donation.donor_email.toLowerCase() !== member.email.toLowerCase()) {
       notFound();
     }
@@ -82,32 +82,32 @@ export default async function ReceiptPage({
           reference: donation.id,
         }}
         member={{ full_name: member.full_name, email: member.email }}
-        lodge={lodge ? { name: lodge.name, lodge_number: lodge.lodge_number, support_email: lodge.support_email } : null}
+        church={church ? { name: church.name, church_number: church.church_number, support_email: church.support_email } : null}
       />
     );
   }
 
-  // dues
-  const duesRecords = await db.getMemberDues(member.lodge_id, {
+  // giving
+  const givingRecords = await db.getMemberGiving(member.church_id, {
     memberEmail: member.email,
   });
-  const dues = duesRecords.find((d) => d.id === id);
-  if (!dues) notFound();
+  const giving = givingRecords.find((d) => d.id === id);
+  if (!giving) notFound();
   return (
     <ReceiptClient
-      kind="dues"
+      kind="giving"
       receipt={{
-        id: dues.id,
-        date: dues.paid_at ?? dues.updated_at,
-        status: dues.status,
-        currency: dues.currency,
-        total: dues.amount,
-        lines: [{ label: "Annual dues", amount: dues.amount }],
-        notes: `Period ${dues.period_start} to ${dues.period_end}`,
-        reference: dues.id,
+        id: giving.id,
+        date: giving.paid_at ?? giving.updated_at,
+        status: giving.status,
+        currency: giving.currency,
+        total: giving.amount,
+        lines: [{ label: "Annual giving", amount: giving.amount }],
+        notes: `Period ${giving.period_start} to ${giving.period_end}`,
+        reference: giving.id,
       }}
       member={{ full_name: member.full_name, email: member.email }}
-      lodge={lodge ? { name: lodge.name, lodge_number: lodge.lodge_number, support_email: lodge.support_email } : null}
+      church={church ? { name: church.name, church_number: church.church_number, support_email: church.support_email } : null}
     />
   );
 }

@@ -1,5 +1,5 @@
 import * as db from "@/lib/db";
-import type { Member, Lodge } from "@/lib/db/types";
+import type { Member, Church } from "@/lib/db/types";
 import { coerceButtonsInEmailHtml } from "@/lib/email/coerce-buttons";
 import { renderBrandedEmail } from "@/lib/email/templates";
 import { sendWithLog } from "@/lib/email/send-with-log";
@@ -9,12 +9,12 @@ export type Recipient = {
   email: string;
   name: string;
   member_id?: string | null;
-  lead_id?: string | null;
+  newcomer_id?: string | null;
   context: Record<string, string | undefined>;
 };
 
 export async function sendBatch({
-  lodgeId,
+  churchId,
   templateKey,
   subject,
   htmlBody,
@@ -22,7 +22,7 @@ export async function sendBatch({
   audienceLabel,
   fromOverride,
 }: {
-  lodgeId: string;
+  churchId: string;
   templateKey: string | null;
   subject: string;
   htmlBody: string;
@@ -47,13 +47,13 @@ export async function sendBatch({
       applyMergeTags(htmlBody, recipient.context),
     );
     const brandedBody = renderBrandedEmail({
-      eyebrow: audienceLabel ?? "Lodge update",
+      eyebrow: audienceLabel ?? "Church update",
       title: personalSubject,
       preview: personalSubject,
       children: personalBody,
     });
     const result = await sendWithLog({
-      lodgeId,
+      churchId,
       toEmail: recipient.email,
       toName: recipient.name,
       memberId: recipient.member_id ?? null,
@@ -79,7 +79,7 @@ export async function sendBatch({
         recipient_email: recipient.email,
         recipient_name: recipient.name,
         recipient_member_id: recipient.member_id ?? null,
-        recipient_lead_id: recipient.lead_id ?? null,
+        recipient_newcomer_id: recipient.newcomer_id ?? null,
         audience_label: audienceLabel ?? null,
         status: "sent",
         error_message: null,
@@ -98,7 +98,7 @@ export async function sendBatch({
         recipient_email: recipient.email,
         recipient_name: recipient.name,
         recipient_member_id: recipient.member_id ?? null,
-        recipient_lead_id: recipient.lead_id ?? null,
+        recipient_newcomer_id: recipient.newcomer_id ?? null,
         audience_label: audienceLabel ?? null,
         status: "failed",
         error_message: result.error,
@@ -109,13 +109,13 @@ export async function sendBatch({
     }
   }
 
-  await db.logMessages(lodgeId, sentRows);
+  await db.logMessages(churchId, sentRows);
   return { sent, failed, skipped: 0 };
 }
 
 export function buildMemberContext(
   member: Member,
-  lodge: Lodge | null,
+  church: Church | null,
   extra: Partial<MergeTagContext> = {}
 ): Record<string, string | undefined> {
   const [first = member.full_name, ...rest] = member.full_name.split(/\s+/);
@@ -124,7 +124,7 @@ export function buildMemberContext(
     last_name: rest.join(" "),
     full_name: member.full_name,
     email: member.email,
-    lodge_name: lodge?.name ?? "the lodge",
+    church_name: church?.name ?? "the church",
     ...extra,
   };
 }

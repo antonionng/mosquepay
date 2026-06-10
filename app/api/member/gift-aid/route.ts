@@ -12,7 +12,7 @@
 // PATCH   -> revoke the current declaration ("I'm no longer eligible" or
 //            "decline forever"). Never deletes -- HMRC retention.
 //
-// Auth: signed-in member only. We never accept arbitrary lodge / email
+// Auth: signed-in member only. We never accept arbitrary church / email
 // from the body; the member identity drives every write.
 //
 // Paper declarations are NOT created here -- those belong to the admin
@@ -47,7 +47,7 @@ async function resolveMember() {
   if (error || !user || !user.email) return null;
   const member =
     (await db.getMemberByAuthUserId(user.id)) ??
-    (await db.getMemberByEmailAcrossLodges(user.email));
+    (await db.getMemberByEmailAcrossChurches(user.email));
   if (!member) return null;
   return { user, member };
 }
@@ -66,7 +66,7 @@ export async function GET() {
   }
   try {
     const declaration = await db.getActiveGiftAidDeclarationByMember(
-      ctx.member.lodge_id,
+      ctx.member.church_id,
       { id: ctx.member.id, email: ctx.member.email }
     );
     return NextResponse.json({
@@ -169,12 +169,12 @@ export async function POST(request: NextRequest) {
   const userAgent = request.headers.get("user-agent");
   const signedAtIso = new Date().toISOString();
 
-  let lodge = null;
+  let church = null;
   try {
-    lodge = await db.getLodgeById(ctx.member.lodge_id);
+    church = await db.getChurchById(ctx.member.church_id);
   } catch (err) {
-    console.warn("member gift-aid POST: lodge lookup failed (non-fatal)", {
-      lodge_id: ctx.member.lodge_id,
+    console.warn("member gift-aid POST: church lookup failed (non-fatal)", {
+      church_id: ctx.member.church_id,
       message: err instanceof Error ? err.message : String(err),
     });
   }
@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
   // the bytes are safely written to the private bucket.
   let declaration;
   try {
-    declaration = await db.addGiftAidDeclaration(ctx.member.lodge_id, {
+    declaration = await db.addGiftAidDeclaration(ctx.member.church_id, {
       donor_name: donorName,
       donor_email: ctx.member.email,
       donor_address_line_1: addressLine1,
@@ -225,7 +225,7 @@ export async function POST(request: NextRequest) {
   let evidenceSha: string | null = null;
   try {
     const evidence = await persistDigitalEvidence({
-      lodgeId: ctx.member.lodge_id,
+      churchId: ctx.member.church_id,
       declarationId: declaration.id,
       donorName,
       donorEmail: ctx.member.email,
@@ -242,14 +242,14 @@ export async function POST(request: NextRequest) {
       signedAtIso,
       ipAddress: ip,
       userAgent,
-      lodgeName: lodge?.name ?? "Lodge",
-      lodgeNumber: lodge?.lodge_number ?? null,
-      charityReference: lodge?.hmrc_charity_reference ?? null,
+      churchName: church?.name ?? "Church",
+      churchNumber: church?.church_number ?? null,
+      charityReference: church?.hmrc_charity_reference ?? null,
       source: "member_portal",
     });
     await db.updateGiftAidDeclarationEvidence(
       declaration.id,
-      ctx.member.lodge_id,
+      ctx.member.church_id,
       {
         evidence_source: "digital",
         evidence_storage_bucket: evidence.bucket,
@@ -275,7 +275,7 @@ export async function POST(request: NextRequest) {
   // Append-only event log + denormalised member status. Both wrapped so a
   // failure on either leg doesn't blank out the declaration row.
   try {
-    await db.insertGiftAidDeclarationEvent(ctx.member.lodge_id, {
+    await db.insertGiftAidDeclarationEvent(ctx.member.church_id, {
       declaration_id: declaration.id,
       event_type: "created_digital",
       actor_kind: "member",
@@ -298,7 +298,7 @@ export async function POST(request: NextRequest) {
     });
   }
   try {
-    await db.updateMemberGiftAidPosture(ctx.member.id, ctx.member.lodge_id, {
+    await db.updateMemberGiftAidPosture(ctx.member.id, ctx.member.church_id, {
       gift_aid_consent_status: "declared",
       gift_aid_prompted_at: signedAtIso,
     });
@@ -310,7 +310,7 @@ export async function POST(request: NextRequest) {
   }
 
   await writeAuditLog({
-    lodgeId: ctx.member.lodge_id,
+    churchId: ctx.member.church_id,
     action: "gift_aid_declaration_created_digital",
     entityType: "gift_aid_declaration",
     entityId: declaration.id,
@@ -365,7 +365,7 @@ export async function PATCH(request: NextRequest) {
 
   if (action === "decline") {
     try {
-      await db.updateMemberGiftAidPosture(ctx.member.id, ctx.member.lodge_id, {
+      await db.updateMemberGiftAidPosture(ctx.member.id, ctx.member.church_id, {
         gift_aid_consent_status: "declined",
         gift_aid_prompted_at: new Date().toISOString(),
       });
@@ -380,7 +380,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
     await writeAuditLog({
-      lodgeId: ctx.member.lodge_id,
+      churchId: ctx.member.church_id,
       action: "gift_aid_member_declined",
       entityType: "member",
       entityId: ctx.member.id,
@@ -391,7 +391,7 @@ export async function PATCH(request: NextRequest) {
 
   if (action === "dismiss") {
     try {
-      await db.updateMemberGiftAidPosture(ctx.member.id, ctx.member.lodge_id, {
+      await db.updateMemberGiftAidPosture(ctx.member.id, ctx.member.church_id, {
         gift_aid_prompted_at: new Date().toISOString(),
       });
     } catch (err) {
@@ -403,6 +403,32 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  if (action === "clear") {
+    try {
+      await db.updateMemberGiftAidPosture(ctx.member.id, ctx.member.church_id, {
+        gift_aid_consent_status: "unknown",
+        gift_aid_prompted_at: null,
+      });
+    } catch (err) {
+      console.error("member gift-aid PATCH clear failed", {
+        member_id: ctx.member.id,
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return NextResponse.json(
+        { error: "Could not clear Gift Aid refusal." },
+        { status: 500 },
+      );
+    }
+    await writeAuditLog({
+      churchId: ctx.member.church_id,
+      action: "gift_aid_member_refusal_cleared",
+      entityType: "member",
+      entityId: ctx.member.id,
+      summary: `Member ${ctx.member.email} cleared their Gift Aid refusal.`,
+    });
+    return NextResponse.json({ consent_status: "unknown" });
+  }
+
   if (action !== "revoke") {
     return NextResponse.json(
       { error: "Unknown action." },
@@ -411,7 +437,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   const declaration = await db.getActiveGiftAidDeclarationByMember(
-    ctx.member.lodge_id,
+    ctx.member.church_id,
     { id: ctx.member.id, email: ctx.member.email }
   );
   if (!declaration) {
@@ -429,7 +455,7 @@ export async function PATCH(request: NextRequest) {
   const reason = typeof body.reason === "string" ? body.reason.trim() : null;
   if (declaration.evidence_source === "paper") {
     try {
-      await db.insertGiftAidDeclarationEvent(ctx.member.lodge_id, {
+      await db.insertGiftAidDeclarationEvent(ctx.member.church_id, {
         declaration_id: declaration.id,
         event_type: "revoked",
         actor_kind: "member",
@@ -457,10 +483,10 @@ export async function PATCH(request: NextRequest) {
   }
 
   try {
-    await db.revokeGiftAidDeclaration(declaration.id, ctx.member.lodge_id, {
+    await db.revokeGiftAidDeclaration(declaration.id, ctx.member.church_id, {
       reason,
     });
-    await db.insertGiftAidDeclarationEvent(ctx.member.lodge_id, {
+    await db.insertGiftAidDeclarationEvent(ctx.member.church_id, {
       declaration_id: declaration.id,
       event_type: "revoked",
       actor_kind: "member",
@@ -472,7 +498,7 @@ export async function PATCH(request: NextRequest) {
       evidence_sha256: declaration.evidence_sha256,
       notes: reason,
     });
-    await db.updateMemberGiftAidPosture(ctx.member.id, ctx.member.lodge_id, {
+    await db.updateMemberGiftAidPosture(ctx.member.id, ctx.member.church_id, {
       gift_aid_consent_status: "declined",
     });
   } catch (err) {
@@ -487,7 +513,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   await writeAuditLog({
-    lodgeId: ctx.member.lodge_id,
+    churchId: ctx.member.church_id,
     action: "gift_aid_declaration_revoked",
     entityType: "gift_aid_declaration",
     entityId: declaration.id,

@@ -12,18 +12,18 @@ export default async function CampaignDetailPage({
 }) {
   const { id } = await params;
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.lodgeId) {
+  if (ctx.mode !== "database" || !ctx.churchId) {
     notFound();
   }
-  const lodgeId = ctx.lodgeId;
-  const campaign = await db.getCharityCampaignById(id, lodgeId);
+  const churchId = ctx.churchId;
+  const campaign = await db.getCharityCampaignById(id, churchId);
   if (!campaign) notFound();
 
   const [donations, allDonations, events, giftAid] = await Promise.all([
-    db.getDonationsByCampaign(id, lodgeId),
-    db.getDonations(lodgeId),
-    db.getEvents(lodgeId),
-    db.getGiftAidDeclarations(lodgeId),
+    db.getDonationsByCampaign(id, churchId),
+    db.getDonations(churchId),
+    db.getEvents(churchId),
+    db.getGiftAidDeclarations(churchId),
   ]);
 
   const eventTitleMap = new Map(events.map((e) => [e.id, e.title] as const));
@@ -33,7 +33,7 @@ export default async function CampaignDetailPage({
       .map((g) => [g.donor_email.toLowerCase(), g] as const)
   );
 
-  // Match meeting (event) collections by charity_name match (legacy data without campaign_id)
+  // Match service (event) collections by charity_name match (legacy data without campaign_id)
   const possibleMatches = allDonations.filter(
     (d) =>
       d.campaign_id === id ||

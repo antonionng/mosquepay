@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import { renderSimpleMessageEmail } from "@/lib/email/templates";
 import { sendWebsiteNotification } from "@/lib/email/website-notifications";
 import { sendWithLog } from "@/lib/email/send-with-log";
-import { getLodgeAdminNotificationRecipients } from "@/lib/email/website-recipients";
-import type { LodgeSiteSectionStyle } from "@/lib/db/types";
+import { getChurchAdminNotificationRecipients } from "@/lib/email/website-recipients";
+import type { ChurchSiteSectionStyle } from "@/lib/db/types";
 import {
   parseRecipientList,
   rejectHoneypot,
@@ -22,8 +22,8 @@ function textValue(value: unknown) {
 
 export async function POST(request: NextRequest) {
   try {
-    const lodgeSlug = getLodgeSlugFromRequest(request);
-    const isTenantMode = request.nextUrl.searchParams.has("lodge");
+    const churchSlug = getChurchSlugFromRequest(request);
+    const isTenantMode = request.nextUrl.searchParams.has("church");
     const body = (await request.json()) as Record<string, unknown>;
     const honeypot = rejectHoneypot(body);
     if (honeypot) return honeypot;
@@ -37,16 +37,16 @@ export async function POST(request: NextRequest) {
     const rateLimited = rejectRateLimited(request, "contact", email);
     if (rateLimited) return rateLimited;
 
-    const resolvedLodge = isTenantMode
+    const resolvedChurch = isTenantMode
       ? isSupabaseConfigured()
-        ? await db.getLodgeBySlug(lodgeSlug)
-        : mockDb.getLodgeBySlug(lodgeSlug)
+        ? await db.getChurchBySlug(churchSlug)
+        : mockDb.getChurchBySlug(churchSlug)
       : null;
-    let formStyle: LodgeSiteSectionStyle | null = null;
-    if (isTenantMode && resolvedLodge && sectionId) {
+    let formStyle: ChurchSiteSectionStyle | null = null;
+    if (isTenantMode && resolvedChurch && sectionId) {
       const site = isSupabaseConfigured()
-        ? await db.getLodgeSite(resolvedLodge.id)
-        : mockDb.getLodgeSite(lodgeSlug);
+        ? await db.getChurchSite(resolvedChurch.id)
+        : mockDb.getChurchSite(churchSlug);
       formStyle =
         site?.sections.find((section) => section.id === sectionId)?.style ??
         site?.custom_pages
@@ -78,28 +78,28 @@ export async function POST(request: NextRequest) {
     }
 
     const notificationContext =
-      resolvedLodge ?? {
+      resolvedChurch ?? {
         id: null,
-        name: "LodgePay",
+        name: "ChurchPay",
         support_email: CONTACT_NOTIFICATION_EMAIL,
         secretary_name: null,
       };
-    const responderName = resolvedLodge?.name ?? "LodgePay";
-    const recipients = await getLodgeAdminNotificationRecipients(
-      resolvedLodge,
+    const responderName = resolvedChurch?.name ?? "ChurchPay";
+    const recipients = await getChurchAdminNotificationRecipients(
+      resolvedChurch,
       parseRecipientList(formStyle?.form_notification_recipients)
     );
 
     await sendWebsiteNotification({
-      lodge: notificationContext,
+      church: notificationContext,
       replyTo: email,
-      subject: `[LodgePay contact] ${subject}`,
-      eyebrow: isTenantMode ? "Lodge website enquiry" : "LodgePay enquiry",
+      subject: `[ChurchPay contact] ${subject}`,
+      eyebrow: isTenantMode ? "Church website enquiry" : "ChurchPay enquiry",
       title: subject,
       preview: `New enquiry from ${name}.`,
       intro: isTenantMode
-        ? "A new lodge website enquiry has been submitted."
-        : "A new LodgePay website enquiry has been submitted.",
+        ? "A new church website enquiry has been submitted."
+        : "A new ChurchPay website enquiry has been submitted.",
       rows: [
         { label: "Name", value: name },
         { label: "Email", value: email },
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
 
     if (process.env.RESEND_API_KEY) {
       await sendWithLog({
-        lodgeId: null,
+        churchId: null,
         toEmail: email,
         toName: name,
         emailType: "contact_form_autoresponder",
@@ -124,24 +124,24 @@ export async function POST(request: NextRequest) {
           formStyle?.form_autoresponder_subject ||
           (isTenantMode
             ? `We have received your enquiry for ${responderName}`
-            : "We have received your LodgePay enquiry"),
+            : "We have received your ChurchPay enquiry"),
         html: renderSimpleMessageEmail({
           eyebrow: "Enquiry received",
           title: isTenantMode
             ? "Thanks for getting in touch"
-            : "Thanks for contacting LodgePay",
+            : "Thanks for contacting ChurchPay",
           preview: isTenantMode
-            ? "Your message has reached the lodge."
-            : "Your message has reached the LodgePay team.",
+            ? "Your message has reached the church."
+            : "Your message has reached the ChurchPay team.",
           greeting: `Hello ${name},`,
           paragraphs: [
             formStyle?.form_autoresponder_body ||
               (isTenantMode
                 ? `Thank you for getting in touch. Your message has reached ${responderName} and we will reply as soon as we can.`
-                : "Thank you for getting in touch. Your message has reached the LodgePay team and we will reply as soon as we can."),
+                : "Thank you for getting in touch. Your message has reached the ChurchPay team and we will reply as soon as we can."),
             isTenantMode
-              ? "If your enquiry is about visiting or membership, please include any dates or context that would help the lodge respond."
-              : "If your enquiry is about a product walkthrough, we will come back with a practical next step based on your lodge or group.",
+              ? "If your enquiry is about newcomer or membership, please include any dates or context that would help the church respond."
+              : "If your enquiry is about a product walkthrough, we will come back with a practical next step based on your church or group.",
           ],
           note: `Your message: ${message}`,
         }),

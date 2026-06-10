@@ -57,7 +57,7 @@ type BankTransaction = {
 
 type LedgerEntry = {
   source_id: string;
-  source_type: "payment" | "dues" | "donation";
+  source_type: "payment" | "giving" | "donation";
   occurred_at: string;
   contact_email: string | null;
   contact_name: string | null;
@@ -213,7 +213,7 @@ export function ReconciliationClient({
             type="text"
             value={accountLabel}
             onChange={(e) => setAccountLabel(e.target.value)}
-            placeholder="Account label (e.g. Lodge Current Account)"
+            placeholder="Account label (e.g. Church Current Account)"
             className="h-10 flex-1 min-w-[240px] rounded-xl border border-slate-200 bg-white px-3 text-sm"
           />
           <Button onClick={() => fileRef.current?.click()} disabled={busy}>
@@ -451,7 +451,7 @@ function MatchDialog({
 }) {
   const [search, setSearch] = useState("");
 
-  const candidates = useMemo(() => {
+  const newcomers = useMemo(() => {
     const txDate = new Date(tx.posted_date).getTime();
     return ledger
       .filter((entry) => {
@@ -490,7 +490,7 @@ function MatchDialog({
             className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
           />
           <div className="max-h-72 space-y-2 overflow-y-auto">
-            {candidates.length === 0 ? (
+            {newcomers.length === 0 ? (
               <p className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-xs text-slate-500">
                 <CircleHelp className="mx-auto mb-2 h-4 w-4 text-slate-400" />
                 No ledger entries match this amount and date window. Use the
@@ -498,7 +498,7 @@ function MatchDialog({
                 without linking to a record.
               </p>
             ) : (
-              candidates.map((entry) => (
+              newcomers.map((entry) => (
                 <button
                   key={`${entry.source_type}-${entry.source_id}`}
                   type="button"

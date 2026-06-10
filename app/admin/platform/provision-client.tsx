@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-type Province = { id: string; name: string };
+type Network = { id: string; name: string };
 
 function slugify(name: string): string {
   return name
@@ -18,7 +18,7 @@ function slugify(name: string): string {
     .slice(0, 60);
 }
 
-export function ProvisionLodgeClient({ provinces }: { provinces: Province[] }) {
+export function ProvisionChurchClient({ networks }: { networks: Network[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -26,11 +26,11 @@ export function ProvisionLodgeClient({ provinces }: { provinces: Province[] }) {
   const [form, setForm] = useState({
     name: "",
     slug: "",
-    lodge_number: "",
+    church_number: "",
     city: "",
     secretary_name: "",
     secretary_email: "",
-    province_id: "",
+    network_id: "",
     send_invite: false,
   });
 
@@ -48,47 +48,47 @@ export function ProvisionLodgeClient({ provinces }: { provinces: Province[] }) {
 
   async function submit() {
     if (!form.name.trim()) {
-      setFeedback("Lodge name is required.");
+      setFeedback("Church name is required.");
       return;
     }
     setBusy(true);
     try {
       const requestedInvite = form.send_invite;
-      const res = await fetch("/api/admin/platform/lodges", {
+      const res = await fetch("/api/admin/platform/churches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: form.name.trim(),
           slug: form.slug.trim() || slugify(form.name),
-          lodge_number: form.lodge_number.trim() || null,
+          church_number: form.church_number.trim() || null,
           city: form.city.trim() || null,
           secretary_name: form.secretary_name.trim() || null,
           secretary_email: form.secretary_email.trim() || null,
-          province_id: form.province_id || null,
+          network_id: form.network_id || null,
           send_invite: form.send_invite,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Could not create lodge.");
-      let feedbackMessage = "Lodge created.";
+      if (!res.ok) throw new Error(data.error ?? "Could not create church.");
+      let feedbackMessage = "Church created.";
       if (form.secretary_email && requestedInvite) {
         feedbackMessage = data.invite?.sent
-          ? `Lodge created. Invite sent to ${form.secretary_email}.`
-          : `Lodge created. Invite failed: ${data.invite?.error ?? "unknown error"}`;
+          ? `Church created. Invite sent to ${form.secretary_email}.`
+          : `Church created. Invite failed: ${data.invite?.error ?? "unknown error"}`;
       } else if (form.secretary_email) {
-        feedbackMessage = `Lodge created with secretary ${form.secretary_email}. Send the invite from the lodge admin when ready.`;
+        feedbackMessage = `Church created with secretary ${form.secretary_email}. Send the invite from the church admin when ready.`;
       } else {
-        feedbackMessage = "Lodge created. Add officers from the lodge admin.";
+        feedbackMessage = "Church created. Add officers from the church admin.";
       }
       setFeedback(feedbackMessage);
       setForm({
         name: "",
         slug: "",
-        lodge_number: "",
+        church_number: "",
         city: "",
         secretary_name: "",
         secretary_email: "",
-        province_id: "",
+        network_id: "",
         send_invite: false,
       });
       router.refresh();
@@ -102,7 +102,7 @@ export function ProvisionLodgeClient({ provinces }: { provinces: Province[] }) {
   if (!open) {
     return (
       <Button onClick={() => setOpen(true)}>
-        <Plus className="mr-2 h-4 w-4" /> Provision lodge
+        <Plus className="mr-2 h-4 w-4" /> Provision church
       </Button>
     );
   }
@@ -112,10 +112,10 @@ export function ProvisionLodgeClient({ provinces }: { provinces: Province[] }) {
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-base font-semibold text-slate-900">
-            Provision a new lodge
+            Provision a new church
           </h2>
           <p className="text-xs text-slate-500">
-            Creates the tenant, optionally links it to a province, and emails
+            Creates the tenant, optionally links it to a network, and emails
             the secretary an invite to set up their admin account.
           </p>
         </div>
@@ -126,12 +126,12 @@ export function ProvisionLodgeClient({ provinces }: { provinces: Province[] }) {
 
       <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
         <div>
-          <Label htmlFor="prov-name">Lodge name</Label>
+          <Label htmlFor="prov-name">Church name</Label>
           <Input
             id="prov-name"
             value={form.name}
             onChange={(e) => update("name", e.target.value)}
-            placeholder="St George's Lodge No 1234"
+            placeholder="St George's Church No 1234"
           />
         </div>
         <div>
@@ -144,11 +144,11 @@ export function ProvisionLodgeClient({ provinces }: { provinces: Province[] }) {
           />
         </div>
         <div>
-          <Label htmlFor="prov-num">Lodge number</Label>
+          <Label htmlFor="prov-num">Church number</Label>
           <Input
             id="prov-num"
-            value={form.lodge_number}
-            onChange={(e) => update("lodge_number", e.target.value)}
+            value={form.church_number}
+            onChange={(e) => update("church_number", e.target.value)}
           />
         </div>
         <div>
@@ -178,15 +178,15 @@ export function ProvisionLodgeClient({ provinces }: { provinces: Province[] }) {
           />
         </div>
         <div className="md:col-span-2">
-          <Label htmlFor="prov-province">Province (optional)</Label>
+          <Label htmlFor="prov-network">Network (optional)</Label>
           <select
-            id="prov-province"
+            id="prov-network"
             className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-            value={form.province_id}
-            onChange={(e) => update("province_id", e.target.value)}
+            value={form.network_id}
+            onChange={(e) => update("network_id", e.target.value)}
           >
             <option value="">Unassigned</option>
-            {provinces.map((p) => (
+            {networks.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
@@ -220,7 +220,7 @@ export function ProvisionLodgeClient({ provinces }: { provinces: Province[] }) {
       <div className="mt-4 flex justify-end">
         <Button onClick={submit} disabled={busy}>
           {busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
-          Create lodge
+          Create church
         </Button>
       </div>
     </div>

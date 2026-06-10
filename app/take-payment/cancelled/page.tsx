@@ -35,7 +35,7 @@ export default function TakePaymentCancelledPage() {
         <p className="text-center text-xs text-slate-400">
           Powered by{" "}
           <Link href="/" className="font-medium text-slate-500 hover:text-slate-700">
-            LodgePay
+            ChurchPay
           </Link>
         </p>
       </div>

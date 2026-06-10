@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 
-const SESSION_COOKIE = "covenant_admin_session";
-const SESSION_SECRET = process.env.SESSION_SECRET ?? "covenant-dummy-secret-change-in-production";
+const SESSION_COOKIE = "churchpay_admin_session";
+const SESSION_SECRET = process.env.SESSION_SECRET ?? "churchpay-dummy-secret-change-in-production";
 
 function sign(value: string): string {
   const encoder = new TextEncoder();
@@ -38,7 +38,7 @@ export async function hasDummySession(): Promise<boolean> {
 }
 
 export function validateDummyCredentials(email: string, password: string): boolean {
-  const adminEmail = process.env.ADMIN_EMAIL ?? "admin@covenantlodge.org.uk";
+  const adminEmail = process.env.ADMIN_EMAIL ?? "admin@covenantchurch.org.uk";
   const adminPassword = process.env.ADMIN_PASSWORD ?? "admin";
   return email === adminEmail && password === adminPassword;
 }

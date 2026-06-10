@@ -32,15 +32,15 @@ type MooovConnectEvent = {
     failure_category?: string;
     // Mooov 2026-05-28 reply, Q-A: stamped on payment.succeeded /
     // payment.failed for any payment created with customer_ref. Used by
-    // the dues subscription enrolment projector to seed
-    // dues_schedules.mooov_payment_method_id + stripe_customer_id once.
+    // the giving subscription enrolment projector to seed
+    // giving_schedules.mooov_payment_method_id + stripe_customer_id once.
     payment_method_id?: string;
     stripe_customer_id?: string;
     customer_ref?: string;
     // Mooov 2026-05-28 post-lock: Slice 3a fields. Present on
     // subscription.* events (subscription.activated, .updated,
     // .canceled, .invoice_paid, .invoice_failed). subscription_metadata
-    // carries LP correlation IDs (lp_schedule_id, lp_member_dues_id)
+    // carries LP correlation IDs (lp_schedule_id, lp_member_giving_id)
     // verbatim from the Stripe Subscription object's metadata. Fields
     // are omitted entirely (not null) when unpopulated.
     subscription_id?: string;
@@ -63,13 +63,13 @@ function firstNonEmptyEnv(...keys: string[]): string | undefined {
   return undefined;
 }
 
-async function findLodgeIdForMerchant(
+async function findChurchIdForMerchant(
   supa: ReturnType<typeof createServiceClient>,
   merchantId: string
 ): Promise<string | null> {
   const { data, error } = await supa
     .schema("mooov")
-    .from("lodges")
+    .from("churches")
     .select("id")
     .eq("merchant_id", merchantId)
     .maybeSingle<{ id: string }>();
@@ -78,16 +78,16 @@ async function findLodgeIdForMerchant(
 
   const demoMerchant =
     process.env.MOOOV_DEMO_MERCHANT_ID ??
-    process.env.MOOOV_DEMO_LODGE_ID ??
-    process.env.MOOOV_LODGE_PILOT_MERCHANT_ID;
+    process.env.MOOOV_DEMO_CHURCH_ID ??
+    process.env.MOOOV_CHURCH_PILOT_MERCHANT_ID;
   if (merchantId !== demoMerchant) return null;
 
-  const demoLodgeId = process.env.MOOOV_DEMO_LODGE_ID ?? "merch_lodgepay_demo";
-  const { error: upsertError } = await supa.schema("mooov").from("lodges").upsert(
+  const demoChurchId = process.env.MOOOV_DEMO_CHURCH_ID ?? "merch_churchpay_demo";
+  const { error: upsertError } = await supa.schema("mooov").from("churches").upsert(
     {
-      id: demoLodgeId,
+      id: demoChurchId,
       merchant_id: merchantId,
-      display_name: "LodgePay demo merchant",
+      display_name: "ChurchPay demo merchant",
       currency: "GBP",
       status: "active",
       metadata: { source: "mooov_connect_staging_webhook" },
@@ -95,7 +95,7 @@ async function findLodgeIdForMerchant(
     { onConflict: "id" }
   );
   if (upsertError) throw upsertError;
-  return demoLodgeId;
+  return demoChurchId;
 }
 
 export async function POST(request: NextRequest) {
@@ -155,8 +155,8 @@ export async function POST(request: NextRequest) {
   // a body-less Vercel 500. Mooov's outbox can safely retry on 500.
   try {
     const supa = createServiceClient();
-    const lodgeId = await findLodgeIdForMerchant(supa, event.merchant.id);
-    if (!lodgeId) {
+    const churchId = await findChurchIdForMerchant(supa, event.merchant.id);
+    if (!churchId) {
       console.warn("Mooov webhook for unknown merchant", {
         event_id: event.id,
         event_type: event.type,
@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
       .schema("mooov")
       .from("mooov_webhook_events")
       .insert({
-        lodge_id: lodgeId,
+        church_id: churchId,
         event_id: event.id,
         event_type: event.type,
         payment_id: paymentId,
@@ -200,7 +200,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await projectConnectEvent(supa, lodgeId, event);
+    await projectConnectEvent(supa, churchId, event);
     return NextResponse.json({ ok: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -234,7 +234,7 @@ export async function POST(request: NextRequest) {
 
 async function projectConnectEvent(
   supa: ReturnType<typeof createServiceClient>,
-  lodgeId: string,
+  churchId: string,
   event: MooovConnectEvent
 ) {
   const paymentId = event.data?.payment_id;
@@ -260,7 +260,7 @@ async function projectConnectEvent(
         status: "captured",
         captured_at: new Date().toISOString(),
       })
-      .eq("lodge_id", lodgeId)
+      .eq("church_id", churchId)
       .eq("payment_id", paymentId)
       .is("captured_at", null);
     // Now project to LP-side tables based on the recorded intent. We read
@@ -273,7 +273,7 @@ async function projectConnectEvent(
       .select(
         "payment_id, intent, amount, currency, guest_descriptor, metadata, member_id"
       )
-      .eq("lodge_id", lodgeId)
+      .eq("church_id", churchId)
       .eq("payment_id", paymentId)
       .maybeSingle<{
         payment_id: string;
@@ -295,18 +295,18 @@ async function projectConnectEvent(
     }
     if (!attempt) return;
     if (attempt.intent === "donation") {
-      await projectDonationCaptured(lodgeId, attempt);
+      await projectDonationCaptured(churchId, attempt);
     } else if (attempt.intent === "event") {
-      await projectEventCaptured(lodgeId, attempt);
-    } else if (attempt.intent === "dues") {
-      await projectDuesCaptured(lodgeId, attempt);
-    } else if (attempt.intent === "dues_subscription_enrol") {
-      await projectDuesSubscriptionEnrolCaptured(lodgeId, attempt, event);
-    } else if (attempt.intent === "dues_subscription_cycle") {
-      await projectDuesSubscriptionCycleCaptured(lodgeId, attempt, event);
+      await projectEventCaptured(churchId, attempt);
+    } else if (attempt.intent === "giving") {
+      await projectGivingCaptured(churchId, attempt);
+    } else if (attempt.intent === "giving_subscription_enrol") {
+      await projectGivingSubscriptionEnrolCaptured(churchId, attempt, event);
+    } else if (attempt.intent === "giving_subscription_cycle") {
+      await projectGivingSubscriptionCycleCaptured(churchId, attempt, event);
     } else if (
       attempt.intent === "take_payment" ||
-      attempt.intent === "lodge_generic_standing_qr" ||
+      attempt.intent === "church_generic_standing_qr" ||
       attempt.intent === "charity_donation_standing_qr" ||
       attempt.intent === "event_dining_standing_qr" ||
       attempt.intent === "event_raffle_standing_qr"
@@ -315,7 +315,12 @@ async function projectConnectEvent(
       // public.payments with the right dining/charity/raffle split based on
       // intent so the Treasurer's existing rollups (admin/payments,
       // admin/treasurer, admin/reports) include these without any new code.
-      await projectStandingOrTakePaymentCaptured(lodgeId, attempt);
+      await projectStandingOrTakePaymentCaptured(churchId, attempt);
+    } else if (attempt.intent === "kiosk_giving") {
+      // Self-service giving kiosk (/give/<slug>/kiosk). Same projection
+      // shape as take-payment plus an optional digital Gift Aid declaration
+      // captured on the kiosk itself.
+      await projectKioskGivingCaptured(churchId, attempt);
     }
     return;
   }
@@ -338,14 +343,14 @@ async function projectConnectEvent(
 
       // Look up the attempt before we mark it failed so we can find the
       // speculative RSVP that was created pre-checkout. The webhook is
-      // the only place where we learn the brother walked away without
+      // the only place where we learn the member walked away without
       // paying, so without this step the abandoned RSVP would linger
       // forever as `payment_pending`.
       const { data: attemptRow } = await supa
         .schema("mooov")
         .from("payment_attempts")
         .select("guest_descriptor, intent")
-        .eq("lodge_id", lodgeId)
+        .eq("church_id", churchId)
         .eq("payment_id", paymentId)
         .maybeSingle<{
           guest_descriptor: Record<string, unknown> | null;
@@ -359,7 +364,7 @@ async function projectConnectEvent(
           status: "failed",
           failure_reason: failureReason,
         })
-        .eq("lodge_id", lodgeId)
+        .eq("church_id", churchId)
         .eq("payment_id", paymentId);
 
       // Reverse the speculative event RSVP, if any. We only do this for
@@ -373,10 +378,10 @@ async function projectConnectEvent(
         typeof descriptor.rsvp_id === "string" ? descriptor.rsvp_id : null;
       if (rsvpIdFromAttempt && (attemptRow?.intent === "event" || !attemptRow?.intent)) {
         try {
-          await db.updateRsvp(rsvpIdFromAttempt, lodgeId, {
+          await db.updateRsvp(rsvpIdFromAttempt, churchId, {
             status: "cancelled",
           });
-          await db.deleteEventGuestsByRsvp(rsvpIdFromAttempt, lodgeId);
+          await db.deleteEventGuestsByRsvp(rsvpIdFromAttempt, churchId);
         } catch (cancelErr) {
           console.error("mooov webhook: failed to cancel abandoned RSVP", {
             event_id: event.id,
@@ -391,15 +396,15 @@ async function projectConnectEvent(
         }
       }
 
-      // For dues subscription cycles or enrolment, bump dunning state
+      // For giving subscription cycles or enrolment, bump dunning state
       // on the schedule so the cron + treasurer notifications branch
       // correctly. Donations/events/standing-QR remain unaffected.
       if (
         attemptRow &&
-        (attemptRow.intent === "dues_subscription_enrol" ||
-          attemptRow.intent === "dues_subscription_cycle")
+        (attemptRow.intent === "giving_subscription_enrol" ||
+          attemptRow.intent === "giving_subscription_cycle")
       ) {
-        await handleDuesSubscriptionFailure(lodgeId, {
+        await handleGivingSubscriptionFailure(churchId, {
           intent: attemptRow.intent,
           guest_descriptor: descriptor,
         }, {
@@ -411,7 +416,7 @@ async function projectConnectEvent(
 
       // Event-driven abandon for the open-ended subscription_checkouts
       // flow. Mooov fires `payment.failed` with `payment_id =
-      // sub_dues_<schedule_id>` (the enrolment handle) and
+      // sub_giving_<schedule_id>` (the enrolment handle) and
       // `failure_code = checkout_abandoned` when the member never
       // completes the hosted checkout and the session expires. This is
       // the AUTHORITATIVE abandon signal — far safer than the blind
@@ -425,20 +430,20 @@ async function projectConnectEvent(
       // already-active / activated row.
       if (
         paymentId &&
-        paymentId.startsWith("sub_dues_") &&
+        paymentId.startsWith("sub_giving_") &&
         failureCode === "checkout_abandoned"
       ) {
         const meta = (event.data?.metadata ?? {}) as Record<string, unknown>;
         const scheduleId =
           typeof meta.lp_schedule_id === "string" && meta.lp_schedule_id
             ? meta.lp_schedule_id
-            : paymentId.slice("sub_dues_".length);
+            : paymentId.slice("sub_giving_".length);
         try {
           const sched = await db
-            .getDuesSchedule(scheduleId, lodgeId)
+            .getGivingSchedule(scheduleId, churchId)
             .catch(() => null);
           if (sched && sched.status === "pending") {
-            await db.updateDuesSchedule(scheduleId, lodgeId, {
+            await db.updateGivingSchedule(scheduleId, churchId, {
               status: "cancelled",
               cancelled_at: new Date().toISOString(),
               cancelled_by_actor: "system_abandoned_checkout",
@@ -468,20 +473,20 @@ async function projectConnectEvent(
         }
       }
 
-      // account_invalid means the lodge's underlying PSP connection got
-      // severed (typically: the lodge clicked "Disconnect" from inside
+      // account_invalid means the church's underlying PSP connection got
+      // severed (typically: the church clicked "Disconnect" from inside
       // their Stripe dashboard, or Stripe's risk team paused the
-      // connection). Mooov can't fix this server-side -- the lodge admin
-      // has to walk through Mooov's portal repair flow. Flip the lodge
+      // connection). Mooov can't fix this server-side -- the church admin
+      // has to walk through Mooov's portal repair flow. Flip the church
       // row to needs_repair so /admin/integrations renders the deep-link
       // banner. Other failure codes (checkout_abandoned, etc.) are
       // expected wear-and-tear and don't change the connection state.
       if (failureCode === "account_invalid") {
         const { data: existing } = await supa
           .schema("mooov")
-          .from("lodges")
+          .from("churches")
           .select("metadata")
-          .eq("id", lodgeId)
+          .eq("id", churchId)
           .maybeSingle<{ metadata: Record<string, unknown> | null }>();
         const mergedMetadata: Record<string, unknown> = {
           ...(existing?.metadata ?? {}),
@@ -493,13 +498,13 @@ async function projectConnectEvent(
         };
         const { error: updateErr } = await supa
           .schema("mooov")
-          .from("lodges")
+          .from("churches")
           .update({ status: "needs_repair", metadata: mergedMetadata })
-          .eq("id", lodgeId);
+          .eq("id", churchId);
         if (updateErr) {
-          console.error("mooov webhook: account_invalid lodge update failed", {
+          console.error("mooov webhook: account_invalid church update failed", {
             event_id: event.id,
-            lodge_id: lodgeId,
+            church_id: churchId,
             message: updateErr.message,
           });
         }
@@ -515,7 +520,7 @@ async function projectConnectEvent(
           status: "refunded",
           refunded_at: new Date().toISOString(),
         })
-        .eq("lodge_id", lodgeId)
+        .eq("church_id", churchId)
         .eq("payment_id", paymentId);
       return;
     case "payment.disputed":
@@ -526,13 +531,13 @@ async function projectConnectEvent(
         .update({
           status: "disputed",
         })
-        .eq("lodge_id", lodgeId)
+        .eq("church_id", churchId)
         .eq("payment_id", paymentId);
       return;
     case "grant.revoked":
       await supa
         .schema("mooov")
-        .from("lodges")
+        .from("churches")
         .update({
           status: "revoked",
           metadata: {
@@ -540,7 +545,7 @@ async function projectConnectEvent(
             revoked_event_id: event.id,
           },
         })
-        .eq("id", lodgeId);
+        .eq("id", churchId);
       return;
     case "subscription.activated":
     case "subscription.updated":
@@ -548,16 +553,16 @@ async function projectConnectEvent(
     case "subscription.invoice_paid":
     case "subscription.invoice_failed": {
       // Mooov 2026-06-01 reply: open-ended subscription pass-through
-      // is GA. We project these events into the LP dues_schedules /
-      // member_dues_instalments / public.payments tables so the
+      // is GA. We project these events into the LP giving_schedules /
+      // member_giving_instalments / public.payments tables so the
       // member portal and treasurer dashboard reflect cycle-by-cycle
       // truth. The dual-emitted payment.captured event on the same
       // money movement is intentionally a no-op (our payment.captured
-      // handler above only projects intents we set ourselves: dues,
-      // donation, dues_subscription_enrol, etc.). Subscription
+      // handler above only projects intents we set ourselves: giving,
+      // donation, giving_subscription_enrol, etc.). Subscription
       // invoices are owned by Mooov server-side, so the linkage is
       // here, on the subscription lane.
-      await handleSubscriptionEvent(lodgeId, event);
+      await handleSubscriptionEvent(churchId, event);
       return;
     }
   }
@@ -572,7 +577,7 @@ async function projectConnectEvent(
 // webhook delivery (same payment_id) lands here twice; the second call
 // short-circuits.
 async function projectDonationCaptured(
-  lodgeId: string,
+  churchId: string,
   attempt: {
     payment_id: string;
     amount: number;
@@ -601,7 +606,7 @@ async function projectDonationCaptured(
   const currencyMajor = (attempt.currency ?? "GBP").toUpperCase();
   const completedAt = new Date().toISOString();
 
-  const payment = await db.addPayment(lodgeId, {
+  const payment = await db.addPayment(churchId, {
     rsvp_id: null,
     event_id: null,
     user_email: donorEmail,
@@ -613,7 +618,7 @@ async function projectDonationCaptured(
     dining_amount: 0,
     charity_amount: amountMajor,
     raffle_amount: 0,
-    meeting_fee_amount: 0,
+    service_fee_amount: 0,
     guest_ticket_amount: 0,
     total_amount: amountMajor,
     currency: currencyMajor,
@@ -626,7 +631,7 @@ async function projectDonationCaptured(
 
   let giftAidDeclarationId: string | null = null;
   if (giftAid) {
-    const declaration = await db.addGiftAidDeclaration(lodgeId, {
+    const declaration = await db.addGiftAidDeclaration(churchId, {
       donor_name: donorName ?? "",
       donor_email: donorEmail,
       donor_address_line_1:
@@ -653,7 +658,7 @@ async function projectDonationCaptured(
     giftAidDeclarationId = declaration.id;
   }
 
-  await db.addDonation(lodgeId, {
+  await db.addDonation(churchId, {
     event_id: null,
     payment_id: payment.id,
     donor_name: donorName,
@@ -669,13 +674,13 @@ async function projectDonationCaptured(
   // Mooov payment_id.
   if (donorEmail) {
     try {
-      const lodge = await db.getLodgeById(lodgeId).catch(() => null);
+      const church = await db.getChurchById(churchId).catch(() => null);
       const { sendOnlinePaymentReceipt } = await import(
         "@/lib/email/payment-receipts"
       );
       await sendOnlinePaymentReceipt({
-        lodgeId,
-        lodge,
+        churchId,
+        church,
         toEmail: donorEmail,
         toName: donorName,
         memberId: null,
@@ -700,12 +705,12 @@ async function projectDonationCaptured(
 // Project a captured Mooov event-guest payment into LP public.payments +
 // flip the RSVP to payment_completed/confirmed. Mirrors the legacy Stripe
 // webhook's handleRsvpPaymentCompleted (with the same dining/charity/
-// meeting_fee/guest_total split on the payments row).
+// service_fee/guest_total split on the payments row).
 //
 // Idempotent on payments.mooov_payment_id; a duplicate Mooov webhook
 // delivery for the same payment_id short-circuits.
 async function projectEventCaptured(
-  lodgeId: string,
+  churchId: string,
   attempt: {
     payment_id: string;
     amount: number;
@@ -743,7 +748,7 @@ async function projectEventCaptured(
       ? Number(guest[k]) || 0
       : 0;
   const diningTotal = numField("dining_total");
-  const meetingFee = numField("meeting_fee");
+  const serviceFee = numField("service_fee");
   const charityAmount = numField("charity_amount");
   const guestTotal = numField("guest_total");
   const raffleAmount = numField("raffle_amount");
@@ -751,7 +756,7 @@ async function projectEventCaptured(
   const currencyMajor = (attempt.currency ?? "GBP").toUpperCase();
   const completedAt = new Date().toISOString();
 
-  const payment = await db.addPayment(lodgeId, {
+  const payment = await db.addPayment(churchId, {
     rsvp_id: rsvpId,
     event_id: eventId,
     user_email: donorEmail,
@@ -763,7 +768,7 @@ async function projectEventCaptured(
     dining_amount: diningTotal,
     charity_amount: charityAmount,
     raffle_amount: raffleAmount,
-    meeting_fee_amount: meetingFee,
+    service_fee_amount: serviceFee,
     guest_ticket_amount: guestTotal,
     total_amount: totalMajor,
     currency: currencyMajor,
@@ -775,7 +780,7 @@ async function projectEventCaptured(
   });
 
   if (rsvpId) {
-    await db.updateRsvp(rsvpId, lodgeId, {
+    await db.updateRsvp(rsvpId, churchId, {
       payment_id: payment.id,
       payment_completed: true,
       status: "confirmed",
@@ -788,17 +793,17 @@ async function projectEventCaptured(
   // (idempotency on payments.mooov_payment_id keeps replays safe).
   if (donorEmail) {
     try {
-      const [event, lodge] = await Promise.all([
-        db.getEventById(eventId, lodgeId),
-        db.getLodgeById(lodgeId),
+      const [event, church] = await Promise.all([
+        db.getEventById(eventId, churchId),
+        db.getChurchById(churchId),
       ]);
       if (event) {
         const totalPaid =
-          diningTotal + meetingFee + charityAmount + guestTotal + raffleAmount;
+          diningTotal + serviceFee + charityAmount + guestTotal + raffleAmount;
         await sendGuestWelcomeEmail({
           toEmail: donorEmail,
           toName: donorName ?? donorEmail,
-          lodgeName: lodge?.name ?? "the lodge",
+          churchName: church?.name ?? "the church",
           eventTitle: event.title,
           eventDate: event.event_date,
           eventTime: event.event_time,
@@ -825,7 +830,7 @@ async function projectEventCaptured(
   let giftAidDeclarationId: string | null = null;
   if (giftAid === true || giftAid === "true") {
     const g = attempt.guest_descriptor as Record<string, unknown>;
-    const declaration = await db.addGiftAidDeclaration(lodgeId, {
+    const declaration = await db.addGiftAidDeclaration(churchId, {
       donor_name:
         typeof g.gift_aid_donor_name === "string"
           ? g.gift_aid_donor_name
@@ -857,7 +862,7 @@ async function projectEventCaptured(
   }
 
   // Record the charity portion as an event-linked donation so the
-  // per-meeting Gift Aid panel + close batch pick it up. Written for every
+  // per-service Gift Aid panel + close batch pick it up. Written for every
   // charity contribution, not just GA opt-ins: the claim batcher matches
   // donation -> declaration by email at close time, so a declaration
   // uploaded later (paper form, profile import) makes this gift reclaimable
@@ -870,7 +875,7 @@ async function projectEventCaptured(
         ? "eligible"
         : "unknown";
     try {
-      await db.addDonation(lodgeId, {
+      await db.addDonation(churchId, {
         event_id: eventId,
         payment_id: payment.id,
         donor_name: donorName,
@@ -892,15 +897,15 @@ async function projectEventCaptured(
   }
 }
 
-// Project a captured Mooov member-dues payment. Mirrors the legacy Stripe
-// webhook's handleDuesCompleted: writes a public.payments row, flips the
-// member_dues row to paid (linking to the new payment), and -- if the
-// dues record carried a charitable portion -- writes a donations row plus
+// Project a captured Mooov member-giving payment. Mirrors the legacy Stripe
+// webhook's handleGivingCompleted: writes a public.payments row, flips the
+// member_giving row to paid (linking to the new payment), and -- if the
+// giving record carried a charitable portion -- writes a donations row plus
 // gift-aid declaration link if one is on file for this member email.
 //
 // Idempotent on payments.mooov_payment_id (same gate the other intents use).
-async function projectDuesCaptured(
-  lodgeId: string,
+async function projectGivingCaptured(
+  churchId: string,
   attempt: {
     payment_id: string;
     amount: number;
@@ -911,32 +916,32 @@ async function projectDuesCaptured(
 ) {
   const existing = await db.getPaymentByMooovId(attempt.payment_id);
   if (existing) {
-    console.log("mooov webhook: dues payment already projected (idempotent)", {
+    console.log("mooov webhook: giving payment already projected (idempotent)", {
       payment_id: attempt.payment_id,
     });
     return;
   }
 
   const guest = (attempt.guest_descriptor ?? {}) as Record<string, unknown>;
-  const duesId = typeof guest.dues_id === "string" ? guest.dues_id : null;
-  if (!duesId) {
-    console.error("mooov webhook: dues payment missing dues_id in guest_descriptor", {
+  const givingId = typeof guest.giving_id === "string" ? guest.giving_id : null;
+  if (!givingId) {
+    console.error("mooov webhook: giving payment missing giving_id in guest_descriptor", {
       payment_id: attempt.payment_id,
     });
     return;
   }
 
-  // We re-fetch the dues record so we have authoritative member_name /
+  // We re-fetch the giving record so we have authoritative member_name /
   // currency / charitable_amount, instead of trusting the snapshot the
   // route captured at preflight time (could be hours/days ago if the
   // member opened the hosted Checkout page in a browser tab and paid
   // later).
-  const allDues = await db.getMemberDues(lodgeId);
-  const duesRecord = allDues.find((d) => d.id === duesId);
-  if (!duesRecord) {
-    console.error("mooov webhook: dues record not found for captured payment", {
+  const allGiving = await db.getMemberGiving(churchId);
+  const givingRecord = allGiving.find((d) => d.id === givingId);
+  if (!givingRecord) {
+    console.error("mooov webhook: giving record not found for captured payment", {
       payment_id: attempt.payment_id,
-      dues_id: duesId,
+      giving_id: givingId,
     });
     return;
   }
@@ -944,17 +949,17 @@ async function projectDuesCaptured(
   const donorEmail =
     typeof guest.donor_email === "string"
       ? guest.donor_email
-      : duesRecord.member_email;
+      : givingRecord.member_email;
   const donorName =
     typeof guest.donor_name === "string"
       ? guest.donor_name
-      : duesRecord.member_name ?? null;
+      : givingRecord.member_name ?? null;
   const totalMajor = (attempt.amount ?? 0) / 100;
   const currencyMajor = (attempt.currency ?? "GBP").toUpperCase();
-  const charitableAmount = duesRecord.charitable_amount ?? 0;
+  const charitableAmount = givingRecord.charitable_amount ?? 0;
   const completedAt = new Date().toISOString();
 
-  const payment = await db.addPayment(lodgeId, {
+  const payment = await db.addPayment(churchId, {
     rsvp_id: null,
     event_id: null,
     user_email: donorEmail,
@@ -966,11 +971,11 @@ async function projectDuesCaptured(
     dining_amount: 0,
     charity_amount: charitableAmount,
     raffle_amount: 0,
-    meeting_fee_amount: 0,
+    service_fee_amount: 0,
     guest_ticket_amount: 0,
     total_amount: totalMajor,
     currency: currencyMajor,
-    charity_name: charitableAmount > 0 ? "Dues charitable portion" : null,
+    charity_name: charitableAmount > 0 ? "Giving charitable portion" : null,
     status: "succeeded",
     refund_amount: 0,
     refund_reason: null,
@@ -979,7 +984,7 @@ async function projectDuesCaptured(
 
   const declaration =
     charitableAmount > 0
-      ? await db.getActiveGiftAidDeclarationByEmail(lodgeId, donorEmail)
+      ? await db.getActiveGiftAidDeclarationByEmail(churchId, donorEmail)
       : null;
   const giftAidStatus = declaration
     ? "declared"
@@ -987,7 +992,7 @@ async function projectDuesCaptured(
     ? "eligible"
     : "unknown";
 
-  await db.updateMemberDuesStatus(duesId, lodgeId, {
+  await db.updateMemberGivingStatus(givingId, churchId, {
     status: "paid",
     payment_id: payment.id,
     gift_aid_declaration_id: declaration?.id ?? null,
@@ -997,14 +1002,14 @@ async function projectDuesCaptured(
   });
 
   if (charitableAmount > 0) {
-    await db.addDonation(lodgeId, {
+    await db.addDonation(churchId, {
       event_id: null,
       payment_id: payment.id,
       donor_name: donorName,
       donor_email: donorEmail,
       amount: charitableAmount,
       currency: currencyMajor,
-      source: "dues_charitable_portion",
+      source: "giving_charitable_portion",
       status: "completed",
       gift_aid_declaration_id: declaration?.id ?? null,
       gift_aid_status: giftAidStatus,
@@ -1014,28 +1019,28 @@ async function projectDuesCaptured(
 
   // Receipt to the payer. Best-effort; idempotent on Mooov payment_id.
   try {
-    const lodge = await db.getLodgeById(lodgeId).catch(() => null);
-    const member = duesRecord.member_id
-      ? await db.getMemberById(duesRecord.member_id, lodgeId).catch(() => null)
+    const church = await db.getChurchById(churchId).catch(() => null);
+    const member = givingRecord.member_id
+      ? await db.getMemberById(givingRecord.member_id, churchId).catch(() => null)
       : null;
     const { sendOnlinePaymentReceipt } = await import(
       "@/lib/email/payment-receipts"
     );
     await sendOnlinePaymentReceipt({
-      lodgeId,
-      lodge,
+      churchId,
+      church,
       toEmail: donorEmail,
       toName: donorName,
       memberId: member?.id ?? null,
       amountMajor: totalMajor,
       currency: currencyMajor,
-      kind: "dues_full",
-      description: `This receipt covers your full annual dues for the ${lodge?.name ?? "lodge"}.`,
+      kind: "giving_full",
+      description: `This receipt covers your full annual giving for the ${church?.name ?? "church"}.`,
       mooovPaymentId: attempt.payment_id,
-      metadata: { dues_id: duesId },
+      metadata: { giving_id: givingId },
     });
   } catch (err) {
-    console.error("mooov webhook: dues receipt email failed", {
+    console.error("mooov webhook: giving receipt email failed", {
       payment_id: attempt.payment_id,
       message: err instanceof Error ? err.message : String(err),
     });
@@ -1076,7 +1081,7 @@ function readLineItems(
 }
 
 async function projectStandingOrTakePaymentCaptured(
-  lodgeId: string,
+  churchId: string,
   attempt: {
     payment_id: string;
     intent: string;
@@ -1121,6 +1126,8 @@ async function projectStandingOrTakePaymentCaptured(
       ? (guest.gift_aid_declaration_id as string)
       : null;
   const giftAidEligible = guest.gift_aid_eligible === true;
+  const giftAidRefused =
+    guest.gift_aid_refused === true || metadata.gift_aid_refused === true;
 
   // Translate the various standing-QR + take_payment intents into the unified
   // (category, charityName) shape the shared projector expects. Generic /
@@ -1152,14 +1159,14 @@ async function projectStandingOrTakePaymentCaptured(
     case "take_payment":
       // category already set from metadata above.
       break;
-    case "lodge_generic_standing_qr":
+    case "church_generic_standing_qr":
     default:
       category = null;
       break;
   }
 
   const result = await projectTakePaymentCaptured({
-    lodgeId,
+    churchId,
     mooovPaymentId: attempt.payment_id,
     amountMajor,
     currency: attempt.currency ?? "GBP",
@@ -1174,6 +1181,7 @@ async function projectStandingOrTakePaymentCaptured(
     guestId,
     giftAidDeclarationId,
     giftAidEligible,
+    giftAidRefused,
     paymentMethod: "card_qr",
   });
 
@@ -1206,7 +1214,7 @@ async function projectStandingOrTakePaymentCaptured(
     try {
       await sendTakePaymentReceipt({
         toEmail: payerEmail,
-        toName: payerName ?? "Friend of the lodge",
+        toName: payerName ?? "Friend of the church",
         amountMajor,
         currency: attempt.currency ?? "GBP",
         category,
@@ -1215,7 +1223,7 @@ async function projectStandingOrTakePaymentCaptured(
         paymentMethod: "card_qr",
         recordedByEmail,
         giftAidEligible,
-        lodgeId,
+        churchId,
         paymentId: attempt.payment_id,
         lineItems,
       });
@@ -1228,10 +1236,178 @@ async function projectStandingOrTakePaymentCaptured(
   }
 }
 
-// Project a captured Mooov dues SUBSCRIPTION ENROLMENT payment.
+// Project a captured self-service kiosk gift (/give/<slug>/kiosk).
 //
-// First cycle of a yearly dues schedule. We:
-//   1. Persist the saved Stripe PM + Customer onto dues_schedules so the
+// Differences from the take-payment projection:
+//   * The giver may have signed a digital Gift Aid declaration ON the kiosk
+//     (address + taxpayer confirmation captured pre-payment and stashed on
+//     the guest_descriptor). We create the gift_aid_declarations row here,
+//     once payment actually captures, mirroring projectDonationCaptured.
+//   * Tithes / offerings / general gifts are donations to the church charity
+//     too, so when a declaration (or at least a donor email) is present we
+//     log a donations row for the FULL amount even when the purpose isn't
+//     "charity" — that's what the Gift Aid claim batcher reclaims against.
+//
+// Idempotent on payments.mooov_payment_id: the early-exit below also guards
+// the declaration + donation inserts against webhook redelivery.
+async function projectKioskGivingCaptured(
+  churchId: string,
+  attempt: {
+    payment_id: string;
+    intent: string;
+    amount: number;
+    currency: string;
+    guest_descriptor: Record<string, unknown> | null;
+    metadata: Record<string, unknown> | null;
+  },
+) {
+  const existing = await db.getPaymentByMooovId(attempt.payment_id);
+  if (existing) {
+    console.log("mooov webhook: kiosk gift already projected (idempotent)", {
+      payment_id: attempt.payment_id,
+    });
+    return;
+  }
+
+  const amountMajor = (attempt.amount ?? 0) / 100;
+  const currencyMajor = (attempt.currency ?? "GBP").toUpperCase();
+  const metadata = (attempt.metadata ?? {}) as Record<string, unknown>;
+  const guest = (attempt.guest_descriptor ?? {}) as Record<string, unknown>;
+
+  const purpose =
+    typeof guest.purpose === "string" ? (guest.purpose as string) : "general";
+  const category =
+    typeof guest.category === "string" ? (guest.category as string) : purpose;
+  const payerName =
+    typeof guest.payer_name === "string" ? (guest.payer_name as string) : null;
+  const payerEmail =
+    typeof guest.payer_email === "string"
+      ? (guest.payer_email as string)
+      : null;
+  const wantsGiftAid = guest.gift_aid === true || guest.gift_aid === "true";
+
+  // Create the digital declaration first so the projected donation row can
+  // link straight to it. Failure here is non-fatal: the gift still books,
+  // the donation just lands as "eligible" for a later declaration match.
+  let giftAidDeclarationId: string | null = null;
+  if (wantsGiftAid && payerEmail && payerName) {
+    try {
+      const declaration = await db.addGiftAidDeclaration(churchId, {
+        donor_name: payerName,
+        donor_email: payerEmail,
+        donor_address_line_1:
+          typeof guest.gift_aid_address_line_1 === "string"
+            ? guest.gift_aid_address_line_1
+            : null,
+        donor_address_line_2:
+          typeof guest.gift_aid_address_line_2 === "string"
+            ? guest.gift_aid_address_line_2
+            : null,
+        donor_city:
+          typeof guest.gift_aid_city === "string" ? guest.gift_aid_city : null,
+        donor_postcode:
+          typeof guest.gift_aid_postcode === "string"
+            ? guest.gift_aid_postcode
+            : null,
+        donor_country: "United Kingdom",
+        declaration_text:
+          "I am a UK taxpayer and understand that if I pay less Income Tax and/or Capital Gains Tax than the amount of Gift Aid claimed on all my donations in that tax year it is my responsibility to pay any difference.",
+        declaration_confirmed: true,
+        confirmation_method: "kiosk_self_service",
+        hmrc_eligible: true,
+      });
+      giftAidDeclarationId = declaration.id;
+    } catch (err) {
+      console.error("mooov webhook: kiosk declaration insert failed", {
+        payment_id: attempt.payment_id,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  const result = await projectTakePaymentCaptured({
+    churchId,
+    mooovPaymentId: attempt.payment_id,
+    amountMajor,
+    currency: currencyMajor,
+    category,
+    lineItems: null,
+    reference: "Self-service kiosk",
+    eventId: null,
+    charityName: null,
+    payerName,
+    payerEmail,
+    giftAidDeclarationId,
+    giftAidEligible: Boolean(giftAidDeclarationId),
+    paymentMethod: "card_qr",
+    paymentMethodNote: "kiosk_self_service",
+  });
+
+  if (result.alreadyExisted) return;
+
+  // The shared projector only logs a donation when charity_amount > 0, i.e.
+  // when the kiosk purpose was "charity". Tithes, offerings, and general
+  // gifts with an identified donor are reclaimable donations too, so log
+  // them here for the Gift Aid pipeline. Anonymous non-charity gifts stay
+  // ledger-only (no GASDS on card payments, nothing to reclaim).
+  if (category !== "charity" && result.donationId === null && payerEmail) {
+    try {
+      await db.addDonation(churchId, {
+        event_id: null,
+        payment_id: result.paymentId,
+        donor_name: payerName,
+        donor_email: payerEmail,
+        amount: amountMajor,
+        currency: currencyMajor.toLowerCase(),
+        source: "kiosk_self_service",
+        status: "completed",
+        gift_aid_declaration_id: giftAidDeclarationId,
+        gift_aid_status: giftAidDeclarationId ? "declared" : "eligible",
+        gift_aid_eligible_amount: giftAidDeclarationId ? amountMajor : 0,
+      });
+    } catch (err) {
+      console.error("mooov webhook: kiosk donation insert failed (non-fatal)", {
+        payment_id: attempt.payment_id,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  // Receipt to the giver, when they shared an email. Best-effort + deduped
+  // on the mooov payment_id so redelivery never double-sends.
+  if (payerEmail) {
+    const description =
+      typeof metadata.description === "string"
+        ? (metadata.description as string)
+        : null;
+    try {
+      await sendTakePaymentReceipt({
+        toEmail: payerEmail,
+        toName: payerName ?? "Friend of the church",
+        amountMajor,
+        currency: currencyMajor,
+        category,
+        reference: null,
+        description,
+        paymentMethod: "card_qr",
+        recordedByEmail: null,
+        giftAidEligible: Boolean(giftAidDeclarationId),
+        churchId,
+        paymentId: attempt.payment_id,
+      });
+    } catch (err) {
+      console.warn("mooov webhook: kiosk receipt failed (non-fatal)", {
+        payment_id: attempt.payment_id,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+}
+
+// Project a captured Mooov giving SUBSCRIPTION ENROLMENT payment.
+//
+// First cycle of a yearly giving schedule. We:
+//   1. Persist the saved Stripe PM + Customer onto giving_schedules so the
 //      daily cron has what it needs to run subsequent cycles via
 //      /v1/charges/saved (Mooov 2026-05-28 reply, Q-A — both fields
 //      stamped on data when customer_ref was set on the create call).
@@ -1241,13 +1417,13 @@ async function projectStandingOrTakePaymentCaptured(
 //      Treasurer ledger picks the cycle up (existing reporting query).
 //   4. If this was a single-cycle schedule (e.g. one-shot subscription
 //      that just collects month 1 because remaining months <= 1) flip
-//      member_dues to paid at this point.
+//      member_giving to paid at this point.
 //
 // Idempotent on payments.mooov_payment_id (re-deliveries skip the
-// duplicate payments insert) and on dues_schedules.status (only the
+// duplicate payments insert) and on giving_schedules.status (only the
 // first transition writes the saved PM + customer).
-async function projectDuesSubscriptionEnrolCaptured(
-  lodgeId: string,
+async function projectGivingSubscriptionEnrolCaptured(
+  churchId: string,
   attempt: {
     payment_id: string;
     amount: number;
@@ -1260,7 +1436,7 @@ async function projectDuesSubscriptionEnrolCaptured(
   const existingPayment = await db.getPaymentByMooovId(attempt.payment_id);
   if (existingPayment) {
     console.log(
-      "mooov webhook: dues subscription enrolment already projected (idempotent)",
+      "mooov webhook: giving subscription enrolment already projected (idempotent)",
       { payment_id: attempt.payment_id }
     );
     return;
@@ -1269,30 +1445,30 @@ async function projectDuesSubscriptionEnrolCaptured(
   const guest = (attempt.guest_descriptor ?? {}) as Record<string, unknown>;
   const scheduleId =
     typeof guest.schedule_id === "string" ? guest.schedule_id : null;
-  const duesId = typeof guest.dues_id === "string" ? guest.dues_id : null;
-  if (!scheduleId || !duesId) {
+  const givingId = typeof guest.giving_id === "string" ? guest.giving_id : null;
+  if (!scheduleId || !givingId) {
     console.error(
-      "mooov webhook: dues enrolment missing schedule_id/dues_id in guest_descriptor",
+      "mooov webhook: giving enrolment missing schedule_id/giving_id in guest_descriptor",
       { payment_id: attempt.payment_id }
     );
     return;
   }
 
-  const schedule = await db.getDuesSchedule(scheduleId, lodgeId);
+  const schedule = await db.getGivingSchedule(scheduleId, churchId);
   if (!schedule) {
-    console.error("mooov webhook: dues schedule not found", {
+    console.error("mooov webhook: giving schedule not found", {
       payment_id: attempt.payment_id,
       schedule_id: scheduleId,
     });
     return;
   }
 
-  const allDues = await db.getMemberDues(lodgeId);
-  const duesRecord = allDues.find((d) => d.id === duesId);
-  if (!duesRecord) {
-    console.error("mooov webhook: dues record not found for enrolment capture", {
+  const allGiving = await db.getMemberGiving(churchId);
+  const givingRecord = allGiving.find((d) => d.id === givingId);
+  if (!givingRecord) {
+    console.error("mooov webhook: giving record not found for enrolment capture", {
       payment_id: attempt.payment_id,
-      dues_id: duesId,
+      giving_id: givingId,
     });
     return;
   }
@@ -1312,7 +1488,7 @@ async function projectDuesSubscriptionEnrolCaptured(
     // missing, log loud and refuse to flip the schedule active — without
     // a saved PM the cron has no card to charge against.
     console.error(
-      "mooov webhook: dues enrolment payment.succeeded missing data.payment_method_id; schedule remains pending",
+      "mooov webhook: giving enrolment payment.succeeded missing data.payment_method_id; schedule remains pending",
       {
         payment_id: attempt.payment_id,
         schedule_id: scheduleId,
@@ -1322,12 +1498,12 @@ async function projectDuesSubscriptionEnrolCaptured(
     return;
   }
 
-  const instalments = await db.getInstalmentsForDues(duesId, lodgeId);
+  const instalments = await db.getInstalmentsForGiving(givingId, churchId);
   const firstInstalment = instalments.find((i) => i.sequence === 1);
   const secondInstalment = instalments.find((i) => i.sequence === 2);
 
   // 1. Stamp saved PM + customer + status active on the schedule.
-  await db.updateDuesSchedule(scheduleId, lodgeId, {
+  await db.updateGivingSchedule(scheduleId, churchId, {
     mooov_payment_method_id: paymentMethodId,
     stripe_customer_id: stripeCustomerId,
     status: "active",
@@ -1346,16 +1522,16 @@ async function projectDuesSubscriptionEnrolCaptured(
   const totalMajor = (attempt.amount ?? 0) / 100;
   const currencyMajor = (attempt.currency ?? "GBP").toUpperCase();
   const charitablePerCycle = computeCyclicalCharitable(
-    duesRecord.charitable_amount,
+    givingRecord.charitable_amount,
     instalments.length
   );
   const completedAt = new Date().toISOString();
 
-  const payment = await db.addPayment(lodgeId, {
+  const payment = await db.addPayment(churchId, {
     rsvp_id: null,
     event_id: null,
-    user_email: duesRecord.member_email,
-    user_name: duesRecord.member_name,
+    user_email: givingRecord.member_email,
+    user_name: givingRecord.member_name,
     stripe_payment_intent_id: null,
     stripe_charge_id: null,
     stripe_customer_id: stripeCustomerId,
@@ -1363,11 +1539,11 @@ async function projectDuesSubscriptionEnrolCaptured(
     dining_amount: 0,
     charity_amount: charitablePerCycle,
     raffle_amount: 0,
-    meeting_fee_amount: 0,
+    service_fee_amount: 0,
     guest_ticket_amount: 0,
     total_amount: totalMajor,
     currency: currencyMajor,
-    charity_name: charitablePerCycle > 0 ? "Dues charitable portion" : null,
+    charity_name: charitablePerCycle > 0 ? "Giving charitable portion" : null,
     status: "succeeded",
     refund_amount: 0,
     refund_reason: null,
@@ -1375,7 +1551,7 @@ async function projectDuesSubscriptionEnrolCaptured(
   });
 
   if (firstInstalment) {
-    await db.updateInstalment(firstInstalment.id, lodgeId, {
+    await db.updateInstalment(firstInstalment.id, churchId, {
       status: "paid",
       paid_at: completedAt,
       payment_reference: attempt.payment_id,
@@ -1383,35 +1559,35 @@ async function projectDuesSubscriptionEnrolCaptured(
   }
 
   // 3. If the schedule has only one cycle (degenerate case: e.g. someone
-  //    enrolled with 1 month remaining), flip the parent member_dues to
+  //    enrolled with 1 month remaining), flip the parent member_giving to
   //    paid right now and mark the schedule completed.
   if (instalments.length <= 1) {
-    await db.updateMemberDuesStatus(duesId, lodgeId, {
+    await db.updateMemberGivingStatus(givingId, churchId, {
       status: "paid",
       payment_id: payment.id,
       paid_at: completedAt,
     });
-    await db.updateDuesSchedule(scheduleId, lodgeId, {
+    await db.updateGivingSchedule(scheduleId, churchId, {
       status: "completed",
     });
   }
 
   // 4. Charitable donation row for the cycle, mirroring the one-off
-  //    dues path. Per-cycle attribution keeps the Gift Aid claim
+  //    giving path. Per-cycle attribution keeps the Gift Aid claim
   //    batcher's date alignment correct (gift made on charge date).
   if (charitablePerCycle > 0) {
     const declaration = await db.getActiveGiftAidDeclarationByEmail(
-      lodgeId,
-      duesRecord.member_email
+      churchId,
+      givingRecord.member_email
     );
-    await db.addDonation(lodgeId, {
+    await db.addDonation(churchId, {
       event_id: null,
       payment_id: payment.id,
-      donor_name: duesRecord.member_name,
-      donor_email: duesRecord.member_email,
+      donor_name: givingRecord.member_name,
+      donor_email: givingRecord.member_email,
       amount: charitablePerCycle,
       currency: currencyMajor,
-      source: "dues_charitable_portion",
+      source: "giving_charitable_portion",
       status: "completed",
       gift_aid_declaration_id: declaration?.id ?? null,
       gift_aid_status: declaration ? "declared" : "eligible",
@@ -1420,18 +1596,18 @@ async function projectDuesSubscriptionEnrolCaptured(
   }
 }
 
-// Project a captured Mooov dues SUBSCRIPTION CYCLE payment. Driven by
-// the daily cron's runSavedDuesCharge call (Mooov 2026-05-28 reply,
+// Project a captured Mooov giving SUBSCRIPTION CYCLE payment. Driven by
+// the daily cron's runSavedGivingCharge call (Mooov 2026-05-28 reply,
 // task L1.3). One row per cycle.
 //
 // Cycle correlation: the cron stamps payment_id =
-// pay_dues_<schedule_id>_<NNN> on the matching member_dues_instalments
+// pay_giving_<schedule_id>_<NNN> on the matching member_giving_instalments
 // row at preflight time, then this projector flips that row to paid.
 //
 // When the last outstanding instalment is paid we flip the parent
-// member_dues to paid and the schedule to completed.
-async function projectDuesSubscriptionCycleCaptured(
-  lodgeId: string,
+// member_giving to paid and the schedule to completed.
+async function projectGivingSubscriptionCycleCaptured(
+  churchId: string,
   attempt: {
     payment_id: string;
     amount: number;
@@ -1444,7 +1620,7 @@ async function projectDuesSubscriptionCycleCaptured(
   const existingPayment = await db.getPaymentByMooovId(attempt.payment_id);
   if (existingPayment) {
     console.log(
-      "mooov webhook: dues subscription cycle already projected (idempotent)",
+      "mooov webhook: giving subscription cycle already projected (idempotent)",
       { payment_id: attempt.payment_id }
     );
     return;
@@ -1453,32 +1629,32 @@ async function projectDuesSubscriptionCycleCaptured(
   const guest = (attempt.guest_descriptor ?? {}) as Record<string, unknown>;
   const scheduleId =
     typeof guest.schedule_id === "string" ? guest.schedule_id : null;
-  const duesId = typeof guest.dues_id === "string" ? guest.dues_id : null;
+  const givingId = typeof guest.giving_id === "string" ? guest.giving_id : null;
   const instalmentId =
     typeof guest.instalment_id === "string" ? guest.instalment_id : null;
-  if (!scheduleId || !duesId) {
+  if (!scheduleId || !givingId) {
     console.error(
-      "mooov webhook: dues cycle missing schedule_id/dues_id in guest_descriptor",
+      "mooov webhook: giving cycle missing schedule_id/giving_id in guest_descriptor",
       { payment_id: attempt.payment_id }
     );
     return;
   }
 
-  const schedule = await db.getDuesSchedule(scheduleId, lodgeId);
+  const schedule = await db.getGivingSchedule(scheduleId, churchId);
   if (!schedule) {
-    console.error("mooov webhook: dues schedule not found for cycle capture", {
+    console.error("mooov webhook: giving schedule not found for cycle capture", {
       payment_id: attempt.payment_id,
       schedule_id: scheduleId,
     });
     return;
   }
 
-  const allDues = await db.getMemberDues(lodgeId);
-  const duesRecord = allDues.find((d) => d.id === duesId);
-  if (!duesRecord) {
-    console.error("mooov webhook: dues record not found for cycle capture", {
+  const allGiving = await db.getMemberGiving(churchId);
+  const givingRecord = allGiving.find((d) => d.id === givingId);
+  if (!givingRecord) {
+    console.error("mooov webhook: giving record not found for cycle capture", {
       payment_id: attempt.payment_id,
-      dues_id: duesId,
+      giving_id: givingId,
     });
     return;
   }
@@ -1486,17 +1662,17 @@ async function projectDuesSubscriptionCycleCaptured(
   const totalMajor = (attempt.amount ?? 0) / 100;
   const currencyMajor = (attempt.currency ?? "GBP").toUpperCase();
   const completedAt = new Date().toISOString();
-  const allInstalments = await db.getInstalmentsForDues(duesId, lodgeId);
+  const allInstalments = await db.getInstalmentsForGiving(givingId, churchId);
   const charitablePerCycle = computeCyclicalCharitable(
-    duesRecord.charitable_amount,
+    givingRecord.charitable_amount,
     allInstalments.length
   );
 
-  const payment = await db.addPayment(lodgeId, {
+  const payment = await db.addPayment(churchId, {
     rsvp_id: null,
     event_id: null,
-    user_email: duesRecord.member_email,
-    user_name: duesRecord.member_name,
+    user_email: givingRecord.member_email,
+    user_name: givingRecord.member_name,
     stripe_payment_intent_id: null,
     stripe_charge_id: null,
     stripe_customer_id: schedule.stripe_customer_id ?? null,
@@ -1504,11 +1680,11 @@ async function projectDuesSubscriptionCycleCaptured(
     dining_amount: 0,
     charity_amount: charitablePerCycle,
     raffle_amount: 0,
-    meeting_fee_amount: 0,
+    service_fee_amount: 0,
     guest_ticket_amount: 0,
     total_amount: totalMajor,
     currency: currencyMajor,
-    charity_name: charitablePerCycle > 0 ? "Dues charitable portion" : null,
+    charity_name: charitablePerCycle > 0 ? "Giving charitable portion" : null,
     status: "succeeded",
     refund_amount: 0,
     refund_reason: null,
@@ -1530,7 +1706,7 @@ async function projectDuesSubscriptionCycleCaptured(
       .sort((a, b) => a.sequence - b.sequence)[0];
   }
   if (target) {
-    await db.updateInstalment(target.id, lodgeId, {
+    await db.updateInstalment(target.id, churchId, {
       status: "paid",
       paid_at: completedAt,
       payment_reference: attempt.payment_id,
@@ -1549,7 +1725,7 @@ async function projectDuesSubscriptionCycleCaptured(
     .sort((a, b) => a.sequence - b.sequence);
 
   if (remaining.length === 0) {
-    await db.updateDuesSchedule(scheduleId, lodgeId, {
+    await db.updateGivingSchedule(scheduleId, churchId, {
       status: "completed",
       next_charge_at: null,
       last_charged_at: completedAt,
@@ -1558,13 +1734,13 @@ async function projectDuesSubscriptionCycleCaptured(
       last_failure_category: null,
       last_failure_at: null,
     });
-    await db.updateMemberDuesStatus(duesId, lodgeId, {
+    await db.updateMemberGivingStatus(givingId, churchId, {
       status: "paid",
       payment_id: payment.id,
       paid_at: completedAt,
     });
   } else {
-    await db.updateDuesSchedule(scheduleId, lodgeId, {
+    await db.updateGivingSchedule(scheduleId, churchId, {
       status: "active",
       next_charge_at: remaining[0].due_date,
       last_charged_at: completedAt,
@@ -1580,17 +1756,17 @@ async function projectDuesSubscriptionCycleCaptured(
 
   if (charitablePerCycle > 0) {
     const declaration = await db.getActiveGiftAidDeclarationByEmail(
-      lodgeId,
-      duesRecord.member_email
+      churchId,
+      givingRecord.member_email
     );
-    await db.addDonation(lodgeId, {
+    await db.addDonation(churchId, {
       event_id: null,
       payment_id: payment.id,
-      donor_name: duesRecord.member_name,
-      donor_email: duesRecord.member_email,
+      donor_name: givingRecord.member_name,
+      donor_email: givingRecord.member_email,
       amount: charitablePerCycle,
       currency: currencyMajor,
-      source: "dues_charitable_portion",
+      source: "giving_charitable_portion",
       status: "completed",
       gift_aid_declaration_id: declaration?.id ?? null,
       gift_aid_status: declaration ? "declared" : "eligible",
@@ -1599,11 +1775,11 @@ async function projectDuesSubscriptionCycleCaptured(
   }
 }
 
-// Bump consecutive_failures + status on the dues_schedules row when a
+// Bump consecutive_failures + status on the giving_schedules row when a
 // cycle (or the enrolment intent) fails. The cron retries on its next
 // tick and Mooov's idempotency replay protects against double-charge.
-async function handleDuesSubscriptionFailure(
-  lodgeId: string,
+async function handleGivingSubscriptionFailure(
+  churchId: string,
   attempt: {
     intent: string;
     guest_descriptor: Record<string, unknown> | null;
@@ -1619,7 +1795,7 @@ async function handleDuesSubscriptionFailure(
     typeof guest.schedule_id === "string" ? guest.schedule_id : null;
   if (!scheduleId) return;
 
-  const schedule = await db.getDuesSchedule(scheduleId, lodgeId);
+  const schedule = await db.getGivingSchedule(scheduleId, churchId);
   if (!schedule) return;
 
   const nextFailures = (schedule.consecutive_failures ?? 0) + 1;
@@ -1629,7 +1805,7 @@ async function handleDuesSubscriptionFailure(
   const status: "past_due" | "paused" =
     nextFailures >= 5 ? "paused" : "past_due";
 
-  await db.updateDuesSchedule(scheduleId, lodgeId, {
+  await db.updateGivingSchedule(scheduleId, churchId, {
     status,
     consecutive_failures: nextFailures,
     last_failure_code: failure.failureCode,
@@ -1637,7 +1813,7 @@ async function handleDuesSubscriptionFailure(
     last_failure_at: new Date().toISOString(),
   });
 
-  console.log("dues subscription failure", {
+  console.log("giving subscription failure", {
     schedule_id: scheduleId,
     intent: attempt.intent,
     consecutive_failures: nextFailures,
@@ -1648,7 +1824,7 @@ async function handleDuesSubscriptionFailure(
   });
 }
 
-// Per-cycle attribution of the charitable portion of the annual dues.
+// Per-cycle attribution of the charitable portion of the annual giving.
 // The full-year charitable amount is divided across the cycles so the
 // donations row at each capture lines up with the cycle's tax-year date,
 // keeping the Gift Aid claim batcher's date alignment correct.
@@ -1673,7 +1849,7 @@ function computeCyclicalCharitable(
 //                               a public.payments row, attribute charitable
 //                               portion / Gift Aid for the cycle.
 //   subscription.invoice_failed cycle failed; bump dunning state to
-//                               past_due so /admin/dues/schedules and
+//                               past_due so /admin/giving/schedules and
 //                               the member portal can render a fix-card
 //                               banner.
 //   subscription.canceled       member or admin cancelled the Stripe
@@ -1685,8 +1861,8 @@ function computeCyclicalCharitable(
 //   * Resolution prefers event.data.subscription_metadata.lp_schedule_id
 //     (verbatim from the Stripe Subscription metadata we set on
 //     /v1/subscription_checkouts) and falls back to subscription_id ->
-//     dues_schedules.mooov_subscription_id. Cross-tenant safe because
-//     the resolved schedule's lodge_id MUST match the webhook's lodge.
+//     giving_schedules.mooov_subscription_id. Cross-tenant safe because
+//     the resolved schedule's church_id MUST match the webhook's church.
 //   * subscription.activated is idempotent on schedule.status (already
 //     active_stripe = noop). Redeliveries are common around the
 //     incomplete -> active transition.
@@ -1746,7 +1922,7 @@ function readSubscriptionEvent(event: MooovConnectEvent): MooovSubscriptionEvent
 }
 
 async function resolveSubscriptionSchedule(
-  lodgeId: string,
+  churchId: string,
   parsed: MooovSubscriptionEventData,
   eventId: string,
 ) {
@@ -1757,23 +1933,23 @@ async function resolveSubscriptionSchedule(
 
   let schedule =
     lpScheduleId != null
-      ? await db.getDuesSchedule(lpScheduleId, lodgeId).catch(() => null)
+      ? await db.getGivingSchedule(lpScheduleId, churchId).catch(() => null)
       : null;
 
   if (!schedule && parsed.subscriptionId) {
     const bySubId = await db
-      .getDuesScheduleByMooovSubscriptionId(parsed.subscriptionId)
+      .getGivingScheduleByMooovSubscriptionId(parsed.subscriptionId)
       .catch(() => null);
-    if (bySubId && bySubId.lodge_id === lodgeId) {
+    if (bySubId && bySubId.church_id === churchId) {
       schedule = bySubId;
-    } else if (bySubId && bySubId.lodge_id !== lodgeId) {
+    } else if (bySubId && bySubId.church_id !== churchId) {
       console.error(
-        "mooov webhook subscription: schedule lodge mismatch — refusing to project",
+        "mooov webhook subscription: schedule church mismatch — refusing to project",
         {
           event_id: eventId,
           subscription_id: parsed.subscriptionId,
-          schedule_lodge_id: bySubId.lodge_id,
-          webhook_lodge_id: lodgeId,
+          schedule_church_id: bySubId.church_id,
+          webhook_church_id: churchId,
         },
       );
       return null;
@@ -1793,11 +1969,11 @@ async function resolveSubscriptionSchedule(
 }
 
 async function handleSubscriptionEvent(
-  lodgeId: string,
+  churchId: string,
   event: MooovConnectEvent,
 ): Promise<void> {
   const parsed = readSubscriptionEvent(event);
-  let schedule = await resolveSubscriptionSchedule(lodgeId, parsed, event.id);
+  let schedule = await resolveSubscriptionSchedule(churchId, parsed, event.id);
   if (!schedule) return;
 
   // Terminal-state guard. Once a schedule has been cancelled or completed,
@@ -1843,7 +2019,7 @@ async function handleSubscriptionEvent(
           prior_cancelled_by_actor: schedule.cancelled_by_actor,
         },
       );
-      await db.updateDuesSchedule(schedule.id, lodgeId, {
+      await db.updateGivingSchedule(schedule.id, churchId, {
         status: "pending",
         cancelled_at: null,
         cancelled_by_actor: null,
@@ -1872,16 +2048,16 @@ async function handleSubscriptionEvent(
 
   switch (event.type) {
     case "subscription.activated":
-      await handleSubscriptionActivated(lodgeId, schedule, parsed, event.id);
+      await handleSubscriptionActivated(churchId, schedule, parsed, event.id);
       return;
     case "subscription.invoice_paid":
-      await handleSubscriptionInvoicePaid(lodgeId, schedule, parsed, event.id);
+      await handleSubscriptionInvoicePaid(churchId, schedule, parsed, event.id);
       return;
     case "subscription.invoice_failed":
-      await handleSubscriptionInvoiceFailed(lodgeId, schedule, parsed, event.id);
+      await handleSubscriptionInvoiceFailed(churchId, schedule, parsed, event.id);
       return;
     case "subscription.canceled":
-      await handleSubscriptionCanceled(lodgeId, schedule, parsed, event.id);
+      await handleSubscriptionCanceled(churchId, schedule, parsed, event.id);
       return;
     case "subscription.updated":
       console.log("mooov webhook: subscription.updated (log-only)", {
@@ -1894,8 +2070,8 @@ async function handleSubscriptionEvent(
 }
 
 async function handleSubscriptionActivated(
-  lodgeId: string,
-  schedule: db.DuesSchedule,
+  churchId: string,
+  schedule: db.GivingSchedule,
   parsed: MooovSubscriptionEventData,
   eventId: string,
 ): Promise<void> {
@@ -1907,7 +2083,7 @@ async function handleSubscriptionActivated(
     return;
   }
 
-  await db.updateDuesSchedule(schedule.id, lodgeId, {
+  await db.updateGivingSchedule(schedule.id, churchId, {
     status: "active_stripe",
     mooov_payment_method_id:
       parsed.paymentMethodId ?? schedule.mooov_payment_method_id,
@@ -1920,29 +2096,29 @@ async function handleSubscriptionActivated(
     last_failure_at: null,
   });
 
-  // Auto-tag the underlying member_dues row as 'online_subscription'
+  // Auto-tag the underlying member_giving row as 'online_subscription'
   // so the treasurer dashboard / member-list pill / reports breakdown
   // all reflect reality without the admin having to manually mark it.
   // Only overwrite NULL or already-online tags — never clobber an
   // explicit BACS / paid_in_full / fee_waived tag the admin set.
-  let duesRecord: db.MemberDues | null = null;
+  let givingRecord: db.MemberGiving | null = null;
   try {
-    duesRecord = await db.getMemberDuesById(
-      schedule.member_dues_id,
-      lodgeId,
+    givingRecord = await db.getMemberGivingById(
+      schedule.member_giving_id,
+      churchId,
     );
     if (
-      duesRecord &&
-      (duesRecord.dues_payment_method == null ||
-        duesRecord.dues_payment_method === "online_subscription")
+      givingRecord &&
+      (givingRecord.giving_payment_method == null ||
+        givingRecord.giving_payment_method === "online_subscription")
     ) {
-      await db.setMemberDuesPaymentMethod(duesRecord.id, lodgeId, {
+      await db.setMemberGivingPaymentMethod(givingRecord.id, churchId, {
         method: "online_subscription",
         setBy: "mooov_webhook_subscription_activated",
       });
     }
   } catch (err) {
-    console.error("mooov webhook: failed to auto-tag dues_payment_method", {
+    console.error("mooov webhook: failed to auto-tag giving_payment_method", {
       schedule_id: schedule.id,
       message: err instanceof Error ? err.message : String(err),
     });
@@ -1953,13 +2129,13 @@ async function handleSubscriptionActivated(
   // index keyed off the Mooov subscription_id.
   try {
     const member =
-      duesRecord?.member_id != null
-        ? await db.getMemberById(duesRecord.member_id, lodgeId).catch(() => null)
+      givingRecord?.member_id != null
+        ? await db.getMemberById(givingRecord.member_id, churchId).catch(() => null)
         : await db
-            .getMemberByEmail(schedule.member_email, lodgeId)
+            .getMemberByEmail(schedule.member_email, churchId)
             .catch(() => null);
-    const lodge = await db.getLodgeById(lodgeId).catch(() => null);
-    if (member && duesRecord) {
+    const church = await db.getChurchById(churchId).catch(() => null);
+    if (member && givingRecord) {
       const cycleAmount =
         typeof parsed.amount === "number" && parsed.amount > 0
           ? parsed.amount / 100
@@ -1971,12 +2147,12 @@ async function handleSubscriptionActivated(
                   : null;
               return fromMeta ?? 0;
             })();
-      const { notifyDuesSubscriptionActivated } = await import(
-        "@/lib/email/dues-notifications"
+      const { notifyGivingSubscriptionActivated } = await import(
+        "@/lib/email/giving-notifications"
       );
-      await notifyDuesSubscriptionActivated({
-        lodgeId,
-        lodge,
+      await notifyGivingSubscriptionActivated({
+        churchId,
+        church,
         member: {
           id: member.id,
           email: member.email,
@@ -1988,10 +2164,10 @@ async function handleSubscriptionActivated(
           mooov_subscription_id: schedule.mooov_subscription_id,
           next_charge_at: schedule.next_charge_at,
         },
-        duesRecord: {
-          id: duesRecord.id,
-          amount: duesRecord.amount,
-          currency: duesRecord.currency,
+        givingRecord: {
+          id: givingRecord.id,
+          amount: givingRecord.amount,
+          currency: givingRecord.currency,
         },
         cycleAmount,
       });
@@ -2005,8 +2181,8 @@ async function handleSubscriptionActivated(
 }
 
 async function handleSubscriptionInvoicePaid(
-  lodgeId: string,
-  schedule: db.DuesSchedule,
+  churchId: string,
+  schedule: db.GivingSchedule,
   parsed: MooovSubscriptionEventData,
   eventId: string,
 ): Promise<void> {
@@ -2030,11 +2206,11 @@ async function handleSubscriptionInvoicePaid(
     return;
   }
 
-  const duesRecord = await db.getMemberDuesById(schedule.member_dues_id, lodgeId);
-  if (!duesRecord) {
+  const givingRecord = await db.getMemberGivingById(schedule.member_giving_id, churchId);
+  if (!givingRecord) {
     console.error(
-      "mooov webhook: subscription.invoice_paid dues record missing",
-      { event_id: eventId, dues_id: schedule.member_dues_id, schedule_id: schedule.id },
+      "mooov webhook: subscription.invoice_paid giving record missing",
+      { event_id: eventId, giving_id: schedule.member_giving_id, schedule_id: schedule.id },
     );
     return;
   }
@@ -2042,17 +2218,17 @@ async function handleSubscriptionInvoicePaid(
   const totalMajor = (parsed.amount ?? 0) / 100;
   const currencyMajor = parsed.currency || "GBP";
   const completedAt = new Date().toISOString();
-  const allInstalments = await db.getInstalmentsForDues(duesRecord.id, lodgeId);
+  const allInstalments = await db.getInstalmentsForGiving(givingRecord.id, churchId);
   const charitablePerCycle = computeCyclicalCharitable(
-    duesRecord.charitable_amount,
+    givingRecord.charitable_amount,
     Math.max(allInstalments.length, 1),
   );
 
-  const payment = await db.addPayment(lodgeId, {
+  const payment = await db.addPayment(churchId, {
     rsvp_id: null,
     event_id: null,
-    user_email: duesRecord.member_email,
-    user_name: duesRecord.member_name,
+    user_email: givingRecord.member_email,
+    user_name: givingRecord.member_name,
     stripe_payment_intent_id: null,
     stripe_charge_id: null,
     stripe_customer_id:
@@ -2061,11 +2237,11 @@ async function handleSubscriptionInvoicePaid(
     dining_amount: 0,
     charity_amount: charitablePerCycle,
     raffle_amount: 0,
-    meeting_fee_amount: 0,
+    service_fee_amount: 0,
     guest_ticket_amount: 0,
     total_amount: totalMajor,
     currency: currencyMajor,
-    charity_name: charitablePerCycle > 0 ? "Dues charitable portion" : null,
+    charity_name: charitablePerCycle > 0 ? "Giving charitable portion" : null,
     status: "succeeded",
     refund_amount: 0,
     refund_reason: null,
@@ -2075,10 +2251,10 @@ async function handleSubscriptionInvoicePaid(
   // Mark the next outstanding instalment paid by sequence. Open-ended
   // schedules can outlive the pre-created in-year cycles; once we run
   // out of outstanding rows we just leave the public.payments row as
-  // the per-cycle accounting record (dues_schedules.metadata.cycles_paid
+  // the per-cycle accounting record (giving_schedules.metadata.cycles_paid
   // is the authoritative count for the UI). No new instalment is
   // forged for renewal cycles -- those will be re-baselined when the
-  // next masonic year is configured by the lodge admin.
+  // next giving year is configured by the church admin.
   const nextOutstanding = allInstalments
     .filter(
       (i) =>
@@ -2088,7 +2264,7 @@ async function handleSubscriptionInvoicePaid(
     .sort((a, b) => a.sequence - b.sequence)[0];
 
   if (nextOutstanding) {
-    await db.updateInstalment(nextOutstanding.id, lodgeId, {
+    await db.updateInstalment(nextOutstanding.id, churchId, {
       status: "paid",
       paid_at: completedAt,
       payment_reference: syntheticPaymentId,
@@ -2111,7 +2287,7 @@ async function handleSubscriptionInvoicePaid(
   const priorCyclesPaid =
     typeof metadata.cycles_paid === "number" ? metadata.cycles_paid : 0;
 
-  await db.updateDuesSchedule(schedule.id, lodgeId, {
+  await db.updateGivingSchedule(schedule.id, churchId, {
     status: "active_stripe",
     next_charge_at: remainingAfter[0]?.due_date ?? null,
     last_charged_at: completedAt,
@@ -2127,13 +2303,13 @@ async function handleSubscriptionInvoicePaid(
     },
   });
 
-  // Flip the parent member_dues to paid once we've covered the in-year
+  // Flip the parent member_giving to paid once we've covered the in-year
   // total. For open-ended subscriptions this is when the last
   // pre-created instalment is consumed; subsequent invoices belong to
-  // the NEXT masonic year (a lodge admin will spin up the next year's
-  // member_dues row separately, or we'll auto-roll it later).
+  // the NEXT giving year (a church admin will spin up the next year's
+  // member_giving row separately, or we'll auto-roll it later).
   if (remainingAfter.length === 0) {
-    await db.updateMemberDuesStatus(duesRecord.id, lodgeId, {
+    await db.updateMemberGivingStatus(givingRecord.id, churchId, {
       status: "paid",
       payment_id: payment.id,
       paid_at: completedAt,
@@ -2145,17 +2321,17 @@ async function handleSubscriptionInvoicePaid(
   // donation row dated to the charge.
   if (charitablePerCycle > 0) {
     const declaration = await db.getActiveGiftAidDeclarationByEmail(
-      lodgeId,
-      duesRecord.member_email,
+      churchId,
+      givingRecord.member_email,
     );
-    await db.addDonation(lodgeId, {
+    await db.addDonation(churchId, {
       event_id: null,
       payment_id: payment.id,
-      donor_name: duesRecord.member_name,
-      donor_email: duesRecord.member_email,
+      donor_name: givingRecord.member_name,
+      donor_email: givingRecord.member_email,
       amount: charitablePerCycle,
       currency: currencyMajor,
-      source: "dues_charitable_portion",
+      source: "giving_charitable_portion",
       status: "completed",
       gift_aid_declaration_id: declaration?.id ?? null,
       gift_aid_status: declaration ? "declared" : "eligible",
@@ -2169,12 +2345,12 @@ async function handleSubscriptionInvoicePaid(
   // truth.
   try {
     const member =
-      duesRecord.member_id != null
-        ? await db.getMemberById(duesRecord.member_id, lodgeId).catch(() => null)
+      givingRecord.member_id != null
+        ? await db.getMemberById(givingRecord.member_id, churchId).catch(() => null)
         : await db
-            .getMemberByEmail(duesRecord.member_email, lodgeId)
+            .getMemberByEmail(givingRecord.member_email, churchId)
             .catch(() => null);
-    const lodge = await db.getLodgeById(lodgeId).catch(() => null);
+    const church = await db.getChurchById(churchId).catch(() => null);
     if (member) {
       const meta = (schedule.metadata ?? {}) as Record<string, unknown>;
       const cyclesTotal =
@@ -2183,12 +2359,12 @@ async function handleSubscriptionInvoicePaid(
           : null;
       const cyclePaidNumber =
         (typeof meta.cycles_paid === "number" ? (meta.cycles_paid as number) : 0) + 1;
-      const { notifyDuesCyclePaid } = await import(
-        "@/lib/email/dues-notifications"
+      const { notifyGivingCyclePaid } = await import(
+        "@/lib/email/giving-notifications"
       );
-      await notifyDuesCyclePaid({
-        lodgeId,
-        lodge,
+      await notifyGivingCyclePaid({
+        churchId,
+        church,
         member: {
           id: member.id,
           email: member.email,
@@ -2212,8 +2388,8 @@ async function handleSubscriptionInvoicePaid(
 }
 
 async function handleSubscriptionInvoiceFailed(
-  lodgeId: string,
-  schedule: db.DuesSchedule,
+  churchId: string,
+  schedule: db.GivingSchedule,
   parsed: MooovSubscriptionEventData,
   eventId: string,
 ): Promise<void> {
@@ -2227,7 +2403,7 @@ async function handleSubscriptionInvoiceFailed(
       : null;
 
   const nextFailures = schedule.consecutive_failures + 1;
-  await db.updateDuesSchedule(schedule.id, lodgeId, {
+  await db.updateGivingSchedule(schedule.id, churchId, {
     status: "past_due",
     consecutive_failures: nextFailures,
     last_failure_code: failureCode,
@@ -2244,25 +2420,25 @@ async function handleSubscriptionInvoiceFailed(
 
   // Member nudge on every fail; treasurer escalation at 1, 3, 5.
   try {
-    const duesRecord = await db
-      .getMemberDuesById(schedule.member_dues_id, lodgeId)
+    const givingRecord = await db
+      .getMemberGivingById(schedule.member_giving_id, churchId)
       .catch(() => null);
     const member =
-      duesRecord?.member_id != null
-        ? await db.getMemberById(duesRecord.member_id, lodgeId).catch(() => null)
+      givingRecord?.member_id != null
+        ? await db.getMemberById(givingRecord.member_id, churchId).catch(() => null)
         : await db
-            .getMemberByEmail(schedule.member_email, lodgeId)
+            .getMemberByEmail(schedule.member_email, churchId)
             .catch(() => null);
-    const lodge = await db.getLodgeById(lodgeId).catch(() => null);
+    const church = await db.getChurchById(churchId).catch(() => null);
     if (member) {
       const invoiceDedupeKey =
         parsed.invoiceId ?? `sub_evt_${eventId}_failed`;
-      const { notifyDuesCycleFailed } = await import(
-        "@/lib/email/dues-notifications"
+      const { notifyGivingCycleFailed } = await import(
+        "@/lib/email/giving-notifications"
       );
-      await notifyDuesCycleFailed({
-        lodgeId,
-        lodge,
+      await notifyGivingCycleFailed({
+        churchId,
+        church,
         member: {
           id: member.id,
           email: member.email,
@@ -2288,8 +2464,8 @@ async function handleSubscriptionInvoiceFailed(
 }
 
 async function handleSubscriptionCanceled(
-  lodgeId: string,
-  schedule: db.DuesSchedule,
+  churchId: string,
+  schedule: db.GivingSchedule,
   parsed: MooovSubscriptionEventData,
   eventId: string,
 ): Promise<void> {
@@ -2301,7 +2477,7 @@ async function handleSubscriptionCanceled(
     return;
   }
 
-  await db.updateDuesSchedule(schedule.id, lodgeId, {
+  await db.updateGivingSchedule(schedule.id, churchId, {
     status: "cancelled",
     cancelled_at: new Date().toISOString(),
     cancelled_by_actor: parsed.cancelReason ?? "stripe_subscription_canceled",
@@ -2310,16 +2486,16 @@ async function handleSubscriptionCanceled(
 
   try {
     const member = await db
-      .getMemberByEmail(schedule.member_email, lodgeId)
+      .getMemberByEmail(schedule.member_email, churchId)
       .catch(() => null);
-    const lodge = await db.getLodgeById(lodgeId).catch(() => null);
+    const church = await db.getChurchById(churchId).catch(() => null);
     if (member) {
-      const { notifyDuesSubscriptionCanceled } = await import(
-        "@/lib/email/dues-notifications"
+      const { notifyGivingSubscriptionCanceled } = await import(
+        "@/lib/email/giving-notifications"
       );
-      await notifyDuesSubscriptionCanceled({
-        lodgeId,
-        lodge,
+      await notifyGivingSubscriptionCanceled({
+        churchId,
+        church,
         member: {
           id: member.id,
           email: member.email,

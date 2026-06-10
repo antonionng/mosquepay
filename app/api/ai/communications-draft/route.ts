@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -10,14 +10,14 @@ import { completeJSON } from "@/lib/ai/client";
 
 type CommunicationCategory =
   | "members_newsletter"
-  | "post_meeting_recap"
+  | "post_service_recap"
   | "event_reminder"
-  | "candidate_follow_up"
-  | "dues_reminder"
-  | "welfare_check_in"
+  | "newcomer_follow_up"
+  | "giving_reminder"
+  | "pastoral_check_in"
   | "charity_appeal";
 
-type CommunicationAudience = "active_members" | "all_members" | "leads";
+type CommunicationAudience = "active_members" | "all_members" | "newcomers";
 
 type CommunicationDraft = {
   subject: string;
@@ -28,39 +28,39 @@ type CommunicationDraft = {
 
 const CATEGORY_LABELS: Record<CommunicationCategory, string> = {
   members_newsletter: "Members newsletter",
-  post_meeting_recap: "Post-meeting recap",
+  post_service_recap: "Post-service recap",
   event_reminder: "Event reminder",
-  candidate_follow_up: "Candidate follow-up",
-  dues_reminder: "Dues reminder",
-  welfare_check_in: "Welfare check-in",
+  newcomer_follow_up: "Newcomer follow-up",
+  giving_reminder: "Giving reminder",
+  pastoral_check_in: "PastoralCare check-in",
   charity_appeal: "Charity appeal",
 };
 
 const CATEGORY_AUDIENCES: Record<CommunicationCategory, CommunicationAudience> = {
   members_newsletter: "active_members",
-  post_meeting_recap: "active_members",
+  post_service_recap: "active_members",
   event_reminder: "active_members",
-  candidate_follow_up: "leads",
-  dues_reminder: "active_members",
-  welfare_check_in: "active_members",
+  newcomer_follow_up: "newcomers",
+  giving_reminder: "active_members",
+  pastoral_check_in: "active_members",
   charity_appeal: "all_members",
 };
 
 const CATEGORY_GUIDANCE: Record<CommunicationCategory, string> = {
   members_newsletter:
-    "A concise monthly lodge update with recent highlights, upcoming dates, charity notes, and a warm closing.",
-  post_meeting_recap:
-    "A warm thank-you after a meeting with a short recap and next steps.",
+    "A concise monthly church update with recent highlights, upcoming dates, charity notes, and a warm closing.",
+  post_service_recap:
+    "A warm thank-you after a service with a short recap and next steps.",
   event_reminder:
-    "A practical reminder about an upcoming meeting or event, including RSVP and dining prompts.",
-  candidate_follow_up:
+    "A practical reminder about an upcoming service or event, including RSVP and dining prompts.",
+  newcomer_follow_up:
     "A friendly follow-up to prospective members, encouraging the next conversation without pressure.",
-  dues_reminder:
+  giving_reminder:
     "A polite Treasurer-style payment reminder that is firm, clear, and respectful.",
-  welfare_check_in:
-    "A sensitive Almoner-style check-in. Keep it personal, gentle, and never speculative.",
+  pastoral_check_in:
+    "A sensitive PastoralCare-style check-in. Keep it personal, gentle, and never speculative.",
   charity_appeal:
-    "A positive charity update or appeal with a clear reason to support the lodge campaign.",
+    "A positive charity update or appeal with a clear reason to support the church campaign.",
 };
 
 const ALLOWED_CATEGORIES = new Set<CommunicationCategory>(
@@ -87,7 +87,7 @@ function cleanCategory(value: unknown): CommunicationCategory {
 }
 
 function cleanAudience(value: unknown, fallback: CommunicationAudience) {
-  return value === "active_members" || value === "all_members" || value === "leads"
+  return value === "active_members" || value === "all_members" || value === "newcomers"
     ? value
     : fallback;
 }
@@ -95,9 +95,9 @@ function cleanAudience(value: unknown, fallback: CommunicationAudience) {
 function normalizeDraft(
   draft: Partial<CommunicationDraft>,
   category: CommunicationCategory,
-  lodgeName: string
+  churchName: string
 ): CommunicationDraft {
-  const fallback = fallbackDraft(category, lodgeName, "");
+  const fallback = fallbackDraft(category, churchName, "");
   const notes = Array.isArray(draft.admin_notes)
     ? draft.admin_notes.filter((note): note is string => typeof note === "string")
     : fallback.admin_notes;
@@ -115,26 +115,26 @@ function normalizeDraft(
 
 function fallbackDraft(
   category: CommunicationCategory,
-  lodgeName: string,
+  churchName: string,
   notes: string
 ): CommunicationDraft {
   const label = CATEGORY_LABELS[category];
   const noteParagraph = notes
     ? `<p>${escapeHtml(notes)}</p>`
-    : "<p>Please add the latest lodge details before sending.</p>";
+    : "<p>Please add the latest church details before sending.</p>";
 
   return {
     subject:
-      category === "dues_reminder"
-        ? "Reminder: lodge dues"
-        : category === "candidate_follow_up"
-          ? `An update from ${lodgeName}`
-          : `${lodgeName}: ${label}`,
+      category === "giving_reminder"
+        ? "Reminder: church giving"
+        : category === "newcomer_follow_up"
+          ? `An update from ${churchName}`
+          : `${churchName}: ${label}`,
     html_body: [
       "<p>Dear {{first_name}},</p>",
-      `<p>Here is a short ${label.toLowerCase()} from ${lodgeName}.</p>`,
+      `<p>Here is a short ${label.toLowerCase()} from ${churchName}.</p>`,
       noteParagraph,
-      "<p>Yours fraternally,<br/>The Secretary</p>",
+      "<p>With every blessing,<br/>The Secretary</p>",
     ].join("\n"),
     recommended_audience: CATEGORY_AUDIENCES[category],
     admin_notes: [
@@ -155,28 +155,28 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("members:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("members:write", churchId);
   if (forbidden) return forbidden;
 
-  const [body, lodge] = await Promise.all([
+  const [body, church] = await Promise.all([
     request.json().catch(() => ({})),
-    db.getLodgeById(lodgeId),
+    db.getChurchById(churchId),
   ]);
   const category = cleanCategory(body.category);
   const notes = cleanText(body.notes);
   const eventId = cleanText(body.event_id);
-  const event = eventId ? await db.getEventById(eventId, lodgeId) : null;
-  const lodgeName = lodge?.name ?? "the lodge";
+  const event = eventId ? await db.getEventById(eventId, churchId) : null;
+  const churchName = church?.name ?? "the church";
 
   const aiDraft = await completeJSON<CommunicationDraft>({
     system:
-      "You draft lodge communications for admins. Reply with strict JSON: { subject: string, html_body: string, recommended_audience: 'active_members'|'all_members'|'leads', admin_notes: string[] }. html_body must be safe email HTML using paragraphs, headings, lists, and merge tag {{first_name}}. Do not include private ritual details, sensitive speculation, or claims of secrecy.",
-    user: `Lodge: ${lodgeName}
+      "You draft church communications for admins. Reply with strict JSON: { subject: string, html_body: string, recommended_audience: 'active_members'|'all_members'|'newcomers', admin_notes: string[] }. html_body must be safe email HTML using paragraphs, headings, lists, and merge tag {{first_name}}. Do not include private ritual details, sensitive speculation, or claims of secrecy.",
+    user: `Church: ${churchName}
 Category: ${CATEGORY_LABELS[category]}
 Audience guidance: ${CATEGORY_AUDIENCES[category]}
 Content guidance: ${CATEGORY_GUIDANCE[category]}
@@ -188,8 +188,8 @@ Draft a ready-to-review email with a useful subject, concise body, and 2-4 admin
   });
 
   const draft = aiDraft
-    ? normalizeDraft(aiDraft, category, lodgeName)
-    : fallbackDraft(category, lodgeName, notes);
+    ? normalizeDraft(aiDraft, category, churchName)
+    : fallbackDraft(category, churchName, notes);
 
   return NextResponse.json({
     draft,

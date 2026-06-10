@@ -1,7 +1,7 @@
 // lib/mooov-charges.ts
 //
 // Adapters for the Mooov saved-charge subscription surface that backs
-// LP's monthly dues schedules. Two surfaces:
+// LP's monthly giving schedules. Two surfaces:
 //
 //   1. Enrolment intent — POST /v1/payment_intents with
 //      setup_future_usage:"off_session" + customer_ref. Captures the
@@ -19,7 +19,7 @@
 
 import { callMooovConnect } from "@/lib/mooov";
 
-export type DuesEnrolmentIntentInput = {
+export type GivingEnrolmentIntentInput = {
   payment_id: string;
   merchant_id: string;
   customer_ref: string;
@@ -33,7 +33,7 @@ export type DuesEnrolmentIntentInput = {
   idempotency_key: string;
 };
 
-export type DuesEnrolmentIntentResult = {
+export type GivingEnrolmentIntentResult = {
   payment_id: string;
   state: "authorized" | "captured" | "processing" | "failed";
   hosted_url: string | null;
@@ -50,9 +50,9 @@ export type DuesEnrolmentIntentResult = {
  *
  * Mooov spec ref: 2026-05-28 reply, Task L1.1.
  */
-export async function createDuesEnrolmentIntent(
-  input: DuesEnrolmentIntentInput
-): Promise<DuesEnrolmentIntentResult> {
+export async function createGivingEnrolmentIntent(
+  input: GivingEnrolmentIntentInput
+): Promise<GivingEnrolmentIntentResult> {
   const result = await callMooovConnect<{
     payment_id: string;
     state: "authorized" | "captured" | "processing" | "failed";
@@ -142,7 +142,7 @@ export type SavedChargeResult = {
  * branches the cron must code for, plus three idempotency edge cases:
  *
  *   status="succeeded"        flip instalment paid, advance schedule
- *   status="requires_action"  store next_action.* on dues_schedules and
+ *   status="requires_action"  store next_action.* on giving_schedules and
  *                             email the member a resume link
  *   status="failed"           bump consecutive_failures; cron retries on
  *                             next tick (idempotency key keeps replays safe)
@@ -155,7 +155,7 @@ export type SavedChargeResult = {
  *                                    returns the originally committed
  *                                    envelope if Mooov did commit
  */
-export async function runSavedDuesCharge(
+export async function runSavedGivingCharge(
   input: SavedChargeInput
 ): Promise<SavedChargeResult> {
   const result = await callMooovConnect<SavedChargeResult>(

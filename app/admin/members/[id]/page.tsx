@@ -2,23 +2,23 @@ import { notFound } from "next/navigation";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
-import { computeNextDuesForMember } from "@/lib/dues/next-due";
-import { sweepAbandonedPendingSchedules } from "@/lib/dues/abandoned-pending-sweep";
-import { getDefaultLodgeSlug } from "@/lib/tenant";
+import { computeNextGivingForMember } from "@/lib/giving/next-due";
+import { sweepAbandonedPendingSchedules } from "@/lib/giving/abandoned-pending-sweep";
+import { getDefaultChurchSlug } from "@/lib/tenant";
 import type {
-  DuesSchedule,
+  GivingSchedule,
   GiftAidDeclaration,
-  MemberDues,
-  MemberDuesInstalment,
+  MemberGiving,
+  MemberGivingInstalment,
 } from "@/lib/db/types";
 import { MemberDetailClient } from "./member-detail-client";
 
-function pickCurrentYearDues(
-  duesRecords: MemberDues[],
+function pickCurrentYearGiving(
+  givingRecords: MemberGiving[],
   yearStartIso: string | null,
   yearEndIso: string | null,
-): MemberDues | null {
-  const nonAdvance = duesRecords.filter((d) => !d.is_advance);
+): MemberGiving | null {
+  const nonAdvance = givingRecords.filter((d) => !d.is_advance);
   if (nonAdvance.length === 0) return null;
   if (yearStartIso && yearEndIso) {
     const ys = yearStartIso.slice(0, 10);
@@ -43,7 +43,7 @@ export default async function AdminMemberDetailPage({
   const { id } = await params;
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
-  const lodgeId = ctx.mode === "database" ? ctx.lodgeId : null;
+  const churchId = ctx.mode === "database" ? ctx.churchId : null;
 
   if (useMock) {
     const member = mockDb.getMemberById(id);
@@ -57,67 +57,67 @@ export default async function AdminMemberDetailPage({
         member={JSON.parse(JSON.stringify(member))}
         dietaryHistory={JSON.parse(JSON.stringify(dietaryHistory))}
         paymentHistory={JSON.parse(JSON.stringify(paymentHistory))}
-        duesRecords={[]}
-        nextDues={null}
+        givingRecords={[]}
+        nextGiving={null}
         subscription={null}
         giftAidDeclaration={null}
-        duesMethod={null}
+        givingMethod={null}
       />
     );
   }
 
-  if (!lodgeId) notFound();
+  if (!churchId) notFound();
 
-  const member = await db.getMemberById(id, lodgeId);
+  const member = await db.getMemberById(id, churchId);
   if (!member) notFound();
 
   // Self-heal stale pending schedules from abandoned Mooov checkouts
   // before we read this member's subscription history.
-  await sweepAbandonedPendingSchedules(lodgeId).catch(() => 0);
+  await sweepAbandonedPendingSchedules(churchId).catch(() => 0);
 
   const [
     dietaryHistory,
     paymentHistory,
-    duesRecords,
+    givingRecords,
     offices,
     currentYear,
-    lodgeDues,
+    churchGiving,
     schedules,
     giftAidDeclaration,
     recentEmails,
   ] = await Promise.all([
-    db.getRsvpDietaryByEmail(member.email, lodgeId),
-    db.getPaymentsByEmail(member.email, lodgeId),
-    db.getMemberDues(lodgeId, { memberEmail: member.email }),
-    db.listOfficerLadder(lodgeId),
-    db.getCurrentMasonicYear(lodgeId),
-    db.getLodgeDues(lodgeId),
-    db.getDuesSchedulesForMember(lodgeId, member.email),
+    db.getRsvpDietaryByEmail(member.email, churchId),
+    db.getPaymentsByEmail(member.email, churchId),
+    db.getMemberGiving(churchId, { memberEmail: member.email }),
+    db.listOfficerLadder(churchId),
+    db.getCurrentChurchYear(churchId),
+    db.getChurchGiving(churchId),
+    db.getGivingSchedulesForMember(churchId, member.email),
     // Seed the Gift Aid panel with the active declaration. The panel
     // re-fetches on mount so an upload from another tab will update; the
     // server seed just avoids the empty-flash on first paint.
-    db.getActiveGiftAidDeclarationByMember(lodgeId, {
+    db.getActiveGiftAidDeclarationByMember(churchId, {
       id: member.id,
       email: member.email,
     }),
     // The "Recent emails" panel reads append-only sends from
     // public.email_log (migration 064). Empty list = no sends yet,
     // not an error.
-    db.listEmailLogForMember(lodgeId, member.email, 10).catch(() => []),
+    db.listEmailLogForMember(churchId, member.email, 10).catch(() => []),
   ]);
 
-  const nextDues = computeNextDuesForMember({
+  const nextGiving = computeNextGivingForMember({
     currentYear,
-    memberDues: duesRecords,
+    memberGiving: givingRecords,
     defaultAnnualAmount:
-      currentYear?.annual_dues_amount ?? lodgeDues[0]?.amount ?? null,
-    annualDuesWaived: member.annual_dues_waived === true,
-    annualDuesWaiverReason: member.annual_dues_waiver_reason ?? null,
+      currentYear?.annual_giving_amount ?? churchGiving[0]?.amount ?? null,
+    annualGivingWaived: member.annual_giving_waived === true,
+    annualGivingWaiverReason: member.annual_giving_waiver_reason ?? null,
   });
 
   // Pick the most relevant subscription for the panel: prefer any
   // active/needs-attention schedule over completed/cancelled history.
-  // Returned schedules from db.getDuesSchedulesForMember are already
+  // Returned schedules from db.getGivingSchedulesForMember are already
   // ordered created_at DESC.
   const subscriptionPriority: Record<string, number> = {
     action_required: 0,
@@ -140,12 +140,12 @@ export default async function AdminMemberDetailPage({
     (a, b) =>
       (subscriptionPriority[a.status] ?? 99) -
       (subscriptionPriority[b.status] ?? 99)
-  )[0] as DuesSchedule | undefined;
+  )[0] as GivingSchedule | undefined;
 
   let subscription:
     | {
-        schedule: DuesSchedule;
-        instalments: MemberDuesInstalment[];
+        schedule: GivingSchedule;
+        instalments: MemberGivingInstalment[];
       }
     | null = null;
   // Only render the subscription panel for genuinely live schedules.
@@ -157,57 +157,57 @@ export default async function AdminMemberDetailPage({
     activeSchedule.status !== "cancelled" &&
     activeSchedule.status !== "completed";
   if (activeSchedule && hasLiveSchedule) {
-    const instalments = await db.getInstalmentsForDues(
-      activeSchedule.member_dues_id,
-      lodgeId
+    const instalments = await db.getInstalmentsForGiving(
+      activeSchedule.member_giving_id,
+      churchId
     );
     subscription = { schedule: activeSchedule, instalments };
   }
 
-  // Pick the dues row that drives the new "Dues payment method" panel.
+  // Pick the giving row that drives the new "Giving payment method" panel.
   // Same row-resolution logic the API uses so the panel reflects what
   // the POST handler will mutate.
-  const duesRowForMethod = pickCurrentYearDues(
-    duesRecords,
+  const givingRowForMethod = pickCurrentYearGiving(
+    givingRecords,
     currentYear?.start_date ?? null,
     currentYear?.end_date ?? null,
   );
 
   // Build the public subscription/pay link the admin can copy or
-  // mailto. Same shape as the initiation cron template:
-  // ${siteUrl}/dues/[duesId]?email=...&lodge=...
+  // mailto. Same shape as the membership cron template:
+  // ${siteUrl}/giving/[givingId]?email=...&church=...
   let subscriptionLink: string | null = null;
-  if (duesRowForMethod) {
+  if (givingRowForMethod) {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
-    const lodgeSlug = ctx.mode === "database" ? ctx.lodgeSlug : null;
+    const churchSlug = ctx.mode === "database" ? ctx.churchSlug : null;
     if (siteUrl) {
-      const u = new URL(`/dues/${duesRowForMethod.id}`, siteUrl);
+      const u = new URL(`/giving/${givingRowForMethod.id}`, siteUrl);
       u.searchParams.set("email", member.email);
-      if (lodgeSlug && lodgeSlug !== getDefaultLodgeSlug()) {
-        u.searchParams.set("lodge", lodgeSlug);
+      if (churchSlug && churchSlug !== getDefaultChurchSlug()) {
+        u.searchParams.set("church", churchSlug);
       }
       subscriptionLink = u.toString();
     }
   }
 
-  const duesMethod = duesRowForMethod
+  const givingMethod = givingRowForMethod
     ? {
-        duesId: duesRowForMethod.id,
-        method: duesRowForMethod.dues_payment_method ?? null,
-        bacsMonthlyAmount: duesRowForMethod.bacs_monthly_amount ?? null,
-        bacsReference: duesRowForMethod.bacs_reference ?? null,
-        waiverReason: duesRowForMethod.waiver_reason ?? null,
-        paidAt: duesRowForMethod.paid_at ?? null,
-        setBy: duesRowForMethod.payment_method_set_by ?? null,
-        setAt: duesRowForMethod.payment_method_set_at ?? null,
+        givingId: givingRowForMethod.id,
+        method: givingRowForMethod.giving_payment_method ?? null,
+        bacsMonthlyAmount: givingRowForMethod.bacs_monthly_amount ?? null,
+        bacsReference: givingRowForMethod.bacs_reference ?? null,
+        waiverReason: givingRowForMethod.waiver_reason ?? null,
+        paidAt: givingRowForMethod.paid_at ?? null,
+        setBy: givingRowForMethod.payment_method_set_by ?? null,
+        setAt: givingRowForMethod.payment_method_set_at ?? null,
         annualAmount:
-          duesRowForMethod.full_year_amount ?? duesRowForMethod.amount,
+          givingRowForMethod.full_year_amount ?? givingRowForMethod.amount,
         yearLabel: currentYear?.label ?? null,
         subscriptionLink,
         hasActiveSubscription: subscription != null,
       }
     : {
-        duesId: null,
+        givingId: null,
         method: null,
         bacsMonthlyAmount: null,
         bacsReference: null,
@@ -226,9 +226,9 @@ export default async function AdminMemberDetailPage({
       member={JSON.parse(JSON.stringify(member))}
       dietaryHistory={JSON.parse(JSON.stringify(dietaryHistory))}
       paymentHistory={JSON.parse(JSON.stringify(paymentHistory))}
-      duesRecords={JSON.parse(JSON.stringify(duesRecords))}
+      givingRecords={JSON.parse(JSON.stringify(givingRecords))}
       offices={JSON.parse(JSON.stringify(offices))}
-      nextDues={nextDues ? JSON.parse(JSON.stringify(nextDues)) : null}
+      nextGiving={nextGiving ? JSON.parse(JSON.stringify(nextGiving)) : null}
       subscription={
         subscription ? JSON.parse(JSON.stringify(subscription)) : null
       }
@@ -239,7 +239,7 @@ export default async function AdminMemberDetailPage({
             ) as GiftAidDeclaration)
           : null
       }
-      duesMethod={JSON.parse(JSON.stringify(duesMethod))}
+      givingMethod={JSON.parse(JSON.stringify(givingMethod))}
       recentEmails={JSON.parse(JSON.stringify(recentEmails))}
     />
   );

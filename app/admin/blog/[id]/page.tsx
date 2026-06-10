@@ -14,11 +14,11 @@ export default async function EditBlogPostPage({
   const { id } = await params;
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
-  const lodgeId = ctx.mode === "database" ? ctx.lodgeId : null;
+  const churchId = ctx.mode === "database" ? ctx.churchId : null;
   const post = useMock
     ? mockDb.getBlogPostById(id)
-    : lodgeId
-      ? await db.getBlogPostById(id, lodgeId)
+    : churchId
+      ? await db.getBlogPostById(id, churchId)
       : null;
 
   if (!post) notFound();

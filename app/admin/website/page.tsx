@@ -11,29 +11,29 @@ export const dynamic = "force-dynamic";
 export default async function AdminWebsitePage() {
   const ctx = await getAdminReadContext();
 
-  if (ctx.mode !== "database" || !ctx.lodgeId) {
+  if (ctx.mode !== "database" || !ctx.churchId) {
     return (
       <div className="space-y-4 sm:space-y-6">
         <div className="admin-page-head">
           <div>
             <h1 className="admin-page-title">Website</h1>
             <p className="admin-page-copy">
-              Build the lodge website, manage brand settings, and connect domains.
+              Build the church website, manage brand settings, and connect domains.
             </p>
           </div>
         </div>
         <EmptyState
           icon={Globe}
-          title="Website needs a selected lodge"
-          description="Connect Supabase and choose a lodge to edit the public website."
+          title="Website needs a selected church"
+          description="Connect Supabase and choose a church to edit the public website."
         />
       </div>
     );
   }
 
-  const [lodge, rawSite] = await Promise.all([
-    db.getLodgeById(ctx.lodgeId),
-    db.getLodgeSite(ctx.lodgeId),
+  const [church, rawSite] = await Promise.all([
+    db.getChurchById(ctx.churchId),
+    db.getChurchSite(ctx.churchId),
   ]);
   const site = rawSite
     ? {
@@ -43,7 +43,7 @@ export default async function AdminWebsitePage() {
       }
     : rawSite;
 
-  if (!lodge) {
+  if (!church) {
     redirect("/admin");
   }
   return (
@@ -52,12 +52,12 @@ export default async function AdminWebsitePage() {
         <div>
           <h1 className="admin-page-title">Website</h1>
           <p className="admin-page-copy">
-            Build the public lodge site, manage brand settings, and connect domains.
+            Build the public church site, manage brand settings, and connect domains.
           </p>
         </div>
       </div>
 
-      <AdminWebsiteManager lodge={lodge} site={site} />
+      <AdminWebsiteManager church={church} site={site} />
     </div>
   );
 }

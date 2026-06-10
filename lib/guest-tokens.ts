@@ -5,7 +5,7 @@ export function generateGuestInvitationToken(): string {
   return randomBytes(32).toString("base64url");
 }
 
-/** Hash a token for storage; mirror of the summons access link pattern. */
+/** Hash a token for storage; mirror of the notice access link pattern. */
 export function hashGuestInvitationToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
@@ -19,14 +19,14 @@ export function defaultMaxUsesForPolicy(
 }
 
 /**
- * Per-guest token used for lodge-scoped visitor links. Same shape as invitation tokens
+ * Per-guest token used for church-scoped newcomer links. Same shape as invitation tokens
  * (32 bytes, base64url, sha256-hashed at rest); a separate generator just so
  * the call site reads clearly.
  */
-export function generateVisitorToken(): string {
+export function generateNewcomerToken(): string {
   return randomBytes(32).toString("base64url");
 }
 
-export function hashVisitorToken(token: string): string {
+export function hashNewcomerToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }

@@ -3,7 +3,7 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import { getAdminReadContext } from "@/lib/admin/read-context";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
@@ -12,21 +12,21 @@ import { filterPubliclyVisible } from "@/lib/events/public-visibility";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const lodgeSlug = getLodgeSlugFromRequest(request);
+  const churchSlug = getChurchSlugFromRequest(request);
 
   if (isSupabaseConfigured()) {
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    if (!lodgeId) {
+    const churchId = await db.resolveChurchId(churchSlug);
+    if (!churchId) {
       return NextResponse.json([]);
     }
-    const events = await db.getEvents(lodgeId, { published: true });
+    const events = await db.getEvents(churchId, { published: true });
     return NextResponse.json(filterPubliclyVisible(events));
   }
 
   const _rejectMock = rejectIfMockDisabled();
   if (_rejectMock) return _rejectMock;
 
-  const events = mockDb.getEvents({ lodge_slug: lodgeSlug });
+  const events = mockDb.getEvents({ church_slug: churchSlug });
   return NextResponse.json(filterPubliclyVisible(events));
 }
 
@@ -39,12 +39,12 @@ export async function POST(request: NextRequest) {
     if (unauthorized) return unauthorized;
 
     const adminCtx = await getAdminReadContext();
-    const lodgeSlug =
-      adminCtx.mode === "database" ? adminCtx.lodgeSlug : "";
+    const churchSlug =
+      adminCtx.mode === "database" ? adminCtx.churchSlug : "";
     const body = await request.json();
     const title = body.title?.trim();
     const slug = body.slug?.trim()?.toLowerCase().replace(/[^a-z0-9-]/g, "-");
-    const event_type = body.event_type ?? "lodge_meeting";
+    const event_type = body.event_type ?? "church_service";
     const event_date = body.event_date;
     if (!title || !slug || !event_date) {
       return NextResponse.json(
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       event_type,
       event_date: new Date(event_date).toISOString(),
       event_time: body.event_time ?? null,
-      location: body.location?.trim() ?? "Mark Masons' Hall",
+      location: body.location?.trim() ?? "Mark members' Hall",
       temple_room: body.temple_room?.trim() ?? null,
       dress_code: body.dress_code?.trim() ?? null,
       enable_rsvp: body.enable_rsvp !== false,
@@ -96,9 +96,9 @@ export async function POST(request: NextRequest) {
       raffle_wine_description:
         body.raffle_wine_description?.trim() ??
         "Bring a bottle of wine for the evening raffle",
-      enable_meeting_fee: body.enable_meeting_fee === true,
-      meeting_fee_amount: body.meeting_fee_amount != null ? Number(body.meeting_fee_amount) : null,
-      meeting_fee_description: body.meeting_fee_description?.trim() ?? null,
+      enable_service_fee: body.enable_service_fee === true,
+      service_fee_amount: body.service_fee_amount != null ? Number(body.service_fee_amount) : null,
+      service_fee_description: body.service_fee_description?.trim() ?? null,
       enable_guest_tickets: body.enable_guest_tickets === true,
       guest_ticket_price: body.guest_ticket_price != null ? Number(body.guest_ticket_price) : null,
       guest_ticket_description: body.guest_ticket_description?.trim() ?? null,
@@ -113,40 +113,40 @@ export async function POST(request: NextRequest) {
     } satisfies Omit<
       db.Event,
       | "id"
-      | "lodge_id"
+      | "church_id"
       | "created_at"
       | "updated_at"
       | "sequence_id"
       | "sequence_position"
-      | "summons_status"
-      | "summons_auto_drafted_at"
-      | "summons_approved_at"
-      | "summons_approved_by_email"
-      | "summons_last_sent_at"
-      | "meeting_closed_at"
-      | "meeting_closed_by_email"
-      | "meeting_close_notes"
+      | "notice_status"
+      | "notice_auto_drafted_at"
+      | "notice_approved_at"
+      | "notice_approved_by_email"
+      | "notice_last_sent_at"
+      | "service_closed_at"
+      | "service_closed_by_email"
+      | "service_close_notes"
     >;
 
     if (isSupabaseConfigured()) {
-      if (adminCtx.mode !== "database" || !adminCtx.lodgeId) {
-        return NextResponse.json({ error: "Lodge not selected." }, { status: 404 });
+      if (adminCtx.mode !== "database" || !adminCtx.churchId) {
+        return NextResponse.json({ error: "Church not selected." }, { status: 404 });
       }
-      const lodgeId = adminCtx.lodgeId;
-      const forbidden = await requireAdminApiPermission("meetings:write", lodgeId);
+      const churchId = adminCtx.churchId;
+      const forbidden = await requireAdminApiPermission("services:write", churchId);
       if (forbidden) return forbidden;
-      const event = await db.addEvent(lodgeId, eventData);
+      const event = await db.addEvent(churchId, eventData);
       await writeAuditLog({
-        lodgeId,
+        churchId,
         action: "created",
-        entityType: "meeting",
+        entityType: "service",
         entityId: event.id,
-        summary: `Created meeting ${event.title}`,
+        summary: `Created service ${event.title}`,
       });
       return NextResponse.json({ id: event.id, success: true });
     }
 
-    const event = mockDb.addEvent({ ...eventData, lodge_slug: lodgeSlug });
+    const event = mockDb.addEvent({ ...eventData, church_slug: churchSlug });
     return NextResponse.json({ id: event.id, success: true });
   } catch (e) {
     console.error("Events API error:", e);

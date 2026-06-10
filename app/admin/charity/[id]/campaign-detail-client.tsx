@@ -85,7 +85,7 @@ export function CharityCampaignDetailClient({
 
   const totalDonated = donations.reduce((s, d) => s + d.amount, 0);
   const completed = donations.filter((d) => d.status === "completed");
-  const meetingCollections = donations.filter((d) => d.event_id);
+  const serviceCollections = donations.filter((d) => d.event_id);
   const giftAidEligibleAmount = donations.reduce(
     (sum, d) =>
       d.gift_aid_status === "declared" || giftAidSet.has(d.donor_email.toLowerCase())
@@ -135,7 +135,7 @@ export function CharityCampaignDetailClient({
 
   const collectionsByEvent = useMemo(() => {
     const map = new Map<string, { eventId: string; total: number; count: number }>();
-    for (const d of meetingCollections) {
+    for (const d of serviceCollections) {
       if (!d.event_id) continue;
       const cur = map.get(d.event_id) ?? {
         eventId: d.event_id,
@@ -147,7 +147,7 @@ export function CharityCampaignDetailClient({
       map.set(d.event_id, cur);
     }
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
-  }, [meetingCollections]);
+  }, [serviceCollections]);
 
   function downloadCsv(filename: string, headers: string[], rows: (string | number)[][]) {
     const csv = [headers, ...rows]
@@ -459,16 +459,16 @@ export function CharityCampaignDetailClient({
         <Card variant="panel" className="overflow-hidden p-0 lg:col-span-2">
           <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
             <div>
-              <h3 className="dash-panel-header-title">Meeting collections</h3>
+              <h3 className="dash-panel-header-title">Service collections</h3>
               <p className="dash-panel-header-description">
-                Charity collections linked to specific meetings.
+                Charity collections linked to specific services.
               </p>
             </div>
           </div>
           <CardContent className="border-t border-dash-border bg-dash-surface p-5">
             {collectionsByEvent.length === 0 ? (
               <p className="text-sm text-dash-muted">
-                No meeting-linked collections recorded for this campaign.
+                No service-linked collections recorded for this campaign.
               </p>
             ) : (
               <ul className="divide-y divide-dash-border">
@@ -478,10 +478,10 @@ export function CharityCampaignDetailClient({
                     className="flex items-center justify-between py-2.5 text-sm"
                   >
                     <Link
-                      href={`/admin/meetings`}
+                      href={`/admin/services`}
                       className="font-medium text-dash-text hover:underline"
                     >
-                      {eventNames.get(row.eventId) ?? "Meeting"}
+                      {eventNames.get(row.eventId) ?? "Service"}
                     </Link>
                     <span className="text-xs text-dash-muted">
                       {row.count} donation{row.count === 1 ? "" : "s"}

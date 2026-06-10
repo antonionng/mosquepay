@@ -14,7 +14,7 @@ import type { LineItemInput, TakePaymentCategory } from "./categorize";
 // module pulled into a route handler).
 const KNOWN_CATEGORIES = new Set<TakePaymentCategory>([
   "general",
-  "meeting_fee",
+  "service_fee",
   "guest_ticket",
   "dining",
   "charity",

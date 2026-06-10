@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Award, CheckCircle2, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { masonicTitleFor } from "@/lib/members/rank";
+import { churchTitleFor } from "@/lib/members/rank";
 
 export type OfficeRung = {
   id: string;
@@ -64,7 +64,7 @@ export function OfficesPanel({
     setSavingId(rungId);
     setError(null);
     try {
-      const res = await fetch(`/api/officer-ladder/${rungId}`, {
+      const res = await fetch(`/api/members/${rungId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ current_member_id: memberId || null }),
@@ -90,12 +90,12 @@ export function OfficesPanel({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-dash-text">
-            Lodge officers
+            Church officers
           </h2>
           <p className="mt-1 text-sm text-dash-muted">
-            Pick a brother for each office. To replace someone (e.g. install a
-            new Worshipful Master) just choose a different name. Changes save
-            automatically and appear on every summons.
+            Pick a member for each office. To replace someone (e.g. install a
+            new Lead Pastor) just choose a different name. Changes save
+            automatically and appear on every notice.
           </p>
         </div>
         <div className="rounded-full border border-dash-border bg-dash-surface-subtle px-3 py-1 text-xs font-medium text-dash-muted">
@@ -142,8 +142,8 @@ export function OfficesPanel({
                         href={`/admin/members/${holder.id}`}
                         className="font-medium text-blue-700 hover:underline"
                       >
-                        {masonicTitleFor(holder.rank)
-                          ? `${masonicTitleFor(holder.rank)} `
+                        {churchTitleFor(holder.rank)
+                          ? `${churchTitleFor(holder.rank)} `
                           : ""}
                         {holder.full_name}
                       </Link>
@@ -174,8 +174,8 @@ export function OfficesPanel({
                           : "";
                       return (
                         <option key={m.id} value={m.id}>
-                          {masonicTitleFor(m.rank)
-                            ? `${masonicTitleFor(m.rank)} `
+                          {churchTitleFor(m.rank)
+                            ? `${churchTitleFor(m.rank)} `
                             : ""}
                           {m.full_name}
                           {suffix}

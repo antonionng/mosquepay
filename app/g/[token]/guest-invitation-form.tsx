@@ -20,9 +20,9 @@ type Props = {
   enableDining: boolean;
   diningPrice: number | null;
   diningDescription: string | null;
-  enableMeetingFee: boolean;
-  meetingFeeAmount: number | null;
-  meetingFeeDescription: string | null;
+  enableServiceFee: boolean;
+  serviceFeeAmount: number | null;
+  serviceFeeDescription: string | null;
   enableCharity: boolean;
   charityName: string | null;
   charitySuggestedAmounts: number[];
@@ -45,16 +45,16 @@ const baseSchema = z.object({
   notes: z.string().optional(),
 });
 
-const masonExtras = z.object({
-  mother_lodge_name: z.string().min(1, "Your lodge name is required"),
-  mother_lodge_number: z.string().optional(),
+const memberExtras = z.object({
+  mother_church_name: z.string().min(1, "Your church name is required"),
+  mother_church_number: z.string().optional(),
   constitution: z.string().optional(),
   rank: z.string().optional(),
 });
 
 function buildSchema(policy: GuestPolicy) {
   if (policy === "blue_table") {
-    return baseSchema.merge(masonExtras);
+    return baseSchema.merge(memberExtras);
   }
   return baseSchema;
 }
@@ -68,9 +68,9 @@ export function GuestInvitationForm({
   enableDining,
   diningPrice,
   diningDescription,
-  enableMeetingFee,
-  meetingFeeAmount,
-  meetingFeeDescription,
+  enableServiceFee,
+  serviceFeeAmount,
+  serviceFeeDescription,
   enableCharity,
   charityName,
   charitySuggestedAmounts,
@@ -101,15 +101,15 @@ export function GuestInvitationForm({
   const attendingDining = watch("attending_dining");
   const charityAmount = (watch("charity_amount") as number | undefined) ?? 0;
 
-  const meetingFee =
-    payer === "guest" && enableMeetingFee && meetingFeeAmount != null
-      ? meetingFeeAmount
+  const serviceFee =
+    payer === "guest" && enableServiceFee && serviceFeeAmount != null
+      ? serviceFeeAmount
       : 0;
   const diningTotal =
     payer === "guest" && enableDining && attendingDining && diningPrice != null
       ? diningPrice
       : 0;
-  const total = meetingFee + diningTotal + (charityAmount || 0);
+  const total = serviceFee + diningTotal + (charityAmount || 0);
   const requiresPayment = enablePayments && total > 0;
 
   async function onSubmit(data: FormData) {
@@ -121,7 +121,7 @@ export function GuestInvitationForm({
         body: JSON.stringify({
           ...data,
           dining_total: diningTotal,
-          meeting_fee: meetingFee,
+          service_fee: serviceFee,
           charity_amount: data.charity_amount ?? 0,
         }),
       });
@@ -193,26 +193,26 @@ export function GuestInvitationForm({
       {guestPolicy === "blue_table" ? (
         <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-5">
           <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
-            Your masonic details
+            Your church details
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="mother_lodge_name">Your lodge *</Label>
+              <Label htmlFor="mother_church_name">Your church *</Label>
               <Input
-                id="mother_lodge_name"
-                {...register("mother_lodge_name" as never)}
+                id="mother_church_name"
+                {...register("mother_church_name" as never)}
               />
-              {(errors as Record<string, { message?: string }>).mother_lodge_name ? (
+              {(errors as Record<string, { message?: string }>).mother_church_name ? (
                 <p className="text-sm text-destructive">
-                  {(errors as Record<string, { message?: string }>).mother_lodge_name?.message}
+                  {(errors as Record<string, { message?: string }>).mother_church_name?.message}
                 </p>
               ) : null}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="mother_lodge_number">Lodge number</Label>
+              <Label htmlFor="mother_church_number">Church number</Label>
               <Input
-                id="mother_lodge_number"
-                {...register("mother_lodge_number" as never)}
+                id="mother_church_number"
+                {...register("mother_church_number" as never)}
               />
             </div>
             <div className="space-y-2">
@@ -321,9 +321,9 @@ export function GuestInvitationForm({
             Total
           </p>
           <div className="mt-2 space-y-1 text-sm text-slate-600">
-            {meetingFee > 0 ? (
+            {serviceFee > 0 ? (
               <p>
-                {meetingFeeDescription ?? "Meeting fee"}: £{meetingFee.toFixed(2)}
+                {serviceFeeDescription ?? "Service fee"}: £{serviceFee.toFixed(2)}
               </p>
             ) : null}
             {diningTotal > 0 ? <p>Dining: £{diningTotal.toFixed(2)}</p> : null}
@@ -351,16 +351,16 @@ export function GuestInvitationForm({
         </Button>
         {requiresPayment ? (
           <p className="text-xs text-slate-500">
-            As is custom in Masonry, your place is confirmed at the point of
+            As is custom in memberry, your place is confirmed at the point of
             payment and is{" "}
             <span className="font-semibold text-slate-700">non-refundable</span>.
-            If you can no longer attend, please notify the lodge as soon as
+            If you can no longer attend, please notify the church as soon as
             possible.
           </p>
         ) : (
           <p className="text-xs text-slate-500">
             Your place is confirmed as soon as you press the button above. If
-            you can no longer attend, please notify the lodge as soon as
+            you can no longer attend, please notify the church as soon as
             possible.
           </p>
         )}

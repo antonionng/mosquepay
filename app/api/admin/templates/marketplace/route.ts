@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -22,12 +22,12 @@ export async function POST(request: NextRequest) {
       { status: 503 }
     );
   }
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("members:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("members:write", churchId);
   if (forbidden) return forbidden;
 
   const body = await request.json().catch(() => ({}));
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     const tpl = SYSTEM_TEMPLATES.find((t) => t.template_key === key);
     if (!tpl) continue;
     try {
-      const row = await db.upsertMessageTemplate(lodgeId, {
+      const row = await db.upsertMessageTemplate(churchId, {
         template_key: tpl.template_key,
         name: tpl.name,
         subject: tpl.subject,
@@ -60,10 +60,10 @@ export async function POST(request: NextRequest) {
   }
 
   await writeAuditLog({
-    lodgeId,
+    churchId,
     action: "templates_installed",
     entityType: "message_template",
-    entityId: lodgeId,
+    entityId: churchId,
     summary: `Installed ${installed.length} templates from the marketplace`,
     metadata: { keys },
   });

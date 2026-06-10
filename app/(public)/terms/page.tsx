@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { LegalPage } from "@/components/marketing/legal-page";
 import { marketingMetadata } from "@/lib/seo";
 import {
-  COMPANY_DETAILS,
   COMPANY_NAME,
   CONTACT_PATH,
   LEGAL_LAST_UPDATED,
@@ -10,47 +10,47 @@ import {
 } from "@/lib/legal";
 
 export const metadata: Metadata = marketingMetadata({
-  title: "Terms of Service | LodgePay",
+  title: "Terms of Service | ChurchPay",
   description:
-    "Terms for using LodgePay lodge websites, member portals, events, payments, dues, donations, Gift Aid, candidate management, communications, reporting, and administration tools.",
+    "Terms for using ChurchPay church websites, member portals, services, payments, giving, donations, Gift Aid, newcomer management, communications, reporting, and administration tools.",
   path: "/terms",
-  keywords: ["LodgePay terms", "Masonic software terms", "lodge platform terms"],
+  keywords: ["ChurchPay terms", "church software terms", "church platform terms"],
 });
 
 const sections = [
   {
-    title: "Using LodgePay",
+    title: "Using ChurchPay",
     body: [
-      `${PRODUCT_NAME} provides software for lodge websites, member portals, meetings, summons, RSVPs, dues, donations, Gift Aid, candidate management, welfare workflows, communications, reporting, and multi-lodge administration.`,
-      `The service is operated by ${COMPANY_NAME}. Customers are responsible for making sure their officers, staff, members, and invited users use the platform lawfully, accurately, and with appropriate authority.`,
+      `${PRODUCT_NAME} provides software for church websites, member portals, services, service notices, RSVPs, giving, donations, Gift Aid, newcomer management, pastoral workflows, communications, reporting, and multi-church administration.`,
+      `The service is operated by ${COMPANY_NAME}. Customers are responsible for making sure their staff, volunteers, members, and invited users use the platform lawfully, accurately, and with appropriate authority.`,
     ],
   },
   {
     title: "Customer responsibilities",
     body: [
-      "Customers must maintain accurate lodge information, use appropriate officer permissions, protect login credentials, and only upload or process personal data they are entitled to manage.",
-      "Customers are responsible for the content they publish through lodge websites, news posts, events, summons, emails, donation pages, and member communications.",
+      "Customers must maintain accurate church information, use appropriate role permissions, protect login credentials, and only upload or process personal data they are entitled to manage.",
+      "Customers are responsible for the content they publish through church websites, news posts, events, service notices, emails, donation pages, and member communications.",
     ],
   },
   {
     title: "Payments and financial records",
     body: [
-      "LodgePay supports payment and donation workflows through payment partners. Payment availability, settlement, refunds, chargebacks, and card processing may be subject to partner terms and processor rules.",
+      "ChurchPay supports payment and donation workflows through payment partners. Payment availability, settlement, refunds, chargebacks, and card processing may be subject to partner terms and processor rules.",
       "Treasurer tools, ledgers, reports, bank imports, and reconciliation views are operational aids. Customers remain responsible for reviewing their accounts, tax position, Gift Aid records, and statutory obligations.",
     ],
   },
   {
     title: "Sensitive records",
     body: [
-      "Some modules may hold sensitive lodge information, including welfare, Almoner, mentoring, candidate, conduct, audit, or compliance notes. Customers must restrict access to authorised users and follow their own governance rules.",
-      "LodgePay provides technical controls such as role-based access and audit logs, but customers decide who should have access inside their organisation.",
+      "Some modules may hold sensitive church information, including pastoral care, mentoring, newcomer, conduct, audit, or compliance notes. Customers must restrict access to authorised users and follow their own governance rules.",
+      "ChurchPay provides technical controls such as role-based access and audit logs, but customers decide who should have access inside their organisation.",
     ],
   },
   {
     title: "Availability and support",
     body: [
       "We aim to provide a reliable platform, but service availability may be affected by maintenance, hosting providers, payment providers, email providers, network issues, security events, or events outside our control.",
-      "Technical support requests should be sent through the contact form. We may need enough detail to identify the lodge, user, browser, page, and affected workflow.",
+      "Technical support requests should be sent through the contact form. We may need enough detail to identify the church, user, browser, page, and affected workflow.",
     ],
   },
   {
@@ -64,7 +64,7 @@ const sections = [
     title: "Liability",
     body: [
       "Nothing in these terms excludes liability where it would be unlawful to do so, including liability for fraud or fraudulent misrepresentation.",
-      "To the extent permitted by law, LodgePay is provided as an operational software service and customers remain responsible for their own governance, accounts, tax decisions, lodge records, and published content.",
+      "To the extent permitted by law, ChurchPay is provided as an operational software service and customers remain responsible for their own governance, accounts, tax decisions, church records, and published content.",
     ],
   },
   {
@@ -77,53 +77,20 @@ const sections = [
 
 export default function TermsPage() {
   return (
-    <div className="bg-dash-bg text-dash-text">
-      <section className="border-b border-dash-border bg-dash-surface pt-28">
-        <div className="mx-auto max-w-6xl px-5 pb-16 pt-10 lg:px-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-dash-ring">Terms</p>
-          <h1 className="mt-4 max-w-4xl font-heading text-4xl font-semibold leading-[1.05] tracking-tight text-dash-text sm:text-5xl lg:text-6xl">
-            Terms for using LodgePay.
-          </h1>
-          <p className="mt-6 max-w-2xl text-base leading-relaxed text-dash-muted sm:text-lg">
-            Last updated {LEGAL_LAST_UPDATED}. These terms describe how {PRODUCT_NAME} should be
-            used by lodges, Provinces, officers, members, administrators, and public visitors.
-          </p>
-        </div>
-      </section>
-
-      <section className="border-b border-dash-border bg-dash-surface py-20 lg:py-24">
-        <div className="mx-auto grid max-w-6xl gap-6 px-5 lg:px-8">
-          <article className="rounded-[1.25rem] border border-dash-border bg-dash-surface-subtle p-8 shadow-dash">
-            <h2 className="font-heading text-2xl font-semibold text-dash-text">Who we are</h2>
-            <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2">
-              {COMPANY_DETAILS.map((item) => (
-                <div key={item.label}>
-                  <dt className="font-semibold text-dash-text">{item.label}</dt>
-                  <dd className="mt-1 text-dash-muted">{item.value}</dd>
-                </div>
-              ))}
-            </dl>
-          </article>
-
-          {sections.map((section) => (
-            <article key={section.title} className="rounded-[1.25rem] border border-dash-border bg-dash-surface p-8 shadow-dash">
-              <h2 className="font-heading text-2xl font-semibold text-dash-text">{section.title}</h2>
-              <div className="mt-4 space-y-4 text-base leading-relaxed text-dash-muted">
-                {section.body.map((paragraph) => (
-                  <p key={paragraph}>{paragraph}</p>
-                ))}
-              </div>
-            </article>
-          ))}
-          <div className="rounded-[1.25rem] border border-dash-border bg-dash-surface-subtle p-8 text-base leading-relaxed text-dash-muted">
-            For support, billing, access, or account questions, use the{" "}
-            <Link href={CONTACT_PATH} className="font-semibold text-dash-ring hover:underline">
-              contact form
-            </Link>
-            .
-          </div>
-        </div>
-      </section>
-    </div>
+    <LegalPage
+      kicker="Terms"
+      title="Terms for using ChurchPay."
+      intro={`Last updated ${LEGAL_LAST_UPDATED}. These terms describe how ${PRODUCT_NAME} should be used by churches, networks, staff, volunteers, members, administrators, and public visitors.`}
+      sections={sections}
+      footer={
+        <>
+          For support, billing, access, or account questions, use the{" "}
+          <Link href={CONTACT_PATH} className="font-semibold text-brand hover:underline">
+            contact form
+          </Link>
+          .
+        </>
+      }
+    />
   );
 }

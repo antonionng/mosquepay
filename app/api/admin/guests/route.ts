@@ -6,7 +6,7 @@ import {
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -27,11 +27,15 @@ function trimOrNull(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-async function ensureFlag(lodgeId: string | null) {
-  const enabled = await isFeatureEnabled(lodgeId, "guest_links");
+function giftAidStatus(value: unknown): "unknown" | "declared" | "declined" {
+  return value === "declared" || value === "declined" ? value : "unknown";
+}
+
+async function ensureFlag(churchId: string | null) {
+  const enabled = await isFeatureEnabled(churchId, "guest_links");
   if (enabled) return null;
   return NextResponse.json(
-    { error: "Guest links are disabled for this lodge." },
+    { error: "Guest links are disabled for this church." },
     { status: 403 }
   );
 }
@@ -43,18 +47,18 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const search = url.searchParams.get("q") ?? undefined;
   const includeArchived = url.searchParams.get("archived") === "true";
-  const lodgeSlug = getLodgeSlugFromRequest(request);
+  const churchSlug = getChurchSlugFromRequest(request);
 
   if (isSupabaseConfigured()) {
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    if (!lodgeId) {
-      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    const churchId = await db.resolveChurchId(churchSlug);
+    if (!churchId) {
+      return NextResponse.json({ error: "Church not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("members:read", lodgeId);
+    const forbidden = await requireAdminApiPermission("members:read", churchId);
     if (forbidden) return forbidden;
-    const flagBlocked = await ensureFlag(lodgeId);
+    const flagBlocked = await ensureFlag(churchId);
     if (flagBlocked) return flagBlocked;
-    const guests = await db.listGuests(lodgeId, {
+    const guests = await db.listGuests(churchId, {
       search: search ?? undefined,
       includeArchived,
     });
@@ -65,7 +69,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ guests: [] });
   }
   const guests = mockDb.listGuests({
-    lodge_slug: lodgeSlug,
+    church_slug: churchSlug,
     search: search ?? undefined,
     includeArchived,
   });
@@ -79,7 +83,7 @@ export async function POST(request: NextRequest) {
   const unauthorized = await requireAdminApiAuth();
   if (unauthorized) return unauthorized;
 
-  const lodgeSlug = getLodgeSlugFromRequest(request);
+  const churchSlug = getChurchSlugFromRequest(request);
   let body: Record<string, unknown> = {};
   try {
     body = await request.json();
@@ -99,12 +103,12 @@ export async function POST(request: NextRequest) {
     full_name: fullName,
     email: trimOrNull(body.email),
     phone: trimOrNull(body.phone),
-    mother_lodge_name: trimOrNull(body.mother_lodge_name),
-    mother_lodge_number: trimOrNull(body.mother_lodge_number),
+    mother_church_name: trimOrNull(body.mother_church_name),
+    mother_church_number: trimOrNull(body.mother_church_number),
     constitution: trimOrNull(body.constitution),
     rank: trimOrNull(body.rank),
     dietary_requirements: trimOrNull(body.dietary_requirements),
-    is_mason: parseBoolean(body.is_mason, true),
+    is_member: parseBoolean(body.is_member, true),
     notes: trimOrNull(body.notes),
     guest_category:
       body.guest_category === "honorary_guest"
@@ -115,42 +119,43 @@ export async function POST(request: NextRequest) {
         ? Number(body.guest_dining_amount)
         : null,
     dining_waived: body.dining_waived === true,
+    gift_aid_consent_status: giftAidStatus(body.gift_aid_consent_status),
   };
 
   if (isSupabaseConfigured()) {
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    if (!lodgeId) {
-      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    const churchId = await db.resolveChurchId(churchSlug);
+    if (!churchId) {
+      return NextResponse.json({ error: "Church not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("members:write", lodgeId);
+    const forbidden = await requireAdminApiPermission("members:write", churchId);
     if (forbidden) return forbidden;
-    const flagBlocked = await ensureFlag(lodgeId);
+    const flagBlocked = await ensureFlag(churchId);
     if (flagBlocked) return flagBlocked;
 
-    const guest = await db.createGuest(lodgeId, {
+    const guest = await db.createGuest(churchId, {
       ...payload,
       first_seen_event_id: null,
       last_seen_event_id: null,
       visit_count: 0,
       archived_at: null,
-      visitor_token_hash: null,
+      newcomer_token_hash: null,
     });
 
     await writeAuditLog({
-      lodgeId,
+      churchId,
       action: "created",
       entityType: "guest",
       entityId: guest.id,
       summary: `Added guest ${guest.full_name}`,
       metadata: {
-        is_mason: guest.is_mason,
-        mother_lodge_name: guest.mother_lodge_name,
+        is_member: guest.is_member,
+        mother_church_name: guest.mother_church_name,
       },
     });
 
     return NextResponse.json({ guest });
   }
 
-  const guest = mockDb.createGuestRecord({ ...payload, lodge_slug: lodgeSlug });
+  const guest = mockDb.createGuestRecord({ ...payload, church_slug: churchSlug });
   return NextResponse.json({ guest });
 }

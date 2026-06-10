@@ -69,8 +69,8 @@ export function GiftAidClient({
   const router = useRouter();
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "expired" | "revoked">("all");
   const [search, setSearch] = useState("");
-  const [periodStart, setPeriodStart] = useState(() => `${new Date().getFullYear()}-01-01`);
-  const [periodEnd, setPeriodEnd] = useState(() => new Date().toISOString().slice(0, 10));
+  const [periodStart, setPeriodStart] = useState("");
+  const [periodEnd, setPeriodEnd] = useState("");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -181,7 +181,10 @@ export function GiftAidClient({
       const res = await fetch("/api/gift-aid/claims", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ period_start: periodStart, period_end: periodEnd }),
+        body: JSON.stringify({
+          period_start: periodStart || null,
+          period_end: periodEnd || null,
+        }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? "Could not create claim batch.");
@@ -327,6 +330,7 @@ export function GiftAidClient({
               </h2>
               <p className="mt-2 text-sm text-dash-muted">
                 £{eligibleAmount.toFixed(2)} eligible, £{eligibleReclaimable.toFixed(2)} reclaimable.
+                Leave dates blank to batch all unclaimed eligible donations.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -397,7 +401,7 @@ export function GiftAidClient({
                   {typeof claim.declarations_count === "number" && claim.declarations_count > 0 ? (
                     <p className="mt-1 text-xs text-emerald-700">
                       Includes {claim.declarations_count} declaration
-                      {claim.declarations_count === 1 ? "" : "s"} for the Relief Chest
+                      {claim.declarations_count === 1 ? "" : "s"} for the Gift Aid pack
                     </p>
                   ) : null}
                   <div className="mt-3 flex flex-wrap gap-2">

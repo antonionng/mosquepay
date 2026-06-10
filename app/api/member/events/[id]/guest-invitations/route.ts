@@ -9,14 +9,14 @@ import {
   generateGuestInvitationToken,
   hashGuestInvitationToken,
 } from "@/lib/guest-tokens";
-import { buildPublicUrl, lodgeScopedGuestPath } from "@/lib/public-links";
+import { buildPublicUrl, churchScopedGuestPath } from "@/lib/public-links";
 import { sendGuestInviteEmail } from "@/lib/email/guest";
 
-async function buildGuestUrl(request: NextRequest, lodge: db.Lodge | null, token: string) {
+async function buildGuestUrl(request: NextRequest, church: db.Church | null, token: string) {
   const base = (
     process.env.NEXT_PUBLIC_SITE_URL ?? request.nextUrl.origin
   ).replace(/\/$/, "");
-  return buildPublicUrl(base, lodgeScopedGuestPath(lodge?.slug ?? "lodge", token));
+  return buildPublicUrl(base, churchScopedGuestPath(church?.slug ?? "church", token));
 }
 
 async function resolveMember() {
@@ -28,7 +28,7 @@ async function resolveMember() {
   if (error || !user?.email) return null;
   const member =
     (await db.getMemberByAuthUserId(user.id)) ??
-    (await db.getMemberByEmailAcrossLodges(user.email));
+    (await db.getMemberByEmailAcrossChurches(user.email));
   return member;
 }
 
@@ -47,7 +47,7 @@ export async function GET(
   const { id: eventId } = await params;
   const all = await db.listGuestInvitationsForMember(
     member.id,
-    member.lodge_id
+    member.church_id
   );
   const invitations = all.filter((inv) => inv.event_id === eventId);
   return NextResponse.json({ invitations });
@@ -82,7 +82,7 @@ export async function POST(
       body.payer === "inviter" ? "inviter" : "guest";
     const sendEmail = body.send_email !== false;
 
-    const event = await db.getEventById(eventId, member.lodge_id);
+    const event = await db.getEventById(eventId, member.church_id);
     if (!event) {
       return NextResponse.json({ error: "Event not found." }, { status: 404 });
     }
@@ -96,7 +96,7 @@ export async function POST(
     const token = generateGuestInvitationToken();
     const tokenHash = hashGuestInvitationToken(token);
 
-    const invitation = await db.createGuestInvitation(member.lodge_id, {
+    const invitation = await db.createGuestInvitation(member.church_id, {
       event_id: eventId,
       inviter_member_id: member.id,
       inviter_admin_user_id: null,
@@ -108,15 +108,15 @@ export async function POST(
       expires_at: null,
     });
 
-    const lodge = await db.getLodgeById(member.lodge_id);
-    const inviteUrl = await buildGuestUrl(request, lodge, token);
+    const church = await db.getChurchById(member.church_id);
+    const inviteUrl = await buildGuestUrl(request, church, token);
 
     let emailSent = false;
     if (sendEmail && recipientEmail) {
       const result = await sendGuestInviteEmail({
         toEmail: recipientEmail,
         toName: recipientName ?? recipientEmail,
-        lodgeName: lodge?.name ?? "the Lodge",
+        churchName: church?.name ?? "the Church",
         eventTitle: event.title,
         eventDate: event.event_date,
         eventTime: event.event_time,
@@ -170,7 +170,7 @@ export async function DELETE(
 
   const invitation = await db.getGuestInvitationById(
     invitationId,
-    member.lodge_id
+    member.church_id
   );
   if (!invitation || invitation.inviter_member_id !== member.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -178,6 +178,6 @@ export async function DELETE(
   if (invitation.event_id !== eventId) {
     return NextResponse.json({ error: "Mismatched event" }, { status: 400 });
   }
-  await db.revokeGuestInvitation(invitationId, member.lodge_id);
+  await db.revokeGuestInvitation(invitationId, member.church_id);
   return NextResponse.json({ success: true });
 }

@@ -28,26 +28,26 @@ export default async function EditEventPage({
   const { id } = await params;
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
-  const lodgeId = ctx.mode === "database" ? ctx.lodgeId : null;
-  const lodgeSlug = ctx.mode === "database" ? ctx.lodgeSlug : "covenant-4344";
+  const churchId = ctx.mode === "database" ? ctx.churchId : null;
+  const churchSlug = ctx.mode === "database" ? ctx.churchSlug : "st-marys-demo";
   const event = useMock
     ? mockDb.getEventById(id)
-    : lodgeId
-      ? await db.getEventById(id, lodgeId)
+    : churchId
+      ? await db.getEventById(id, churchId)
       : null;
 
   if (!event) notFound();
 
   const rsvps = useMock
     ? mockDb.getRsvpsByEventId(id)
-    : lodgeId
-      ? await db.getRsvpsByEventId(id, lodgeId)
+    : churchId
+      ? await db.getRsvpsByEventId(id, churchId)
       : [];
 
   const payments = useMock
     ? mockDb.getPayments()
-    : lodgeId
-      ? await db.getPayments(lodgeId)
+    : churchId
+      ? await db.getPayments(churchId)
       : [];
 
   const eventPayments = payments.filter((p) => p.event_id === id);
@@ -80,7 +80,7 @@ export default async function EditEventPage({
     title: event.title as string,
     slug: event.slug as string,
     description: (event.description as string) ?? "",
-    event_type: event.event_type as "lodge_meeting" | "lodge_of_instruction" | "social" | "charity",
+    event_type: event.event_type as "church_service" | "church_of_instruction" | "social" | "charity",
     event_date: eventDate ? new Date(eventDate).toISOString().slice(0, 16) : "",
     event_time: (event.event_time as string) ?? "",
     location: (event.location as string) ?? "",
@@ -96,9 +96,9 @@ export default async function EditEventPage({
     charity_description: (event.charity_description as string) ?? "",
     enable_raffle_donation: event.enable_raffle_donation === true,
     raffle_description: (event.raffle_description as string) ?? "",
-    enable_meeting_fee: event.enable_meeting_fee === true,
-    meeting_fee_amount: event.meeting_fee_amount ?? undefined,
-    meeting_fee_description: event.meeting_fee_description ?? "",
+    enable_service_fee: event.enable_service_fee === true,
+    service_fee_amount: event.service_fee_amount ?? undefined,
+    service_fee_description: event.service_fee_description ?? "",
     enable_guest_tickets: event.enable_guest_tickets === true,
     guest_ticket_price: event.guest_ticket_price ?? undefined,
     guest_ticket_description: event.guest_ticket_description ?? "",
@@ -109,13 +109,13 @@ export default async function EditEventPage({
     <div>
       <div className="mb-8 flex flex-wrap items-center gap-3">
         <Button asChild variant="secondary" size="sm">
-          <Link href="/admin/meetings">
+          <Link href="/admin/services">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to meetings
+            Back to services
           </Link>
         </Button>
         {event.enable_payments && (
-          <CopyPaymentLink lodgeSlug={lodgeSlug} slug={event.slug} />
+          <CopyPaymentLink churchSlug={churchSlug} slug={event.slug} />
         )}
       </div>
 

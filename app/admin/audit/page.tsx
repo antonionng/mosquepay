@@ -10,16 +10,16 @@ export const dynamic = "force-dynamic";
 const ENTITY_PATHS: Record<string, (id: string) => string> = {
   donation: (id) => `/admin/donations/${id}`,
   gift_aid_declaration: (id) => `/admin/gift-aid/${id}`,
-  welfare_case: (id) => `/admin/almoner/cases/${id}`,
-  welfare_register: () => `/admin/almoner`,
-  welfare_alert: () => `/admin/almoner`,
+  pastoral_case: (id) => `/admin/pastoral_care/cases/${id}`,
+  pastoral_register: () => `/admin/pastoral_care`,
+  pastoral_alert: () => `/admin/pastoral_care`,
   member: (id) => `/admin/members/${id}`,
-  lead: (id) => `/admin/leads/${id}`,
+  newcomer: (id) => `/admin/newcomers/church/${id}`,
   event: (id) => `/admin/events/${id}`,
   blog_post: (id) => `/admin/blog/${id}`,
   charity_campaign: (id) => `/admin/charity/${id}`,
   payment: (id) => `/admin/payments/${id}`,
-  province: (id) => `/admin/provinces/${id}`,
+  network: (id) => `/admin/networks/${id}`,
 };
 
 function entityHref(entityType: string, entityId: string | null): string | null {
@@ -31,7 +31,7 @@ function entityHref(entityType: string, entityId: string | null): string | null 
 export default async function AdminAuditPage() {
   const ctx = await getAdminReadContext();
   const logs =
-    ctx.mode === "database" && ctx.lodgeId ? await db.listAuditLogs(ctx.lodgeId, 150) : [];
+    ctx.mode === "database" && ctx.churchId ? await db.listAuditLogs(ctx.churchId, 150) : [];
 
   return (
     <div className="space-y-5 sm:space-y-8">
@@ -50,7 +50,7 @@ export default async function AdminAuditPage() {
             <EmptyState
               icon={ShieldCheck}
               title="No audit events yet"
-              description="Member, meeting, dues, summons, website, charity, and payment actions will appear here as admins use the platform."
+              description="Member, service, giving, notice, website, charity, and payment actions will appear here as admins use the platform."
             />
           </div>
         ) : (

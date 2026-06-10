@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -22,15 +22,15 @@ export async function GET(request: NextRequest) {
   if (unauthorized) return unauthorized;
   if (!isSupabaseConfigured()) return NextResponse.json({ settings: [] });
 
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("members:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("members:write", churchId);
   if (forbidden) return forbidden;
 
-  const settings = await db.listAutomationSettings(lodgeId);
+  const settings = await db.listAutomationSettings(churchId);
   return NextResponse.json({ settings });
 }
 
@@ -43,12 +43,12 @@ export async function PATCH(request: NextRequest) {
       { status: 503 }
     );
   }
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("members:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("members:write", churchId);
   if (forbidden) return forbidden;
 
   const body = await request.json();
@@ -59,16 +59,16 @@ export async function PATCH(request: NextRequest) {
     );
   }
   const setting = await db.upsertAutomationSetting(
-    lodgeId,
+    churchId,
     body.automation_key,
     Boolean(body.enabled),
     body.config ?? {}
   );
   await writeAuditLog({
-    lodgeId,
+    churchId,
     action: "automation_toggled",
     entityType: "automation",
-    entityId: lodgeId,
+    entityId: churchId,
     summary: `Automation ${body.automation_key} ${setting.enabled ? "enabled" : "disabled"}`,
     metadata: { key: setting.automation_key, enabled: setting.enabled },
   });
@@ -84,20 +84,20 @@ export async function POST(request: NextRequest) {
       { status: 503 }
     );
   }
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("members:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("members:write", churchId);
   if (forbidden) return forbidden;
 
-  const results = await runAllAutomations(lodgeId);
+  const results = await runAllAutomations(churchId);
   await writeAuditLog({
-    lodgeId,
+    churchId,
     action: "automations_run",
     entityType: "automation",
-    entityId: lodgeId,
+    entityId: churchId,
     summary: `Ran ${results.filter((r) => r.attempted > 0).length} active automations`,
     metadata: { results },
   });

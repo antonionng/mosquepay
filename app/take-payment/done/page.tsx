@@ -5,7 +5,7 @@
 // admin), and intentionally outside /admin/ so the auth proxy doesn't trap
 // them on an admin-login redirect.
 //
-// Server component: looks up the payment_attempt + lodge for friendly display.
+// Server component: looks up the payment_attempt + church for friendly display.
 // Falls back to a generic thank-you if the payment_id can't be resolved (e.g.
 // somebody bookmarked an expired link). Never reveals payer name / email /
 // guest details — just the public-safe summary of the transaction the user
@@ -27,7 +27,7 @@ type AttemptRow = {
   status: string;
   amount: number;
   currency: string;
-  lodge_id: string;
+  church_id: string;
 };
 
 type ProjectedRow = {
@@ -77,7 +77,7 @@ async function loadSummary(paymentId: string | null) {
     const { data: attempt } = await supa
       .schema("mooov")
       .from("payment_attempts")
-      .select("payment_id, status, amount, currency, lodge_id")
+      .select("payment_id, status, amount, currency, church_id")
       .eq("payment_id", paymentId)
       .maybeSingle<AttemptRow>();
     if (!attempt) return null;
@@ -98,12 +98,12 @@ async function loadSummary(paymentId: string | null) {
       .eq("mooov_payment_id", paymentId)
       .maybeSingle<ProjectedRow>();
 
-    let lodgeName: string | null = null;
+    let churchName: string | null = null;
     try {
-      const lodge = await db.getLodgeById(attempt.lodge_id);
-      lodgeName = lodge?.name ?? null;
+      const church = await db.getChurchById(attempt.church_id);
+      churchName = church?.name ?? null;
     } catch {
-      lodgeName = null;
+      churchName = null;
     }
 
     const status = projected?.status ?? attempt.status;
@@ -112,7 +112,7 @@ async function loadSummary(paymentId: string | null) {
       amountMinor: attempt.amount,
       currency: projected?.currency ?? attempt.currency,
       phase: phaseFor(status),
-      lodgeName,
+      churchName,
     };
   } catch {
     return null;
@@ -161,10 +161,10 @@ export default async function TakePaymentDonePage({
                   {formatAmount(summary.amountMinor, summary.currency)}
                 </dd>
               </div>
-              {summary.lodgeName ? (
+              {summary.churchName ? (
                 <div className="flex items-center justify-between">
                   <dt className="text-slate-500">Paid to</dt>
-                  <dd className="font-medium text-slate-800">{summary.lodgeName}</dd>
+                  <dd className="font-medium text-slate-800">{summary.churchName}</dd>
                 </div>
               ) : null}
             </dl>
@@ -179,7 +179,7 @@ export default async function TakePaymentDonePage({
         <p className="text-center text-xs text-slate-400">
           Powered by{" "}
           <Link href="/" className="font-medium text-slate-500 hover:text-slate-700">
-            LodgePay
+            ChurchPay
           </Link>
         </p>
       </div>

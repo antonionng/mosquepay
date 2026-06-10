@@ -26,7 +26,7 @@ const nav = [
   { href: "/member/events", label: "Events", icon: Calendar },
   { href: "/member/guests", label: "Guests", icon: UserPlus },
   { href: "/member/payments", label: "Payments", icon: CreditCard },
-  { href: "/member/dues", label: "Dues", icon: Wallet },
+  { href: "/member/giving", label: "Giving", icon: Wallet },
   { href: "/member/donations", label: "Donations", icon: Heart },
   { href: "/member/card", label: "My card", icon: IdCard },
   { href: "/member/notifications", label: "Notifications", icon: Bell },
@@ -68,7 +68,7 @@ export function MemberSidebar() {
           // Anchored to the safe-area inset on iOS so the trigger sits
           // inside the new MemberTopBar's leading slot, never overlapping
           // the notch / status bar. The bottom tabs handle primary nav on
-          // phone; this hamburger gives one-tap access to lodge context,
+          // phone; this hamburger gives one-tap access to church context,
           // user info, and logout for secondary actions.
           "fixed left-3 top-[calc(env(safe-area-inset-top)+0.625rem)] z-50 h-10 w-10 border border-dash-border bg-dash-surface text-dash-text shadow-sm lg:hidden",
           "hover:bg-dash-surface-subtle hover:text-dash-text"
@@ -92,11 +92,11 @@ export function MemberSidebar() {
             href="/member"
             className="flex min-w-0 items-center"
             onClick={() => setMobileOpen(false)}
-            aria-label="LodgePay member portal"
+            aria-label="ChurchPay member portal"
           >
             <Image
-              src="/brand/lodgepay-sidebar-logo.png"
-              alt="LodgePay"
+              src="/brand/churchpay-sidebar-logo.png"
+              alt="ChurchPay"
               width={1032}
               height={245}
               priority

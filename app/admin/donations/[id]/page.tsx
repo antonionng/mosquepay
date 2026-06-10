@@ -12,26 +12,26 @@ export default async function DonationDetailPage({
 }) {
   const { id } = await params;
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.lodgeId) {
+  if (ctx.mode !== "database" || !ctx.churchId) {
     redirect("/admin/donations");
   }
-  const lodgeId = ctx.lodgeId;
+  const churchId = ctx.churchId;
 
-  const donation = await db.getDonationById(id, lodgeId);
+  const donation = await db.getDonationById(id, churchId);
   if (!donation) notFound();
 
   const [campaigns, declarations, events, payment, declaration, auditLogs] =
     await Promise.all([
-      db.getCharityCampaigns(lodgeId),
-      db.getGiftAidDeclarations(lodgeId),
-      db.getEvents(lodgeId),
+      db.getCharityCampaigns(churchId),
+      db.getGiftAidDeclarations(churchId),
+      db.getEvents(churchId),
       donation.payment_id
-        ? db.getPaymentById(donation.payment_id, lodgeId)
+        ? db.getPaymentById(donation.payment_id, churchId)
         : Promise.resolve(null),
       donation.gift_aid_declaration_id
-        ? db.getGiftAidDeclarationById(donation.gift_aid_declaration_id, lodgeId)
+        ? db.getGiftAidDeclarationById(donation.gift_aid_declaration_id, churchId)
         : Promise.resolve(null),
-      db.listAuditLogsByEntity(lodgeId, "donation", id),
+      db.listAuditLogsByEntity(churchId, "donation", id),
     ]);
 
   const event = donation.event_id

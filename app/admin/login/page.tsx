@@ -45,12 +45,12 @@ function LoginForm() {
     <div className="w-full max-w-sm">
       <div className="mb-6 flex flex-col items-center text-center sm:mb-8">
         <Image
-          src="/brand/lodgepay-admin-signin.png"
-          alt="LodgePay"
-          width={1024}
-          height={1024}
+          src="/brand/churchpay-admin-signin.png"
+          alt="ChurchPay"
+          width={1200}
+          height={800}
           priority
-          className="mb-4 h-24 w-24 object-contain sm:mb-6 sm:h-44 sm:w-44"
+          className="mb-4 h-20 w-72 max-w-full object-contain sm:mb-6 sm:h-28 sm:w-96"
         />
         <h1 className="text-2xl font-semibold tracking-tight text-dash-text sm:text-3xl">Admin login</h1>
         <p className="mt-1.5 text-sm text-dash-muted sm:mt-2">Sign in to access the admin panel.</p>
@@ -83,7 +83,7 @@ function LoginForm() {
               spellCheck={false}
               inputMode="email"
               enterKeyHint="next"
-              placeholder="admin@covenantlodge.org.uk"
+              placeholder="admin@covenantchurch.org.uk"
             />
           </div>
           <div className="space-y-2">

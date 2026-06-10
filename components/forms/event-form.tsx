@@ -22,7 +22,7 @@ const schema = z.object({
   title: z.string().min(1, "Title is required"),
   slug: z.string().min(1, "Slug is required").regex(/^[a-z0-9-]+$/, "Slug: lowercase letters, numbers, hyphens only"),
   description: z.string().optional(),
-  event_type: z.enum(["lodge_meeting", "lodge_of_instruction", "social", "charity"]),
+  event_type: z.enum(["church_service", "church_of_instruction", "social", "charity"]),
   event_date: z.string().min(1, "Date is required"),
   event_time: z.string().optional(),
   location: z.string().optional(),
@@ -38,9 +38,9 @@ const schema = z.object({
   charity_description: z.string().optional(),
   enable_raffle_donation: z.boolean().default(false),
   raffle_description: z.string().optional(),
-  enable_meeting_fee: z.boolean().default(false),
-  meeting_fee_amount: z.coerce.number().min(0).optional(),
-  meeting_fee_description: z.string().optional(),
+  enable_service_fee: z.boolean().default(false),
+  service_fee_amount: z.coerce.number().min(0).optional(),
+  service_fee_description: z.string().optional(),
   enable_guest_tickets: z.boolean().default(false),
   guest_ticket_price: z.coerce.number().min(0).optional(),
   guest_ticket_description: z.string().optional(),
@@ -69,14 +69,14 @@ export function EventForm({ eventId, defaultValues }: { eventId?: string; defaul
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      event_type: "lodge_meeting",
-      location: "Mark Masons' Hall",
+      event_type: "church_service",
+      location: "Mark members' Hall",
       enable_rsvp: true,
       enable_payments: false,
       enable_dining_rsvp: false,
       enable_charity_donation: false,
       enable_raffle_donation: false,
-      enable_meeting_fee: false,
+      enable_service_fee: false,
       enable_guest_tickets: false,
       published: true,
       feature_on_website: false,
@@ -107,7 +107,7 @@ export function EventForm({ eventId, defaultValues }: { eventId?: string; defaul
         throw new Error(body.error ?? "Failed to save event");
       }
       const result = await res.json().catch(() => ({}));
-      router.push(result.id ? `/admin/events/${result.id}` : "/admin/meetings");
+      router.push(result.id ? `/admin/events/${result.id}` : "/admin/services");
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
@@ -131,7 +131,7 @@ export function EventForm({ eventId, defaultValues }: { eventId?: string; defaul
           </div>
           <div className="space-y-2">
             <Label htmlFor="slug">URL slug *</Label>
-            <Input id="slug" {...register("slug")} placeholder="e.g. march-2026-meeting" />
+            <Input id="slug" {...register("slug")} placeholder="e.g. march-2026-service" />
             {errors.slug && <p className="text-sm text-destructive">{errors.slug.message}</p>}
           </div>
           <div className="space-y-2">
@@ -149,8 +149,8 @@ export function EventForm({ eventId, defaultValues }: { eventId?: string; defaul
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="lodge_meeting">Lodge meeting</SelectItem>
-                  <SelectItem value="lodge_of_instruction">Lodge of instruction</SelectItem>
+                  <SelectItem value="church_service">Church service</SelectItem>
+                  <SelectItem value="church_of_instruction">Church of instruction</SelectItem>
                   <SelectItem value="social">Social</SelectItem>
                   <SelectItem value="charity">Charity</SelectItem>
                 </SelectContent>
@@ -193,11 +193,11 @@ export function EventForm({ eventId, defaultValues }: { eventId?: string; defaul
                 className="mt-1 h-4 w-4 rounded border-input text-blue-600 focus:ring-blue-500"
               />
               <span>
-                <span className="font-medium">Show on the public lodge website</span>
+                <span className="font-medium">Show on the public church website</span>
                 <span className="mt-1 block text-xs text-slate-500">
-                  Socials and charity events are public by default. Tick this only for meetings
-                  that genuinely welcome visitors (e.g. an open installation). Regular lodge
-                  meetings and lodges of instruction stay private even when published.
+                  Socials and charity events are public by default. Tick this only for services
+                  that genuinely welcome newcomers (e.g. an open special_service). Regular church
+                  services and churches of instruction stay private even when published.
                 </span>
               </span>
             </label>
@@ -259,24 +259,24 @@ export function EventForm({ eventId, defaultValues }: { eventId?: string; defaul
                 </div>
               )}
               <div className="flex items-center gap-2">
-                <input type="checkbox" id="enable_meeting_fee" {...register("enable_meeting_fee")} className="h-4 w-4 rounded border-input text-blue-600 focus:ring-blue-500" />
-                <Label htmlFor="enable_meeting_fee">Meeting / ceremony fee</Label>
+                <input type="checkbox" id="enable_service_fee" {...register("enable_service_fee")} className="h-4 w-4 rounded border-input text-blue-600 focus:ring-blue-500" />
+                <Label htmlFor="enable_service_fee">Service / ceremony fee</Label>
               </div>
-              {watch("enable_meeting_fee") && (
+              {watch("enable_service_fee") && (
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="meeting_fee_amount">Fee amount (£)</Label>
-                    <Input id="meeting_fee_amount" type="number" step="0.01" min={0} {...register("meeting_fee_amount")} />
+                    <Label htmlFor="service_fee_amount">Fee amount (£)</Label>
+                    <Input id="service_fee_amount" type="number" step="0.01" min={0} {...register("service_fee_amount")} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="meeting_fee_description">Fee description</Label>
-                    <Input id="meeting_fee_description" {...register("meeting_fee_description")} placeholder="Meeting attendance fee" />
+                    <Label htmlFor="service_fee_description">Fee description</Label>
+                    <Input id="service_fee_description" {...register("service_fee_description")} placeholder="Service attendance fee" />
                   </div>
                 </div>
               )}
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="enable_guest_tickets" {...register("enable_guest_tickets")} className="h-4 w-4 rounded border-input text-blue-600 focus:ring-blue-500" />
-                <Label htmlFor="enable_guest_tickets">Guest tickets (bring a visitor)</Label>
+                <Label htmlFor="enable_guest_tickets">Guest tickets (bring a newcomer)</Label>
               </div>
               {watch("enable_guest_tickets") && (
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -286,7 +286,7 @@ export function EventForm({ eventId, defaultValues }: { eventId?: string; defaul
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="guest_ticket_description">Guest ticket description</Label>
-                    <Input id="guest_ticket_description" {...register("guest_ticket_description")} placeholder="Visitor dining ticket" />
+                    <Input id="guest_ticket_description" {...register("guest_ticket_description")} placeholder="Newcomer dining ticket" />
                   </div>
                 </div>
               )}

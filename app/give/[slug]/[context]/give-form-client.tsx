@@ -15,7 +15,7 @@ type Context = "charity" | "raffle" | "dining" | "general";
 type Props = {
   slug: string;
   context: Context;
-  lodgeName: string;
+  churchName: string;
   eventId: string | null;
   heading: string;
   subheading: string;
@@ -31,7 +31,7 @@ type Props = {
 export function GiveFormClient({
   slug,
   context,
-  lodgeName,
+  churchName,
   eventId,
   heading,
   subheading,
@@ -110,11 +110,11 @@ export function GiveFormClient({
     try {
       // Reuse the existing donations route — it already handles gift aid
       // declaration creation + dedupe via the Mooov webhook projection.
-      // Pass lodge=<slug> so the route's tenant resolver picks the right
-      // lodge when this page is opened on the bare host instead of a
-      // lodge subdomain.
+      // Pass church=<slug> so the route's tenant resolver picks the right
+      // church when this page is opened on the bare host instead of a
+      // church subdomain.
       const res = await fetch(
-        `/api/donations?lodge=${encodeURIComponent(slug)}`,
+        `/api/donations?church=${encodeURIComponent(slug)}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -157,7 +157,7 @@ export function GiveFormClient({
               <ContextIcon context={context} />
             </span>
             <div className="text-sm font-medium uppercase tracking-wide text-slate-500">
-              {charityHeader || lodgeName}
+              {charityHeader || churchName}
             </div>
           </div>
           <h1 className="mt-4 text-3xl font-semibold text-slate-900">
@@ -254,7 +254,7 @@ export function GiveFormClient({
                         Add Gift Aid (+25% at no cost to you)
                       </p>
                       <p className="mt-1 text-xs text-emerald-800">
-                        If you&apos;re a UK taxpayer, the lodge can reclaim
+                        If you&apos;re a UK taxpayer, the church can reclaim
                         25p for every £1 you give from HMRC. One-off
                         donation: £{effectiveAmount.toFixed(2)} becomes £
                         {(effectiveAmount * 1.25).toFixed(2)}.
@@ -355,13 +355,13 @@ export function GiveFormClient({
               <ShieldCheck className="h-4 w-4 text-emerald-600" />
               <span>
                 You&apos;ll pay via Mooov on a secure page. Cards are not
-                stored on the lodge&apos;s server.
+                stored on the church&apos;s server.
               </span>
             </div>
           </form>
         </div>
         <p className="mt-4 text-center text-xs text-slate-500">
-          Powered by LodgePay &amp; Mooov
+          Powered by ChurchPay &amp; Mooov
         </p>
       </div>
     </main>

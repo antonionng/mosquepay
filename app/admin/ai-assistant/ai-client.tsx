@@ -35,7 +35,7 @@ import {
 
 type EventLite = { id: string; title: string; event_date: string };
 
-type SummonsDraft = {
+type NoticeDraft = {
   opening_text: string;
   agenda_items: string[];
   notices: string[];
@@ -57,14 +57,14 @@ type DataIssue = {
 
 type CommunicationCategory =
   | "members_newsletter"
-  | "post_meeting_recap"
+  | "post_service_recap"
   | "event_reminder"
-  | "candidate_follow_up"
-  | "dues_reminder"
-  | "welfare_check_in"
+  | "newcomer_follow_up"
+  | "giving_reminder"
+  | "pastoral_check_in"
   | "charity_appeal";
 
-type CommunicationAudience = "active_members" | "all_members" | "leads";
+type CommunicationAudience = "active_members" | "all_members" | "newcomers";
 
 type CommunicationDraft = {
   subject: string;
@@ -83,11 +83,11 @@ const COMMUNICATION_CATEGORIES: Array<{
   label: string;
 }> = [
   { value: "members_newsletter", label: "Members newsletter" },
-  { value: "post_meeting_recap", label: "Post-meeting recap" },
+  { value: "post_service_recap", label: "Post-service recap" },
   { value: "event_reminder", label: "Event reminder" },
-  { value: "candidate_follow_up", label: "Candidate follow-up" },
-  { value: "dues_reminder", label: "Dues reminder" },
-  { value: "welfare_check_in", label: "Welfare check-in" },
+  { value: "newcomer_follow_up", label: "Newcomer follow-up" },
+  { value: "giving_reminder", label: "Giving reminder" },
+  { value: "pastoral_check_in", label: "PastoralCare check-in" },
   { value: "charity_appeal", label: "Charity appeal" },
 ];
 
@@ -99,14 +99,14 @@ export function AiAssistantClient({
   events: EventLite[];
 }) {
   const [busy, setBusy] = useState<string | null>(null);
-  const [summonsEvent, setSummonsEvent] = useState(events[0]?.id ?? "");
-  const [summonsNotes, setSummonsNotes] = useState("");
-  const [summonsDraft, setSummonsDraft] = useState<SummonsDraft | null>(null);
-  const [summonsFeedback, setSummonsFeedback] = useState<string | null>(null);
+  const [noticeEvent, setNoticeEvent] = useState(events[0]?.id ?? "");
+  const [noticeNotes, setNoticeNotes] = useState("");
+  const [noticeDraft, setNoticeDraft] = useState<NoticeDraft | null>(null);
+  const [noticeFeedback, setNoticeFeedback] = useState<string | null>(null);
   const [summaryEvent, setSummaryEvent] = useState(events[0]?.id ?? "");
   const [summaryNotes, setSummaryNotes] = useState("");
   const [summary, setSummary] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("summons");
+  const [activeTab, setActiveTab] = useState("notice");
   const [communicationCategory, setCommunicationCategory] =
     useState<CommunicationCategory>("members_newsletter");
   const [communicationEvent, setCommunicationEvent] = useState(events[0]?.id ?? "");
@@ -144,54 +144,54 @@ export function AiAssistantClient({
     }
   }
 
-  async function draftSummons() {
-    if (!summonsEvent) return;
-    setBusy("summons");
-    setSummonsFeedback(null);
+  async function draftNotice() {
+    if (!noticeEvent) return;
+    setBusy("notice");
+    setNoticeFeedback(null);
     try {
-      const res = await fetch("/api/ai/summons-draft", {
+      const res = await fetch("/api/ai/notice-draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ event_id: summonsEvent, notes: summonsNotes }),
+        body: JSON.stringify({ event_id: noticeEvent, notes: noticeNotes }),
       });
       const data = await res.json();
-      setSummonsDraft(data.draft);
+      setNoticeDraft(data.draft);
     } finally {
       setBusy(null);
     }
   }
 
-  async function applySummonsDraft() {
-    if (!summonsEvent || !summonsDraft) return;
-    setBusy("summons-apply");
-    setSummonsFeedback(null);
+  async function applyNoticeDraft() {
+    if (!noticeEvent || !noticeDraft) return;
+    setBusy("notice-apply");
+    setNoticeFeedback(null);
     try {
-      const existingRes = await fetch(`/api/summons/${summonsEvent}`);
+      const existingRes = await fetch(`/api/notice/${noticeEvent}`);
       const existingData = await existingRes.json().catch(() => ({}));
       if (!existingRes.ok) {
-        throw new Error(existingData.error ?? "Could not load current summons.");
+        throw new Error(existingData.error ?? "Could not load current notice.");
       }
-      const current = existingData.summons ?? {};
-      const saveRes = await fetch(`/api/summons/${summonsEvent}`, {
+      const current = existingData.notice ?? {};
+      const saveRes = await fetch(`/api/notice/${noticeEvent}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...current,
-          opening_text: summonsDraft.opening_text,
-          agenda_items: summonsDraft.agenda_items,
-          notices: summonsDraft.notices,
+          opening_text: noticeDraft.opening_text,
+          agenda_items: noticeDraft.agenda_items,
+          notices: noticeDraft.notices,
         }),
       });
       const saveData = await saveRes.json().catch(() => ({}));
       if (!saveRes.ok) {
-        throw new Error(saveData.error ?? "Could not save summons draft.");
+        throw new Error(saveData.error ?? "Could not save notice draft.");
       }
-      setSummonsFeedback(
-        "Draft applied to the summons. Review it in the editor, send a test, then send to members."
+      setNoticeFeedback(
+        "Draft applied to the notice. Review it in the editor, send a test, then send to members."
       );
     } catch (error) {
-      setSummonsFeedback(
-        error instanceof Error ? error.message : "Could not apply summons draft."
+      setNoticeFeedback(
+        error instanceof Error ? error.message : "Could not apply notice draft."
       );
     } finally {
       setBusy(null);
@@ -211,7 +211,7 @@ export function AiAssistantClient({
     if (!summaryEvent) return;
     setBusy("summary");
     try {
-      const res = await fetch("/api/ai/post-meeting-summary", {
+      const res = await fetch("/api/ai/post-service-summary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ event_id: summaryEvent, notes: summaryNotes }),
@@ -226,11 +226,11 @@ export function AiAssistantClient({
   function applySummaryToCommunication() {
     if (!summary) return;
     const event = events.find((item) => item.id === summaryEvent);
-    setCommunicationCategory("post_meeting_recap");
+    setCommunicationCategory("post_service_recap");
     setCommunicationEvent(summaryEvent);
     setCommunicationAudience("active_members");
     setCommunicationDraft({
-      subject: event ? `Thank you for attending ${event.title}` : "Post-meeting update",
+      subject: event ? `Thank you for attending ${event.title}` : "Post-service update",
       html_body: [
         "<p>Dear {{first_name}},</p>",
         ...summary
@@ -247,24 +247,24 @@ export function AiAssistantClient({
       ],
     });
     setCommunicationRecipient(null);
-    setCommunicationFeedback("Post-meeting recap is ready to preview and send.");
+    setCommunicationFeedback("Post-service recap is ready to preview and send.");
     setActiveTab("communications");
   }
 
   function draftRiskCommunication(row: RiskRow) {
-    setCommunicationCategory("welfare_check_in");
+    setCommunicationCategory("pastoral_check_in");
     setCommunicationAudience("active_members");
     setCommunicationRecipient({ email: row.email, name: row.full_name });
     setCommunicationNotes(
-      `Draft a careful follow-up for ${row.full_name}. Reasons flagged: ${row.reasons.join(", ")}. Keep it sensitive and suitable for secretary or Almoner review.`
+      `Draft a careful follow-up for ${row.full_name}. Reasons flagged: ${row.reasons.join(", ")}. Keep it sensitive and suitable for secretary or PastoralCare review.`
     );
     setCommunicationDraft({
-      subject: `A note from the lodge`,
+      subject: `A note from the church`,
       html_body: [
         "<p>Dear {{first_name}},</p>",
-        "<p>I hope you are keeping well. We wanted to check in and let you know the lodge is thinking of you.</p>",
-        "<p>If there is anything practical the lodge can do, or if you would simply welcome a conversation, please do let us know.</p>",
-        "<p>Yours fraternally,<br/>The Almoner</p>",
+        "<p>I hope you are keeping well. We wanted to check in and let you know the church is thinking of you.</p>",
+        "<p>If there is anything practical the church can do, or if you would simply welcome a conversation, please do let us know.</p>",
+        "<p>With every blessing,<br/>The PastoralCare</p>",
       ].join("\n"),
       recommended_audience: "active_members",
       admin_notes: [
@@ -274,7 +274,7 @@ export function AiAssistantClient({
       ],
     });
     setCommunicationFeedback(
-      "Welfare draft created for the selected member. Review carefully before sending."
+      "PastoralCare draft created for the selected member. Review carefully before sending."
     );
     setActiveTab("communications");
   }
@@ -378,7 +378,7 @@ export function AiAssistantClient({
       <div>
         <h1 className="text-2xl font-bold text-slate-900">AI operations assistant</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Draft summonses and post-meeting recaps, surface members at risk, and
+          Draft noticees and post-service recaps, surface members at risk, and
           spot data quality issues. Add an OpenAI API key to enable AI drafting;
           deterministic fallbacks are always available.
         </p>
@@ -398,23 +398,23 @@ export function AiAssistantClient({
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="summons">Summons draft</TabsTrigger>
+          <TabsTrigger value="notice">Notice draft</TabsTrigger>
           <TabsTrigger value="communications">Comms handoff</TabsTrigger>
-          <TabsTrigger value="summary">Post-meeting</TabsTrigger>
+          <TabsTrigger value="summary">Post-service</TabsTrigger>
           <TabsTrigger value="risk">Members at risk</TabsTrigger>
           <TabsTrigger value="quality">Data quality</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="summons">
+        <TabsContent value="notice">
           <Card>
             <h2 className="text-base font-semibold text-slate-900">
-              Auto-draft summons
+              Auto-draft notice
             </h2>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <Field label="Meeting">
+              <Field label="Service">
                 <select
-                  value={summonsEvent}
-                  onChange={(e) => setSummonsEvent(e.target.value)}
+                  value={noticeEvent}
+                  onChange={(e) => setNoticeEvent(e.target.value)}
                   className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"
                 >
                   {events.map((e) => (
@@ -426,51 +426,51 @@ export function AiAssistantClient({
               </Field>
               <Field label="Optional secretary notes">
                 <input
-                  value={summonsNotes}
-                  onChange={(e) => setSummonsNotes(e.target.value)}
+                  value={noticeNotes}
+                  onChange={(e) => setNoticeNotes(e.target.value)}
                   className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm"
                 />
               </Field>
             </div>
             <div className="mt-3 flex flex-wrap justify-end gap-2">
-              <Button onClick={draftSummons} disabled={busy === "summons"}>
-                {busy === "summons" ? (
+              <Button onClick={draftNotice} disabled={busy === "notice"}>
+                {busy === "notice" ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <Wand2 className="mr-2 h-4 w-4" />
                 )}
-                Draft summons
+                Draft notice
               </Button>
               <Button
                 variant="outline"
-                onClick={applySummonsDraft}
-                disabled={!summonsDraft || busy === "summons-apply"}
+                onClick={applyNoticeDraft}
+                disabled={!noticeDraft || busy === "notice-apply"}
               >
-                {busy === "summons-apply" ? (
+                {busy === "notice-apply" ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <ArrowRight className="mr-2 h-4 w-4" />
                 )}
-                Apply to summons
+                Apply to notice
               </Button>
             </div>
-            {summonsFeedback && (
+            {noticeFeedback && (
               <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-900">
-                {summonsFeedback}
+                {noticeFeedback}
               </div>
             )}
-            {summonsDraft && (
+            {noticeDraft && (
               <div className="mt-4 space-y-3 rounded-xl bg-slate-50 p-4 text-sm">
                 <div>
                   <p className="text-xs font-semibold text-slate-500">Opening</p>
                   <p className="mt-1 whitespace-pre-line text-slate-800">
-                    {summonsDraft.opening_text}
+                    {noticeDraft.opening_text}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-slate-500">Agenda</p>
                   <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-slate-800">
-                    {summonsDraft.agenda_items.map((item, i) => (
+                    {noticeDraft.agenda_items.map((item, i) => (
                       <li key={i}>{item}</li>
                     ))}
                   </ol>
@@ -478,7 +478,7 @@ export function AiAssistantClient({
                 <div>
                   <p className="text-xs font-semibold text-slate-500">Notices</p>
                   <ul className="mt-1 list-disc space-y-0.5 pl-5 text-slate-800">
-                    {summonsDraft.notices.map((n, i) => (
+                    {noticeDraft.notices.map((n, i) => (
                       <li key={i}>{n}</li>
                     ))}
                   </ul>
@@ -487,20 +487,20 @@ export function AiAssistantClient({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={applySummonsDraft}
-                    disabled={busy === "summons-apply"}
+                    onClick={applyNoticeDraft}
+                    disabled={busy === "notice-apply"}
                   >
-                    Apply to summons editor
+                    Apply to notice editor
                   </Button>
                   <Button asChild variant="outline" size="sm">
-                    <a href={`/admin/meetings/${summonsEvent}/summons/edit`}>
+                    <a href={`/admin/services/${noticeEvent}/notice/edit`}>
                       <ExternalLink className="mr-2 h-4 w-4" />
                       Open editor
                     </a>
                   </Button>
                   <Button asChild variant="outline" size="sm">
-                    <a href={`/admin/meetings/${summonsEvent}/summons`}>
-                      Preview summons
+                    <a href={`/admin/services/${noticeEvent}/notice`}>
+                      Preview notice
                     </a>
                   </Button>
                 </div>
@@ -549,7 +549,7 @@ export function AiAssistantClient({
                   ))}
                 </select>
               </Field>
-              <Field label="Related meeting or event">
+              <Field label="Related service or event">
                 <select
                   value={communicationEvent}
                   onChange={(e) => setCommunicationEvent(e.target.value)}
@@ -573,7 +573,7 @@ export function AiAssistantClient({
                 >
                   <option value="active_members">Active members</option>
                   <option value="all_members">All members</option>
-                  <option value="leads">Leads</option>
+                  <option value="newcomers">Newcomers</option>
                 </select>
               </Field>
             </div>
@@ -693,10 +693,10 @@ export function AiAssistantClient({
         <TabsContent value="summary">
           <Card>
             <h2 className="text-base font-semibold text-slate-900">
-              Post-meeting summary
+              Post-service summary
             </h2>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <Field label="Meeting">
+              <Field label="Service">
                 <select
                   value={summaryEvent}
                   onChange={(e) => setSummaryEvent(e.target.value)}
@@ -709,7 +709,7 @@ export function AiAssistantClient({
                   ))}
                 </select>
               </Field>
-              <Field label="Optional notes from the meeting">
+              <Field label="Optional notes from the service">
                 <input
                   value={summaryNotes}
                   onChange={(e) => setSummaryNotes(e.target.value)}

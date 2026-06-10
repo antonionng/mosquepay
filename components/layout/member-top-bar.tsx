@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 const META: Record<string, { title: string; isRoot?: boolean }> = {
   "/member": { title: "Dashboard", isRoot: true },
   "/member/events": { title: "Events", isRoot: true },
-  "/member/dues": { title: "Pay", isRoot: true },
+  "/member/giving": { title: "Pay", isRoot: true },
   "/member/payments": { title: "Payments" },
   "/member/donations": { title: "Donations" },
   "/member/card": { title: "Member card", isRoot: true },
@@ -29,7 +29,7 @@ function resolveMeta(pathname: string): { title: string; isRoot: boolean } {
   if (exact) return { title: exact.title, isRoot: Boolean(exact.isRoot) };
   // Heuristics for dynamic routes.
   if (pathname.startsWith("/member/events/")) return { title: "Event", isRoot: false };
-  if (pathname.startsWith("/member/dues/")) return { title: "Dues", isRoot: false };
+  if (pathname.startsWith("/member/giving/")) return { title: "Giving", isRoot: false };
   if (pathname.startsWith("/member/payments/")) return { title: "Payment", isRoot: false };
   if (pathname.startsWith("/member/donations/")) return { title: "Donation", isRoot: false };
   return { title: "Member", isRoot: true };

@@ -13,12 +13,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
-import { getScheduleStatusDisplay } from "@/lib/dues/status-display";
-import type { DuesSchedule, MemberDuesInstalment } from "@/lib/db/types";
+import { getScheduleStatusDisplay } from "@/lib/giving/status-display";
+import type { GivingSchedule, MemberGivingInstalment } from "@/lib/db/types";
 
 interface Props {
-  schedule: DuesSchedule;
-  instalments: MemberDuesInstalment[];
+  schedule: GivingSchedule;
+  instalments: MemberGivingInstalment[];
   memberName: string;
 }
 
@@ -98,7 +98,7 @@ export function MemberSubscriptionPanel({
     setCancelling(true);
     setError(null);
     try {
-      const res = await fetch(`/api/dues/schedules/${schedule.id}/cancel`, {
+      const res = await fetch(`/api/giving/schedules/${schedule.id}/cancel`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ actor: "admin" }),
@@ -128,7 +128,7 @@ export function MemberSubscriptionPanel({
             </div>
             <div>
               <p className="font-semibold text-slate-900">
-                Monthly dues subscription
+                Monthly giving subscription
               </p>
               <p className="text-sm text-slate-600">
                 {CADENCE_LABELS[schedule.cadence] ?? schedule.cadence} ·{" "}
@@ -219,7 +219,7 @@ export function MemberSubscriptionPanel({
             </div>
             <Button asChild variant="outline" size="sm">
               <a
-                href={`/dues/schedules/${schedule.id}/resume`}
+                href={`/giving/schedules/${schedule.id}/resume`}
                 target="_blank"
                 rel="noopener noreferrer"
               >

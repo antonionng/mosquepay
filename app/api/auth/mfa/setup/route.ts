@@ -17,7 +17,7 @@ export async function POST() {
     );
   }
   const scope = await getCurrentAdminScope();
-  if (scope.kind !== "platform" && scope.kind !== "lodge") {
+  if (scope.kind !== "platform" && scope.kind !== "church") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const admin = await db.getAdminUserByEmail(scope.email);

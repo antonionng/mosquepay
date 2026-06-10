@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
 } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
 
-const ALLOWED_SOURCE_TYPES = ["payment", "dues", "donation", "manual"] as const;
+const ALLOWED_SOURCE_TYPES = ["payment", "giving", "donation", "manual"] as const;
 type SourceType = (typeof ALLOWED_SOURCE_TYPES)[number];
 
 export async function PATCH(
@@ -25,12 +25,12 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("payments:write", churchId);
   if (forbidden) return forbidden;
 
   const body = await request.json();
@@ -52,7 +52,7 @@ export async function PATCH(
         { status: 400 }
       );
     }
-    updated = await db.updateBankTransaction(id, lodgeId, {
+    updated = await db.updateBankTransaction(id, churchId, {
       status: "matched",
       matched_source_type: sourceType,
       matched_source_id: sourceType === "manual" ? null : (sourceId ?? null),
@@ -61,7 +61,7 @@ export async function PATCH(
       notes: body.notes ?? null,
     });
   } else if (action === "unmatch") {
-    updated = await db.updateBankTransaction(id, lodgeId, {
+    updated = await db.updateBankTransaction(id, churchId, {
       status: "unmatched",
       matched_source_type: null,
       matched_source_id: null,
@@ -69,7 +69,7 @@ export async function PATCH(
       matched_at: null,
     });
   } else if (action === "ignore") {
-    updated = await db.updateBankTransaction(id, lodgeId, {
+    updated = await db.updateBankTransaction(id, churchId, {
       status: "ignored",
       notes: body.notes ?? null,
     });
@@ -82,7 +82,7 @@ export async function PATCH(
   }
 
   await writeAuditLog({
-    lodgeId,
+    churchId,
     action: `bank_transaction_${action}`,
     entityType: "bank_transaction",
     entityId: id,

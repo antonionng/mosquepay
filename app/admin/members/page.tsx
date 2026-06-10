@@ -1,7 +1,7 @@
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
-import { sweepAbandonedPendingSchedules } from "@/lib/dues/abandoned-pending-sweep";
+import { sweepAbandonedPendingSchedules } from "@/lib/giving/abandoned-pending-sweep";
 import { AdminMembersClient } from "./members-client";
 
 export const dynamic = "force-dynamic";
@@ -9,25 +9,25 @@ export const dynamic = "force-dynamic";
 export default async function AdminMembersPage() {
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
-  const lodgeId = ctx.mode === "database" ? ctx.lodgeId : null;
+  const churchId = ctx.mode === "database" ? ctx.churchId : null;
 
   const members = useMock
     ? mockDb.getMembers()
-    : lodgeId
-      ? await db.getMembers(lodgeId)
+    : churchId
+      ? await db.getMembers(churchId)
       : [];
 
-  const offices = lodgeId ? await db.listOfficerLadder(lodgeId) : [];
+  const offices = churchId ? await db.listOfficerLadder(churchId) : [];
 
   // Drive the "missing Gift Aid" / "has declaration" quick filters.
-  // One query for the lodge's declarations, then we build a member-side
+  // One query for the church's declarations, then we build a member-side
   // lookup from member_id + lowercased email so we hit both linkage
   // paths (member_id is the primary, email is the historical fallback
   // for pre-link rows). Cheap relative to looping per-member.
   let giftAidDeclaredIds: string[] = [];
-  if (lodgeId) {
+  if (churchId) {
     try {
-      const declarations = await db.getGiftAidDeclarations(lodgeId);
+      const declarations = await db.getGiftAidDeclarations(churchId);
       const activeByMember = new Map<string, true>();
       const activeByEmail = new Map<string, true>();
       for (const d of declarations) {
@@ -49,15 +49,15 @@ export default async function AdminMembersPage() {
     }
   }
 
-  // Build a member-id -> dues payment method map so the list can
-  // surface a per-row "Dues" pill. We pull the active masonic year and
-  // every member_dues row for the lodge once, match by member_id (or
+  // Build a member-id -> giving payment method map so the list can
+  // surface a per-row "Giving" pill. We pull the active giving year and
+  // every member_giving row for the church once, match by member_id (or
   // by email as fallback), and emit the most recent in-year row's
-  // dues_payment_method. Live subscription rows take precedence even
-  // when the dues_payment_method tag hasn't been set yet, so the
+  // giving_payment_method. Live subscription rows take precedence even
+  // when the giving_payment_method tag hasn't been set yet, so the
   // dashboard never falsely shows "Not tagged" for someone we know is
   // actively paying.
-  const duesMethodByMemberId: Record<
+  const givingMethodByMemberId: Record<
     string,
     {
       method:
@@ -69,22 +69,22 @@ export default async function AdminMembersPage() {
       bacsMonthlyAmount: number | null;
     }
   > = {};
-  if (lodgeId && members.length > 0) {
+  if (churchId && members.length > 0) {
     try {
       // Self-heal: cancel any `pending` schedules left over from
       // abandoned Mooov checkouts before we read. This guarantees the
       // members-list view never shows a phantom "Online" pill from a
       // stale pending row even if the per-checkout abandon path didn't
       // fire (e.g. the member never came back to retry).
-      await sweepAbandonedPendingSchedules(lodgeId).catch(() => 0);
-      const [allDues, currentYear, schedules] = await Promise.all([
-        db.getMemberDues(lodgeId),
-        db.getCurrentMasonicYear(lodgeId).catch(() => null),
-        db.listDuesSchedules(lodgeId).catch(() => []),
+      await sweepAbandonedPendingSchedules(churchId).catch(() => 0);
+      const [allGiving, currentYear, schedules] = await Promise.all([
+        db.getMemberGiving(churchId),
+        db.getCurrentChurchYear(churchId).catch(() => null),
+        db.listGivingSchedules(churchId).catch(() => []),
       ]);
       const ys = currentYear?.start_date.slice(0, 10) ?? null;
       const ye = currentYear?.end_date.slice(0, 10) ?? null;
-      const inYear = allDues.filter((d) => {
+      const inYear = allGiving.filter((d) => {
         if (d.is_advance) return false;
         if (!ys || !ye) return true;
         return (
@@ -142,9 +142,9 @@ export default async function AdminMembersPage() {
         const hasActiveSchedule = activeScheduleEmails.has(
           m.email.toLowerCase(),
         );
-        const tagged = row?.dues_payment_method ?? null;
+        const tagged = row?.giving_payment_method ?? null;
         const method = tagged ?? (hasActiveSchedule ? "online_subscription" : null);
-        duesMethodByMemberId[m.id] = {
+        givingMethodByMemberId[m.id] = {
           method,
           bacsMonthlyAmount:
             tagged === "bacs" && row?.bacs_monthly_amount != null
@@ -162,7 +162,7 @@ export default async function AdminMembersPage() {
       members={JSON.parse(JSON.stringify(members))}
       offices={JSON.parse(JSON.stringify(offices))}
       giftAidDeclaredMemberIds={giftAidDeclaredIds}
-      duesMethodByMemberId={duesMethodByMemberId}
+      givingMethodByMemberId={givingMethodByMemberId}
     />
   );
 }

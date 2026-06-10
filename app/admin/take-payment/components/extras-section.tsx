@@ -20,7 +20,7 @@ import {
   type EventOption,
 } from "./types";
 
-// Collapsible "extras" panel: meeting link, category, reference, receipt
+// Collapsible "extras" panel: service link, category, reference, receipt
 // note. Hidden by default to keep the entry form to the essentials — most
 // treasurers just want to type £20 and hit go.
 
@@ -58,8 +58,8 @@ export function ExtrasSection({
   /** Hidden when the form is in itemised mode — each line carries its own
    *  category, so the single-category picker would be misleading. */
   hideCategory?: boolean;
-  /** Hidden when the meeting picker is surfaced prominently above the form
-   *  (MeetingLinkField) so the two don't duplicate. */
+  /** Hidden when the service picker is surfaced prominently above the form
+   *  (ServiceLinkField) so the two don't duplicate. */
   hideEvent?: boolean;
   /** Initial collapsed/open state. Pages that deep-link with a preset
    *  event_id or non-default category pass true so the operator sees the
@@ -94,7 +94,7 @@ export function ExtrasSection({
         <div className="space-y-4 border-t border-slate-200 p-4">
           {events.length > 0 && !hideEvent ? (
             <div className="space-y-2">
-              <Label htmlFor="tp-event">Link to meeting (optional)</Label>
+              <Label htmlFor="tp-event">Link to service (optional)</Label>
               <Select
                 value={eventId ?? NO_EVENT_VALUE}
                 onValueChange={(v) =>
@@ -102,10 +102,10 @@ export function ExtrasSection({
                 }
               >
                 <SelectTrigger id="tp-event">
-                  <SelectValue placeholder="No meeting" />
+                  <SelectValue placeholder="No service" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NO_EVENT_VALUE}>No meeting</SelectItem>
+                  <SelectItem value={NO_EVENT_VALUE}>No service</SelectItem>
                   {events.map((event) => (
                     <SelectItem key={event.id} value={event.id}>
                       {event.title} · {formatDate(event.event_date)}
@@ -114,7 +114,7 @@ export function ExtrasSection({
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Roll this payment into a specific meeting&apos;s &quot;Money raised&quot; total.
+                Roll this payment into a specific service&apos;s &quot;Money raised&quot; total.
               </p>
             </div>
           ) : null}
@@ -180,7 +180,7 @@ export function ExtrasSection({
             <Input
               id="tp-description"
               type="text"
-              placeholder="Festive Board top-up — 5 June"
+              placeholder="Fellowship Meal top-up — 5 June"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               maxLength={140}

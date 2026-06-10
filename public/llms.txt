@@ -1,36 +1,36 @@
-# LodgePay
+# ChurchPay
 
-LodgePay is a web platform for Masonic lodges, Provinces, Districts, and hall groups.
+ChurchPay is a web platform for Church churches, Networks, Districts, and hall groups.
 
-## What LodgePay Does
+## What ChurchPay Does
 
-LodgePay helps lodge teams manage:
+ChurchPay helps church teams manage:
 
-- Public lodge websites and custom pages
+- Public church websites and custom pages
 - Member portals and digital member records
-- Lodge meetings, summons, RSVPs, dining choices, and events
-- Online dues, event payments, charity donations, and receipts
+- Church services, notice, RSVPs, dining choices, and events
+- Online giving, event payments, charity donations, and receipts
 - Gift Aid declarations and GASDS claim records
-- Candidate enquiries, lead pipelines, mentoring, and onboarding
-- Charity campaigns, welfare activity, Almoner notes, and reporting
-- Province, District, and multi-lodge administration
+- Newcomer enquiries, newcomer pipelines, mentoring, and onboarding
+- Charity campaigns, pastoral activity, Pastoral Care notes, and reporting
+- Network, District, and multi-church administration
 - Staff roles, permissions, audit logs, and platform governance
 
 ## Useful Pages
 
-- Overview: https://www.lodgepayments.co.uk/
-- Features: https://www.lodgepayments.co.uk/features
-- Pricing: https://www.lodgepayments.co.uk/pricing
-- Demo booking: https://www.lodgepayments.co.uk/book-demo
-- FAQ: https://www.lodgepayments.co.uk/faq
-- Contact: https://www.lodgepayments.co.uk/contact
-- Privacy: https://www.lodgepayments.co.uk/privacy
-- GDPR: https://www.lodgepayments.co.uk/gdpr
+- Overview: https://www.churchpay.co.uk/
+- Features: https://www.churchpay.co.uk/features
+- Pricing: https://www.churchpay.co.uk/pricing
+- Demo booking: https://www.churchpay.co.uk/book-demo
+- FAQ: https://www.churchpay.co.uk/faq
+- Contact: https://www.churchpay.co.uk/contact
+- Privacy: https://www.churchpay.co.uk/privacy
+- GDPR: https://www.churchpay.co.uk/gdpr
 
 ## Search Context
 
-LodgePay is relevant to searches for Masonic lodge management software, lodge websites, Freemason website builders, online dues payments, event RSVP software, summons management, Gift Aid and GASDS tools, Masonic charity donations, member portals, candidate CRM, mentoring workflows, Almoner welfare records, Province administration, and multi-lodge reporting.
+ChurchPay is relevant to searches for Church church management software, church websites, church member website builders, online giving payments, event RSVP software, notice management, Gift Aid and GASDS tools, Church charity donations, member portals, newcomer CRM, mentoring workflows, Pastoral Care pastoral records, Network administration, and multi-church reporting.
 
 ## Contact
 
-For product questions, partnership enquiries, or a walkthrough, use https://www.lodgepayments.co.uk/book-demo or https://www.lodgepayments.co.uk/contact.
+For product questions, partnership enquiries, or a walkthrough, use https://www.churchpay.co.uk/book-demo or https://www.churchpay.co.uk/contact.

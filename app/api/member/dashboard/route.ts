@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import * as db from "@/lib/db";
-import { computeYearPosition } from "@/lib/dues/year-position";
-import { duesSubscriptionEnabled } from "@/lib/dues/feature-flags";
-import { sweepAbandonedPendingSchedules } from "@/lib/dues/abandoned-pending-sweep";
+import { computeYearPosition } from "@/lib/giving/year-position";
+import { givingSubscriptionEnabled } from "@/lib/giving/feature-flags";
+import { sweepAbandonedPendingSchedules } from "@/lib/giving/abandoned-pending-sweep";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +27,7 @@ export async function GET() {
 
     const member =
       (await db.getMemberByAuthUserId(user.id)) ??
-      (await db.getMemberByEmailAcrossLodges(memberEmail));
+      (await db.getMemberByEmailAcrossChurches(memberEmail));
 
     if (!member) {
       return NextResponse.json({
@@ -35,13 +35,13 @@ export async function GET() {
           full_name: user.user_metadata?.full_name ?? null,
           email: user.email,
         },
-        lodgeSlug: null,
+        churchSlug: null,
         upcomingEvents: 0,
-        outstandingDues: 0,
+        outstandingGiving: 0,
         recentPaymentsTotal: 0,
         donationTotal: 0,
         recentActivity: [],
-        dues: null,
+        giving: null,
         payments: [],
         donationData: {
           totalThisYear: 0,
@@ -51,15 +51,15 @@ export async function GET() {
       });
     }
 
-    // Look up the lodge slug so the client can build cross-tenant URLs
-    // (e.g. /donate?lodge=<slug>) that work whether the member is on the
-    // lodge subdomain or the bare host. Tolerate a lookup failure --
+    // Look up the church slug so the client can build cross-tenant URLs
+    // (e.g. /donate?church=<slug>) that work whether the member is on the
+    // church subdomain or the bare host. Tolerate a lookup failure --
     // the dashboard doesn't depend on this and the donate page will fall
     // back to host/cookie resolution.
-    let lodgeSlug: string | null = null;
+    let churchSlug: string | null = null;
     try {
-      const lodge = await db.getLodgeById(member.lodge_id);
-      lodgeSlug = lodge?.slug ?? null;
+      const church = await db.getChurchById(member.church_id);
+      churchSlug = church?.slug ?? null;
     } catch {
       // non-fatal
     }
@@ -68,26 +68,26 @@ export async function GET() {
     // before we read. Cheap and best-effort: if the sweep fails, the
     // dashboard still renders correctly because the read-side filters
     // also exclude pending rows from the "active subscription" card.
-    await sweepAbandonedPendingSchedules(member.lodge_id).catch(() => 0);
+    await sweepAbandonedPendingSchedules(member.church_id).catch(() => 0);
 
-    const [upcomingEventRows, allEvents, payments, donations, duesRecords, lodgeDues, rsvps, summonsLinks, activeGiftAidDeclaration, currentMasonicYear, allMasonicYears, duesSchedules] = await Promise.all([
-      db.getEvents(member.lodge_id, { published: true, upcoming: true }),
-      db.getEvents(member.lodge_id, { published: true }),
-      db.getPaymentsByEmail(member.email, member.lodge_id),
-      db.getDonationsByEmail(member.email, member.lodge_id),
-      db.getMemberDues(member.lodge_id, { memberEmail: member.email }),
-      db.getLodgeDues(member.lodge_id),
-      db.getRsvpsByEmail(member.email, member.lodge_id),
-      db.getSummonsAccessLinksByEmail(member.email, member.lodge_id),
+    const [upcomingEventRows, allEvents, payments, donations, givingRecords, churchGiving, rsvps, noticeLinks, activeGiftAidDeclaration, currentChurchYear, allChurchYears, givingSchedules] = await Promise.all([
+      db.getEvents(member.church_id, { published: true, upcoming: true }),
+      db.getEvents(member.church_id, { published: true }),
+      db.getPaymentsByEmail(member.email, member.church_id),
+      db.getDonationsByEmail(member.email, member.church_id),
+      db.getMemberGiving(member.church_id, { memberEmail: member.email }),
+      db.getChurchGiving(member.church_id),
+      db.getRsvpsByEmail(member.email, member.church_id),
+      db.getNoticeAccessLinksByEmail(member.email, member.church_id),
       db
-        .getActiveGiftAidDeclarationByMember(member.lodge_id, {
+        .getActiveGiftAidDeclarationByMember(member.church_id, {
           id: member.id,
           email: member.email,
         })
         .catch(() => null),
-      db.getCurrentMasonicYear(member.lodge_id).catch(() => null),
-      db.listLodgeMasonicYears(member.lodge_id).catch(() => []),
-      db.getDuesSchedulesForMember(member.lodge_id, member.email).catch(() => []),
+      db.getCurrentChurchYear(member.church_id).catch(() => null),
+      db.listChurchGivingYears(member.church_id).catch(() => []),
+      db.getGivingSchedulesForMember(member.church_id, member.email).catch(() => []),
     ]);
     const giftAidDeclarationId = activeGiftAidDeclaration?.id ?? null;
 
@@ -121,70 +121,70 @@ export async function GET() {
       )
       .reduce((sum, d) => sum + (d.amount ?? 0), 0);
 
-    const unpaidDues = duesRecords.filter(
+    const unpaidGiving = givingRecords.filter(
       (d) => d.status !== "paid" && !d.is_advance
     );
-    const paidDues = duesRecords.filter((d) => d.status === "paid");
-    const advanceDues = duesRecords.filter((d) => d.is_advance);
-    const outstandingDues = unpaidDues.reduce((sum, d) => sum + (d.amount ?? 0), 0);
-    const currentDues = unpaidDues[0] ?? duesRecords.find((d) => !d.is_advance) ?? null;
-    const duesConfig = lodgeDues[0] ?? null;
-    const paidAmount = paidDues.reduce((sum, d) => sum + (d.amount ?? 0), 0);
+    const paidGiving = givingRecords.filter((d) => d.status === "paid");
+    const advanceGiving = givingRecords.filter((d) => d.is_advance);
+    const outstandingGiving = unpaidGiving.reduce((sum, d) => sum + (d.amount ?? 0), 0);
+    const currentGiving = unpaidGiving[0] ?? givingRecords.find((d) => !d.is_advance) ?? null;
+    const givingConfig = churchGiving[0] ?? null;
+    const paidAmount = paidGiving.reduce((sum, d) => sum + (d.amount ?? 0), 0);
 
-    // Resolve year position for the dues UX router on the member portal.
-    // Defaults are safe for lodges that haven't configured a masonic year:
+    // Resolve year position for the giving UX router on the member portal.
+    // Defaults are safe for churches that haven't configured a giving year:
     // we omit `yearPosition` and the portal falls back to the legacy view.
-    const yearPosition = currentMasonicYear
+    const yearPosition = currentChurchYear
       ? computeYearPosition({
-          yearStartDate: currentMasonicYear.start_date,
-          yearEndDate: currentMasonicYear.end_date,
-          dateOfInitiation: member.date_of_initiation ?? null,
+          yearStartDate: currentChurchYear.start_date,
+          yearEndDate: currentChurchYear.end_date,
+          dateOfInitiation: member.date_of_membership ?? null,
           hasPaidCurrentYear:
-            !!currentDues && currentDues.status === "paid",
+            !!currentGiving && currentGiving.status === "paid",
           hasOutstandingCurrentYear:
-            !!currentDues &&
-            currentDues.status !== "paid" &&
-            currentDues.status !== "waived",
+            !!currentGiving &&
+            currentGiving.status !== "paid" &&
+            currentGiving.status !== "waived",
         })
       : null;
 
-    // Resolve next masonic year for the pay-in-advance card. Only surfaced
-    // when (a) the lodge has more than one masonic year row configured or
+    // Resolve next giving year for the pay-in-advance card. Only surfaced
+    // when (a) the church has more than one giving year row configured or
     // we can synthesise next year's bounds from the current one, AND (b)
     // the member is paid up for current year.
-    const nextMasonicYear = currentMasonicYear
-      ? allMasonicYears.find(
+    const nextChurchYear = currentChurchYear
+      ? allChurchYears.find(
           (y) =>
             y.start_date.slice(0, 10) >
-            currentMasonicYear.end_date.slice(0, 10)
+            currentChurchYear.end_date.slice(0, 10)
         ) ?? null
       : null;
-    const advanceForNextYear = nextMasonicYear
-      ? advanceDues.find((d) => d.advance_for_year_id === nextMasonicYear.id) ??
+    const advanceForNextYear = nextChurchYear
+      ? advanceGiving.find((d) => d.advance_for_year_id === nextChurchYear.id) ??
         null
       : null;
     const advanceCardEligible =
       !!yearPosition &&
       yearPosition.quadrant === "paid_up_current_year" &&
-      !!duesConfig &&
-      duesConfig.active === true;
+      !!givingConfig &&
+      givingConfig.active === true;
     const advanceBaseAmount =
-      nextMasonicYear?.annual_dues_amount ??
-      duesConfig?.amount ??
-      currentMasonicYear?.annual_dues_amount ??
+      nextChurchYear?.annual_giving_amount ??
+      givingConfig?.amount ??
+      currentChurchYear?.annual_giving_amount ??
       null;
-    const advanceDiscountPct = duesConfig?.advance_discount_percent ?? 0;
+    const advanceDiscountPct = givingConfig?.advance_discount_percent ?? 0;
     const advanceDiscountedAmount =
       advanceBaseAmount != null
         ? Math.round(advanceBaseAmount * (1 - advanceDiscountPct / 100) * 100) /
           100
         : null;
 
-    // Active dues schedule (saved-charge subscription OR Mooov-branded
+    // Active giving schedule (saved-charge subscription OR Mooov-branded
     // subscription_checkout). Surfaced as a status card with a cancel
     // button + an SCA resume CTA when the last cycle returned
     // requires_action. We only consider schedules tied to the
-    // current-year dues record so a paused/cancelled last-year schedule
+    // current-year giving record so a paused/cancelled last-year schedule
     // doesn't pollute the dashboard.
     //
     // We also EXCLUDE 'pending' here. Pending = "schedule row written,
@@ -196,10 +196,10 @@ export async function GET() {
     // CTA stays visible until Mooov confirms cycle 1, so members can
     // retry cleanly.
     const activeSchedule =
-      currentDues != null
-        ? duesSchedules.find(
+      currentGiving != null
+        ? givingSchedules.find(
             (s) =>
-              s.member_dues_id === currentDues.id &&
+              s.member_giving_id === currentGiving.id &&
               s.cancelled_at == null &&
               s.status !== "cancelled" &&
               s.status !== "completed" &&
@@ -223,9 +223,9 @@ export async function GET() {
       requiresAction: boolean;
       currency: string;
     } | null = null;
-    if (activeSchedule && currentDues) {
+    if (activeSchedule && currentGiving) {
       const instalments = await db
-        .getInstalmentsForDues(currentDues.id, member.lodge_id)
+        .getInstalmentsForGiving(currentGiving.id, member.church_id)
         .catch(() => []);
       const scoped = instalments.filter(
         (i) => i.schedule_id === activeSchedule.id
@@ -251,7 +251,7 @@ export async function GET() {
         consecutiveFailures: activeSchedule.consecutive_failures ?? 0,
         lastFailureCode: activeSchedule.last_failure_code ?? null,
         requiresAction: activeSchedule.status === "action_required",
-        currency: (currentDues.currency ?? "gbp").toUpperCase(),
+        currency: (currentGiving.currency ?? "gbp").toUpperCase(),
       };
     }
 
@@ -303,7 +303,7 @@ export async function GET() {
       recentActivity.push({
         id: rsvp.id,
         type: "event",
-        description: `RSVP ${rsvp.status} for ${event?.title ?? "meeting"}`,
+        description: `RSVP ${rsvp.status} for ${event?.title ?? "service"}`,
         date: formatDate(rsvp.created_at),
         sortDate: rsvp.created_at,
       });
@@ -325,7 +325,7 @@ export async function GET() {
         membership_status: member.membership_status,
         portal_token: member.portal_token,
       },
-      lodgeSlug,
+      churchSlug,
       nextEvent: nextEvent
         ? {
             id: nextEvent.id,
@@ -349,7 +349,7 @@ export async function GET() {
           }
         : null,
       upcomingEvents,
-      outstandingDues,
+      outstandingGiving,
       recentPaymentsTotal,
       donationTotal,
       recentActivity: recentActivity.slice(0, 5).map((item) => ({
@@ -359,12 +359,12 @@ export async function GET() {
         date: item.date,
         amount: item.amount,
       })),
-      summonsLinks: summonsLinks.slice(0, 6).map((link) => {
+      noticeLinks: noticeLinks.slice(0, 6).map((link) => {
         const event = eventById.get(link.event_id);
         return {
           id: link.id,
           eventId: link.event_id,
-          title: event?.title ?? "Meeting summons",
+          title: event?.title ?? "Service notice",
           eventDate: event?.event_date ?? null,
           sentAt: link.created_at,
           accessedAt: link.accessed_at,
@@ -376,7 +376,7 @@ export async function GET() {
         return {
           id: rsvp.id,
           eventId: rsvp.event_id,
-          eventTitle: event?.title ?? "Meeting",
+          eventTitle: event?.title ?? "Service",
           eventDate: event?.event_date ?? null,
           status: rsvp.status,
           attendingDining: rsvp.attending_dining,
@@ -390,53 +390,53 @@ export async function GET() {
         id: event.id,
         title: event.title,
         date: event.event_date,
-        text: event.description ?? "Upcoming lodge meeting.",
+        text: event.description ?? "Upcoming church service.",
       })),
-      dues: currentDues
+      giving: currentGiving
         ? {
-            annualAmount: currentDues.amount,
-            status: currentDues.status,
-            paidAmount: currentDues.status === "paid" ? currentDues.amount : paidAmount,
-            dueDate: currentDues.period_end,
-            duesId: currentDues.id,
-            memberEmail: currentDues.member_email,
-            memberName: currentDues.member_name ?? member.full_name,
-            // allowInstalments is the AND of (lodge configured them) AND
+            annualAmount: currentGiving.amount,
+            status: currentGiving.status,
+            paidAmount: currentGiving.status === "paid" ? currentGiving.amount : paidAmount,
+            dueDate: currentGiving.period_end,
+            givingId: currentGiving.id,
+            memberEmail: currentGiving.member_email,
+            memberName: currentGiving.member_name ?? member.full_name,
+            // allowInstalments is the AND of (church configured them) AND
             // (the platform-level subscription path is enabled). Hides
             // the "Set up instalments" CTA in the portal until Mooov has
             // shipped the saved-charge subscription contract to prod.
             allowInstalments:
-              (duesConfig?.allow_instalments ?? false) &&
-              duesSubscriptionEnabled(),
-            instalmentCount: duesConfig?.instalment_count ?? 12,
-            instalmentFrequency: duesConfig?.instalment_frequency ?? "monthly",
+              (givingConfig?.allow_instalments ?? false) &&
+              givingSubscriptionEnabled(),
+            instalmentCount: givingConfig?.instalment_count ?? 12,
+            instalmentFrequency: givingConfig?.instalment_frequency ?? "monthly",
             yearPosition,
-            yearLabel: currentMasonicYear?.label ?? null,
-            yearStart: currentMasonicYear?.start_date ?? null,
-            yearEnd: currentMasonicYear?.end_date ?? null,
-            strategies: duesConfig
+            yearLabel: currentChurchYear?.label ?? null,
+            yearStart: currentChurchYear?.start_date ?? null,
+            yearEnd: currentChurchYear?.end_date ?? null,
+            strategies: givingConfig
               ? {
                   catch_up_lump_then_monthly:
-                    duesConfig.enable_strategy_catch_up_lump,
+                    givingConfig.enable_strategy_catch_up_lump,
                   monthly_then_balloon:
-                    duesConfig.enable_strategy_balloon,
-                  reslice_remaining: duesConfig.enable_strategy_reslice,
+                    givingConfig.enable_strategy_balloon,
+                  reslice_remaining: givingConfig.enable_strategy_reslice,
                 }
               : null,
-            catchUpMaxMonths: duesConfig?.catch_up_max_months ?? 6,
+            catchUpMaxMonths: givingConfig?.catch_up_max_months ?? 6,
             advance: advanceCardEligible
               ? {
                   alreadyPaid: !!advanceForNextYear,
-                  memberDuesId: advanceForNextYear?.id ?? null,
-                  nextYearLabel: nextMasonicYear?.label ?? null,
+                  memberGivingId: advanceForNextYear?.id ?? null,
+                  nextYearLabel: nextChurchYear?.label ?? null,
                   baseAmount: advanceBaseAmount,
                   discountPercent: advanceDiscountPct,
                   amount: advanceDiscountedAmount,
-                  currency: duesConfig?.currency ?? "gbp",
+                  currency: givingConfig?.currency ?? "gbp",
                 }
               : null,
             schedule: scheduleCard,
-            history: paidDues.map((d) => ({
+            history: paidGiving.map((d) => ({
               id: d.id,
               date: d.paid_at ?? d.updated_at,
               amount: d.amount,

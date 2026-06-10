@@ -79,7 +79,7 @@ export function MemberOrderPanel({
               Order directory
             </h2>
             <p className="text-xs text-dash-muted">
-              Drag the order members appear in the summons directory list.
+              Drag the order members appear in the notice directory list.
               Officer positions are managed in the Offices tab.
             </p>
           </div>

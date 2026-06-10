@@ -122,7 +122,7 @@ export function MemberPickerSheet({
             <li className="px-4 py-10 text-center text-sm text-slate-500">
               {query.trim()
                 ? `No members match "${query}".`
-                : "No active members in this lodge yet."}
+                : "No active members in this church yet."}
             </li>
           ) : (
             filtered.map((m) => (

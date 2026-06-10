@@ -1,27 +1,27 @@
-// GET  /api/donations  -- list donations for the current lodge (admin)
+// GET  /api/donations  -- list donations for the current church (admin)
 // POST /api/donations  -- create a hosted donation checkout via Mooov
 //
 // POST flow (Mooov-only; no Stripe fallback by design):
-//   1. Resolve LodgePay lodge id from the request (subdomain/slug).
-//   2. Resolve the Mooov merchant id for that lodge from mooov.lodges.
-//      If the lodge has not connected Mooov yet, return HTTP 503 with a
+//   1. Resolve ChurchPay church id from the request (subdomain/slug).
+//   2. Resolve the Mooov merchant id for that church from mooov.churches.
+//      If the church has not connected Mooov yet, return HTTP 503 with a
 //      structured error -- this is the user-facing message the donate page
 //      surfaces. We deliberately do NOT fall back to direct-Stripe: per
 //      product direction, every payment surface runs through Mooov so the
-//      lodge's PSP (connected via Mooov Connect) is the settlement target.
+//      church's PSP (connected via Mooov Connect) is the settlement target.
 //   3. Persist a preflight mooov.payment_attempts row keyed on payment_id
 //      (intent='donation'), with donor + gift-aid info on guest_descriptor
 //      so the Mooov webhook handler can project it into LP donations /
 //      payments / gift_aid_declarations when payment.succeeded arrives.
 //   4. POST /v1/payment_intents with flow="redirect" + success/cancel URLs
 //      + customer_email. Mooov returns a hosted Stripe Checkout URL on the
-//      lodge's connected account. We persist hosted_url on payment_attempts
+//      church's connected account. We persist hosted_url on payment_attempts
 //      and return {url} for the client to window.location.assign.
 
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { createServiceClient } from "@/lib/supabase/server";
 import { callMooovConnect, MooovApiError } from "@/lib/mooov";
@@ -38,15 +38,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ donations: [] });
     }
 
-    const lodgeSlug = getLodgeSlugFromRequest(request);
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    if (!lodgeId) {
-      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    const churchSlug = getChurchSlugFromRequest(request);
+    const churchId = await db.resolveChurchId(churchSlug);
+    if (!churchId) {
+      return NextResponse.json({ error: "Church not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("charity:write", lodgeId);
+    const forbidden = await requireAdminApiPermission("charity:write", churchId);
     if (forbidden) return forbidden;
 
-    const donations = await db.getDonations(lodgeId);
+    const donations = await db.getDonations(churchId);
     return NextResponse.json({ donations });
   } catch (e) {
     console.error("Donations GET error:", e);
@@ -70,19 +70,19 @@ interface PaymentIntentResponse {
 
 async function loadMooovMerchant(
   supa: ReturnType<typeof createServiceClient>,
-  lodgeId: string,
+  churchId: string,
 ): Promise<string | null> {
   const { data, error } = await supa
     .schema("mooov")
-    .from("lodges")
+    .from("churches")
     .select("merchant_id, status")
-    .eq("id", lodgeId)
+    .eq("id", churchId)
     .maybeSingle<{ merchant_id: string; status: string }>();
   if (error) throw error;
   if (!data) return null;
-  // status='revoked' means the lodge admin disconnected Mooov via the OAuth
+  // status='revoked' means the church admin disconnected Mooov via the OAuth
   // grant.revoked webhook; treat as not-connected so the donor sees the
-  // same friendly 503 as a never-connected lodge.
+  // same friendly 503 as a never-connected church.
   if (data.status && data.status !== "active") return null;
   return data.merchant_id ?? null;
 }
@@ -128,14 +128,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
 
   // If the donor's email already has an active Gift Aid declaration on
-  // file for this lodge, the enduring declaration covers this donation
+  // file for this church, the enduring declaration covers this donation
   // (HMRC model). In that case we don't need the address again -- the
   // saved declaration has it. Only require the full Gift Aid form when
   // we have nothing on file for this email yet.
@@ -143,13 +143,13 @@ export async function POST(request: NextRequest) {
   if (giftAid) {
     try {
       const existing = await db.getActiveGiftAidDeclarationByEmail(
-        lodgeId,
+        churchId,
         donorEmail
       );
       existingGiftAidDeclarationId = existing?.id ?? null;
     } catch (err) {
       console.error("Donations POST: existing gift aid lookup failed", {
-        lodge_id: lodgeId,
+        church_id: churchId,
         message: err instanceof Error ? err.message : String(err),
       });
     }
@@ -180,14 +180,14 @@ export async function POST(request: NextRequest) {
 
   let merchantId: string | null;
   try {
-    merchantId = await loadMooovMerchant(supa, lodgeId);
+    merchantId = await loadMooovMerchant(supa, churchId);
   } catch (err) {
     console.error("Donations POST: mooov merchant lookup failed", {
-      lodge_id: lodgeId,
+      church_id: churchId,
       message: err instanceof Error ? err.message : String(err),
     });
     return NextResponse.json(
-      { error: "Could not look up payment processor for this lodge." },
+      { error: "Could not look up payment processor for this church." },
       { status: 500 }
     );
   }
@@ -195,8 +195,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error:
-          "This lodge has not finished setting up online donations yet. Please contact the lodge directly.",
-        code: "lodge_not_connected",
+          "This church has not finished setting up online donations yet. Please contact the church directly.",
+        code: "church_not_connected",
       },
       { status: 503 }
     );
@@ -205,22 +205,22 @@ export async function POST(request: NextRequest) {
   // amount comes in pounds (e.g. 25.00). Mooov takes minor units (pence).
   const amountMinor = Math.round(amount * 100);
   const currency = "GBP";
-  const paymentId = `don_${lodgeId}_${Date.now().toString(36)}_${Math.random()
+  const paymentId = `don_${churchId}_${Date.now().toString(36)}_${Math.random()
     .toString(36)
     .slice(2, 10)}`;
   const idempotencyKey = `don_${paymentId}`;
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  // Always thread ?lodge=<slug> through success/cancel URLs -- even when this
-  // lodge is the platform default. Keeping the slug explicit means (a) the
-  // PublicHeader on /donate renders the correct lodge branding when a donor
+  // Always thread ?church=<slug> through success/cancel URLs -- even when this
+  // church is the platform default. Keeping the slug explicit means (a) the
+  // PublicHeader on /donate renders the correct church branding when a donor
   // hits "back" to retry, and (b) the link cannot silently retarget another
-  // lodge if DEFAULT_LODGE_SLUG ever changes.
-  const lodgeQuery = `&lodge=${encodeURIComponent(lodgeSlug)}`;
+  // church if DEFAULT_CHURCH_SLUG ever changes.
+  const churchQuery = `&church=${encodeURIComponent(churchSlug)}`;
   const successUrl = `${siteUrl}/events/rsvp/success?payment_id=${encodeURIComponent(
     paymentId
-  )}&type=donation${lodgeQuery}`;
-  const cancelUrl = `${siteUrl}/donate?lodge=${encodeURIComponent(lodgeSlug)}`;
+  )}&type=donation${churchQuery}`;
+  const cancelUrl = `${siteUrl}/donate?church=${encodeURIComponent(churchSlug)}`;
   const description = donorName
     ? `Donation from ${donorName}`
     : "Donation";
@@ -233,7 +233,7 @@ export async function POST(request: NextRequest) {
     source: "online_donation",
     donor_email: donorEmail,
     donor_name: donorName || null,
-    lodge_slug: lodgeSlug,
+    church_slug: churchSlug,
     gift_aid: giftAid,
     // When the donor already has an enduring Gift Aid declaration on file we
     // forward its id so the webhook reuses it instead of creating a duplicate
@@ -251,9 +251,9 @@ export async function POST(request: NextRequest) {
       : {}),
   };
   const initialMetadata: Record<string, unknown> = {
-    source: "lodgepay_donate_form",
-    lodge_slug: lodgeSlug,
-    lodge_id: lodgeId,
+    source: "churchpay_donate_form",
+    church_slug: churchSlug,
+    church_id: churchId,
     intent: "donation",
   };
   const { error: insertError } = await supa
@@ -261,7 +261,7 @@ export async function POST(request: NextRequest) {
     .from("payment_attempts")
     .insert({
       payment_id: paymentId,
-      lodge_id: lodgeId,
+      church_id: churchId,
       member_id: null,
       amount: amountMinor,
       currency,
@@ -273,7 +273,7 @@ export async function POST(request: NextRequest) {
     });
   if (insertError) {
     console.error("Donations POST: preflight insert failed", {
-      lodge_id: lodgeId,
+      church_id: churchId,
       payment_id: paymentId,
       code: insertError.code,
       message: insertError.message,
@@ -308,8 +308,8 @@ export async function POST(request: NextRequest) {
           customer_email: donorEmail,
           metadata: {
             intent: "donation",
-            lodge_id: lodgeId,
-            lodge_slug: lodgeSlug,
+            church_id: churchId,
+            church_slug: churchSlug,
           },
         },
       }
@@ -379,8 +379,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             error:
-              "This lodge has not finished setting up online donations yet. Please contact the lodge directly.",
-            code: "lodge_setup_incomplete",
+              "This church has not finished setting up online donations yet. Please contact the church directly.",
+            code: "church_setup_incomplete",
             setup_url: err.setupHint.setupUrl,
           },
           { status: 503 }

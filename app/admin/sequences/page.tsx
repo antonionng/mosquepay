@@ -7,11 +7,11 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminSequencesPage() {
   const ctx = await getAdminReadContext();
-  const lodgeId = ctx.mode === "database" ? ctx.lodgeId : null;
+  const churchId = ctx.mode === "database" ? ctx.churchId : null;
 
   const sequences =
-    isSupabaseConfigured() && lodgeId
-      ? await db.listMeetingSequences(lodgeId)
+    isSupabaseConfigured() && churchId
+      ? await db.listServiceSequences(churchId)
       : [];
 
   const eventsBySequence: Record<
@@ -21,26 +21,26 @@ export default async function AdminSequencesPage() {
       title: string;
       slug: string;
       event_date: string;
-      summons_status: string;
-      summons_auto_drafted_at: string | null;
-      summons_approved_at: string | null;
-      summons_last_sent_at: string | null;
+      notice_status: string;
+      notice_auto_drafted_at: string | null;
+      notice_approved_at: string | null;
+      notice_last_sent_at: string | null;
       published: boolean;
     }>
   > = {};
 
-  if (lodgeId) {
+  if (churchId) {
     for (const sequence of sequences) {
-      const events = await db.getEventsBySequenceId(sequence.id, lodgeId);
+      const events = await db.getEventsBySequenceId(sequence.id, churchId);
       eventsBySequence[sequence.id] = events.map((event) => ({
         id: event.id,
         title: event.title,
         slug: event.slug,
         event_date: event.event_date,
-        summons_status: event.summons_status,
-        summons_auto_drafted_at: event.summons_auto_drafted_at,
-        summons_approved_at: event.summons_approved_at,
-        summons_last_sent_at: event.summons_last_sent_at,
+        notice_status: event.notice_status,
+        notice_auto_drafted_at: event.notice_auto_drafted_at,
+        notice_approved_at: event.notice_approved_at,
+        notice_last_sent_at: event.notice_last_sent_at,
         published: event.published,
       }));
     }

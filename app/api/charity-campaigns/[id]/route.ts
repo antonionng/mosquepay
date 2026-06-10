@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import { writeAuditLog } from "@/lib/audit";
 
 const VALID_STATUSES = new Set(["active", "completed", "paused"]);
@@ -16,7 +16,7 @@ export async function PATCH(
 
   const { id } = await params;
   try {
-    const lodgeSlug = getLodgeSlugFromRequest(request);
+    const churchSlug = getChurchSlugFromRequest(request);
     const body = await request.json();
     const updates: Record<string, unknown> = {};
     if (typeof body.name === "string") updates.name = body.name.trim();
@@ -48,19 +48,19 @@ export async function PATCH(
         { status: 503 }
       );
     }
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    if (!lodgeId) {
-      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    const churchId = await db.resolveChurchId(churchSlug);
+    if (!churchId) {
+      return NextResponse.json({ error: "Church not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("charity:write", lodgeId);
+    const forbidden = await requireAdminApiPermission("charity:write", churchId);
     if (forbidden) return forbidden;
 
-    const campaign = await db.updateCharityCampaign(id, lodgeId, updates);
+    const campaign = await db.updateCharityCampaign(id, churchId, updates);
     if (!campaign) {
       return NextResponse.json({ error: "Campaign not found." }, { status: 404 });
     }
     await writeAuditLog({
-      lodgeId,
+      churchId,
       action: "updated",
       entityType: "charity_campaign",
       entityId: campaign.id,
@@ -93,15 +93,15 @@ export async function DELETE(
       );
     }
 
-    const lodgeSlug = getLodgeSlugFromRequest(request);
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    if (!lodgeId) {
-      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    const churchSlug = getChurchSlugFromRequest(request);
+    const churchId = await db.resolveChurchId(churchSlug);
+    if (!churchId) {
+      return NextResponse.json({ error: "Church not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("charity:write", lodgeId);
+    const forbidden = await requireAdminApiPermission("charity:write", churchId);
     if (forbidden) return forbidden;
 
-    const campaign = await db.updateCharityCampaign(id, lodgeId, {
+    const campaign = await db.updateCharityCampaign(id, churchId, {
       status: "paused",
       end_date: new Date().toISOString(),
     });
@@ -109,7 +109,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Campaign not found." }, { status: 404 });
     }
     await writeAuditLog({
-      lodgeId,
+      churchId,
       action: "archived",
       entityType: "charity_campaign",
       entityId: campaign.id,

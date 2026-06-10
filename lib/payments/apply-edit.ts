@@ -1,14 +1,14 @@
 // Shared "edit a payment record (not the amount)" logic.
 //
-// Used by the single-payment PATCH endpoint and the meeting bulk-associate
-// endpoint so both recategorise + (re)link to a meeting identically, and both
+// Used by the single-payment PATCH endpoint and the service bulk-associate
+// endpoint so both recategorise + (re)link to a service identically, and both
 // keep the charity donation / Gift Aid ledger in step.
 //
 // Rules:
 //   - total_amount, refunds and status are NEVER changed here.
 //   - Recategorising re-splits total_amount into the chosen category bucket.
 //   - Charity sync: to-charity mints a linked donation (auto-linking an active
-//     declaration); still-charity updates amount + meeting link; away-from-
+//     declaration); still-charity updates amount + service link; away-from-
 //     charity removes the auto-created donation.
 //   - We refuse to reduce/remove a donation that's already in a Gift Aid claim
 //     batch so we never diverge from what was filed.
@@ -25,7 +25,7 @@ export type ApplyPaymentEditOptions = {
   /** When true, set event_id to `eventId` (which may be null to detach). */
   changeEvent?: boolean;
   /** The validated event id to link, or null to detach. Caller validates it
-   *  belongs to the lodge. */
+   *  belongs to the church. */
   eventId?: string | null;
 };
 
@@ -34,7 +34,7 @@ export type ApplyPaymentEditResult =
   | { ok: false; status: number; error: string };
 
 export async function applyPaymentEdit(
-  lodgeId: string,
+  churchId: string,
   payment: Payment,
   opts: ApplyPaymentEditOptions,
 ): Promise<ApplyPaymentEditResult> {
@@ -49,7 +49,7 @@ export async function applyPaymentEdit(
     updates.dining_amount = splits.dining_amount;
     updates.charity_amount = splits.charity_amount;
     updates.raffle_amount = splits.raffle_amount;
-    updates.meeting_fee_amount = splits.meeting_fee_amount;
+    updates.service_fee_amount = splits.service_fee_amount;
     updates.guest_ticket_amount = splits.guest_ticket_amount;
   }
 
@@ -66,7 +66,7 @@ export async function applyPaymentEdit(
   ) as string | null;
 
   const linkedDonations = await db
-    .getDonationsByPaymentId(payment.id, lodgeId)
+    .getDonationsByPaymentId(payment.id, churchId)
     .catch(() => []);
   const existingDonation = linkedDonations[0] ?? null;
 
@@ -86,7 +86,7 @@ export async function applyPaymentEdit(
     };
   }
 
-  const updated = await db.updatePayment(payment.id, lodgeId, updates);
+  const updated = await db.updatePayment(payment.id, churchId, updates);
   if (!updated) {
     return { ok: false, status: 500, error: "Could not update payment." };
   }
@@ -95,7 +95,7 @@ export async function applyPaymentEdit(
   try {
     if (newCharity > 0) {
       if (existingDonation) {
-        await db.updateDonation(existingDonation.id, lodgeId, {
+        await db.updateDonation(existingDonation.id, churchId, {
           amount: newCharity,
           event_id: newEventId,
           gift_aid_eligible_amount: existingDonation.gift_aid_declaration_id
@@ -107,7 +107,7 @@ export async function applyPaymentEdit(
         const email = payment.user_email ?? "";
         const declaration = email
           ? await db
-              .getActiveGiftAidDeclarationByEmail(lodgeId, email)
+              .getActiveGiftAidDeclarationByEmail(churchId, email)
               .catch(() => null)
           : null;
         const giftAidStatus = declaration
@@ -115,7 +115,7 @@ export async function applyPaymentEdit(
           : email
             ? "eligible"
             : "unknown";
-        await db.addDonation(lodgeId, {
+        await db.addDonation(churchId, {
           event_id: newEventId,
           payment_id: payment.id,
           donor_name: payment.user_name ?? null,
@@ -134,7 +134,7 @@ export async function applyPaymentEdit(
         donationAction = "created";
       }
     } else if (existingDonation) {
-      await db.deleteDonation(existingDonation.id, lodgeId);
+      await db.deleteDonation(existingDonation.id, churchId);
       donationAction = "deleted";
     }
   } catch (err) {

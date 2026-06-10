@@ -54,7 +54,7 @@ type Payment = {
   dining_amount: number;
   charity_amount: number;
   raffle_amount: number;
-  meeting_fee_amount: number;
+  service_fee_amount: number;
   guest_ticket_amount: number;
   refund_amount: number;
   status: string;
@@ -73,7 +73,7 @@ type EventOption = { id: string; title: string; event_date: string };
 
 // How the money arrived, grouped for the treasurer's mental model:
 //   * cash  — physically handed over, counted into the tin.
-//   * card  — LodgePay digital (QR / online card). null/legacy online rows
+//   * card  — ChurchPay digital (QR / online card). null/legacy online rows
 //             fall here too since they were card payments before we tracked
 //             the method explicitly.
 //   * other — cheque / BACS / manual "other".
@@ -100,10 +100,10 @@ function methodMeta(pm: string | null | undefined): {
     case "other":
       return { label: "Other", icon: Coins, group: "other" };
     case "card_online":
-      return { label: "LodgePay", icon: CreditCard, group: "card" };
+      return { label: "ChurchPay", icon: CreditCard, group: "card" };
     case "card_qr":
     default:
-      return { label: "LodgePay", icon: CreditCard, group: "card" };
+      return { label: "ChurchPay", icon: CreditCard, group: "card" };
   }
 }
 
@@ -115,7 +115,7 @@ const CATEGORY_KEYS = [
   "dining",
   "charity",
   "raffle",
-  "meeting_fee",
+  "service_fee",
   "guest_ticket",
   "general",
 ] as const;
@@ -125,7 +125,7 @@ const CATEGORY_LABEL: Record<CategoryKey, string> = {
   dining: "Dining",
   charity: "Charity",
   raffle: "Raffle",
-  meeting_fee: "Meeting fee",
+  service_fee: "Service fee",
   guest_ticket: "Guest ticket",
   general: "General / Other",
 };
@@ -134,7 +134,7 @@ function categoryAmounts(p: Payment): Record<CategoryKey, number> {
   const dining = Number(p.dining_amount ?? 0);
   const charity = Number(p.charity_amount ?? 0);
   const raffle = Number(p.raffle_amount ?? 0);
-  const meetingFee = Number(p.meeting_fee_amount ?? 0);
+  const serviceFee = Number(p.service_fee_amount ?? 0);
   const guestTicket = Number(p.guest_ticket_amount ?? 0);
   const general = Math.max(
     0,
@@ -142,14 +142,14 @@ function categoryAmounts(p: Payment): Record<CategoryKey, number> {
       dining -
       charity -
       raffle -
-      meetingFee -
+      serviceFee -
       guestTicket,
   );
   return {
     dining,
     charity,
     raffle,
-    meeting_fee: meetingFee,
+    service_fee: serviceFee,
     guest_ticket: guestTicket,
     general,
   };
@@ -243,7 +243,7 @@ type GiftAidDeclaration = {
   status: string;
 };
 
-type DuesRecord = {
+type GivingRecord = {
   id: string;
   member_name: string | null;
   member_email: string;
@@ -338,7 +338,7 @@ function giftAidStatusBadge(status: string) {
 }
 
 const EDIT_CATEGORIES: { value: string; label: string }[] = [
-  { value: "meeting_fee", label: "Meeting fee" },
+  { value: "service_fee", label: "Service fee" },
   { value: "guest_ticket", label: "Guest ticket" },
   { value: "dining", label: "Dining" },
   { value: "charity", label: "Charity" },
@@ -346,7 +346,7 @@ const EDIT_CATEGORIES: { value: string; label: string }[] = [
   { value: "general", label: "General / Other" },
 ];
 
-// Inline editor for a single payment's categorisation and meeting link.
+// Inline editor for a single payment's categorisation and service link.
 // Edits the record only — never the amount. Posts to PATCH
 // /api/admin/payments/[id], which re-splits total_amount into the chosen
 // category and (re)attaches/detaches the event. Refunds and totals are
@@ -360,7 +360,7 @@ function PaymentEditForm({
 }) {
   const router = useRouter();
   const buckets = [
-    "meeting_fee",
+    "service_fee",
     "guest_ticket",
     "dining",
     "charity",
@@ -410,7 +410,7 @@ function PaymentEditForm({
   return (
     <div className="mt-4 rounded-xl border border-dash-border bg-dash-surface p-4">
       <p className="mb-3 text-xs font-medium uppercase tracking-wide text-dash-muted">
-        Edit categorisation &amp; meeting
+        Edit categorisation &amp; service
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
@@ -452,14 +452,14 @@ function PaymentEditForm({
         </div>
         <div>
           <label className="mb-1 block text-xs text-dash-text-muted">
-            Meeting
+            Service
           </label>
           <Select value={eventId} onValueChange={setEventId}>
             <SelectTrigger variant="dashboard" className="h-10 w-full">
-              <SelectValue placeholder="Meeting" />
+              <SelectValue placeholder="Service" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">No meeting</SelectItem>
+              <SelectItem value="none">No service</SelectItem>
               {events.map((e) => (
                 <SelectItem key={e.id} value={e.id}>
                   {e.title} · {formatDate(e.event_date)}
@@ -491,13 +491,13 @@ export function AdminPaymentsClient({
   payments,
   donations,
   giftAidDeclarations,
-  duesRecords,
+  givingRecords,
   events = [],
 }: {
   payments: Payment[];
   donations: Donation[];
   giftAidDeclarations: GiftAidDeclaration[];
-  duesRecords: DuesRecord[];
+  givingRecords: GivingRecord[];
   events?: EventOption[];
 }) {
   const [activeTab, setActiveTab] = useState<Tab>("payments");
@@ -510,7 +510,7 @@ export function AdminPaymentsClient({
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [dateScope, setDateScope] = useState<DateScope>("all");
   // Price of one raffle strip, so a £10 payment counts as 2 strips, not 1.
-  // Remembered across visits/meetings via localStorage.
+  // Remembered across visits/services via localStorage.
   const [rafflePrice, setRafflePrice] = useState(5);
   useEffect(() => {
     const saved = window.localStorage.getItem("c0v.rafflePricePerStrip");
@@ -572,10 +572,10 @@ export function AdminPaymentsClient({
     0,
   );
   const raffleBuyers = succeeded.filter((p) => p.raffle_amount > 0).length;
-  const duesOutstanding = duesRecords
+  const givingOutstanding = givingRecords
     .filter((d) => d.status === "outstanding")
     .reduce((s, d) => s + d.amount, 0);
-  const duesCollected = duesRecords
+  const givingCollected = givingRecords
     .filter((d) => d.status === "paid" || d.status === "succeeded" || d.status === "completed")
     .reduce((s, d) => s + d.amount, 0);
 
@@ -604,7 +604,7 @@ export function AdminPaymentsClient({
   ).length;
 
   const breakdownTotal =
-    diningIncome + charityIncome + raffleIncome + otherIncome + duesCollected;
+    diningIncome + charityIncome + raffleIncome + otherIncome + givingCollected;
 
   const breakdownCategories: Array<{
     label: string;
@@ -641,9 +641,9 @@ export function AdminPaymentsClient({
       countLabel: `${raffleStrips} strip${raffleStrips !== 1 ? "s" : ""} · ${raffleBuyers} ${raffleBuyers === 1 ? "buyer" : "buyers"}`,
     },
     {
-      label: "Dues",
-      value: duesCollected,
-      count: duesRecords.filter(
+      label: "Giving",
+      value: givingCollected,
+      count: givingRecords.filter(
         (d) => d.status === "paid" || d.status === "succeeded" || d.status === "completed"
       ).length,
       icon: Wallet,
@@ -659,7 +659,7 @@ export function AdminPaymentsClient({
     },
   ];
 
-  // Cash vs LodgePay (digital) split over completed income, for the
+  // Cash vs ChurchPay (digital) split over completed income, for the
   // "How they paid" ratio panel. `other` (cheque/BACS) only shows if present.
   const methodTotals = succeeded.reduce(
     (acc, p) => {
@@ -693,7 +693,7 @@ export function AdminPaymentsClient({
   }> = [
     {
       key: "card",
-      label: "LodgePay digital",
+      label: "ChurchPay digital",
       amount: methodTotals.card.amount,
       count: methodTotals.card.count,
       pct: pctOf(methodTotals.card.amount),
@@ -849,11 +849,11 @@ export function AdminPaymentsClient({
   }
 
   function exportTreasurerReport(kind: string) {
-    if (kind === "dues") {
+    if (kind === "giving") {
       downloadCsv(
-        "dues-outstanding.csv",
+        "giving-outstanding.csv",
         ["Name", "Email", "Amount", "Status", "Period start", "Period end"],
-        duesRecords
+        givingRecords
           .filter((d) => d.status === "outstanding")
           .map((d) => [d.member_name, d.member_email, d.amount, d.status, d.period_start, d.period_end])
       );
@@ -981,10 +981,10 @@ export function AdminPaymentsClient({
       );
     }
     if (kind === "settlement") {
-      // LodgePay (Mooov card) expected settlement, grouped by day. Net = gross
+      // ChurchPay (Mooov card) expected settlement, grouped by day. Net = gross
       // collected minus refunds for card payments only. Reconcile each day's
       // net against the matching Mooov payout / bank credit. Cash and
-      // cheque/BACS are excluded (they don't settle via LodgePay).
+      // cheque/BACS are excluded (they don't settle via ChurchPay).
       const byDay = new Map<
         string,
         { gross: number; refund: number; count: number }
@@ -1010,7 +1010,7 @@ export function AdminPaymentsClient({
           (v.gross - v.refund).toFixed(2),
         ]);
       downloadCsv(
-        "lodgepay-settlement.csv",
+        "churchpay-settlement.csv",
         ["Date", "Card payments", "Gross", "Refunds", "Net expected to settle"],
         rows,
       );
@@ -1018,7 +1018,7 @@ export function AdminPaymentsClient({
     if (kind === "reconciliation") {
       downloadCsv(
         "payment-reconciliation.csv",
-        ["Date", "Name", "Email", "Method", "Gross", "Dining", "Charity", "Raffle", "Meeting fee", "Guest ticket", "Refund", "Status", "Mooov reference"],
+        ["Date", "Name", "Email", "Method", "Gross", "Dining", "Charity", "Raffle", "Service fee", "Guest ticket", "Refund", "Status", "Mooov reference"],
         scopedPayments.map((p) => [
           p.created_at,
           p.user_name,
@@ -1028,7 +1028,7 @@ export function AdminPaymentsClient({
           p.dining_amount,
           p.charity_amount,
           p.raffle_amount,
-          p.meeting_fee_amount,
+          p.service_fee_amount,
           p.guest_ticket_amount,
           p.refund_amount,
           p.status,
@@ -1038,12 +1038,12 @@ export function AdminPaymentsClient({
     }
   }
 
-  // Reconciliation nudge: collected payments with no meeting that were taken
-  // on the same calendar day as a meeting. Treasurers forget to tag takings,
-  // so we surface "N payments from [meeting]'s day aren't linked" with a
-  // jump into that meeting where they can bulk-associate. Uses the full
+  // Reconciliation nudge: collected payments with no service that were taken
+  // on the same calendar day as a service. Treasurers forget to tag takings,
+  // so we surface "N payments from [service]'s day aren't linked" with a
+  // jump into that service where they can bulk-associate. Uses the full
   // (unscoped) payment set so the nudge shows regardless of the date filter.
-  const untaggedMeetingMatches = useMemo(() => {
+  const untaggedServiceMatches = useMemo(() => {
     const byDay = new Map<string, Payment[]>();
     for (const p of payments) {
       if (p.event_id) continue;
@@ -1096,7 +1096,7 @@ export function AdminPaymentsClient({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All time</SelectItem>
-              <SelectItem value="today">Today (this meeting)</SelectItem>
+              <SelectItem value="today">Today (this service)</SelectItem>
               <SelectItem value="yesterday">Yesterday</SelectItem>
               <SelectItem value="7d">Last 7 days</SelectItem>
               <SelectItem value="month">This month</SelectItem>
@@ -1111,24 +1111,24 @@ export function AdminPaymentsClient({
         </div>
       </div>
 
-      {untaggedMeetingMatches.length > 0 ? (
+      {untaggedServiceMatches.length > 0 ? (
         <Card variant="panel" className="border-amber-200 bg-amber-50/60 p-4">
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
             <div className="min-w-0 flex-1 space-y-2">
               <p className="text-sm font-semibold text-amber-900">
-                Some takings aren&rsquo;t linked to a meeting
+                Some takings aren&rsquo;t linked to a service
               </p>
               <p className="text-xs text-amber-800">
                 These collected payments were taken on the same day as a
-                meeting but aren&rsquo;t tagged to it. Open the meeting to review
+                service but aren&rsquo;t tagged to it. Open the service to review
                 and bulk-associate them.
               </p>
               <div className="flex flex-col gap-2 pt-1">
-                {untaggedMeetingMatches.slice(0, 4).map((m) => (
+                {untaggedServiceMatches.slice(0, 4).map((m) => (
                   <Link
                     key={m.event.id}
-                    href={`/admin/meetings/${m.event.id}`}
+                    href={`/admin/services/${m.event.id}`}
                     className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm transition hover:border-amber-300 hover:bg-amber-50"
                   >
                     <span className="min-w-0">
@@ -1192,7 +1192,7 @@ export function AdminPaymentsClient({
         <div className="flex flex-col gap-1">
           <h2 className="text-base font-semibold text-dash-text">Revenue by type</h2>
           <p className="text-sm text-dash-muted">
-            Completed income split across dining, charity, raffle, dues, and other.
+            Completed income split across dining, charity, raffle, giving, and other.
           </p>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
@@ -1273,7 +1273,7 @@ export function AdminPaymentsClient({
         <div className="flex flex-col gap-1">
           <h2 className="text-base font-semibold text-dash-text">How they paid</h2>
           <p className="text-sm text-dash-muted">
-            Completed income split between LodgePay digital and cash — counts and percentages for end-of-night reconciliation.
+            Completed income split between ChurchPay digital and cash — counts and percentages for end-of-night reconciliation.
           </p>
         </div>
 
@@ -1354,10 +1354,10 @@ export function AdminPaymentsClient({
           <div>
             <h2 className="text-base font-semibold text-dash-text">Treasurer Exports</h2>
             <p className="mt-1 text-sm text-dash-muted">
-              Export dues, payments, dining, charity, refunds, Gift Aid, and Mooov reconciliation.
+              Export giving, payments, dining, charity, refunds, Gift Aid, and Mooov reconciliation.
             </p>
             <p className="mt-2 text-xs text-dash-faint">
-              Outstanding dues £{duesOutstanding.toFixed(2)} · Dining £{diningIncome.toFixed(2)} · Charity £{charityIncome.toFixed(2)}
+              Outstanding giving £{givingOutstanding.toFixed(2)} · Dining £{diningIncome.toFixed(2)} · Charity £{charityIncome.toFixed(2)}
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <label
@@ -1392,13 +1392,13 @@ export function AdminPaymentsClient({
             {[
               ["raffle", "Raffle Tickets"],
               ["cash", "Cash Collected"],
-              ["dues", "Dues Outstanding"],
+              ["giving", "Giving Outstanding"],
               ["payments", "Payments Received"],
               ["dining", "Dining Income"],
               ["charity", "Charity Totals"],
               ["refunds", "Refunds"],
               ["gift-aid", "Gift Aid"],
-              ["settlement", "LodgePay Settlement"],
+              ["settlement", "ChurchPay Settlement"],
               ["reconciliation", "Mooov Reconciliation"],
             ].map(([kind, label]) => (
               <Button
@@ -1477,7 +1477,7 @@ export function AdminPaymentsClient({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All methods</SelectItem>
-                  <SelectItem value="card">LodgePay digital</SelectItem>
+                  <SelectItem value="card">ChurchPay digital</SelectItem>
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="other">Cheque / BACS</SelectItem>
                 </SelectContent>
@@ -1653,7 +1653,7 @@ export function AdminPaymentsClient({
                         <TableCell colSpan={8} className="!p-0">
                           <div className="border-t border-dash-border bg-dash-surface-subtle/80 px-6 py-4">
                             {(() => {
-                              const meetingFee = Number(p.meeting_fee_amount ?? 0);
+                              const serviceFee = Number(p.service_fee_amount ?? 0);
                               const guestTicket = Number(p.guest_ticket_amount ?? 0);
                               const dining = Number(p.dining_amount ?? 0);
                               const charity = Number(p.charity_amount ?? 0);
@@ -1664,7 +1664,7 @@ export function AdminPaymentsClient({
                               const general = Math.max(
                                 0,
                                 Number(p.total_amount ?? 0) -
-                                  meetingFee -
+                                  serviceFee -
                                   guestTicket -
                                   dining -
                                   charity -
@@ -1678,10 +1678,10 @@ export function AdminPaymentsClient({
                                 note?: string | null;
                               }> = [
                                 {
-                                  key: "meeting_fee",
-                                  label: "Meeting fee",
+                                  key: "service_fee",
+                                  label: "Service fee",
                                   icon: <Coins className="h-3.5 w-3.5" />,
-                                  amount: meetingFee,
+                                  amount: serviceFee,
                                 },
                                 {
                                   key: "guest_ticket",

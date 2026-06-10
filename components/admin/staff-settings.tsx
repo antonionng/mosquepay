@@ -23,13 +23,13 @@ type StaffRole =
   | "treasurer"
   | "charity_steward"
   | "membership_officer"
-  | "almoner"
+  | "pastoral_care"
   | "master"
   | "operator";
 
 type StaffUser = {
   id: string;
-  lodge_id: string | null;
+  church_id: string | null;
   email: string;
   full_name: string;
   role: StaffRole;
@@ -46,12 +46,12 @@ const ROLE_OPTIONS: Array<{
     value: "secretary",
     label: "Secretary",
     description:
-      "Full access to this lodge: members, meetings, payments, charity, welfare, website, and settings.",
+      "Full access to this church: members, services, payments, charity, pastoral, website, and settings.",
   },
   {
     value: "treasurer",
     label: "Treasurer",
-    description: "Payments, dues, exports, reconciliation, and audit trail.",
+    description: "Payments, giving, exports, reconciliation, and audit trail.",
   },
   {
     value: "charity_steward",
@@ -64,19 +64,19 @@ const ROLE_OPTIONS: Array<{
     description: "Member records and membership workflow.",
   },
   {
-    value: "almoner",
-    label: "Almoner",
-    description: "Welfare cases, visits, alerts, and pastoral register.",
+    value: "pastoral_care",
+    label: "PastoralCare",
+    description: "PastoralCare cases, visits, alerts, and pastoral register.",
   },
   {
     value: "master",
     label: "Master",
-    description: "Meeting oversight, summons visibility, and audit trail.",
+    description: "Service oversight, notice visibility, and audit trail.",
   },
   {
     value: "operator",
     label: "Operator",
-    description: "Platform-wide access across lodges.",
+    description: "Platform-wide access across churches.",
   },
 ];
 
@@ -277,7 +277,7 @@ export function StaffSettings() {
             Staff and Roles
           </h2>
           <p className="dash-panel-header-description">
-            Invite lodge staff, assign responsibilities, and control who can change sensitive records.
+            Invite church staff, assign responsibilities, and control who can change sensitive records.
           </p>
         </div>
         <Badge variant="secondary" className="border-dash-border">
@@ -379,7 +379,7 @@ export function StaffSettings() {
               </span>
             </label>
             <p className="text-xs leading-5 text-dash-muted">
-              Operators are platform-wide. Other roles are scoped to the selected lodge.
+              Operators are platform-wide. Other roles are scoped to the selected church.
             </p>
           </div>
         </form>
@@ -507,7 +507,7 @@ export function StaffSettings() {
                     <p className="text-xs text-dash-faint lg:col-span-5">
                       {draft.role === "operator"
                         ? "Platform-wide operator access."
-                        : `${ROLE_LABELS[draft.role]} for the selected lodge.`}
+                        : `${ROLE_LABELS[draft.role]} for the selected church.`}
                     </p>
                   </div>
                 );

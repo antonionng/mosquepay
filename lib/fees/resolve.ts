@@ -1,4 +1,4 @@
-export type LodgeFeeDefaults = {
+export type ChurchFeeDefaults = {
   default_member_levy_amount: number | null;
   default_member_dining_amount: number | null;
   default_guest_dining_amount: number | null;
@@ -19,8 +19,8 @@ export type GuestFeeProfile = {
 };
 
 export type EventFeeContext = {
-  enable_meeting_fee?: boolean;
-  meeting_fee_amount?: number | null;
+  enable_service_fee?: boolean;
+  service_fee_amount?: number | null;
   enable_dining_rsvp?: boolean;
   dining_price?: number | null;
   enable_guest_tickets?: boolean;
@@ -30,9 +30,9 @@ export type EventFeeContext = {
 };
 
 /**
- * Per-recipient override that takes precedence over both the lodge default
+ * Per-recipient override that takes precedence over both the church default
  * and the profile-level levy_waived/dining_waived flags. Lets a treasurer
- * mark "for this one meeting only" adjustments from the recipients panel.
+ * mark "for this one service only" adjustments from the recipients panel.
  */
 export type EventFeeOverride = {
   levy_amount?: number | null;
@@ -49,20 +49,20 @@ function toAmount(value: number | null | undefined): number | null {
 export function resolveMemberLevy(
   member: MemberFeeProfile | null | undefined,
   event: EventFeeContext,
-  defaults: LodgeFeeDefaults | null | undefined,
+  defaults: ChurchFeeDefaults | null | undefined,
   override?: EventFeeOverride | null
 ): number {
   if (override?.levy_waived) return 0;
   if (override?.levy_amount != null) return toAmount(override.levy_amount) ?? 0;
   if (member?.levy_waived) return 0;
-  if (!event.enable_meeting_fee) return 0;
+  if (!event.enable_service_fee) return 0;
 
   if (member?.fee_use_custom) {
     const custom = toAmount(member.member_levy_amount);
     if (custom != null) return custom;
   }
 
-  const eventAmount = toAmount(event.meeting_fee_amount);
+  const eventAmount = toAmount(event.service_fee_amount);
   if (eventAmount != null) return eventAmount;
 
   return toAmount(defaults?.default_member_levy_amount) ?? 0;
@@ -71,7 +71,7 @@ export function resolveMemberLevy(
 export function resolveMemberDining(
   member: MemberFeeProfile | null | undefined,
   event: EventFeeContext,
-  defaults: LodgeFeeDefaults | null | undefined,
+  defaults: ChurchFeeDefaults | null | undefined,
   attendingDining: boolean,
   override?: EventFeeOverride | null
 ): number {
@@ -97,7 +97,7 @@ export function resolveMemberDining(
 export function resolveGuestDining(
   guest: GuestFeeProfile | null | undefined,
   event: EventFeeContext,
-  defaults: LodgeFeeDefaults | null | undefined,
+  defaults: ChurchFeeDefaults | null | undefined,
   override?: EventFeeOverride | null
 ): number {
   if (!event.enable_guest_tickets && !event.enable_dining_rsvp) return 0;
@@ -127,7 +127,7 @@ export type FeeLineItem = {
 export function buildMemberFeeBreakdown(args: {
   member: MemberFeeProfile | null | undefined;
   event: EventFeeContext;
-  defaults: LodgeFeeDefaults | null | undefined;
+  defaults: ChurchFeeDefaults | null | undefined;
   attendingCeremony: boolean;
   attendingDining: boolean;
   memberOverride?: EventFeeOverride | null;
@@ -147,7 +147,7 @@ export function buildMemberFeeBreakdown(args: {
   if (levy > 0 || memberLevyWaived) {
     items.push({
       key: "levy",
-      label: "Member meeting levy",
+      label: "Member service levy",
       amount: levy,
       waived: memberLevyWaived,
     });
@@ -205,10 +205,10 @@ export function formatFeeLabel(item: FeeLineItem): string {
 
 /**
  * Resolve the amount that will actually be charged for a fee, given a
- * possible per-event override and the lodge-level default. Returns null when
+ * possible per-event override and the church-level default. Returns null when
  * no value is available anywhere (caller decides whether that is an error).
  *
- * Mirrors the resolver precedence: explicit event amount → lodge default.
+ * Mirrors the resolver precedence: explicit event amount → church default.
  * Treats `0` on the event as an intentional override (zero is still a price),
  * and only falls through to the default when the event value is null/undefined.
  */

@@ -28,11 +28,11 @@ const kpiAccentIcon: Record<KpiAccent, { wrap: string; icon: string }> = {
 export default async function AdminBlogPage() {
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
-  const lodgeId = ctx.mode === "database" ? ctx.lodgeId : null;
+  const churchId = ctx.mode === "database" ? ctx.churchId : null;
   const rawPosts = useMock
     ? mockDb.getBlogPosts()
-    : lodgeId
-      ? await db.getBlogPosts(lodgeId)
+    : churchId
+      ? await db.getBlogPosts(churchId)
       : [];
   const posts = rawPosts.map((p) => ({
     id: p.id,
@@ -141,7 +141,7 @@ export default async function AdminBlogPage() {
           <div>
             <h2 className="dash-panel-header-title">All posts</h2>
             <p className="dash-panel-header-description">
-              Slugs appear in URLs; publish when ready for the lodge site.
+              Slugs appear in URLs; publish when ready for the church site.
             </p>
           </div>
         </div>

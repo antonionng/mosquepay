@@ -2,7 +2,7 @@
 //
 // Returns recent in-person take-payment entries — both card QRs
 // (intent='take_payment') and treasurer-recorded cash entries
-// (intent='take_payment_cash') — for the active lodge.
+// (intent='take_payment_cash') — for the active church.
 //
 // Source of truth is mooov.payment_attempts so every entry (including open
 // QRs that have not been paid yet) appears the moment it's created. For
@@ -101,16 +101,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ items: [] });
   }
 
-  // Resolve the lodge from the admin's scope so a lodge-scoped treasurer
-  // whose ADMIN_LODGE_COOKIE is unset doesn't fall through to the platform
-  // default lodge and 401 on a page that rendered fine for them.
+  // Resolve the church from the admin's scope so a church-scoped treasurer
+  // whose ADMIN_CHURCH_COOKIE is unset doesn't fall through to the platform
+  // default church and 401 on a page that rendered fine for them.
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.lodgeId) {
+  if (ctx.mode !== "database" || !ctx.churchId) {
     return NextResponse.json({ items: [] });
   }
-  const lodgeId = ctx.lodgeId;
+  const churchId = ctx.churchId;
 
-  const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("payments:write", churchId);
   if (forbidden) return forbidden;
 
   const url = new URL(request.url);
@@ -137,7 +137,7 @@ export async function GET(request: NextRequest) {
     .select(
       "payment_id, amount, currency, status, intent, failure_reason, metadata, created_at, captured_at, refunded_at",
     )
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .in("intent", ["take_payment", "take_payment_cash"])
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -152,7 +152,7 @@ export async function GET(request: NextRequest) {
 
   if (attemptsErr) {
     console.error("Take payment history: attempts lookup failed", {
-      lodge_id: lodgeId,
+      church_id: churchId,
       code: attemptsErr.code,
       message: attemptsErr.message,
     });

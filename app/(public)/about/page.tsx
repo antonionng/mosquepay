@@ -1,195 +1,141 @@
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Timeline } from "@/components/timeline";
-import { getDefaultLodgeSlug, resolveLodgeSlug } from "@/lib/tenant";
+import { HandHeart, ShieldCheck, Sparkles, Users } from "lucide-react";
+import {
+  MarketingShell,
+  MarketingSection,
+  MarketingKicker,
+  MarketingCtaBand,
+} from "@/components/marketing/marketing-shell";
 import { marketingMetadata } from "@/lib/seo";
 
 export const metadata = marketingMetadata({
-  title: "About Covenant Lodge | London Freemasonry in Mayfair",
+  title: "About ChurchPay | Software Built for UK Church Teams",
   description:
-    "Learn about Covenant Lodge No. 4344, a London Masonic lodge founded in 1922 and meeting at Mark Masons' Hall in Mayfair. Explore its history, values, venue, charitable work, and membership culture.",
+    "ChurchPay exists so church teams spend less time on spreadsheets and more time with people. Learn why we built one platform for giving, Gift Aid, congregation records, services, and pastoral care.",
   path: "/about",
   keywords: [
-    "Covenant Lodge 4344",
-    "London Freemasonry",
-    "Mayfair Masonic lodge",
-    "Mark Masons Hall lodge",
+    "about ChurchPay",
+    "church software company",
+    "UK church technology",
+    "church administration platform",
   ],
 });
 
-const timelineItems = [
+const VALUES = [
   {
-    year: "1921",
-    title: "Warrant issued",
+    Icon: Users,
+    title: "People before process",
     description:
-      "Covenant Lodge's warrant was issued on 7 September 1921 by the United Grand Lodge of England.",
+      "Software should free up volunteers and staff for ministry, not create new admin. Every feature starts with the question: does this give time back?",
   },
   {
-    year: "1922",
-    title: "Consecration",
+    Icon: ShieldCheck,
+    title: "Stewardship and trust",
     description:
-      "The lodge was consecrated on 3 April 1922 at Freemasons' Hall, Great Queen Street, London.",
+      "Churches handle money and sensitive pastoral information. We build with role-based access, audit trails, and UK data protection in mind from day one.",
   },
   {
-    year: "1979",
-    title: "Mark Masons' Hall opens",
+    Icon: HandHeart,
+    title: "Generosity made easy",
     description:
-      "Our current venue at 86 St James's Street opened as Mark Masons' Hall.",
+      "Giving should be simple for the giver and accountable for the church. Gift Aid and GASDS shouldn't require a specialist to claim correctly.",
   },
   {
-    year: "Today",
-    title: "Continuing the work",
+    Icon: Sparkles,
+    title: "Calm, joined-up tools",
     description:
-      "We meet in Mayfair, welcome new members, and uphold the principles of Freemasonry.",
+      "One record, one login, one version of the truth. No more exporting from one tool to paste into another.",
   },
 ];
 
-const values = [
+const STORY = [
   {
-    title: "Integrity",
-    description: "Honesty and moral principles that guide how members conduct themselves.",
+    title: "The problem we kept seeing",
+    body: "Church treasurers reconciling three spreadsheets at midnight. Welcome teams losing newcomers between Sundays. Gift Aid claims left unclaimed because the paperwork was scattered. Churches were running on goodwill and copy-paste.",
   },
   {
-    title: "Friendship",
-    description: "Long-term relationships built through respect, reliability, and fellowship.",
+    title: "Why we built ChurchPay",
+    body: "We believed UK churches deserved software designed around how they actually work: Sunday services, planned giving, Gift Aid and GASDS, pastoral confidentiality, and volunteers who change every year. Not a generic CRM with a cross on the logo.",
   },
   {
-    title: "Charity",
-    description: "A practical commitment to helping others and supporting worthwhile causes.",
-  },
-  {
-    title: "Self-improvement",
-    description: "An expectation that membership should shape you positively over time.",
+    title: "Where we are today",
+    body: "ChurchPay covers giving, congregation records, services and notices, newcomer follow-up, pastoral care, church websites, and treasurer reporting. It works for single churches, multi-site groups, and whole networks.",
   },
 ];
 
-export default async function AboutPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ lodge?: string }>;
-}) {
-  const { lodge } = await searchParams;
-  const lodgeSlug = resolveLodgeSlug(lodge);
-  const defaultSlug = getDefaultLodgeSlug();
-  const withLodgeQuery = (href: string) =>
-    lodgeSlug === defaultSlug ? href : `${href}?lodge=${encodeURIComponent(lodgeSlug)}`;
-
+export default function AboutPage() {
   return (
-    <div className="public-page">
-      <section className="public-hero">
-        <div className="public-hero-shell">
-          <div className="public-hero-copy">
-            <p className="public-kicker">About Covenant Lodge</p>
-            <h1 className="public-hero-title">A London lodge with history, standards, and continuity.</h1>
-            <p className="public-hero-body">
-              Founded in 1922, Covenant Lodge continues the traditions of Freemasonry in a way
-              that feels grounded, welcoming, and relevant to modern life.
+    <MarketingShell>
+      <section className="px-5 pb-4 pt-16 lg:px-8 lg:pt-24">
+        <div className="mx-auto max-w-7xl">
+          <div className="max-w-3xl">
+            <MarketingKicker>About ChurchPay</MarketingKicker>
+            <h1 className="mt-4 font-heading text-4xl font-bold leading-tight tracking-tight text-slate-900 sm:text-5xl">
+              We build software so church teams can get back to people.
+            </h1>
+            <p className="mt-6 text-lg leading-8 text-slate-600">
+              ChurchPay started with a simple conviction: the administrative weight of running a
+              church, from giving records and Gift Aid claims to member lists, rotas, notices, and
+              follow-ups, should not fall on a handful of exhausted volunteers juggling
+              spreadsheets.
             </p>
           </div>
-          <div className="public-hero-panel">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-200">Snapshot</p>
-            <div className="mt-6 grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Founded</p>
-                <p className="mt-2 text-2xl font-semibold text-white">1922</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Venue</p>
-                <p className="mt-2 text-2xl font-semibold text-white">Mayfair</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Focus</p>
-                <p className="mt-2 text-2xl font-semibold text-white">Character</p>
-              </div>
+        </div>
+      </section>
+
+      <MarketingSection>
+        <div className="grid gap-6 lg:grid-cols-3">
+          {STORY.map((item) => (
+            <article key={item.title} className="rounded-3xl border border-[#e9e2d4] bg-white p-8">
+              <h2 className="font-heading text-xl font-semibold text-slate-900">{item.title}</h2>
+              <p className="mt-4 text-sm leading-7 text-slate-600">{item.body}</p>
+            </article>
+          ))}
+        </div>
+      </MarketingSection>
+
+      <MarketingSection tinted>
+        <div className="max-w-2xl">
+          <MarketingKicker>What we believe</MarketingKicker>
+          <h2 className="mt-4 font-heading text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+            Principles that shape every feature we ship.
+          </h2>
+        </div>
+        <div className="mt-12 grid gap-5 sm:grid-cols-2">
+          {VALUES.map(({ Icon, title, description }) => (
+            <article key={title} className="rounded-3xl border border-[#e9e2d4] bg-white p-8">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-brand/8 text-brand">
+                <Icon className="h-5 w-5" />
+              </span>
+              <h3 className="mt-5 font-heading text-lg font-semibold text-slate-900">{title}</h3>
+              <p className="mt-3 text-sm leading-6 text-slate-600">{description}</p>
+            </article>
+          ))}
+        </div>
+      </MarketingSection>
+
+      <MarketingSection>
+        <div className="mx-auto grid max-w-5xl gap-8 rounded-[2rem] border border-[#e9e2d4] bg-white p-10 sm:grid-cols-3 lg:p-14">
+          {[
+            { label: "Focus", value: "UK churches" },
+            { label: "Coverage", value: "Giving to pastoral care" },
+            { label: "Promise", value: "One shared record" },
+          ].map((item) => (
+            <div key={item.label} className="text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                {item.label}
+              </p>
+              <p className="mt-3 font-heading text-2xl font-bold text-slate-900">{item.value}</p>
             </div>
-          </div>
+          ))}
         </div>
-      </section>
+      </MarketingSection>
 
-      <section className="public-section">
-        <div className="container-full">
-          <div className="grid gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] lg:items-start">
-            <div className="public-grid-card">
-              <p className="section-label">Our history</p>
-              <h2 className="section-title">Over a century of brotherhood in London.</h2>
-              <div className="mt-6 space-y-4 leading-relaxed text-slate-600">
-                <p>
-                  Covenant Lodge was constituted under a warrant dated 7 September 1921 and
-                  consecrated on 3 April 1922 at Freemasons&apos; Hall, Great Queen Street, London.
-                </p>
-                <p>
-                  For more than 100 years, the lodge has brought together men of good character
-                  with a shared commitment to integrity, friendship, and service.
-                </p>
-                <p>
-                  Today we meet at Mark Masons&apos; Hall in Mayfair, a Grade II listed building
-                  that provides a fitting home for a lodge with deep roots and clear standards.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid gap-4">
-              {[
-                { label: "Founded", value: "1922" },
-                { label: "Years of continuity", value: "100+" },
-                { label: "Meeting place", value: "Mayfair" },
-              ].map((item) => (
-                <div key={item.label} className="public-stat-card">
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
-                  <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{item.value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="public-section public-section-muted">
-        <div className="container-full">
-          <div className="mb-14 max-w-2xl">
-            <p className="section-label">What we believe</p>
-            <h2 className="section-title">Principles that shape the culture of the lodge.</h2>
-          </div>
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-            {values.map((value) => (
-              <div key={value.title} className="public-grid-card h-full">
-                <div className="mb-5 h-px w-12 bg-blue-500" />
-                <h3 className="text-xl font-semibold text-slate-950">{value.title}</h3>
-                <p className="mt-3 text-sm leading-relaxed text-slate-600">{value.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="public-section">
-        <div className="container-full">
-          <div className="mb-14 max-w-2xl">
-            <p className="section-label">Our journey</p>
-            <h2 className="section-title">Key moments in the lodge&apos;s development.</h2>
-          </div>
-          <div className="max-w-4xl">
-            <Timeline items={timelineItems} />
-          </div>
-        </div>
-      </section>
-
-      <section className="public-section public-section-muted">
-        <div className="container-full">
-          <div className="public-cta-panel mx-auto max-w-3xl text-center">
-            <h2 className="text-3xl font-semibold tracking-tight text-white">
-              Interested in learning more?
-            </h2>
-            <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-slate-300">
-              We welcome enquiries from men of good character who are curious about Freemasonry
-              and what membership could offer them.
-            </p>
-            <Button asChild size="lg" variant="primary" className="mt-8">
-              <Link href={withLodgeQuery("/join")}>Express Your Interest</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
-    </div>
+      <MarketingCtaBand
+        title="Get to know ChurchPay properly."
+        body="The best way to understand what we've built is to see it with your own church in mind. Book a walkthrough or just start a conversation."
+        secondaryLabel="Contact us"
+        secondaryHref="/contact"
+      />
+    </MarketingShell>
   );
 }

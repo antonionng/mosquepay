@@ -6,7 +6,7 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import { resolveCheckoutFeesForMember } from "@/lib/fees/server-resolve";
 
 export async function POST(request: NextRequest) {
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
   if (_rejectMock) return _rejectMock;
 
   try {
-    const lodgeSlug = getLodgeSlugFromRequest(request);
+    const churchSlug = getChurchSlugFromRequest(request);
     const body = await request.json();
     const event_id = body.event_id;
     const user_name = body.user_name?.trim();
@@ -51,20 +51,20 @@ export async function POST(request: NextRequest) {
     };
 
     if (isSupabaseConfigured()) {
-      const lodgeId = await db.resolveLodgeId(lodgeSlug);
-      if (!lodgeId) {
-        return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+      const churchId = await db.resolveChurchId(churchSlug);
+      if (!churchId) {
+        return NextResponse.json({ error: "Church not found." }, { status: 404 });
       }
 
-      // Same defence as the summons access route: when this meeting has
-      // payments enabled and the brother owes something, refuse the
+      // Same defence as the notice access route: when this service has
+      // payments enabled and the member owes something, refuse the
       // no-payment branch. The form must route through checkout so the
       // RSVP only lands alongside a settled payment.
       if (attending_ceremony) {
-        const event = await db.getEventById(event_id, lodgeId);
+        const event = await db.getEventById(event_id, churchId);
         if (event && event.enable_payments) {
           const resolved = await resolveCheckoutFeesForMember({
-            lodgeId,
+            churchId,
             event,
             memberEmail: user_email,
             attendingCeremony: true,
@@ -89,11 +89,11 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const rsvp = await db.addRsvp(lodgeId, rsvpData);
+      const rsvp = await db.addRsvp(churchId, rsvpData);
       return NextResponse.json({ id: rsvp.id, success: true });
     }
 
-    const rsvp = mockDb.addRsvp({ ...rsvpData, lodge_slug: lodgeSlug });
+    const rsvp = mockDb.addRsvp({ ...rsvpData, church_slug: churchSlug });
     return NextResponse.json({ id: rsvp.id, success: true });
   } catch (e) {
     console.error("RSVP API error:", e);

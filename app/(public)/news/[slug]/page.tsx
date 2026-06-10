@@ -6,16 +6,16 @@ import { isSupabaseConfigured, shouldUseInMemoryMock } from "@/lib/db/with-fallb
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { ArrowLeft, User, Calendar } from "lucide-react";
-import { getDefaultLodgeSlug, resolveLodgeSlug } from "@/lib/tenant";
+import { getDefaultChurchSlug, resolveChurchSlug } from "@/lib/tenant";
 import { SOCIAL_SHARE_IMAGE, SITE_ORIGIN } from "@/lib/seo";
 
-async function loadPost(slug: string, lodgeSlug: string) {
+async function loadPost(slug: string, churchSlug: string) {
   if (isSupabaseConfigured()) {
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    return lodgeId ? await db.getBlogPostBySlug(slug, lodgeId) : null;
+    const churchId = await db.resolveChurchId(churchSlug);
+    return churchId ? await db.getBlogPostBySlug(slug, churchId) : null;
   }
   if (shouldUseInMemoryMock()) {
-    return mockDb.getBlogPostBySlug(slug, { lodge_slug: lodgeSlug });
+    return mockDb.getBlogPostBySlug(slug, { church_slug: churchSlug });
   }
   return null;
 }
@@ -25,20 +25,20 @@ export async function generateMetadata({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ lodge?: string }>;
+  searchParams: Promise<{ church?: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const { lodge } = await searchParams;
-  const lodgeSlug = resolveLodgeSlug(lodge);
-  const post = await loadPost(slug, lodgeSlug);
+  const { church } = await searchParams;
+  const churchSlug = resolveChurchSlug(church);
+  const post = await loadPost(slug, churchSlug);
   if (!post) return { title: "News not found" };
 
   const canonical = `${SITE_ORIGIN}/news/${slug}${
-    lodgeSlug !== getDefaultLodgeSlug() ? `?lodge=${encodeURIComponent(lodgeSlug)}` : ""
+    churchSlug !== getDefaultChurchSlug() ? `?church=${encodeURIComponent(churchSlug)}` : ""
   }`;
   const description =
     post.excerpt ||
-    `Read ${post.title} and other updates from LodgePay and lodge websites.`;
+    `Read ${post.title} and other updates from ChurchPay and church websites.`;
   const imageUrl = post.featured_image_url || SOCIAL_SHARE_IMAGE.url;
 
   return {
@@ -66,16 +66,16 @@ export default async function NewsPostPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ lodge?: string }>;
+  searchParams: Promise<{ church?: string }>;
 }) {
   const { slug } = await params;
-  const { lodge } = await searchParams;
-  const lodgeSlug = resolveLodgeSlug(lodge);
-  const defaultSlug = getDefaultLodgeSlug();
-  const withLodgeQuery = (href: string) =>
-    lodgeSlug === defaultSlug ? href : `${href}?lodge=${encodeURIComponent(lodgeSlug)}`;
+  const { church } = await searchParams;
+  const churchSlug = resolveChurchSlug(church);
+  const defaultSlug = getDefaultChurchSlug();
+  const withChurchQuery = (href: string) =>
+    churchSlug === defaultSlug ? href : `${href}?church=${encodeURIComponent(churchSlug)}`;
 
-  const post = await loadPost(slug, lodgeSlug);
+  const post = await loadPost(slug, churchSlug);
 
   if (!post) notFound();
 
@@ -84,7 +84,7 @@ export default async function NewsPostPage({
       <section className="public-hero">
         <div className="container-full relative z-10 max-w-4xl px-6 pb-16 pt-32 md:pb-20 md:pt-40">
           <Link 
-            href={withLodgeQuery("/news")}
+            href={withChurchQuery("/news")}
             className="mb-8 inline-flex items-center gap-2 text-sm text-white/60 transition-colors hover:text-blue-200"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -132,7 +132,7 @@ export default async function NewsPostPage({
         <div className="container-full max-w-3xl text-center">
           <p className="mb-4 text-slate-700">Want to stay updated?</p>
           <Link 
-            href={withLodgeQuery("/news")}
+            href={withChurchQuery("/news")}
             className="font-medium text-blue-600 hover:underline"
           >
             View all news and updates

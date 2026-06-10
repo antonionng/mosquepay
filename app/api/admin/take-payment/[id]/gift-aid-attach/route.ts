@@ -3,9 +3,9 @@
 // declaration had been on file at capture time.
 //
 // Triggered from the on-the-day capture dialog: treasurer logs £20 cash for
-// Brother Smith (no declaration), then snaps the paper slip and uploads it,
+// Member Smith (no declaration), then snaps the paper slip and uploads it,
 // which creates the declaration; this endpoint then closes the loop by
-// inserting the GA donation row so the per-meeting claim batch includes it.
+// inserting the GA donation row so the per-service claim batch includes it.
 //
 // Idempotent: if a donation row already exists for this payment_id + the
 // supplied declaration_id, we return ok without inserting a duplicate.
@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as db from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -38,12 +38,12 @@ export async function POST(
     );
   }
   const { id: paymentId } = await params;
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("charity:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("charity:write", churchId);
   if (forbidden) return forbidden;
 
   const body = (await request.json().catch(() => ({}))) as {
@@ -57,14 +57,14 @@ export async function POST(
     );
   }
 
-  const payment = await db.getPaymentById(paymentId, lodgeId);
+  const payment = await db.getPaymentById(paymentId, churchId);
   if (!payment) {
     return NextResponse.json({ error: "Payment not found." }, { status: 404 });
   }
-  const declaration = await db.getGiftAidDeclarationById(declarationId, lodgeId);
+  const declaration = await db.getGiftAidDeclarationById(declarationId, churchId);
   if (!declaration) {
     return NextResponse.json(
-      { error: "Declaration not found in this lodge." },
+      { error: "Declaration not found in this church." },
       { status: 404 }
     );
   }
@@ -112,7 +112,7 @@ export async function POST(
   try {
     const donations = await db.getDonationsByEmail(
       payment.user_email ?? "",
-      lodgeId
+      churchId
     );
     const existing = donations.find(
       (d) =>
@@ -128,7 +128,7 @@ export async function POST(
 
   let donationId: string | null = null;
   try {
-    const donation = await db.addDonation(lodgeId, {
+    const donation = await db.addDonation(churchId, {
       event_id: payment.event_id,
       payment_id: payment.id,
       donor_name: payment.user_name,
@@ -154,13 +154,13 @@ export async function POST(
 
   let actorEmail: string | null = null;
   try {
-    const admin = await getCurrentAdminContextAny(lodgeId);
+    const admin = await getCurrentAdminContextAny(churchId);
     actorEmail = admin?.email ?? null;
   } catch {
     /* non-fatal */
   }
   try {
-    await db.insertGiftAidDeclarationEvent(lodgeId, {
+    await db.insertGiftAidDeclarationEvent(churchId, {
       declaration_id: declarationId,
       event_type: "address_updated",
       actor_kind: "admin",
@@ -181,7 +181,7 @@ export async function POST(
   }
 
   await writeAuditLog({
-    lodgeId,
+    churchId,
     action: "gift_aid_attached_to_payment",
     entityType: "payment",
     entityId: payment.id,

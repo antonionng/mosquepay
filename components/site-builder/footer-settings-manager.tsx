@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type {
-  LodgeSiteFooterLinkGroup,
-  LodgeSiteFooterSettings,
+  ChurchSiteFooterLinkGroup,
+  ChurchSiteFooterSettings,
 } from "@/lib/db/types";
 import { defaultFooterSettings } from "@/lib/site-section-style";
 import { cn } from "@/lib/utils";
@@ -30,15 +30,15 @@ const FOOTER_PRESETS = [
   {
     id: "full",
     name: "Full footer",
-    description: "Best for lodges with joining, charity, events, and visitor pages.",
+    description: "Best for churches with joining, charity, events, and newcomer pages.",
     groups: [
       footerGroup("Explore", 1, [
         ["About", "/site/about"],
         ["Events", "/events"],
         ["Charity", "/site/charity"],
       ]),
-      footerGroup("Visitors", 2, [
-        ["Visit us", "/site/visit"],
+      footerGroup("Newcomers", 2, [
+        ["Visit us", "/site/newcomers"],
         ["Join", "/site/join"],
         ["Contact", "/site/contact"],
       ]),
@@ -51,8 +51,8 @@ const FOOTER_PRESETS = [
     groups: [
       footerGroup("Get in touch", 1, [
         ["Contact", "/site/contact"],
-        ["Join the lodge", "/site/join"],
-        ["Visit a meeting", "/site/visit"],
+        ["Join the church", "/site/join"],
+        ["Visit a service", "/site/newcomers"],
       ]),
     ],
   },
@@ -62,7 +62,7 @@ function footerGroup(
   title: string,
   order: number,
   links: Array<[label: string, href: string]>
-): LodgeSiteFooterLinkGroup {
+): ChurchSiteFooterLinkGroup {
   return {
     id: crypto.randomUUID(),
     title,
@@ -77,7 +77,7 @@ function footerGroup(
   };
 }
 
-function cloneFooterGroups(groups: readonly LodgeSiteFooterLinkGroup[]) {
+function cloneFooterGroups(groups: readonly ChurchSiteFooterLinkGroup[]) {
   return groups.map((group, groupIndex) => ({
     ...group,
     id: crypto.randomUUID(),
@@ -102,17 +102,17 @@ function initialsFromName(name: string) {
 
 function FooterPreview({
   settings,
-  lodgeName,
-  lodgeNumber,
+  churchName,
+  churchNumber,
   city,
   tagline,
   supportEmail,
   supportPhone,
   logoUrl,
 }: {
-  settings: LodgeSiteFooterSettings;
-  lodgeName: string;
-  lodgeNumber?: string | null;
+  settings: ChurchSiteFooterSettings;
+  churchName: string;
+  churchNumber?: string | null;
   city?: string | null;
   tagline?: string | null;
   supportEmail?: string | null;
@@ -133,7 +133,7 @@ function FooterPreview({
   const footerTagline =
     settings.tagline ??
     tagline ??
-    "A lodge website with meetings, charity, membership enquiries, and contact details.";
+    "A church website with services, charity, membership enquiries, and contact details.";
 
   return (
     <div className="rounded-3xl border border-slate-800 bg-slate-950 p-4 text-white shadow-dash">
@@ -160,25 +160,25 @@ function FooterPreview({
                   {logoUrl ? (
                     <Image
                       src={logoUrl}
-                      alt={`${lodgeName} logo`}
+                      alt={`${churchName} logo`}
                       width={44}
                       height={44}
                       unoptimized
                       className="h-full w-full bg-white object-contain p-1"
                     />
                   ) : (
-                    initialsFromName(lodgeName)
+                    initialsFromName(churchName)
                   )}
                 </div>
               ) : null}
-              {(settings.show_lodge_name || settings.show_lodge_number) ? (
+              {(settings.show_church_name || settings.show_church_number) ? (
                 <div>
-                  {settings.show_lodge_name ? (
-                    <p className="text-base font-semibold tracking-tight">{lodgeName}</p>
+                  {settings.show_church_name ? (
+                    <p className="text-base font-semibold tracking-tight">{churchName}</p>
                   ) : null}
-                  {settings.show_lodge_number ? (
+                  {settings.show_church_number ? (
                     <p className="text-sm text-slate-400">
-                      {[lodgeNumber ? `No. ${lodgeNumber}` : null, city].filter(Boolean).join(" / ")}
+                      {[churchNumber ? `No. ${churchNumber}` : null, city].filter(Boolean).join(" / ")}
                     </p>
                   ) : null}
                 </div>
@@ -221,15 +221,15 @@ function FooterPreview({
         </div>
         <div className="mt-8 border-t border-white/10 pt-6 text-xs text-slate-500">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <span>(c) {new Date().getFullYear()} {lodgeName}. All rights reserved.</span>
+            <span>(c) {new Date().getFullYear()} {churchName}. All rights reserved.</span>
             {settings.show_powered_by !== false ? (
               <a
-                href="https://lodgepayments.co.uk"
+                href="https://churchpay.co.uk"
                 target="_blank"
                 rel="noreferrer"
                 className="transition-colors hover:text-slate-300"
               >
-                Powered by LodgePay
+                Powered by ChurchPay
               </a>
             ) : null}
           </div>
@@ -240,28 +240,28 @@ function FooterPreview({
 }
 
 export function FooterSettingsManager({
-  lodgeSlug,
+  churchSlug,
   initialSettings,
-  lodgeName,
-  lodgeNumber,
+  churchName,
+  churchNumber,
   city,
   tagline,
   supportEmail,
   supportPhone,
   logoUrl,
 }: {
-  lodgeSlug: string;
-  initialSettings?: LodgeSiteFooterSettings | null;
-  lodgeName?: string;
-  lodgeNumber?: string | null;
+  churchSlug: string;
+  initialSettings?: ChurchSiteFooterSettings | null;
+  churchName?: string;
+  churchNumber?: string | null;
   city?: string | null;
   tagline?: string | null;
   supportEmail?: string | null;
   supportPhone?: string | null;
   logoUrl?: string | null;
 }) {
-  const previewLodgeName = lodgeName ?? "Covenant Lodge";
-  const [settings, setSettings] = useState<LodgeSiteFooterSettings>(
+  const previewChurchName = churchName ?? "St Mary's Church";
+  const [settings, setSettings] = useState<ChurchSiteFooterSettings>(
     initialSettings ?? defaultFooterSettings()
   );
   const [saving, setSaving] = useState(false);
@@ -272,7 +272,7 @@ export function FooterSettingsManager({
     [settings.link_groups]
   );
 
-  function updateGroup(id: string, patch: Partial<LodgeSiteFooterLinkGroup>) {
+  function updateGroup(id: string, patch: Partial<ChurchSiteFooterLinkGroup>) {
     setSettings((current) => ({
       ...current,
       link_groups: current.link_groups.map((group) =>
@@ -339,7 +339,7 @@ export function FooterSettingsManager({
   function updateLink(
     groupId: string,
     linkId: string,
-    patch: Partial<LodgeSiteFooterLinkGroup["links"][number]>
+    patch: Partial<ChurchSiteFooterLinkGroup["links"][number]>
   ) {
     setSettings((current) => ({
       ...current,
@@ -376,7 +376,7 @@ export function FooterSettingsManager({
     setSaving(true);
     setMessage(null);
     try {
-      const response = await fetch(`/api/lodges/${lodgeSlug}/site`, {
+      const response = await fetch(`/api/churches/${churchSlug}/site`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ footer_settings: settings }),
@@ -412,10 +412,10 @@ export function FooterSettingsManager({
           <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
             {[
               ["show_logo", "Show logo"],
-              ["show_lodge_name", "Show lodge name"],
-              ["show_lodge_number", "Show lodge number"],
+              ["show_church_name", "Show church name"],
+              ["show_church_number", "Show church number"],
               ["show_contact_details", "Show contact details"],
-              ["show_powered_by", "Show \"Powered by LodgePay\""],
+              ["show_powered_by", "Show \"Powered by ChurchPay\""],
             ].map(([key, label]) => (
               <label
                 key={key}
@@ -423,7 +423,7 @@ export function FooterSettingsManager({
               >
                 <input
                   type="checkbox"
-                  checked={Boolean(settings[key as keyof LodgeSiteFooterSettings])}
+                  checked={Boolean(settings[key as keyof ChurchSiteFooterSettings])}
                   onChange={(event) =>
                     setSettings((current) => ({
                       ...current,
@@ -474,7 +474,7 @@ export function FooterSettingsManager({
                     tagline: event.target.value || null,
                   }))
                 }
-                placeholder="A short sentence about the lodge."
+                placeholder="A short sentence about the church."
                 rows={3}
               />
             </div>
@@ -498,7 +498,7 @@ export function FooterSettingsManager({
               <div>
                 <h3 className="text-sm font-semibold text-dash-text">Footer menu</h3>
                 <p className="mt-1 text-xs text-dash-muted">
-                  These are the columns visitors see at the bottom of the site.
+                  These are the columns newcomers see at the bottom of the site.
                 </p>
               </div>
               <Button type="button" variant="dashboard" size="sm" onClick={addGroup}>
@@ -618,8 +618,8 @@ export function FooterSettingsManager({
         </div>
         <FooterPreview
           settings={settings}
-          lodgeName={previewLodgeName}
-          lodgeNumber={lodgeNumber}
+          churchName={previewChurchName}
+          churchNumber={churchNumber}
           city={city}
           tagline={tagline}
           supportEmail={supportEmail}

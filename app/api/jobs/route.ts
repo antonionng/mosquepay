@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -14,15 +14,15 @@ export async function GET(request: NextRequest) {
   const unauthorized = await requireAdminApiAuth();
   if (unauthorized) return unauthorized;
   if (!isSupabaseConfigured()) return NextResponse.json({ jobs: [] });
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("admin:all", lodgeId);
+  const forbidden = await requireAdminApiPermission("admin:all", churchId);
   if (forbidden) return forbidden;
   return NextResponse.json({
-    jobs: await db.listJobs({ lodgeId, limit: 50 }),
+    jobs: await db.listJobs({ churchId, limit: 50 }),
   });
 }
 
@@ -35,16 +35,16 @@ export async function POST(request: NextRequest) {
       { status: 503 }
     );
   }
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("admin:all", lodgeId);
+  const forbidden = await requireAdminApiPermission("admin:all", churchId);
   if (forbidden) return forbidden;
   const body = await request.json();
   const job = await db.enqueueJob({
-    lodge_id: lodgeId,
+    church_id: churchId,
     job_type: body.job_type,
     payload: body.payload ?? {},
     scheduled_at: body.scheduled_at ?? new Date().toISOString(),

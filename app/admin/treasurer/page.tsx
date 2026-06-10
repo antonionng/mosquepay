@@ -8,43 +8,43 @@ export const dynamic = "force-dynamic";
 
 export default async function TreasurerPage() {
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.lodgeId) {
+  if (ctx.mode !== "database" || !ctx.churchId) {
     return (
       <div className="space-y-4 sm:space-y-6">
         <div className="admin-page-head">
           <div>
             <h1 className="admin-page-title">Treasurer</h1>
             <p className="admin-page-copy">
-              Cash book ledger, dues bulk run, and reconciliation tools.
+              Cash book ledger, giving bulk run, and reconciliation tools.
             </p>
           </div>
         </div>
         <EmptyState
           icon={Wallet}
           title="Treasurer needs a database"
-          description="Connect Supabase and choose a lodge to use the treasurer tools. Demo mode is read-only for finance."
+          description="Connect Supabase and choose a church to use the treasurer tools. Demo mode is read-only for finance."
         />
       </div>
     );
   }
-  const lodgeId = ctx.lodgeId;
+  const churchId = ctx.churchId;
 
-  const currentYear = await db.getCurrentMasonicYear(lodgeId).catch(() => null);
+  const currentYear = await db.getCurrentChurchYear(churchId).catch(() => null);
 
   const [
     ledger,
-    lodgeDues,
+    churchGiving,
     members,
     outstandingInstalments,
     scheduleCounts,
     methodBreakdown,
   ] = await Promise.all([
-    db.getTreasurerLedger(lodgeId),
-    db.getLodgeDues(lodgeId),
-    db.getMembers(lodgeId, { status: "active" }),
-    db.getOutstandingInstalments(lodgeId),
-    db.countDuesSchedulesByStatus(lodgeId),
-    db.countMemberDuesByPaymentMethod(lodgeId, {
+    db.getTreasurerLedger(churchId),
+    db.getChurchGiving(churchId),
+    db.getMembers(churchId, { status: "active" }),
+    db.getOutstandingInstalments(churchId),
+    db.countGivingSchedulesByStatus(churchId),
+    db.countMemberGivingByPaymentMethod(churchId, {
       yearStart: currentYear?.start_date,
       yearEnd: currentYear?.end_date,
     }),
@@ -53,7 +53,7 @@ export default async function TreasurerPage() {
   return (
     <TreasurerClient
       ledger={JSON.parse(JSON.stringify(ledger))}
-      lodgeDues={JSON.parse(JSON.stringify(lodgeDues))}
+      churchGiving={JSON.parse(JSON.stringify(churchGiving))}
       activeMembers={members.length}
       outstandingInstalments={JSON.parse(
         JSON.stringify(outstandingInstalments)

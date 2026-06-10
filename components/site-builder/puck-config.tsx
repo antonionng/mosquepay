@@ -45,7 +45,7 @@ type SectionProps = {
   backgroundImageUrl?: string;
   overlayOpacity?: number;
   backgroundPosition?: string;
-  formMode?: "none" | "contact" | "lead";
+  formMode?: "none" | "contact" | "newcomer";
   backgroundTone?: "default" | "soft" | "brand" | "dark";
   contentWidth?: "narrow" | "standard" | "wide" | "full";
   spacing?: "compact" | "normal" | "spacious";
@@ -62,7 +62,7 @@ type SectionProps = {
 type ComponentProps = {
   Hero: HeroProps;
   About: SectionProps;
-  MeetingDetails: SectionProps;
+  ServiceDetails: SectionProps;
   Officers: SectionProps;
   Charity: SectionProps;
   Events: SectionProps;
@@ -245,7 +245,7 @@ const sectionFields = {
     options: [
       { label: "No form", value: "none" },
       { label: "Contact secretary", value: "contact" },
-      { label: "Lead intake", value: "lead" },
+      { label: "Newcomer intake", value: "newcomer" },
     ],
   },
   backgroundTone: {
@@ -320,8 +320,8 @@ export const puckConfig: Config<ComponentProps> = {
   components: {
     Hero: {
       defaultProps: {
-        heading: "Welcome to Our Lodge",
-        body: "Join a modern brotherhood with deep heritage. Where tradition meets community, and fellowship creates lasting bonds.",
+        heading: "Welcome to Our Church",
+        body: "Join a modern memberhood with deep heritage. Where tradition meets community, and fellowship creates lasting bonds.",
         ctaLabel: "Express Interest",
         ctaHref: "/join",
         primaryColor: "#3b82f6",
@@ -463,8 +463,8 @@ export const puckConfig: Config<ComponentProps> = {
 
     About: {
       defaultProps: {
-        heading: "About Our Lodge",
-        body: "Founded on principles of brotherly love, relief, and truth, our lodge brings members together through meaningful fellowship, personal growth, and charitable service to the community.",
+        heading: "About Our Church",
+        body: "Founded on principles of memberly love, relief, and truth, our church brings members together through meaningful fellowship, personal growth, and charitable service to the community.",
         ctaLabel: "Learn More",
         ctaHref: "/about",
       },
@@ -510,17 +510,17 @@ export const puckConfig: Config<ComponentProps> = {
       ),
     },
 
-    MeetingDetails: {
+    ServiceDetails: {
       defaultProps: {
-        heading: "Meetings & Schedule",
-        body: "We meet regularly throughout the year. Our meetings combine traditional ceremony with social fellowship, making every gathering a meaningful experience.",
+        heading: "Services & Schedule",
+        body: "We meet regularly throughout the year. Our services combine traditional ceremony with social fellowship, making every gathering a meaningful experience.",
         ctaLabel: "View Calendar",
         ctaHref: "/events",
       },
       fields: sectionFields,
       render: ({ heading, body, ctaLabel, ctaHref, imageUrl, imageAlt, imageShape }) => (
         <SectionContainer className="bg-slate-50">
-          <SectionBadge icon={Calendar} label="Meetings" className="bg-indigo-50 text-indigo-700 border-indigo-200" />
+          <SectionBadge icon={Calendar} label="Services" className="bg-indigo-50 text-indigo-700 border-indigo-200" />
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
             {heading}
           </h2>
@@ -532,9 +532,9 @@ export const puckConfig: Config<ComponentProps> = {
           <SectionImage imageUrl={imageUrl} imageAlt={imageAlt} imageShape={imageShape} />
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
             {[
-              { icon: Calendar, label: "Regular Meetings", detail: "Monthly gatherings" },
-              { icon: Clock, label: "Festive Board", detail: "Dining after lodge" },
-              { icon: MapPin, label: "Lodge Hall", detail: "Central location" },
+              { icon: Calendar, label: "Regular Services", detail: "Monthly gatherings" },
+              { icon: Clock, label: "Fellowship Meal", detail: "Dining after church" },
+              { icon: MapPin, label: "Church Hall", detail: "Central location" },
             ].map((item) => (
               <div key={item.label} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <item.icon className="h-6 w-6 text-indigo-500" />
@@ -550,8 +550,8 @@ export const puckConfig: Config<ComponentProps> = {
 
     Officers: {
       defaultProps: {
-        heading: "Lodge Officers",
-        body: "Our dedicated officers volunteer their time and talents to guide the lodge, uphold traditions, and ensure every member feels welcome and supported.",
+        heading: "Church Officers",
+        body: "Our dedicated officers volunteer their time and talents to guide the church, uphold traditions, and ensure every member feels welcome and supported.",
         ctaLabel: "Meet the Team",
         ctaHref: "/about",
       },
@@ -569,13 +569,13 @@ export const puckConfig: Config<ComponentProps> = {
           )}
           <SectionImage imageUrl={imageUrl} imageAlt={imageAlt} imageShape={imageShape} />
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
-            {["Worshipful Master", "Senior Warden", "Junior Warden"].map((role) => (
+            {["Lead Pastor", "Senior Warden", "Junior Warden"].map((role) => (
               <div key={role} className="group rounded-xl border border-slate-100 bg-slate-50 p-5 text-center transition-all hover:border-emerald-200 hover:shadow-md">
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 transition-colors group-hover:bg-emerald-500 group-hover:text-white">
                   <Users className="h-6 w-6" />
                 </div>
                 <h3 className="mt-3 text-sm font-semibold text-slate-900">{role}</h3>
-                <p className="mt-1 text-xs text-slate-500">Lodge Officer</p>
+                <p className="mt-1 text-xs text-slate-500">Church Officer</p>
               </div>
             ))}
           </div>
@@ -587,7 +587,7 @@ export const puckConfig: Config<ComponentProps> = {
     Charity: {
       defaultProps: {
         heading: "Charity & Community",
-        body: "Charitable giving lies at the heart of our lodge. We support local causes, national charities, and global initiatives through fundraising, volunteering, and ongoing contributions.",
+        body: "Charitable giving lies at the heart of our church. We support local causes, national charities, and global initiatives through fundraising, volunteering, and ongoing contributions.",
         ctaLabel: "Our Charity Work",
         ctaHref: "/charity",
       },
@@ -619,7 +619,7 @@ export const puckConfig: Config<ComponentProps> = {
     Events: {
       defaultProps: {
         heading: "Upcoming Events",
-        body: "From regular lodge meetings to social evenings and community fundraisers, there is always something happening. Join us at our next event.",
+        body: "From regular church services to social evenings and community fundraisers, there is always something happening. Join us at our next event.",
         ctaLabel: "View All Events",
         ctaHref: "/events",
       },
@@ -638,7 +638,7 @@ export const puckConfig: Config<ComponentProps> = {
           <SectionImage imageUrl={imageUrl} imageAlt={imageAlt} imageShape={imageShape} />
           <div className="mt-8 space-y-3">
             {[
-              { month: "JAN", day: "15", title: "Regular Lodge Meeting", time: "6:30 PM" },
+              { month: "JAN", day: "15", title: "Regular Church Service", time: "6:30 PM" },
               { month: "FEB", day: "22", title: "Ladies' Evening Dinner", time: "7:00 PM" },
               { month: "MAR", day: "08", title: "Charity Fundraiser", time: "2:00 PM" },
             ].map((event) => (
@@ -665,7 +665,7 @@ export const puckConfig: Config<ComponentProps> = {
     FAQ: {
       defaultProps: {
         heading: "Frequently Asked Questions",
-        body: "We understand you may have questions about lodge life. Here are answers to some of the most common ones.",
+        body: "We understand you may have questions about church life. Here are answers to some of the most common ones.",
         ctaLabel: "More Questions?",
         ctaHref: "/faq",
       },
@@ -685,8 +685,8 @@ export const puckConfig: Config<ComponentProps> = {
           <div className="mt-8 space-y-3">
             {[
               { q: "How do I become a member?", a: "Start by expressing your interest through our form. A member will reach out to guide you." },
-              { q: "Do I need to be recommended?", a: "Typically, candidates are proposed by existing members, but enquiries from newcomers are always welcome." },
-              { q: "What happens at a lodge meeting?", a: "Meetings include traditional ceremonies, discussion of lodge business, and fellowship over dinner." },
+              { q: "Do I need to be recommended?", a: "Typically, newcomers are proposed by existing members, but enquiries from newcomers are always welcome." },
+              { q: "What happens at a church service?", a: "Services include traditional ceremonies, discussion of church business, and fellowship over dinner." },
             ].map((item) => (
               <details key={item.q} className="group rounded-xl border border-slate-200 bg-white shadow-sm">
                 <summary className="flex cursor-pointer items-center justify-between p-5 text-sm font-semibold text-slate-900">
@@ -754,9 +754,9 @@ export const puckConfig: Config<ComponentProps> = {
           <SectionImage imageUrl={imageUrl} imageAlt={imageAlt} imageShape={imageShape} />
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
             {[
-              { icon: Mail, label: "Email", detail: "secretary@lodge.org" },
+              { icon: Mail, label: "Email", detail: "secretary@church.org" },
               { icon: Phone, label: "Phone", detail: "Available on request" },
-              { icon: MapPin, label: "Lodge Hall", detail: "Central location" },
+              { icon: MapPin, label: "Church Hall", detail: "Central location" },
             ].map((item) => (
               <div key={item.label} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-4">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100 text-sky-600">

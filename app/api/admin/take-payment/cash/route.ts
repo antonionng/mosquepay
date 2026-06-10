@@ -1,9 +1,9 @@
 // POST /api/admin/take-payment/cash
 //
-// Treasurer-recorded cash payment. Old masons still bring notes; this is the
+// Treasurer-recorded cash payment. Old members still bring notes; this is the
 // canonical place for the duty officer to log them so they hit the same
 // ledger and Gift Aid reclaim flow as the QR/card payments without sitting
-// on a paper sheet that gets lost between meetings.
+// on a paper sheet that gets lost between services.
 //
 // Persistence model mirrors the QR flow on purpose:
 //   1. Insert a mooov.payment_attempts row with intent='take_payment_cash',
@@ -14,15 +14,15 @@
 //      event-linked donation row for any category=charity entry (status
 //      'declared' when the payer has an active declaration, 'eligible' when
 //      they have an email but no declaration yet, 'unknown' for anonymous
-//      cash) so the per-meeting Gift Aid close can reclaim it later.
+//      cash) so the per-service Gift Aid close can reclaim it later.
 //
-// Auth: admin with payments:write on the active lodge.
+// Auth: admin with payments:write on the active church.
 
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
-import { resolveTodaysMeetingId } from "@/lib/meetings/todays-meeting";
+import { resolveTodaysServiceId } from "@/lib/services/todays-service";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { getCurrentAdminContextAny } from "@/lib/auth/permissions";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -58,8 +58,8 @@ function parseGuestInline(value: unknown): GuestInlineInput | null {
     full_name,
     email: trimOrNull(v.email),
     phone: trimOrNull(v.phone),
-    mother_lodge_name: trimOrNull(v.mother_lodge_name),
-    mother_lodge_number: trimOrNull(v.mother_lodge_number),
+    mother_church_name: trimOrNull(v.mother_church_name),
+    mother_church_number: trimOrNull(v.mother_church_number),
   };
 }
 
@@ -111,9 +111,9 @@ export async function POST(request: NextRequest) {
     typeof body.guest_id === "string" && body.guest_id.trim()
       ? body.guest_id.trim()
       : null;
-  // Optional meeting attribution. When set, the projected public.payments
-  // row sets event_id so per-meeting "Money raised" totals see it. The
-  // event itself is validated below (must belong to the active lodge).
+  // Optional service attribution. When set, the projected public.payments
+  // row sets event_id so per-service "Money raised" totals see it. The
+  // event itself is validated below (must belong to the active church).
   const eventIdInput =
     typeof body.event_id === "string" && body.event_id.trim()
       ? body.event_id.trim()
@@ -145,57 +145,57 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Anchor on the admin's scoped lodge (same logic as the page) so a
-  // lodge-scoped treasurer whose ADMIN_LODGE_COOKIE has not been set
-  // doesn't fall through to the platform default lodge and 401 here while
+  // Anchor on the admin's scoped church (same logic as the page) so a
+  // church-scoped treasurer whose ADMIN_CHURCH_COOKIE has not been set
+  // doesn't fall through to the platform default church and 401 here while
   // the page renders fine.
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.lodgeId) {
-    return NextResponse.json({ error: "Lodge not selected." }, { status: 404 });
+  if (ctx.mode !== "database" || !ctx.churchId) {
+    return NextResponse.json({ error: "Church not selected." }, { status: 404 });
   }
-  const lodgeId = ctx.lodgeId;
-  const lodgeSlug = ctx.lodgeSlug;
+  const churchId = ctx.churchId;
+  const churchSlug = ctx.churchSlug;
 
-  const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("payments:write", churchId);
   if (forbidden) return forbidden;
 
-  // Validate any provided event_id is for this lodge before we accept it on
+  // Validate any provided event_id is for this church before we accept it on
   // the projection. Anonymous payments (no event picked) are still fine.
   let resolvedEventId: string | null = null;
   if (eventIdInput) {
     try {
-      const eventRow = await db.getEventById(eventIdInput, lodgeId);
+      const eventRow = await db.getEventById(eventIdInput, churchId);
       if (eventRow) {
         resolvedEventId = eventRow.id;
       } else {
         return NextResponse.json(
-          { error: "Selected meeting not found in this lodge." },
+          { error: "Selected service not found in this church." },
           { status: 400 },
         );
       }
     } catch (err) {
       console.warn("Cash payment POST: event lookup failed (non-fatal)", {
-        lodge_id: lodgeId,
+        church_id: churchId,
         event_id: eventIdInput,
         message: err instanceof Error ? err.message : String(err),
       });
     }
   }
-  // No meeting chosen: auto-attribute to today's meeting when there's exactly
-  // one, so cash logged during a live meeting rolls up without manual picking.
+  // No service chosen: auto-attribute to today's service when there's exactly
+  // one, so cash logged during a live service rolls up without manual picking.
   if (!resolvedEventId) {
-    resolvedEventId = await resolveTodaysMeetingId(lodgeId);
+    resolvedEventId = await resolveTodaysServiceId(churchId);
   }
 
   let createdByEmail: string | null = null;
   let createdByRole: string | null = null;
   try {
-    const admin = await getCurrentAdminContextAny(lodgeId);
+    const admin = await getCurrentAdminContextAny(churchId);
     createdByEmail = admin?.email ?? null;
     createdByRole = admin?.role ?? null;
   } catch (err) {
     console.warn("Cash payment POST: could not resolve admin identity", {
-      lodge_id: lodgeId,
+      church_id: churchId,
       message: err instanceof Error ? err.message : String(err),
     });
   }
@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Idempotency: same admin retrying with the same client_token returns the
-  // already-recorded row. payment_attempts has a (lodge_id, idempotency_key)
+  // already-recorded row. payment_attempts has a (church_id, idempotency_key)
   // unique constraint so this is safe to call concurrently — at most one
   // attempt row exists per token.
   const idempotencyKey = `cash_${clientToken}`;
@@ -223,7 +223,7 @@ export async function POST(request: NextRequest) {
     .schema("mooov")
     .from("payment_attempts")
     .select("payment_id, status, amount, currency")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .eq("idempotency_key", idempotencyKey)
     .maybeSingle<{
       payment_id: string;
@@ -243,7 +243,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const attribution = await resolveTakePaymentAttribution(lodgeId, {
+  const attribution = await resolveTakePaymentAttribution(churchId, {
     memberId,
     guestId,
     guestInline,
@@ -255,22 +255,23 @@ export async function POST(request: NextRequest) {
     payerEmail,
     giftAidDeclarationId,
     giftAidEligible,
+    giftAidRefused,
   } = attribution;
 
   const amountMinor = Math.round(amount * 100);
   const currency = "GBP";
-  const paymentId = `cash_${lodgeId}_${Date.now().toString(36)}_${Math.random()
+  const paymentId = `cash_${churchId}_${Date.now().toString(36)}_${Math.random()
     .toString(36)
     .slice(2, 10)}`;
 
   // Build a metadata block that mirrors the QR mint route so the history
   // endpoint can render cash rows with the same shape.
   const intentDescription =
-    description || `Cash payment to lodge (${reference || "in-person"})`;
+    description || `Cash payment to church (${reference || "in-person"})`;
   const metadata: Record<string, unknown> = {
-    source: "lodgepay_take_payment_cash",
-    lodge_slug: lodgeSlug,
-    lodge_id: lodgeId,
+    source: "churchpay_take_payment_cash",
+    church_slug: churchSlug,
+    church_id: churchId,
     intent: "take_payment_cash",
     category,
     line_items: itemised ? lineItems : null,
@@ -290,6 +291,7 @@ export async function POST(request: NextRequest) {
     member_email: payerEmail,
     gift_aid_declaration_id: giftAidDeclarationId,
     gift_aid_eligible: giftAidEligible,
+    gift_aid_refused: giftAidRefused,
   };
 
   const capturedAt = new Date().toISOString();
@@ -298,7 +300,7 @@ export async function POST(request: NextRequest) {
     .from("payment_attempts")
     .insert({
       payment_id: paymentId,
-      lodge_id: lodgeId,
+      church_id: churchId,
       member_id: null,
       amount: amountMinor,
       currency,
@@ -309,7 +311,7 @@ export async function POST(request: NextRequest) {
       metadata,
       guest_descriptor: {
         source: "in_person_take_payment_cash",
-        lodge_slug: lodgeSlug,
+        church_slug: churchSlug,
         reference: reference || null,
         category,
         line_items: itemised ? lineItems : null,
@@ -320,18 +322,19 @@ export async function POST(request: NextRequest) {
         payer_email: payerEmail,
         gift_aid_declaration_id: giftAidDeclarationId,
         gift_aid_eligible: giftAidEligible,
+        gift_aid_refused: giftAidRefused,
       },
     });
   if (insertError) {
     // Race against another concurrent submit with the same client_token. The
-    // unique constraint on (lodge_id, idempotency_key) lets us recover by
+    // unique constraint on (church_id, idempotency_key) lets us recover by
     // returning the row that won.
     if (insertError.code === "23505") {
       const { data: existing } = await supa
         .schema("mooov")
         .from("payment_attempts")
         .select("payment_id, amount, currency")
-        .eq("lodge_id", lodgeId)
+        .eq("church_id", churchId)
         .eq("idempotency_key", idempotencyKey)
         .maybeSingle<{
           payment_id: string;
@@ -348,7 +351,7 @@ export async function POST(request: NextRequest) {
       }
     }
     console.error("Cash payment POST: attempt insert failed", {
-      lodge_id: lodgeId,
+      church_id: churchId,
       payment_id: paymentId,
       code: insertError.code,
       message: insertError.message,
@@ -365,7 +368,7 @@ export async function POST(request: NextRequest) {
   // the same client_token and re-uses the existing attempt row).
   try {
     const projection = await projectTakePaymentCaptured({
-      lodgeId,
+      churchId,
       mooovPaymentId: paymentId,
       amountMajor: amount,
       currency,
@@ -382,6 +385,7 @@ export async function POST(request: NextRequest) {
       guestId: resolvedGuestId,
       giftAidDeclarationId,
       giftAidEligible,
+      giftAidRefused,
       paymentMethod: "cash",
       recordedByEmail: createdByEmail,
       paymentMethodNote: note || null,
@@ -397,7 +401,7 @@ export async function POST(request: NextRequest) {
       try {
         await sendTakePaymentReceipt({
           toEmail: payerEmail,
-          toName: payerName ?? "Friend of the lodge",
+          toName: payerName ?? "Friend of the church",
           amountMajor: amount,
           currency,
           category,
@@ -406,7 +410,7 @@ export async function POST(request: NextRequest) {
           paymentMethod: "cash",
           recordedByEmail: createdByEmail,
           giftAidEligible,
-          lodgeId,
+          churchId,
           paymentId,
           lineItems: itemised ? lineItems : null,
         });
@@ -430,7 +434,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     console.error("Cash payment POST: projection failed", {
-      lodge_id: lodgeId,
+      church_id: churchId,
       payment_id: paymentId,
       message: err instanceof Error ? err.message : String(err),
     });

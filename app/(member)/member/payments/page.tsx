@@ -24,10 +24,10 @@ interface Payment {
   description: string;
   amount: number;
   status: "completed" | "pending" | "failed";
-  type: "event" | "dues" | "donation";
+  type: "event" | "giving" | "donation";
 }
 
-type FilterType = "all" | "event" | "dues" | "donation";
+type FilterType = "all" | "event" | "giving" | "donation";
 
 const statusBadge: Record<string, "success" | "warning" | "destructive"> = {
   completed: "success",
@@ -37,7 +37,7 @@ const statusBadge: Record<string, "success" | "warning" | "destructive"> = {
 
 const typeLabel: Record<string, string> = {
   event: "Event",
-  dues: "Dues",
+  giving: "Giving",
   donation: "Donation",
 };
 
@@ -89,7 +89,7 @@ export default function MemberPaymentsPage() {
   const filters: { value: FilterType; label: string }[] = [
     { value: "all", label: "All" },
     { value: "event", label: "Events" },
-    { value: "dues", label: "Dues" },
+    { value: "giving", label: "Giving" },
     { value: "donation", label: "Donations" },
   ];
 

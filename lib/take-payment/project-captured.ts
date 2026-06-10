@@ -18,7 +18,7 @@ import {
 } from "./categorize";
 
 export type ProjectCapturedInput = {
-  lodgeId: string;
+  churchId: string;
   mooovPaymentId: string;
   amountMajor: number;
   currency: string;
@@ -40,6 +40,7 @@ export type ProjectCapturedInput = {
   guestId?: string | null;
   giftAidDeclarationId: string | null;
   giftAidEligible: boolean;
+  giftAidRefused?: boolean;
   completedAt?: string;
   // Source-specific flags for the public.payments row.
   paymentMethod: "card_qr" | "cash";
@@ -76,7 +77,7 @@ export async function projectTakePaymentCaptured(
     ? splitAmountByLineItems(input.lineItems as LineItemInput[])
     : splitAmountByCategory(input.amountMajor, input.category);
 
-  const payment = await db.addPayment(input.lodgeId, {
+  const payment = await db.addPayment(input.churchId, {
     rsvp_id: null,
     event_id: input.eventId,
     user_email: input.payerEmail ?? "",
@@ -88,7 +89,7 @@ export async function projectTakePaymentCaptured(
     dining_amount: splits.dining_amount,
     charity_amount: splits.charity_amount,
     raffle_amount: splits.raffle_amount,
-    meeting_fee_amount: splits.meeting_fee_amount,
+    service_fee_amount: splits.service_fee_amount,
     guest_ticket_amount: splits.guest_ticket_amount,
     total_amount: input.amountMajor,
     currency,
@@ -102,17 +103,17 @@ export async function projectTakePaymentCaptured(
     completed_at: completedAt,
   });
 
-  // Record charity income as a donation row so the per-meeting Gift Aid
+  // Record charity income as a donation row so the per-service Gift Aid
   // panel + close batch can see it. We do this for EVERY charity entry,
-  // not just payers who already have a declaration on file: many lodges
+  // not just payers who already have a declaration on file: many churches
   // collect on the night and upload signed declarations (or import donor
   // profiles) later. The claim batcher matches donation -> declaration by
   // email at close time (lib/gift-aid/eligible.ts), so an email-bearing
   // donation recorded now becomes reclaimable the moment a matching
   // declaration is added -- no re-tagging required.
   //
-  // The row is linked to input.eventId so it rolls up to the meeting's
-  // "Charity income on file" figure and is swept into the per-meeting Gift
+  // The row is linked to input.eventId so it rolls up to the service's
+  // "Charity income on file" figure and is swept into the per-service Gift
   // Aid batch on close. Anonymous cash (no payer email) is still recorded
   // as charity income with gift_aid_status='unknown' so it shows on the
   // collection (and counts toward GASDS), it just can't be GA-reclaimed.
@@ -123,13 +124,15 @@ export async function projectTakePaymentCaptured(
   let donationId: string | null = null;
   if (splits.charity_amount > 0) {
     const hasDeclaration = Boolean(input.giftAidDeclarationId);
-    const giftAidStatus = hasDeclaration
+    const giftAidStatus = input.giftAidRefused
+      ? "declined"
+      : hasDeclaration
       ? "declared"
       : input.payerEmail
         ? "eligible"
         : "unknown";
     try {
-      const donation = await db.addDonation(input.lodgeId, {
+      const donation = await db.addDonation(input.churchId, {
         event_id: input.eventId,
         payment_id: payment.id,
         donor_name: input.payerName,
@@ -143,7 +146,8 @@ export async function projectTakePaymentCaptured(
         status: "completed",
         gift_aid_declaration_id: input.giftAidDeclarationId,
         gift_aid_status: giftAidStatus,
-        gift_aid_eligible_amount: hasDeclaration ? splits.charity_amount : 0,
+        gift_aid_eligible_amount:
+          hasDeclaration && !input.giftAidRefused ? splits.charity_amount : 0,
       });
       donationId = donation?.id ?? null;
     } catch (err) {

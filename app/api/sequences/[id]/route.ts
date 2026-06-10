@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -106,16 +106,16 @@ export async function GET(request: NextRequest, { params }: Params) {
   }
 
   const { id } = await params;
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const sequence = await db.getMeetingSequenceById(id, lodgeId);
+  const sequence = await db.getServiceSequenceById(id, churchId);
   if (!sequence) {
     return NextResponse.json({ error: "Sequence not found." }, { status: 404 });
   }
-  const events = await db.getEventsBySequenceId(id, lodgeId);
+  const events = await db.getEventsBySequenceId(id, churchId);
   return NextResponse.json({ sequence, events });
 }
 
@@ -135,16 +135,16 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   try {
     const { id } = await params;
-    const lodgeSlug = getLodgeSlugFromRequest(request);
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    if (!lodgeId) {
-      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    const churchSlug = getChurchSlugFromRequest(request);
+    const churchId = await db.resolveChurchId(churchSlug);
+    if (!churchId) {
+      return NextResponse.json({ error: "Church not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("meetings:write", lodgeId);
+    const forbidden = await requireAdminApiPermission("services:write", churchId);
     if (forbidden) return forbidden;
 
     const body = await request.json();
-    const updates: Parameters<typeof db.updateMeetingSequence>[2] = {};
+    const updates: Parameters<typeof db.updateServiceSequence>[2] = {};
     if (typeof body.name === "string") updates.name = body.name.trim();
     const description = nullableTrim(body.description);
     if (description !== undefined) updates.description = description;
@@ -171,7 +171,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       // dropped and never persisted.
       let effectiveMonths = months;
       if (effectiveMonths === undefined) {
-        const existing = await db.getMeetingSequenceById(id, lodgeId);
+        const existing = await db.getServiceSequenceById(id, churchId);
         if (!existing) {
           return NextResponse.json(
             { error: "Sequence not found." },
@@ -196,12 +196,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (dress !== undefined) updates.default_dress_code = dress;
     const dining = nullableNumber(body.default_dining_price);
     if (dining !== undefined) updates.default_dining_price = dining;
-    const fee = nullableNumber(body.default_meeting_fee_amount);
-    if (fee !== undefined) updates.default_meeting_fee_amount = fee;
+    const fee = nullableNumber(body.default_service_fee_amount);
+    if (fee !== undefined) updates.default_service_fee_amount = fee;
     if (typeof body.default_enable_dining_rsvp === "boolean")
       updates.default_enable_dining_rsvp = body.default_enable_dining_rsvp;
-    if (typeof body.default_enable_meeting_fee === "boolean")
-      updates.default_enable_meeting_fee = body.default_enable_meeting_fee;
+    if (typeof body.default_enable_service_fee === "boolean")
+      updates.default_enable_service_fee = body.default_enable_service_fee;
     if (typeof body.default_enable_charity_donation === "boolean")
       updates.default_enable_charity_donation = body.default_enable_charity_donation;
     const charityName = nullableTrim(body.default_charity_name);
@@ -215,25 +215,25 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         body.default_enable_raffle_wine_pledge;
     const wineDesc = nullableTrim(body.default_raffle_wine_description);
     if (wineDesc !== undefined) updates.default_raffle_wine_description = wineDesc;
-    const lead = parseInt0(body.summons_lead_weeks, 1, 26);
-    if (lead !== undefined) updates.summons_lead_weeks = lead;
-    const minLead = parseInt0(body.summons_min_lead_weeks, 1, 26);
-    if (minLead !== undefined) updates.summons_min_lead_weeks = minLead;
-    if (typeof body.auto_draft_summons === "boolean")
-      updates.auto_draft_summons = body.auto_draft_summons;
+    const newcomer = parseInt0(body.notice_newcomer_weeks, 1, 26);
+    if (newcomer !== undefined) updates.notice_newcomer_weeks = newcomer;
+    const minNewcomer = parseInt0(body.notice_min_newcomer_weeks, 1, 26);
+    if (minNewcomer !== undefined) updates.notice_min_newcomer_weeks = minNewcomer;
+    if (typeof body.auto_draft_notice === "boolean")
+      updates.auto_draft_notice = body.auto_draft_notice;
     if (typeof body.active === "boolean") updates.active = body.active;
 
-    const sequence = await db.updateMeetingSequence(id, lodgeId, updates);
+    const sequence = await db.updateServiceSequence(id, churchId, updates);
     if (!sequence) {
       return NextResponse.json({ error: "Sequence not found." }, { status: 404 });
     }
 
     await writeAuditLog({
-      lodgeId,
+      churchId,
       action: "updated",
-      entityType: "meeting_sequence",
+      entityType: "service_sequence",
       entityId: sequence.id,
-      summary: `Updated meeting sequence ${sequence.name}`,
+      summary: `Updated service sequence ${sequence.name}`,
       metadata: { fields: Object.keys(updates) },
     });
 
@@ -262,26 +262,26 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   }
 
   const { id } = await params;
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("meetings:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("services:write", churchId);
   if (forbidden) return forbidden;
 
-  const sequence = await db.getMeetingSequenceById(id, lodgeId);
+  const sequence = await db.getServiceSequenceById(id, churchId);
   if (!sequence) {
     return NextResponse.json({ error: "Sequence not found." }, { status: 404 });
   }
 
-  await db.deleteMeetingSequence(id, lodgeId);
+  await db.deleteServiceSequence(id, churchId);
   await writeAuditLog({
-    lodgeId,
+    churchId,
     action: "deleted",
-    entityType: "meeting_sequence",
+    entityType: "service_sequence",
     entityId: id,
-    summary: `Deleted meeting sequence ${sequence.name}`,
+    summary: `Deleted service sequence ${sequence.name}`,
   });
 
   return NextResponse.json({ success: true });

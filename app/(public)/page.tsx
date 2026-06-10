@@ -1,51 +1,51 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { LodgeHomepage } from "@/components/lodge-site/lodge-homepage";
+import { ChurchHomepage } from "@/components/church-site/church-homepage";
 import { PublicFooter } from "@/components/layout/public-footer";
 import { PublicHeader } from "@/components/layout/public-header";
-import { StaticMarketingSite } from "@/components/marketing/static-marketing-site";
+import { MarketingHome } from "@/components/marketing/marketing-home";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getLodgeSlugFromHost, resolveLodgeSlug } from "@/lib/tenant";
+import { getChurchSlugFromHost, resolveChurchSlug } from "@/lib/tenant";
 import { sanitizeCustomPages, sanitizeSiteSections } from "@/lib/site-section-style";
-import { loadPublicSiteExtras } from "@/lib/lodge-site/public-payload";
+import { loadPublicSiteExtras } from "@/lib/church-site/public-payload";
 import { marketingMetadata, SOCIAL_SHARE_IMAGE } from "@/lib/seo";
 
 async function getPublicTenantSlug(querySlug?: string) {
-  if (querySlug) return resolveLodgeSlug(querySlug);
+  if (querySlug) return resolveChurchSlug(querySlug);
 
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host");
   const hostname = host?.split(":")[0]?.toLowerCase() ?? "";
-  const subdomainSlug = getLodgeSlugFromHost(hostname);
+  const subdomainSlug = getChurchSlugFromHost(hostname);
   if (subdomainSlug) return subdomainSlug;
 
   if (!hostname || !isSupabaseConfigured()) return null;
-  const lodge = await db.getLodgeByCustomDomain(hostname);
-  return lodge?.slug ?? null;
+  const church = await db.getChurchByCustomDomain(hostname);
+  return church?.slug ?? null;
 }
 
 async function getPublicSitePayload(tenantSlug: string) {
-  const siteLodge = isSupabaseConfigured()
-    ? await db.getLodgeBySlug(tenantSlug)
-    : mockDb.getLodgeBySlug(tenantSlug);
-  if (!siteLodge) return null;
+  const siteChurch = isSupabaseConfigured()
+    ? await db.getChurchBySlug(tenantSlug)
+    : mockDb.getChurchBySlug(tenantSlug);
+  if (!siteChurch) return null;
 
   const site = isSupabaseConfigured()
-    ? await db.getLodgeSite(siteLodge.id)
-    : mockDb.getLodgeSite(tenantSlug);
+    ? await db.getChurchSite(siteChurch.id)
+    : mockDb.getChurchSite(tenantSlug);
   if (!site) return null;
 
   const extras = await loadPublicSiteExtras({
-    lodgeId: isSupabaseConfigured() ? siteLodge.id : null,
-    lodgeSlug: tenantSlug,
-    currentCharityCampaignId: siteLodge.current_charity_campaign_id ?? null,
+    churchId: isSupabaseConfigured() ? siteChurch.id : null,
+    churchSlug: tenantSlug,
+    currentCharityCampaignId: siteChurch.current_charity_campaign_id ?? null,
   });
 
   return {
-    lodge: siteLodge,
+    church: siteChurch,
     site: {
       ...site,
       sections: sanitizeSiteSections(site.sections) ?? site.sections,
@@ -58,38 +58,38 @@ async function getPublicSitePayload(tenantSlug: string) {
 export async function generateMetadata({
   searchParams,
 }: {
-  searchParams: Promise<{ lodge?: string }>;
+  searchParams: Promise<{ church?: string }>;
 }): Promise<Metadata> {
-  const { lodge } = await searchParams;
-  const tenantSlug = await getPublicTenantSlug(lodge);
+  const { church } = await searchParams;
+  const tenantSlug = await getPublicTenantSlug(church);
   if (!tenantSlug) {
     return marketingMetadata({
-      title: "LodgePay | Masonic Lodge Websites, Payments, Events, and Member CRM",
+      title: "ChurchPay | Church Websites, Giving, Gift Aid, Events, and Congregation CRM",
       description:
-        "LodgePay helps Masonic lodges, Provinces, and hall groups run modern operations: lodge websites, online dues, event payments, charity donations, Gift Aid, summons, member portals, candidate CRM, welfare workflows, and reporting.",
+        "ChurchPay helps churches and networks run modern operations: church websites, online giving, event payments, charity donations, Gift Aid, service notices, member portals, newcomer CRM, pastoral workflows, and reporting.",
       path: "/",
       keywords: [
-        "Masonic lodge software",
-        "Freemason lodge website platform",
-        "Masonic payments platform",
-        "lodge operations software",
+        "church management software",
+        "church member website platform",
+        "church payments platform",
+        "church operations software",
       ],
     });
   }
 
-  const siteLodge = isSupabaseConfigured()
-    ? await db.getLodgeBySlug(tenantSlug)
-    : mockDb.getLodgeBySlug(tenantSlug);
-  const site = siteLodge
+  const siteChurch = isSupabaseConfigured()
+    ? await db.getChurchBySlug(tenantSlug)
+    : mockDb.getChurchBySlug(tenantSlug);
+  const site = siteChurch
     ? isSupabaseConfigured()
-      ? await db.getLodgeSite(siteLodge.id)
-      : mockDb.getLodgeSite(tenantSlug)
+      ? await db.getChurchSite(siteChurch.id)
+      : mockDb.getChurchSite(tenantSlug)
     : null;
-  const title = site?.page_title || siteLodge?.name || "Lodge website";
+  const title = site?.page_title || siteChurch?.name || "Church website";
   const description =
     site?.page_description ||
-    siteLodge?.tagline ||
-    "Visitor information, meetings, charity, membership enquiries, and lodge contact details.";
+    siteChurch?.tagline ||
+    "Newcomer information, services, charity, membership enquiries, and church contact details.";
 
   return {
     title: {
@@ -113,10 +113,10 @@ export async function generateMetadata({
 async function HomeContent({
   searchParams,
 }: {
-  searchParams: Promise<{ lodge?: string }>;
+  searchParams: Promise<{ church?: string }>;
 }) {
-  const { lodge } = await searchParams;
-  const tenantSlug = await getPublicTenantSlug(lodge);
+  const { church } = await searchParams;
+  const tenantSlug = await getPublicTenantSlug(church);
 
   if (tenantSlug) {
     const initialPayload = await getPublicSitePayload(tenantSlug);
@@ -124,18 +124,18 @@ async function HomeContent({
       <div className="flex min-h-screen flex-col bg-white">
         <Suspense>
           <PublicHeader
-            initialBranding={initialPayload?.lodge ?? null}
+            initialBranding={initialPayload?.church ?? null}
             initialHeaderSettings={initialPayload?.site.header_settings ?? null}
             initialCustomPages={initialPayload?.site.custom_pages ?? []}
             initialTenantSlug={tenantSlug}
           />
         </Suspense>
         <main className="flex-1">
-          <LodgeHomepage initialLodgeSlug={tenantSlug} initialPayload={initialPayload} />
+          <ChurchHomepage initialChurchSlug={tenantSlug} initialPayload={initialPayload} />
         </main>
         <Suspense>
           <PublicFooter
-            initialBranding={initialPayload?.lodge ?? null}
+            initialBranding={initialPayload?.church ?? null}
             initialFooterSettings={initialPayload?.site.footer_settings ?? null}
             initialTenantSlug={tenantSlug}
           />
@@ -144,23 +144,19 @@ async function HomeContent({
     );
   }
 
-  return <MarketingHomepage />;
-}
-
-function MarketingHomepage() {
-  return <StaticMarketingSite initialPage="home" />;
+  return <MarketingHome />;
 }
 
 export default function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ lodge?: string }>;
+  searchParams: Promise<{ church?: string }>;
 }) {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-dash-bg">
-          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-dash-border border-t-dash-ring" />
+        <div className="flex min-h-screen items-center justify-center bg-[#faf8f3]">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-[#e9e2d4] border-t-brand" />
         </div>
       }
     >

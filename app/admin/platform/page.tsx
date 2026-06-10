@@ -22,7 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { LucideIcon } from "lucide-react";
-import { ProvisionLodgeClient } from "./provision-client";
+import { ProvisionChurchClient } from "./provision-client";
 import { FeatureFlagsClient } from "./feature-flags-client";
 import { PlatformConsoleManager } from "@/components/admin/platform-console-manager";
 
@@ -41,34 +41,34 @@ export default async function PlatformOverviewPage() {
     redirect("/admin");
   }
 
-  const [stats, provinces, lodges, platformAdmins, tenantAdmins] = await Promise.all([
-    db.getPlatformLodgeStats(),
-    db.listProvinces(),
-    db.listLodges(),
+  const [stats, networks, churches, platformAdmins, tenantAdmins] = await Promise.all([
+    db.getPlatformChurchStats(),
+    db.listNetworks(),
+    db.listChurches(),
     db.listPlatformAdminUsers(),
     db.listTenantAdminUsers(),
   ]);
 
-  const provinceById = new Map(provinces.map((p) => [p.id, p]));
+  const networkById = new Map(networks.map((p) => [p.id, p]));
 
   const totals = stats.reduce(
     (acc, s) => {
-      acc.lodges += 1;
+      acc.churches += 1;
       acc.members += s.members;
       acc.activeMembers += s.active_members;
       acc.upcomingEvents += s.upcoming_events;
-      acc.outstandingDues += s.outstanding_dues;
-      acc.paidDuesAmount += s.paid_dues_amount;
+      acc.outstandingGiving += s.outstanding_giving;
+      acc.paidGivingAmount += s.paid_giving_amount;
       acc.donationsAmount += s.donations_amount;
       return acc;
     },
     {
-      lodges: 0,
+      churches: 0,
       members: 0,
       activeMembers: 0,
       upcomingEvents: 0,
-      outstandingDues: 0,
-      paidDuesAmount: 0,
+      outstandingGiving: 0,
+      paidGivingAmount: 0,
       donationsAmount: 0,
     }
   );
@@ -83,43 +83,43 @@ export default async function PlatformOverviewPage() {
             Platform console
           </p>
           <h1 className="text-2xl font-bold text-slate-900">
-            Cross-lodge overview
+            Cross-church overview
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-500">
-            One dashboard to see the health of every lodge on the platform.
+            One dashboard to see the health of every church on the platform.
             Operators only.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/admin/provinces">
-            <Button variant="outline">Provinces</Button>
+          <Link href="/admin/networks">
+            <Button variant="outline">Networks</Button>
           </Link>
           <Link href="/admin/onboarding">
-            <Button variant="outline">Onboard a lodge</Button>
+            <Button variant="outline">Onboard a church</Button>
           </Link>
         </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <ProvisionLodgeClient
-          provinces={provinces.map((p) => ({ id: p.id, name: p.name }))}
+        <ProvisionChurchClient
+          networks={networks.map((p) => ({ id: p.id, name: p.name }))}
         />
         <FeatureFlagsClient
-          lodges={stats.map((s) => ({ id: s.lodge_id, name: s.lodge_name }))}
+          churches={stats.map((s) => ({ id: s.church_id, name: s.church_name }))}
         />
       </div>
 
       <PlatformConsoleManager
-        lodges={lodges.map((lodge) => ({
-          id: lodge.id,
-          name: lodge.name,
-          slug: lodge.slug,
-          lodge_number: lodge.lodge_number,
-          province_id: lodge.province_id,
+        churches={churches.map((church) => ({
+          id: church.id,
+          name: church.name,
+          slug: church.slug,
+          church_number: church.church_number,
+          network_id: church.network_id,
         }))}
-        provinces={provinces.map((province) => ({
-          id: province.id,
-          name: province.name,
+        networks={networks.map((network) => ({
+          id: network.id,
+          name: network.name,
         }))}
         tenantAdmins={JSON.parse(JSON.stringify(tenantAdmins))}
         platformAdmins={JSON.parse(JSON.stringify(platformAdmins))}
@@ -127,7 +127,7 @@ export default async function PlatformOverviewPage() {
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat icon={Building2} label="Lodges" value={String(totals.lodges)} />
+        <Stat icon={Building2} label="Churches" value={String(totals.churches)} />
         <Stat
           icon={Users}
           label="Members"
@@ -136,36 +136,36 @@ export default async function PlatformOverviewPage() {
         />
         <Stat
           icon={Calendar}
-          label="Upcoming meetings"
+          label="Upcoming services"
           value={String(totals.upcomingEvents)}
-          hint={`${totals.outstandingDues.toLocaleString("en-GB")} dues outstanding`}
+          hint={`${totals.outstandingGiving.toLocaleString("en-GB")} giving outstanding`}
         />
         <Stat
           icon={HeartHandshake}
           label="Donations YTD"
           value={GBP.format(totals.donationsAmount)}
-          hint={`${GBP.format(totals.paidDuesAmount)} dues collected`}
+          hint={`${GBP.format(totals.paidGivingAmount)} giving collected`}
         />
       </div>
 
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-5 py-3">
           <h2 className="text-base font-semibold text-slate-900">
-            Per-lodge breakdown
+            Per-church breakdown
           </h2>
         </div>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Lodge</TableHead>
-                <TableHead>Province</TableHead>
+                <TableHead>Church</TableHead>
+                <TableHead>Network</TableHead>
                 <TableHead className="text-right">Active</TableHead>
                 <TableHead className="text-right">Upcoming</TableHead>
-                <TableHead className="text-right">Outstanding dues</TableHead>
-                <TableHead className="text-right">Dues collected</TableHead>
+                <TableHead className="text-right">Outstanding giving</TableHead>
+                <TableHead className="text-right">Giving collected</TableHead>
                 <TableHead className="text-right">Donations</TableHead>
-                <TableHead>Last meeting</TableHead>
+                <TableHead>Last service</TableHead>
                 <TableHead aria-label="Open" />
               </TableRow>
             </TableHeader>
@@ -173,18 +173,18 @@ export default async function PlatformOverviewPage() {
               {sorted.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} className="py-6 text-center text-sm text-slate-500">
-                    No lodges yet. Use Provinces or Onboarding to add the first one.
+                    No churches yet. Use Networks or Onboarding to add the first one.
                   </TableCell>
                 </TableRow>
               ) : (
                 sorted.map((row) => (
-                  <TableRow key={row.lodge_id}>
+                  <TableRow key={row.church_id}>
                     <TableCell className="text-sm font-medium text-slate-900">
-                      {row.lodge_name}
+                      {row.church_name}
                     </TableCell>
                     <TableCell className="text-sm text-slate-500">
-                      {row.province_id
-                        ? provinceById.get(row.province_id)?.name ?? "-"
+                      {row.network_id
+                        ? networkById.get(row.network_id)?.name ?? "-"
                         : "-"}
                     </TableCell>
                     <TableCell className="text-right text-sm">
@@ -194,22 +194,22 @@ export default async function PlatformOverviewPage() {
                       {row.upcoming_events}
                     </TableCell>
                     <TableCell className="text-right text-sm">
-                      {row.outstanding_dues}
+                      {row.outstanding_giving}
                     </TableCell>
                     <TableCell className="text-right text-sm">
-                      {GBP.format(row.paid_dues_amount)}
+                      {GBP.format(row.paid_giving_amount)}
                     </TableCell>
                     <TableCell className="text-right text-sm">
                       {GBP.format(row.donations_amount)}
                     </TableCell>
                     <TableCell className="text-sm text-slate-500">
-                      {row.last_meeting_at
-                        ? new Date(row.last_meeting_at).toLocaleDateString("en-GB")
+                      {row.last_service_at
+                        ? new Date(row.last_service_at).toLocaleDateString("en-GB")
                         : "-"}
                     </TableCell>
                     <TableCell>
                       <Link
-                        href={`/api/admin/lodge-context?slug=${row.lodge_slug}`}
+                        href={`/api/admin/church-context?slug=${row.church_slug}`}
                         prefetch={false}
                         className="inline-flex items-center text-xs text-blue-600 hover:underline"
                       >

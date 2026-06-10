@@ -2,10 +2,10 @@
 
 // Gift Aid panel on the admin member profile.
 //
-// Designed for the post-meeting workflow described by the user: at the
-// festive board the Charity Steward collects a stack of signed paper
+// Designed for the post-service workflow described by the user: at the
+// fellowship meal the Charity Steward collects a stack of signed paper
 // declarations, then sits down later and walks down the list, opening
-// each Brother's profile and uploading the slip on their behalf.
+// each Member's profile and uploading the slip on their behalf.
 //
 // Two states:
 //
@@ -28,6 +28,7 @@ import {
   Plus,
   ShieldCheck,
   Trash2,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GiftAidPaperUploadDialog } from "@/components/admin/gift-aid-paper-upload-dialog";
@@ -60,15 +61,20 @@ export function MemberGiftAidPanel({
     address_line_2: string | null;
     city: string | null;
     postcode: string | null;
+    gift_aid_consent_status: "unknown" | "declared" | "declined";
   };
   declaration: ActiveDeclaration | null;
 }) {
   const [declaration, setDeclaration] = useState<ActiveDeclaration | null>(
     initialDeclaration,
   );
+  const [consentStatus, setConsentStatus] = useState(
+    member.gift_aid_consent_status,
+  );
   const [dialogOpen, setDialogOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [revoking, setRevoking] = useState(false);
+  const [updatingRefusal, setUpdatingRefusal] = useState(false);
   const [feedback, setFeedback] = useState<{
     type: "success" | "error";
     text: string;
@@ -85,8 +91,10 @@ export function MemberGiftAidPanel({
       if (res.ok) {
         const body = (await res.json()) as {
           declaration: ActiveDeclaration | null;
+          consent_status?: "unknown" | "declared" | "declined";
         };
         setDeclaration(body.declaration);
+        setConsentStatus(body.consent_status ?? "unknown");
       }
     } catch {
       /* non-fatal: stale state is fine */
@@ -158,7 +166,59 @@ export function MemberGiftAidPanel({
     }
   }
 
+  async function updateRefusal(action: "refuse" | "clear") {
+    if (
+      action === "refuse" &&
+      !window.confirm(
+        "Mark this member as having refused Gift Aid? Any active declaration will be revoked for future claims.",
+      )
+    ) {
+      return;
+    }
+    setUpdatingRefusal(true);
+    setFeedback(null);
+    try {
+      const res = await fetch(
+        `/api/admin/members/${encodeURIComponent(member.id)}/gift-aid`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action }),
+        },
+      );
+      const body = (await res.json().catch(() => ({}))) as {
+        consent_status?: "unknown" | "declared" | "declined";
+        declaration?: ActiveDeclaration | null;
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(body.error ?? "Could not update Gift Aid refusal.");
+      }
+      setConsentStatus(body.consent_status ?? "unknown");
+      setDeclaration(body.declaration ?? null);
+      setFeedback({
+        type: "success",
+        text:
+          action === "refuse"
+            ? "Gift Aid marked as refused."
+            : "Gift Aid refusal cleared.",
+      });
+      await refresh();
+    } catch (err) {
+      setFeedback({
+        type: "error",
+        text:
+          err instanceof Error
+            ? err.message
+            : "Could not update Gift Aid refusal.",
+      });
+    } finally {
+      setUpdatingRefusal(false);
+    }
+  }
+
   const isActive = declaration && !declaration.revoked_at;
+  const isRefused = consentStatus === "declined" && !isActive;
   // A paper declaration without stored evidence is a yellow flag -- it
   // shouldn't happen in normal flow (admin POST inserts the row only
   // after the upload succeeds, then revokes on upload failure) but we
@@ -174,7 +234,7 @@ export function MemberGiftAidPanel({
           <HeartHandshake className="h-4 w-4 text-dash-muted" />
           Gift Aid declaration
         </h3>
-        {!isActive ? (
+        {!isActive && !isRefused ? (
           <Button
             size="sm"
             variant="primary"
@@ -337,7 +397,47 @@ export function MemberGiftAidPanel({
                 )}
                 Revoke
               </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => updateRefusal("refuse")}
+                disabled={updatingRefusal}
+                className="gap-2 text-red-700 hover:bg-red-50 hover:text-red-800"
+              >
+                {updatingRefusal ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <XCircle className="h-3.5 w-3.5" />
+                )}
+                Mark refused
+              </Button>
             </div>
+          </div>
+        ) : isRefused ? (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+              <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
+              <div>
+                <p className="font-medium text-rose-900">Gift Aid refused</p>
+                <p className="mt-1 text-xs text-rose-800">
+                  This member has explicitly refused Gift Aid. Their donations
+                  will not be included in future claim batches unless the
+                  refusal is cleared.
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => updateRefusal("clear")}
+              disabled={updatingRefusal}
+              className="gap-2"
+            >
+              {updatingRefusal ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : null}
+              Clear refusal
+            </Button>
           </div>
         ) : (
           <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
@@ -353,6 +453,20 @@ export function MemberGiftAidPanel({
                 only need to confirm the slip date, snap a photo and tick the
                 holding-original attestation.
               </p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => updateRefusal("refuse")}
+                disabled={updatingRefusal}
+                className="mt-3 gap-2"
+              >
+                {updatingRefusal ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <XCircle className="h-3.5 w-3.5" />
+                )}
+                Mark as refused
+              </Button>
             </div>
           </div>
         )}

@@ -29,18 +29,18 @@ import {
 
 type Counts = {
   members: number;
-  dues: number;
+  giving: number;
   events: number;
   staff: number;
 };
 
-type StepId = "intro" | "members" | "dues" | "summons" | "staff" | "done";
+type StepId = "intro" | "members" | "giving" | "notice" | "staff" | "done";
 
 const STEPS: Array<{ id: StepId; title: string; description: string }> = [
   {
     id: "intro",
     title: "Welcome",
-    description: "A 15 minute setup to get your lodge live.",
+    description: "A 15 minute setup to get your church live.",
   },
   {
     id: "members",
@@ -48,19 +48,19 @@ const STEPS: Array<{ id: StepId; title: string; description: string }> = [
     description: "Upload a CSV of your roll book.",
   },
   {
-    id: "dues",
-    title: "Annual dues",
-    description: "Generate this year's dues for every active member.",
+    id: "giving",
+    title: "Annual giving",
+    description: "Generate this year's giving for every active member.",
   },
   {
-    id: "summons",
-    title: "First summons",
-    description: "Schedule your next regular meeting.",
+    id: "notice",
+    title: "First notice",
+    description: "Schedule your next regular service.",
   },
   {
     id: "staff",
     title: "Officer access",
-    description: "Invite your secretary, treasurer, and almoner.",
+    description: "Invite your secretary, treasurer, and pastoral_care.",
   },
   { id: "done", title: "All done", description: "You are live." },
 ];
@@ -110,20 +110,20 @@ function Stepper({
 }
 
 export function OnboardingWizard({
-  lodgeSlug,
-  lodgeName,
+  churchSlug,
+  churchName,
   counts,
 }: {
-  lodgeSlug: string;
-  lodgeName: string;
+  churchSlug: string;
+  churchName: string;
   counts: Counts;
 }) {
   const router = useRouter();
   const initialCompleted = useMemo(() => {
     const set = new Set<StepId>(["intro"]);
     if (counts.members > 0) set.add("members");
-    if (counts.dues > 0) set.add("dues");
-    if (counts.events > 0) set.add("summons");
+    if (counts.giving > 0) set.add("giving");
+    if (counts.events > 0) set.add("notice");
     if (counts.staff > 0) set.add("staff");
     return set;
   }, [counts]);
@@ -154,7 +154,7 @@ export function OnboardingWizard({
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${lodgeSlug}-members-template.csv`;
+    link.download = `${churchSlug}-members-template.csv`;
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -164,14 +164,14 @@ export function OnboardingWizard({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-wider text-slate-500">
-            Lodge onboarding
+            Church onboarding
           </p>
           <h1 className="text-2xl font-bold text-slate-900">
-            Get {lodgeName} live in 15 minutes
+            Get {churchName} live in 15 minutes
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-500">
-            We will guide you through importing members, generating dues,
-            scheduling your first summons, and inviting your officers. Each step
+            We will guide you through importing members, generating giving,
+            scheduling your first notice, and inviting your officers. Each step
             uses the same APIs as the rest of the admin and can be re-run any
             time.
           </p>
@@ -206,27 +206,27 @@ export function OnboardingWizard({
             setBusy={setBusy}
             setFeedback={setFeedback}
             onCsvTemplate={downloadCsvTemplate}
-            onDone={() => markDone("members", "dues")}
-            onSkip={() => setCurrent("dues")}
+            onDone={() => markDone("members", "giving")}
+            onSkip={() => setCurrent("giving")}
           />
         )}
-        {current === "dues" && (
-          <DuesStep
-            existingCount={counts.dues}
+        {current === "giving" && (
+          <GivingStep
+            existingCount={counts.giving}
             busyKey={busy}
             setBusy={setBusy}
             setFeedback={setFeedback}
-            onDone={() => markDone("dues", "summons")}
-            onSkip={() => setCurrent("summons")}
+            onDone={() => markDone("giving", "notice")}
+            onSkip={() => setCurrent("notice")}
           />
         )}
-        {current === "summons" && (
-          <SummonsStep
+        {current === "notice" && (
+          <NoticeStep
             existingCount={counts.events}
             busyKey={busy}
             setBusy={setBusy}
             setFeedback={setFeedback}
-            onDone={() => markDone("summons", "staff")}
+            onDone={() => markDone("notice", "staff")}
             onSkip={() => setCurrent("staff")}
           />
         )}
@@ -240,7 +240,7 @@ export function OnboardingWizard({
             onSkip={() => setCurrent("done")}
           />
         )}
-        {current === "done" && <DoneStep lodgeName={lodgeName} />}
+        {current === "done" && <DoneStep churchName={churchName} />}
       </div>
 
       <div className="flex justify-between">
@@ -287,7 +287,7 @@ function IntroStep({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Could not seed sample data.");
       setSeedFeedback(
-        `Added ${data.created?.members ?? 0} members, ${data.created?.leads ?? 0} leads, ${data.created?.events ?? 0} meetings, ${data.created?.dues ?? 0} dues records.`
+        `Added ${data.created?.members ?? 0} members, ${data.created?.newcomers ?? 0} newcomers, ${data.created?.events ?? 0} services, ${data.created?.giving ?? 0} giving records.`
       );
       router.refresh();
     } catch (error) {
@@ -305,7 +305,7 @@ function IntroStep({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Could not clear sample data.");
       setSeedFeedback(
-        `Removed ${data.removed?.members ?? 0} sample members, ${data.removed?.leads ?? 0} leads, ${data.removed?.events ?? 0} meetings.`
+        `Removed ${data.removed?.members ?? 0} sample members, ${data.removed?.newcomers ?? 0} newcomers, ${data.removed?.events ?? 0} services.`
       );
       router.refresh();
     } catch (error) {
@@ -323,12 +323,12 @@ function IntroStep({
     },
     {
       icon: Wallet,
-      label: "Dues records",
-      value: counts.dues,
+      label: "Giving records",
+      value: counts.giving,
     },
     {
       icon: CalendarPlus,
-      label: "Upcoming meetings",
+      label: "Upcoming services",
       value: counts.events,
     },
     {
@@ -381,7 +381,7 @@ function IntroStep({
           Want to explore safely first?
         </h3>
         <p className="mt-1 text-sm text-slate-500">
-          Load a small set of sample brethren, leads, dues and a demo meeting
+          Load a small set of sample members, newcomers, giving and a demo service
           so you can click around without any real data. Sample records are
           all prefixed &quot;Sample · &quot; and can be cleared in one click.
         </p>
@@ -502,7 +502,7 @@ function MembersStep({
             Import your roll book
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Upload a CSV of every active brother. We will preview the rows before
+            Upload a CSV of every active member. We will preview the rows before
             anything is created. Already have {existingCount} members on file.
           </p>
         </div>
@@ -594,7 +594,7 @@ function MembersStep({
   );
 }
 
-function DuesStep({
+function GivingStep({
   existingCount,
   busyKey,
   setBusy,
@@ -619,9 +619,9 @@ function DuesStep({
   });
 
   async function runBulk() {
-    setBusy("dues:bulk");
+    setBusy("giving:bulk");
     try {
-      const res = await fetch("/api/dues/bulk-run", {
+      const res = await fetch("/api/giving/bulk-run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -633,13 +633,13 @@ function DuesStep({
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "Could not run bulk dues.");
+      if (!res.ok) throw new Error(data.error ?? "Could not run bulk giving.");
       setFeedback(
-        `Created ${data.created ?? 0} dues records, skipped ${data.skipped ?? 0} existing.`
+        `Created ${data.created ?? 0} giving records, skipped ${data.skipped ?? 0} existing.`
       );
       onDone();
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "Bulk dues failed.");
+      setFeedback(error instanceof Error ? error.message : "Bulk giving failed.");
     } finally {
       setBusy(null);
     }
@@ -649,18 +649,18 @@ function DuesStep({
     <div className="space-y-4">
       <h2 className="text-lg font-semibold text-slate-900">
         <Wallet className="mr-2 inline h-5 w-5 text-slate-500" />
-        Generate annual dues
+        Generate annual giving
       </h2>
       <p className="text-sm text-slate-500">
-        Creates one dues record per active member for the period below. Already
-        have {existingCount} dues records on file. Existing records for the same
+        Creates one giving record per active member for the period below. Already
+        have {existingCount} giving records on file. Existing records for the same
         period are skipped automatically.
       </p>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div>
-          <Label htmlFor="dues-amount">Amount per member (GBP)</Label>
+          <Label htmlFor="giving-amount">Amount per member (GBP)</Label>
           <Input
-            id="dues-amount"
+            id="giving-amount"
             type="number"
             min={0}
             step={1}
@@ -671,9 +671,9 @@ function DuesStep({
           />
         </div>
         <div>
-          <Label htmlFor="dues-instalments">Instalments</Label>
+          <Label htmlFor="giving-instalments">Instalments</Label>
           <Input
-            id="dues-instalments"
+            id="giving-instalments"
             type="number"
             min={1}
             max={12}
@@ -684,9 +684,9 @@ function DuesStep({
           />
         </div>
         <div>
-          <Label htmlFor="dues-start">Period start</Label>
+          <Label htmlFor="giving-start">Period start</Label>
           <Input
-            id="dues-start"
+            id="giving-start"
             type="date"
             value={form.period_start}
             onChange={(e) =>
@@ -695,9 +695,9 @@ function DuesStep({
           />
         </div>
         <div>
-          <Label htmlFor="dues-end">Period end</Label>
+          <Label htmlFor="giving-end">Period end</Label>
           <Input
-            id="dues-end"
+            id="giving-end"
             type="date"
             value={form.period_end}
             onChange={(e) =>
@@ -706,9 +706,9 @@ function DuesStep({
           />
         </div>
         <div className="md:col-span-2">
-          <Label htmlFor="dues-freq">Instalment frequency</Label>
+          <Label htmlFor="giving-freq">Instalment frequency</Label>
           <select
-            id="dues-freq"
+            id="giving-freq"
             className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
             value={form.frequency}
             onChange={(e) =>
@@ -725,11 +725,11 @@ function DuesStep({
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button onClick={runBulk} disabled={busyKey === "dues:bulk"}>
-          {busyKey === "dues:bulk" ? (
+        <Button onClick={runBulk} disabled={busyKey === "giving:bulk"}>
+          {busyKey === "giving:bulk" ? (
             <Loader2 className="mr-1 h-4 w-4 animate-spin" />
           ) : null}
-          Run bulk dues
+          Run bulk giving
         </Button>
         <Button variant="outline" onClick={onSkip}>
           Skip for now
@@ -739,7 +739,7 @@ function DuesStep({
   );
 }
 
-function SummonsStep({
+function NoticeStep({
   existingCount,
   busyKey,
   setBusy,
@@ -759,15 +759,15 @@ function SummonsStep({
   future.setMonth(future.getMonth() + 1);
   const defaultDate = future.toISOString().slice(0, 10);
   const [form, setForm] = useState({
-    title: "Regular meeting",
+    title: "Regular service",
     slug: `regular-${defaultDate}`,
     event_date: defaultDate,
     event_time: "18:30",
-    location: "Mark Masons' Hall",
+    location: "Mark members' Hall",
     dress_code: "Morning dress",
   });
 
-  async function createMeeting() {
+  async function createService() {
     setBusy("event:create");
     try {
       const res = await fetch("/api/events", {
@@ -775,17 +775,17 @@ function SummonsStep({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
-          event_type: "lodge_meeting",
+          event_type: "church_service",
           enable_rsvp: true,
           published: true,
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "Could not create meeting.");
-      setFeedback("First summons scheduled. Brothers can now RSVP.");
+      if (!res.ok) throw new Error(data.error ?? "Could not create service.");
+      setFeedback("First notice scheduled. Members can now RSVP.");
       onDone();
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "Could not create meeting.");
+      setFeedback(error instanceof Error ? error.message : "Could not create service.");
     } finally {
       setBusy(null);
     }
@@ -795,11 +795,11 @@ function SummonsStep({
     <div className="space-y-4">
       <h2 className="text-lg font-semibold text-slate-900">
         <CalendarPlus className="mr-2 inline h-5 w-5 text-slate-500" />
-        Schedule the first summons
+        Schedule the first notice
       </h2>
       <p className="text-sm text-slate-500">
-        Adds your next regular meeting with RSVP enabled. Already have{" "}
-        {existingCount} upcoming meetings.
+        Adds your next regular service with RSVP enabled. Already have{" "}
+        {existingCount} upcoming services.
       </p>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div className="md:col-span-2">
@@ -851,11 +851,11 @@ function SummonsStep({
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button onClick={createMeeting} disabled={busyKey === "event:create"}>
+        <Button onClick={createService} disabled={busyKey === "event:create"}>
           {busyKey === "event:create" ? (
             <Loader2 className="mr-1 h-4 w-4 animate-spin" />
           ) : null}
-          Schedule meeting
+          Schedule service
         </Button>
         <Button variant="outline" onClick={onSkip}>
           Skip for now
@@ -868,7 +868,7 @@ function SummonsStep({
 const STAFF_ROLES = [
   { value: "secretary", label: "Secretary" },
   { value: "treasurer", label: "Treasurer" },
-  { value: "almoner", label: "Almoner" },
+  { value: "pastoral_care", label: "PastoralCare" },
   { value: "charity_steward", label: "Charity Steward" },
   { value: "membership_officer", label: "Membership Officer" },
   { value: "master", label: "Master" },
@@ -906,7 +906,7 @@ function StaffStep({
   function addRow() {
     setInvites((prev) => [
       ...prev,
-      { full_name: "", email: "", role: "almoner" },
+      { full_name: "", email: "", role: "pastoral_care" },
     ]);
   }
 
@@ -949,7 +949,7 @@ function StaffStep({
         Invite officers
       </h2>
       <p className="text-sm text-slate-500">
-        Send branded Resend invites to your secretary, treasurer, almoner, and
+        Send branded Resend invites to your secretary, treasurer, pastoral_care, and
         charity steward so they can take over their part of the platform.
         Already have {existingCount} officers with admin access.
       </p>
@@ -1021,17 +1021,17 @@ function StaffStep({
   );
 }
 
-function DoneStep({ lodgeName }: { lodgeName: string }) {
+function DoneStep({ churchName }: { churchName: string }) {
   return (
     <div className="space-y-3 text-center">
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100">
         <CheckCircle2 className="h-7 w-7 text-emerald-600" />
       </div>
       <h2 className="text-xl font-semibold text-slate-900">
-        {lodgeName} is live
+        {churchName} is live
       </h2>
       <p className="mx-auto max-w-md text-sm text-slate-500">
-        Members are imported, dues are scheduled, your first summons is on the
+        Members are imported, giving are scheduled, your first notice is on the
         calendar, and your officers have been invited. From here, the daily
         flow lives in the sidebar.
       </p>

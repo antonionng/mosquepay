@@ -4,7 +4,7 @@
 // Mooov payment_intent for an arbitrary amount + description, returns the
 // hosted_url so the iPad client can render it as a QR for a guest to scan.
 //
-// Auth: admin with payments:write on the active lodge.
+// Auth: admin with payments:write on the active church.
 // Persistence: writes a preflight mooov.payment_attempts row with
 // intent='take_payment' so the Mooov webhook handler projects success into
 // public.payments the same way it does for any other channel.
@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
-import { resolveTodaysMeetingId } from "@/lib/meetings/todays-meeting";
+import { resolveTodaysServiceId } from "@/lib/services/todays-service";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { getCurrentAdminContextAny } from "@/lib/auth/permissions";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -47,8 +47,8 @@ function parseGuestInline(value: unknown): GuestInlineInput | null {
     full_name,
     email: trimOrNull(v.email),
     phone: trimOrNull(v.phone),
-    mother_lodge_name: trimOrNull(v.mother_lodge_name),
-    mother_lodge_number: trimOrNull(v.mother_lodge_number),
+    mother_church_name: trimOrNull(v.mother_church_name),
+    mother_church_number: trimOrNull(v.mother_church_number),
   };
 }
 
@@ -65,13 +65,13 @@ interface PaymentIntentResponse {
 
 async function loadMooovMerchant(
   supa: ReturnType<typeof createServiceClient>,
-  lodgeId: string,
+  churchId: string,
 ): Promise<string | null> {
   const { data, error } = await supa
     .schema("mooov")
-    .from("lodges")
+    .from("churches")
     .select("merchant_id, status")
-    .eq("id", lodgeId)
+    .eq("id", churchId)
     .maybeSingle<{ merchant_id: string; status: string }>();
   if (error) throw error;
   if (!data) return null;
@@ -127,8 +127,8 @@ export async function POST(request: NextRequest) {
     typeof body.guest_id === "string" && body.guest_id.trim()
       ? body.guest_id.trim()
       : null;
-  // Optional meeting attribution. When set, the webhook projector pulls this
-  // out of metadata.event_id and writes payments.event_id so the meeting
+  // Optional service attribution. When set, the webhook projector pulls this
+  // out of metadata.event_id and writes payments.event_id so the service
   // detail page can roll it up.
   const eventIdInput =
     typeof body.event_id === "string" && body.event_id.trim()
@@ -151,48 +151,48 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Use the admin's scoped lodge (same logic as the page) so a lodge-scoped
-  // treasurer whose ADMIN_LODGE_COOKIE has not been set never mints a QR
-  // against the wrong lodge -- they'd previously fall through to the
-  // platform default lodge here and 401 on the permission check.
+  // Use the admin's scoped church (same logic as the page) so a church-scoped
+  // treasurer whose ADMIN_CHURCH_COOKIE has not been set never mints a QR
+  // against the wrong church -- they'd previously fall through to the
+  // platform default church here and 401 on the permission check.
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.lodgeId) {
-    return NextResponse.json({ error: "Lodge not selected." }, { status: 404 });
+  if (ctx.mode !== "database" || !ctx.churchId) {
+    return NextResponse.json({ error: "Church not selected." }, { status: 404 });
   }
-  const lodgeId = ctx.lodgeId;
-  const lodgeSlug = ctx.lodgeSlug;
+  const churchId = ctx.churchId;
+  const churchSlug = ctx.churchSlug;
 
-  const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("payments:write", churchId);
   if (forbidden) return forbidden;
 
-  // Validate any provided event_id is for this lodge. If the lookup throws
+  // Validate any provided event_id is for this church. If the lookup throws
   // we treat it as non-fatal and proceed without an event link rather than
   // failing the QR mint outright.
   let resolvedEventId: string | null = null;
   if (eventIdInput) {
     try {
-      const eventRow = await db.getEventById(eventIdInput, lodgeId);
+      const eventRow = await db.getEventById(eventIdInput, churchId);
       if (eventRow) {
         resolvedEventId = eventRow.id;
       } else {
         return NextResponse.json(
-          { error: "Selected meeting not found in this lodge." },
+          { error: "Selected service not found in this church." },
           { status: 400 },
         );
       }
     } catch (err) {
       console.warn("Take payment POST: event lookup failed (non-fatal)", {
-        lodge_id: lodgeId,
+        church_id: churchId,
         event_id: eventIdInput,
         message: err instanceof Error ? err.message : String(err),
       });
     }
   }
-  // No meeting chosen: if exactly one meeting is dated today, attribute the
+  // No service chosen: if exactly one service is dated today, attribute the
   // takings to it so reconciliation rolls up cleanly without the treasurer
-  // having to pick the event each time during a live meeting.
+  // having to pick the event each time during a live service.
   if (!resolvedEventId) {
-    resolvedEventId = await resolveTodaysMeetingId(lodgeId);
+    resolvedEventId = await resolveTodaysServiceId(churchId);
   }
 
   // Capture who is generating this QR so the history view can show
@@ -202,12 +202,12 @@ export async function POST(request: NextRequest) {
   let createdByEmail: string | null = null;
   let createdByRole: string | null = null;
   try {
-    const admin = await getCurrentAdminContextAny(lodgeId);
+    const admin = await getCurrentAdminContextAny(churchId);
     createdByEmail = admin?.email ?? null;
     createdByRole = admin?.role ?? null;
   } catch (err) {
     console.warn("Take payment POST: could not resolve admin identity", {
-      lodge_id: lodgeId,
+      church_id: churchId,
       message: err instanceof Error ? err.message : String(err),
     });
   }
@@ -227,14 +227,14 @@ export async function POST(request: NextRequest) {
 
   let merchantId: string | null;
   try {
-    merchantId = await loadMooovMerchant(supa, lodgeId);
+    merchantId = await loadMooovMerchant(supa, churchId);
   } catch (err) {
     console.error("Take payment POST: mooov merchant lookup failed", {
-      lodge_id: lodgeId,
+      church_id: churchId,
       message: err instanceof Error ? err.message : String(err),
     });
     return NextResponse.json(
-      { error: "Could not look up payment processor for this lodge." },
+      { error: "Could not look up payment processor for this church." },
       { status: 500 },
     );
   }
@@ -242,8 +242,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error:
-          "This lodge has not connected its payment processor yet. Visit Integrations to connect Mooov before taking in-person payments.",
-        code: "lodge_not_connected",
+          "This church has not connected its payment processor yet. Visit Integrations to connect Mooov before taking in-person payments.",
+        code: "church_not_connected",
       },
       { status: 503 },
     );
@@ -251,7 +251,7 @@ export async function POST(request: NextRequest) {
 
   const amountMinor = Math.round(amount * 100);
   const currency = "GBP";
-  const paymentId = `tip_${lodgeId}_${Date.now().toString(36)}_${Math.random()
+  const paymentId = `tip_${churchId}_${Date.now().toString(36)}_${Math.random()
     .toString(36)
     .slice(2, 10)}`;
   const idempotencyKey = `tip_${paymentId}`;
@@ -264,14 +264,14 @@ export async function POST(request: NextRequest) {
   // active-session card keeps polling the LP-side status independently.
   const successUrl = `${siteUrl}/take-payment/done?payment_id=${encodeURIComponent(paymentId)}`;
   const cancelUrl = `${siteUrl}/take-payment/cancelled?payment_id=${encodeURIComponent(paymentId)}`;
-  const intentDescription = description || `Payment to lodge (${reference || "in-person"})`;
+  const intentDescription = description || `Payment to church (${reference || "in-person"})`;
 
   // Payer attribution. Resolved up front so the downstream webhook projector
   // credits user_name / user_email correctly and we can auto-attach a Gift
-  // Aid declaration when the payer has an active one on this lodge. Shared
+  // Aid declaration when the payer has an active one on this church. Shared
   // with the cash endpoint; supports member, existing guest, and inline-new
   // guest (created via find-or-create on the guests directory).
-  const attribution = await resolveTakePaymentAttribution(lodgeId, {
+  const attribution = await resolveTakePaymentAttribution(churchId, {
     memberId,
     guestId,
     guestInline,
@@ -283,12 +283,13 @@ export async function POST(request: NextRequest) {
     payerEmail,
     giftAidDeclarationId,
     giftAidEligible,
+    giftAidRefused,
   } = attribution;
 
   const initialMetadata: Record<string, unknown> = {
-    source: "lodgepay_take_payment",
-    lodge_slug: lodgeSlug,
-    lodge_id: lodgeId,
+    source: "churchpay_take_payment",
+    church_slug: churchSlug,
+    church_id: churchId,
     intent: "take_payment",
     category,
     line_items: itemised ? lineItems : null,
@@ -308,6 +309,7 @@ export async function POST(request: NextRequest) {
     member_email: payerEmail,
     gift_aid_declaration_id: giftAidDeclarationId,
     gift_aid_eligible: giftAidEligible,
+    gift_aid_refused: giftAidRefused,
   };
 
   const { error: insertError } = await supa
@@ -315,7 +317,7 @@ export async function POST(request: NextRequest) {
     .from("payment_attempts")
     .insert({
       payment_id: paymentId,
-      lodge_id: lodgeId,
+      church_id: churchId,
       member_id: null,
       amount: amountMinor,
       currency,
@@ -325,7 +327,7 @@ export async function POST(request: NextRequest) {
       metadata: initialMetadata,
       guest_descriptor: {
         source: "in_person_take_payment",
-        lodge_slug: lodgeSlug,
+        church_slug: churchSlug,
         reference: reference || null,
         category,
         line_items: itemised ? lineItems : null,
@@ -336,11 +338,12 @@ export async function POST(request: NextRequest) {
         payer_email: payerEmail,
         gift_aid_declaration_id: giftAidDeclarationId,
         gift_aid_eligible: giftAidEligible,
+        gift_aid_refused: giftAidRefused,
       },
     });
   if (insertError) {
     console.error("Take payment POST: preflight insert failed", {
-      lodge_id: lodgeId,
+      church_id: churchId,
       payment_id: paymentId,
       code: insertError.code,
       message: insertError.message,
@@ -368,8 +371,8 @@ export async function POST(request: NextRequest) {
           description: intentDescription,
           metadata: {
             intent: "take_payment",
-            lodge_id: lodgeId,
-            lodge_slug: lodgeSlug,
+            church_id: churchId,
+            church_slug: churchSlug,
             category,
             reference: reference || undefined,
             event_id: resolvedEventId ?? undefined,
@@ -447,8 +450,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             error:
-              "This lodge has not finished setting up online payments yet.",
-            code: "lodge_setup_incomplete",
+              "This church has not finished setting up online payments yet.",
+            code: "church_setup_incomplete",
             setup_url: err.setupHint.setupUrl,
           },
           { status: 503 },

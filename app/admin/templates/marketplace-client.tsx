@@ -32,11 +32,11 @@ import {
 type Category =
   | "all"
   | "newsletter"
-  | "summons"
-  | "dues"
+  | "notice"
+  | "giving"
   | "events"
   | "milestones"
-  | "welfare";
+  | "pastoral";
 
 type MarketplaceTemplate = {
   template_key: string;
@@ -54,16 +54,16 @@ const CATEGORY_META: Record<
   { label: string; icon: LucideIcon; tone: string }
 > = {
   newsletter: { label: "Newsletter", icon: Mail, tone: "bg-blue-100 text-blue-700" },
-  summons: { label: "Summons", icon: FileText, tone: "bg-violet-100 text-violet-700" },
-  dues: { label: "Dues", icon: Wallet, tone: "bg-amber-100 text-amber-700" },
+  notice: { label: "Notice", icon: FileText, tone: "bg-violet-100 text-violet-700" },
+  giving: { label: "Giving", icon: Wallet, tone: "bg-amber-100 text-amber-700" },
   events: { label: "Events", icon: MailCheck, tone: "bg-emerald-100 text-emerald-700" },
   milestones: {
     label: "Milestones",
     icon: PartyPopper,
     tone: "bg-pink-100 text-pink-700",
   },
-  welfare: {
-    label: "Welfare",
+  pastoral: {
+    label: "PastoralCare",
     icon: HeartHandshake,
     tone: "bg-rose-100 text-rose-700",
   },
@@ -152,7 +152,7 @@ export function TemplateMarketplaceClient({
             Communications template library
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-500">
-            Hand-crafted starting points for every email your lodge sends.
+            Hand-crafted starting points for every email your church sends.
             Install one or many; you can edit them freely afterwards under
             Communications &rsaquo; Templates.
           </p>

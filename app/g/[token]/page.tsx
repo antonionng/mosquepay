@@ -38,10 +38,10 @@ function isUsable(invitation: {
 
 export default async function GuestInvitationPage({
   params,
-  expectedLodgeSlug,
+  expectedChurchSlug,
 }: {
   params: Promise<{ token: string }>;
-  expectedLodgeSlug?: string;
+  expectedChurchSlug?: string;
 }) {
   const { token } = await params;
   const tokenHash = hashToken(token);
@@ -49,8 +49,8 @@ export default async function GuestInvitationPage({
   let invitation:
     | {
         id: string;
-        lodge_id: string | null;
-        lodge_slug: string;
+        church_id: string | null;
+        church_slug: string;
         event_id: string;
         inviter_member_id: string | null;
         recipient_email: string | null;
@@ -66,11 +66,11 @@ export default async function GuestInvitationPage({
   if (isSupabaseConfigured()) {
     const inv = await db.getGuestInvitationByTokenHash(tokenHash);
     if (inv) {
-      const lodge = await db.getLodgeById(inv.lodge_id);
+      const church = await db.getChurchById(inv.church_id);
       invitation = {
         id: inv.id,
-        lodge_id: inv.lodge_id,
-        lodge_slug: lodge?.slug ?? expectedLodgeSlug ?? "",
+        church_id: inv.church_id,
+        church_slug: church?.slug ?? expectedChurchSlug ?? "",
         event_id: inv.event_id,
         inviter_member_id: inv.inviter_member_id,
         recipient_email: inv.recipient_email,
@@ -87,8 +87,8 @@ export default async function GuestInvitationPage({
     if (inv) {
       invitation = {
         id: inv.id,
-        lodge_id: null,
-        lodge_slug: inv.lodge_slug,
+        church_id: null,
+        church_slug: inv.church_slug,
         event_id: inv.event_id,
         inviter_member_id: inv.inviter_member_id,
         recipient_email: inv.recipient_email,
@@ -103,7 +103,7 @@ export default async function GuestInvitationPage({
   }
 
   if (!invitation) notFound();
-  if (expectedLodgeSlug && invitation.lodge_slug !== expectedLodgeSlug) {
+  if (expectedChurchSlug && invitation.church_slug !== expectedChurchSlug) {
     notFound();
   }
   if (!isUsable(invitation)) {
@@ -126,22 +126,22 @@ export default async function GuestInvitationPage({
     charity_name: string | null;
     charity_suggested_amounts: number[] | null;
     charity_allow_custom: boolean;
-    enable_meeting_fee: boolean;
-    meeting_fee_amount: number | null;
-    meeting_fee_description: string | null;
+    enable_service_fee: boolean;
+    service_fee_amount: number | null;
+    service_fee_description: string | null;
     enable_payments: boolean;
     guest_policy: "blue_table" | "white_table" | "closed";
   };
 
   let event: EventLike | null = null;
-  let lodgeName: string | null = null;
-  let lodgeLogo: string | null = null;
+  let churchName: string | null = null;
+  let churchLogo: string | null = null;
   let inviterName: string | null = null;
 
-  if (isSupabaseConfigured() && invitation.lodge_id) {
-    const [e, lodge] = await Promise.all([
-      db.getEventById(invitation.event_id, invitation.lodge_id),
-      db.getLodgeById(invitation.lodge_id),
+  if (isSupabaseConfigured() && invitation.church_id) {
+    const [e, church] = await Promise.all([
+      db.getEventById(invitation.event_id, invitation.church_id),
+      db.getChurchById(invitation.church_id),
     ]);
     if (e) {
       event = {
@@ -160,25 +160,25 @@ export default async function GuestInvitationPage({
         charity_name: e.charity_name,
         charity_suggested_amounts: e.charity_suggested_amounts,
         charity_allow_custom: e.charity_allow_custom,
-        enable_meeting_fee: e.enable_meeting_fee,
-        meeting_fee_amount: e.meeting_fee_amount,
-        meeting_fee_description: e.meeting_fee_description,
+        enable_service_fee: e.enable_service_fee,
+        service_fee_amount: e.service_fee_amount,
+        service_fee_description: e.service_fee_description,
         enable_payments: e.enable_payments,
         guest_policy: e.guest_policy,
       };
     }
-    lodgeName = lodge?.name ?? null;
-    lodgeLogo = lodge?.logo_url ?? null;
+    churchName = church?.name ?? null;
+    churchLogo = church?.logo_url ?? null;
     if (invitation.inviter_member_id) {
       const member = await db.getMemberById(
         invitation.inviter_member_id,
-        invitation.lodge_id
+        invitation.church_id
       );
       inviterName = member?.full_name ?? null;
     }
   } else if (shouldUseInMemoryMock()) {
     const e = mockDb.getEventById(invitation.event_id, {
-      lodge_slug: invitation.lodge_slug,
+      church_slug: invitation.church_slug,
     });
     if (e) {
       event = {
@@ -197,16 +197,16 @@ export default async function GuestInvitationPage({
         charity_name: e.charity_name,
         charity_suggested_amounts: e.charity_suggested_amounts,
         charity_allow_custom: e.charity_allow_custom,
-        enable_meeting_fee: e.enable_meeting_fee,
-        meeting_fee_amount: e.meeting_fee_amount,
-        meeting_fee_description: e.meeting_fee_description,
+        enable_service_fee: e.enable_service_fee,
+        service_fee_amount: e.service_fee_amount,
+        service_fee_description: e.service_fee_description,
         enable_payments: e.enable_payments,
         guest_policy: e.guest_policy,
       };
     }
-    const lodge = mockDb.getLodgeBySlug(invitation.lodge_slug);
-    lodgeName = lodge?.name ?? null;
-    lodgeLogo = lodge?.logo_url ?? null;
+    const church = mockDb.getChurchBySlug(invitation.church_slug);
+    churchName = church?.name ?? null;
+    churchLogo = church?.logo_url ?? null;
   }
 
   if (!event) notFound();
@@ -217,11 +217,11 @@ export default async function GuestInvitationPage({
       <article className="mx-auto max-w-3xl space-y-8">
         <header className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
           <div className="flex items-center gap-4">
-            {lodgeLogo ? (
+            {churchLogo ? (
               <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
                 <Image
-                  src={lodgeLogo}
-                  alt={`${lodgeName ?? "Lodge"} logo`}
+                  src={churchLogo}
+                  alt={`${churchName ?? "Church"} logo`}
                   width={56}
                   height={56}
                   className="h-full w-full object-contain p-1.5"
@@ -231,10 +231,10 @@ export default async function GuestInvitationPage({
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">
                 {event.guest_policy === "blue_table"
-                  ? "Visiting brethren welcome"
+                  ? "Newcomer members welcome"
                   : "You're invited"}
               </p>
-              <p className="text-sm text-slate-500">{lodgeName}</p>
+              <p className="text-sm text-slate-500">{churchName}</p>
             </div>
           </div>
           <h1 className="mt-6 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
@@ -287,9 +287,9 @@ export default async function GuestInvitationPage({
               enableDining={event.enable_dining_rsvp}
               diningPrice={event.dining_price}
               diningDescription={event.dining_description}
-              enableMeetingFee={event.enable_meeting_fee}
-              meetingFeeAmount={event.meeting_fee_amount}
-              meetingFeeDescription={event.meeting_fee_description}
+              enableServiceFee={event.enable_service_fee}
+              serviceFeeAmount={event.service_fee_amount}
+              serviceFeeDescription={event.service_fee_description}
               enableCharity={event.enable_charity_donation}
               charityName={event.charity_name}
               charitySuggestedAmounts={event.charity_suggested_amounts ?? [10, 20, 50, 100]}
@@ -338,7 +338,7 @@ function ExpiredOrUsedScreen() {
         </h1>
         <p className="mt-3 text-sm text-slate-600">
           The link may have been revoked, expired, or already used. Please ask
-          the inviting brother for a fresh link.
+          the inviting member for a fresh link.
         </p>
       </div>
     </main>

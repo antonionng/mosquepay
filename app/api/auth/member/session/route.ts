@@ -19,18 +19,18 @@ export async function GET() {
 
     const member =
       (await db.getMemberByAuthUserId(user.id)) ??
-      (user.email ? await db.getMemberByEmailAcrossLodges(user.email) : null);
+      (user.email ? await db.getMemberByEmailAcrossChurches(user.email) : null);
 
-    // Resolve the lodge slug for the member's home lodge so the member
+    // Resolve the church slug for the member's home church so the member
     // portal can scope tenant-aware fetches without falling back to the
-    // hardcoded covenant-4344 default.
-    let lodgeSlug: string | null = null;
-    if (member?.lodge_id) {
+    // hardcoded st-marys-demo default.
+    let churchSlug: string | null = null;
+    if (member?.church_id) {
       try {
-        const lodge = await db.getLodgeById(member.lodge_id);
-        lodgeSlug = lodge?.slug ?? null;
-      } catch (lodgeErr) {
-        console.error("member session: lodge slug lookup failed", lodgeErr);
+        const church = await db.getChurchById(member.church_id);
+        churchSlug = church?.slug ?? null;
+      } catch (churchErr) {
+        console.error("member session: church slug lookup failed", churchErr);
       }
     }
 
@@ -41,8 +41,8 @@ export async function GET() {
         full_name: member?.full_name ?? user.user_metadata?.full_name ?? null,
         phone: member?.phone ?? null,
         dietary_requirements: member?.dietary_requirements ?? null,
-        lodge_id: member?.lodge_id ?? null,
-        lodge_slug: lodgeSlug,
+        church_id: member?.church_id ?? null,
+        church_slug: churchSlug,
         rank: member?.rank ?? null,
         membership_status: member?.membership_status ?? null,
       },
@@ -70,7 +70,7 @@ export async function PATCH(request: Request) {
     const body = await request.json().catch(() => ({}));
     const member =
       (await db.getMemberByAuthUserId(user.id)) ??
-      (await db.getMemberByEmailAcrossLodges(user.email));
+      (await db.getMemberByEmailAcrossChurches(user.email));
 
     if (!member) {
       return NextResponse.json(
@@ -134,7 +134,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "No fields to update." }, { status: 400 });
     }
 
-    const updated = await db.updateMember(member.id, member.lodge_id, updates);
+    const updated = await db.updateMember(member.id, member.church_id, updates);
     if (!updated) {
       return NextResponse.json({ error: "Member not found." }, { status: 404 });
     }
@@ -146,7 +146,7 @@ export async function PATCH(request: Request) {
     }
 
     if (!member.auth_user_id) {
-      await db.updateMember(member.id, member.lodge_id, { auth_user_id: user.id });
+      await db.updateMember(member.id, member.church_id, { auth_user_id: user.id });
     }
 
     return NextResponse.json({
@@ -156,7 +156,7 @@ export async function PATCH(request: Request) {
         full_name: updated.full_name,
         phone: updated.phone,
         dietary_requirements: updated.dietary_requirements,
-        lodge_id: updated.lodge_id,
+        church_id: updated.church_id,
         rank: updated.rank,
         membership_status: updated.membership_status,
       },

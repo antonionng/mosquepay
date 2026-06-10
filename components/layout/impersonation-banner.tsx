@@ -7,12 +7,12 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type Scope = {
-  kind: "none" | "dummy" | "platform" | "lodge";
+  kind: "none" | "dummy" | "platform" | "church";
 };
 
-type LodgeContext = {
+type ChurchContext = {
   selectedSlug: string;
-  selectedLodge: { name: string } | null;
+  selectedChurch: { name: string } | null;
   isPlatform: boolean;
 };
 
@@ -20,7 +20,7 @@ export function ImpersonationBanner() {
   const router = useRouter();
   const pathname = usePathname();
   const [show, setShow] = useState(false);
-  const [lodgeName, setLodgeName] = useState<string>("");
+  const [churchName, setChurchName] = useState<string>("");
   const [actorEmail, setActorEmail] = useState<string>("");
   // Kiosk routes (e.g. /admin/take-payment) get a 28px chip so they don't
   // eat the keypad's vertical real-estate on a phone. Tapping the chip is
@@ -33,17 +33,17 @@ export function ImpersonationBanner() {
       try {
         const [sessionRes, ctxRes] = await Promise.all([
           fetch("/api/auth/session"),
-          fetch("/api/admin/lodge-context"),
+          fetch("/api/admin/church-context"),
         ]);
         if (!active) return;
         if (!sessionRes.ok || !ctxRes.ok) return;
         const session = await sessionRes.json();
-        const ctx: LodgeContext = await ctxRes.json();
+        const ctx: ChurchContext = await ctxRes.json();
         const scope: Scope | undefined = session.scope;
         if (!scope) return;
         if (scope.kind !== "platform" && scope.kind !== "dummy") return;
-        if (!ctx.selectedLodge) return;
-        setLodgeName(ctx.selectedLodge.name);
+        if (!ctx.selectedChurch) return;
+        setChurchName(ctx.selectedChurch.name);
         setActorEmail(session.admin?.email ?? "");
         setShow(true);
       } catch {
@@ -60,10 +60,10 @@ export function ImpersonationBanner() {
 
   async function stop() {
     try {
-      await fetch("/api/admin/lodge-context", {
+      await fetch("/api/admin/church-context", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lodge_slug: "" }),
+        body: JSON.stringify({ church_slug: "" }),
       });
     } catch {
       // ignore
@@ -89,10 +89,10 @@ export function ImpersonationBanner() {
               "border border-amber-300 text-[11px] font-medium text-amber-900",
               "hover:bg-amber-100",
             )}
-            aria-label={`Acting as ${lodgeName}. Tap to return to platform.`}
+            aria-label={`Acting as ${churchName}. Tap to return to platform.`}
           >
             <ShieldAlert className="h-3 w-3" aria-hidden />
-            <span className="max-w-[12rem] truncate">{lodgeName}</span>
+            <span className="max-w-[12rem] truncate">{churchName}</span>
             <X className="h-3 w-3" aria-hidden />
           </button>
         </div>
@@ -112,7 +112,7 @@ export function ImpersonationBanner() {
           <div className="flex items-center gap-2">
             <ShieldAlert className="h-4 w-4" aria-hidden />
             <span>
-              <strong>Acting as {lodgeName}.</strong>{" "}
+              <strong>Acting as {churchName}.</strong>{" "}
               {actorEmail ? (
                 <span className="text-amber-800">
                   Operator session: {actorEmail}. All actions are audited.

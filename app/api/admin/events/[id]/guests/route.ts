@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured, shouldUseInMemoryMock } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -16,7 +16,7 @@ export async function GET(
   if (unauthorized) return unauthorized;
 
   const { id: eventId } = await params;
-  const lodgeSlug = getLodgeSlugFromRequest(request);
+  const churchSlug = getChurchSlugFromRequest(request);
 
   const format = request.nextUrl.searchParams.get("format");
 
@@ -31,16 +31,16 @@ export async function GET(
   }> = [];
 
   if (isSupabaseConfigured()) {
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    if (!lodgeId) {
-      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    const churchId = await db.resolveChurchId(churchSlug);
+    if (!churchId) {
+      return NextResponse.json({ error: "Church not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("meetings:write", lodgeId);
+    const forbidden = await requireAdminApiPermission("services:write", churchId);
     if (forbidden) return forbidden;
 
-    guests = await db.listEventGuestsForLodge(lodgeId, { eventId });
+    guests = await db.listEventGuestsForChurch(churchId, { eventId });
   } else if (shouldUseInMemoryMock()) {
-    guests = mockDb.getGuestsByEvent(eventId, { lodge_slug: lodgeSlug }).map(
+    guests = mockDb.getGuestsByEvent(eventId, { church_slug: churchSlug }).map(
       (g) => ({
         id: g.id,
         guest_name: g.guest_name,

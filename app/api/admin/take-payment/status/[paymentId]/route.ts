@@ -37,16 +37,16 @@ export async function GET(
     );
   }
 
-  // Anchor to the admin's scoped lodge (same logic as the page) so an
-  // unset ADMIN_LODGE_COOKIE doesn't silently swap us onto the platform
-  // default lodge and 401 a polling tablet mid-payment.
+  // Anchor to the admin's scoped church (same logic as the page) so an
+  // unset ADMIN_CHURCH_COOKIE doesn't silently swap us onto the platform
+  // default church and 401 a polling tablet mid-payment.
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.lodgeId) {
-    return NextResponse.json({ error: "Lodge not selected." }, { status: 404 });
+  if (ctx.mode !== "database" || !ctx.churchId) {
+    return NextResponse.json({ error: "Church not selected." }, { status: 404 });
   }
-  const lodgeId = ctx.lodgeId;
+  const churchId = ctx.churchId;
 
-  const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("payments:write", churchId);
   if (forbidden) return forbidden;
 
   const supa = createServiceClient();
@@ -54,16 +54,16 @@ export async function GET(
   const { data: attempt, error: attemptError } = await supa
     .schema("mooov")
     .from("payment_attempts")
-    .select("payment_id, status, amount, currency, failure_reason, lodge_id")
+    .select("payment_id, status, amount, currency, failure_reason, church_id")
     .eq("payment_id", paymentId)
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .maybeSingle<{
       payment_id: string;
       status: string;
       amount: number;
       currency: string;
       failure_reason: string | null;
-      lodge_id: string;
+      church_id: string;
     }>();
   if (attemptError) {
     console.error("Take payment status GET: attempt lookup failed", {
@@ -112,7 +112,7 @@ export async function GET(
       .from("donations")
       .select("id, gift_aid_declaration_id")
       .eq("payment_id", projected.id)
-      .eq("lodge_id", lodgeId)
+      .eq("church_id", churchId)
       .maybeSingle<{
         id: string;
         gift_aid_declaration_id: string | null;

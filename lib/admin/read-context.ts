@@ -1,25 +1,25 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { isSupabaseConfigured, shouldUseInMemoryMock } from "@/lib/db/with-fallback";
-import { getDefaultLodgeId, resolveLodgeId } from "@/lib/db/helpers";
-import { getLodgeById } from "@/lib/db";
+import { getDefaultChurchId, resolveChurchId } from "@/lib/db/helpers";
+import { getChurchById } from "@/lib/db";
 import { getCurrentAdminScope } from "@/lib/auth/permissions";
 import {
-  ADMIN_LODGE_COOKIE,
-  getDefaultLodgeSlug,
-  resolveLodgeSlug,
+  ADMIN_CHURCH_COOKIE,
+  getDefaultChurchSlug,
+  resolveChurchSlug,
 } from "@/lib/tenant";
 
-export { ADMIN_LODGE_COOKIE };
+export { ADMIN_CHURCH_COOKIE };
 
 /**
  * Admin server pages: use mock data only on the offline demo path (see shouldUseInMemoryMock).
- * When Supabase is configured, always scope reads with lodgeId; if the default lodge is
+ * When Supabase is configured, always scope reads with churchId; if the default church is
  * missing, use empty DB paths (never mock) to avoid cross-tenant leakage.
  */
 export type AdminReadContext =
   | { mode: "mock" }
-  | { mode: "database"; lodgeId: string | null; lodgeSlug: string };
+  | { mode: "database"; churchId: string | null; churchSlug: string };
 
 export async function getAdminReadContext(): Promise<AdminReadContext> {
   const scope = await getCurrentAdminScope();
@@ -41,41 +41,41 @@ export async function getAdminReadContext(): Promise<AdminReadContext> {
 
   const cookieStore = await cookies();
 
-  if (scope.kind === "lodge") {
-    const selectedCookieSlug = cookieStore.get(ADMIN_LODGE_COOKIE)?.value;
+  if (scope.kind === "church") {
+    const selectedCookieSlug = cookieStore.get(ADMIN_CHURCH_COOKIE)?.value;
     const selectedSlug = selectedCookieSlug
-      ? resolveLodgeSlug(selectedCookieSlug)
+      ? resolveChurchSlug(selectedCookieSlug)
       : null;
-    const selectedLodgeId = selectedSlug ? await resolveLodgeId(selectedSlug) : null;
-    const scopedLodgeId =
-      selectedLodgeId && scope.lodgeIds.includes(selectedLodgeId)
-        ? selectedLodgeId
-        : scope.lodgeId;
-    const lodge = await getLodgeById(scopedLodgeId);
+    const selectedChurchId = selectedSlug ? await resolveChurchId(selectedSlug) : null;
+    const scopedChurchId =
+      selectedChurchId && scope.churchIds.includes(selectedChurchId)
+        ? selectedChurchId
+        : scope.churchId;
+    const church = await getChurchById(scopedChurchId);
 
     return {
       mode: "database",
-      lodgeId: scopedLodgeId,
-      lodgeSlug: lodge?.slug ?? getDefaultLodgeSlug(),
+      churchId: scopedChurchId,
+      churchSlug: church?.slug ?? getDefaultChurchSlug(),
     };
   }
 
-  const selectedSlug = resolveLodgeSlug(
-    cookieStore.get(ADMIN_LODGE_COOKIE)?.value ?? getDefaultLodgeSlug()
+  const selectedSlug = resolveChurchSlug(
+    cookieStore.get(ADMIN_CHURCH_COOKIE)?.value ?? getDefaultChurchSlug()
   );
-  const selectedLodgeId = await resolveLodgeId(selectedSlug);
+  const selectedChurchId = await resolveChurchId(selectedSlug);
 
-  if (selectedLodgeId) {
+  if (selectedChurchId) {
     return {
       mode: "database",
-      lodgeId: selectedLodgeId,
-      lodgeSlug: selectedSlug,
+      churchId: selectedChurchId,
+      churchSlug: selectedSlug,
     };
   }
 
   return {
     mode: "database",
-    lodgeId: await getDefaultLodgeId(),
-    lodgeSlug: getDefaultLodgeSlug(),
+    churchId: await getDefaultChurchId(),
+    churchSlug: getDefaultChurchSlug(),
   };
 }

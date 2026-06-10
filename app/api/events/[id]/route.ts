@@ -19,12 +19,12 @@ export async function PATCH(
     const unauthorized = await requireAdminApiAuth();
     if (unauthorized) return unauthorized;
 
-    // Resolve the lodge from the admin's actual scope (same path the page
-    // side uses). This is immune to stale ADMIN_LODGE_COOKIE values, which
+    // Resolve the church from the admin's actual scope (same path the page
+    // side uses). This is immune to stale ADMIN_CHURCH_COOKIE values, which
     // is the recurring source of "Save changes returns 401/403" bugs.
     const adminCtx = await getAdminReadContext();
-    const lodgeSlug =
-      adminCtx.mode === "database" ? adminCtx.lodgeSlug : "";
+    const churchSlug =
+      adminCtx.mode === "database" ? adminCtx.churchSlug : "";
     const body = await request.json();
 
     const updates: Record<string, unknown> = {};
@@ -77,14 +77,14 @@ export async function PATCH(
       updates.raffle_wine_description =
         body.raffle_wine_description.trim() || null;
     }
-    if (typeof body.enable_meeting_fee === "boolean") updates.enable_meeting_fee = body.enable_meeting_fee;
-    if ("meeting_fee_amount" in body) {
-      updates.meeting_fee_amount =
-        body.meeting_fee_amount == null || body.meeting_fee_amount === ""
+    if (typeof body.enable_service_fee === "boolean") updates.enable_service_fee = body.enable_service_fee;
+    if ("service_fee_amount" in body) {
+      updates.service_fee_amount =
+        body.service_fee_amount == null || body.service_fee_amount === ""
           ? null
-          : Number(body.meeting_fee_amount);
+          : Number(body.service_fee_amount);
     }
-    if (body.meeting_fee_description != null) updates.meeting_fee_description = body.meeting_fee_description.trim() || null;
+    if (body.service_fee_description != null) updates.service_fee_description = body.service_fee_description.trim() || null;
     if (typeof body.enable_guest_tickets === "boolean") updates.enable_guest_tickets = body.enable_guest_tickets;
     if ("guest_ticket_price" in body) {
       updates.guest_ticket_price =
@@ -98,29 +98,29 @@ export async function PATCH(
       updates.feature_on_website = body.feature_on_website;
 
     if (isSupabaseConfigured()) {
-      if (adminCtx.mode !== "database" || !adminCtx.lodgeId) {
-        return NextResponse.json({ error: "Lodge not selected." }, { status: 404 });
+      if (adminCtx.mode !== "database" || !adminCtx.churchId) {
+        return NextResponse.json({ error: "Church not selected." }, { status: 404 });
       }
-      const lodgeId = adminCtx.lodgeId;
-      const forbidden = await requireAdminApiPermission("meetings:write", lodgeId);
+      const churchId = adminCtx.churchId;
+      const forbidden = await requireAdminApiPermission("services:write", churchId);
       if (forbidden) return forbidden;
-      const updated = await db.updateEvent(id, lodgeId, updates as Parameters<typeof db.updateEvent>[2]);
+      const updated = await db.updateEvent(id, churchId, updates as Parameters<typeof db.updateEvent>[2]);
       if (!updated) {
         return NextResponse.json({ error: "Event not found." }, { status: 404 });
       }
       await writeAuditLog({
-        lodgeId,
+        churchId,
         action: "updated",
-        entityType: "meeting",
+        entityType: "service",
         entityId: updated.id,
-        summary: `Updated meeting ${updated.title}`,
+        summary: `Updated service ${updated.title}`,
         metadata: { fields: Object.keys(updates) },
       });
       return NextResponse.json({ success: true });
     }
 
     const updated = mockDb.updateEvent(id, updates as Parameters<typeof mockDb.updateEvent>[1], {
-      lodge_slug: lodgeSlug,
+      church_slug: churchSlug,
     });
 
     if (!updated) {
@@ -150,46 +150,46 @@ export async function DELETE(
     if (unauthorized) return unauthorized;
 
     const adminCtx = await getAdminReadContext();
-    const lodgeSlug =
-      adminCtx.mode === "database" ? adminCtx.lodgeSlug : "";
+    const churchSlug =
+      adminCtx.mode === "database" ? adminCtx.churchSlug : "";
 
     if (isSupabaseConfigured()) {
-      if (adminCtx.mode !== "database" || !adminCtx.lodgeId) {
-        return NextResponse.json({ error: "Lodge not selected." }, { status: 404 });
+      if (adminCtx.mode !== "database" || !adminCtx.churchId) {
+        return NextResponse.json({ error: "Church not selected." }, { status: 404 });
       }
-      const lodgeId = adminCtx.lodgeId;
-      const forbidden = await requireAdminApiPermission("meetings:write", lodgeId);
+      const churchId = adminCtx.churchId;
+      const forbidden = await requireAdminApiPermission("services:write", churchId);
       if (forbidden) return forbidden;
 
-      const existing = await db.getEventById(id, lodgeId);
+      const existing = await db.getEventById(id, churchId);
       if (!existing) {
         return NextResponse.json({ error: "Event not found." }, { status: 404 });
       }
-      if (existing.meeting_closed_at) {
+      if (existing.service_closed_at) {
         return NextResponse.json(
           {
             error:
-              "This meeting has been closed and cannot be deleted. Reopen or contact support if you need it removed.",
+              "This service has been closed and cannot be deleted. Reopen or contact support if you need it removed.",
           },
           { status: 409 },
         );
       }
 
-      const removed = await db.deleteEvent(id, lodgeId);
+      const removed = await db.deleteEvent(id, churchId);
       if (!removed) {
         return NextResponse.json({ error: "Event not found." }, { status: 404 });
       }
       await writeAuditLog({
-        lodgeId,
+        churchId,
         action: "deleted",
-        entityType: "meeting",
+        entityType: "service",
         entityId: id,
-        summary: `Deleted meeting ${removed.title}`,
+        summary: `Deleted service ${removed.title}`,
       });
       return NextResponse.json({ success: true });
     }
 
-    const removed = mockDb.deleteEvent(id, { lodge_slug: lodgeSlug });
+    const removed = mockDb.deleteEvent(id, { church_slug: churchSlug });
     if (!removed) {
       return NextResponse.json({ error: "Event not found." }, { status: 404 });
     }

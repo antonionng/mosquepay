@@ -7,18 +7,18 @@
 //      so it's printable-sticker safe and survives every mobile browser.
 //
 //   2. With `amount`: mint a Mooov payment_intent via flow:"embedded" with
-//      the right metadata (event_id, campaign_id, intent, lodge_slug),
+//      the right metadata (event_id, campaign_id, intent, church_slug),
 //      then 302 the donor straight to pay.mooov.money/c/<id> for them to
 //      pay with Apple Pay / Google Pay / card.
 //
 // Supported contexts:
-//   - charity: defaults to the lodge's current_charity_campaign_id; falls
+//   - charity: defaults to the church's current_charity_campaign_id; falls
 //     back to a generic donation if no campaign is designated. If an event
 //     id is provided and has enable_charity_donation=true, presets come
 //     from the event's charity_suggested_amounts.
 //   - raffle: requires event_id; presets come from raffle_suggested_amounts.
 //   - dining: requires event_id; single preset = dining_price.
-//   - general: generic lodge payment (no campaign/event linkage).
+//   - general: generic church payment (no campaign/event linkage).
 
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
@@ -77,15 +77,15 @@ export default async function GivePage({
   }
   const ctx = context as Context;
 
-  const lodge = await loadLodge(slug);
-  if (!lodge) {
-    return <NotFoundPage reason="We couldn't find a lodge at this address." />;
+  const church = await loadChurch(slug);
+  if (!church) {
+    return <NotFoundPage reason="We couldn't find a church at this address." />;
   }
 
-  const merchantId = await loadMerchantId(lodge.id);
+  const merchantId = await loadMerchantId(church.id);
   if (!merchantId) {
     return (
-      <NotFoundPage reason="This lodge has not connected its payment processor yet. Please ask the lodge secretary to complete setup." />
+      <NotFoundPage reason="This church has not connected its payment processor yet. Please ask the church secretary to complete setup." />
     );
   }
 
@@ -93,9 +93,9 @@ export default async function GivePage({
     typeof search.event === "string" ? search.event : null;
   const resolved = await resolveContext({
     context: ctx,
-    lodgeId: lodge.id,
+    churchId: church.id,
     eventId,
-    currentCharityCampaignId: lodge.current_charity_campaign_id ?? null,
+    currentCharityCampaignId: church.current_charity_campaign_id ?? null,
   });
 
   const amountParam = firstParam(search.amount);
@@ -108,13 +108,13 @@ export default async function GivePage({
   if (hasAmount) {
     if (amountNumber > 5000) {
       return (
-        <NotFoundPage reason="Amounts above £5,000 cannot be taken on the standing-QR flow. Please contact the lodge directly." />
+        <NotFoundPage reason="Amounts above £5,000 cannot be taken on the standing-QR flow. Please contact the church directly." />
       );
     }
 
     const hostedUrl = await mintAndGetHostedUrl({
-      lodgeId: lodge.id,
-      lodgeSlug: slug,
+      churchId: church.id,
+      churchSlug: slug,
       merchantId,
       amountPounds: amountNumber,
       resolved,
@@ -136,13 +136,13 @@ export default async function GivePage({
       <GiveFormClient
         slug={slug}
         context={ctx}
-        lodgeName={lodge.name}
+        churchName={church.name}
         eventId={eventId}
         heading={resolved.heading}
         subheading={resolved.subheading}
         presetAmounts={resolved.presetAmounts}
         customAllowed={resolved.customAllowed}
-        charityHeader={lodge.name}
+        charityHeader={church.name}
         // The charity context goes through /api/donations (rich form +
         // gift aid + receipt by email). Dining / raffle / general all
         // skip donor capture and let the server resolver mint + 302.
@@ -158,11 +158,11 @@ function firstParam(v: string | string[] | undefined): string | null {
   return v;
 }
 
-async function loadLodge(slug: string) {
+async function loadChurch(slug: string) {
   const normalized = slug.trim().toLowerCase();
   try {
     const { data, error } = await createServiceClient()
-      .from("lodges")
+      .from("churches")
       .select("id, slug, name, current_charity_campaign_id")
       .eq("slug", normalized)
       .eq("is_active", true)
@@ -174,10 +174,10 @@ async function loadLodge(slug: string) {
       }>();
     if (error) {
       // Log loudly: a schema-drift or RLS misconfiguration here turns a
-      // perfectly valid sticker URL into a generic "lodge not found" page,
+      // perfectly valid sticker URL into a generic "church not found" page,
       // which is the least debuggable failure mode for the donor (the
       // sticker LOOKS broken even though the column is just missing).
-      console.error("give resolver: lodge lookup failed", {
+      console.error("give resolver: church lookup failed", {
         slug: normalized,
         code: error.code,
         message: error.message,
@@ -188,7 +188,7 @@ async function loadLodge(slug: string) {
     }
     return data ?? null;
   } catch (err) {
-    console.error("give resolver: lodge lookup threw", {
+    console.error("give resolver: church lookup threw", {
       slug: normalized,
       message: err instanceof Error ? err.message : String(err),
     });
@@ -198,17 +198,17 @@ async function loadLodge(slug: string) {
   }
 }
 
-async function loadMerchantId(lodgeId: string): Promise<string | null> {
+async function loadMerchantId(churchId: string): Promise<string | null> {
   try {
     const { data, error } = await createServiceClient()
       .schema("mooov")
-      .from("lodges")
+      .from("churches")
       .select("merchant_id, status")
-      .eq("id", lodgeId)
+      .eq("id", churchId)
       .maybeSingle<{ merchant_id: string; status: string }>();
     if (error) {
       console.error("give resolver: mooov merchant lookup failed", {
-        lodge_id: lodgeId,
+        church_id: churchId,
         code: error.code,
         message: error.message,
       });
@@ -219,7 +219,7 @@ async function loadMerchantId(lodgeId: string): Promise<string | null> {
     return data.merchant_id ?? null;
   } catch (err) {
     console.error("give resolver: mooov merchant lookup threw", {
-      lodge_id: lodgeId,
+      church_id: churchId,
       message: err instanceof Error ? err.message : String(err),
     });
     return null;
@@ -228,12 +228,12 @@ async function loadMerchantId(lodgeId: string): Promise<string | null> {
 
 async function resolveContext({
   context,
-  lodgeId,
+  churchId,
   eventId,
   currentCharityCampaignId,
 }: {
   context: Context;
-  lodgeId: string;
+  churchId: string;
   eventId: string | null;
   currentCharityCampaignId: string | null;
 }): Promise<ResolvedContext> {
@@ -254,10 +254,10 @@ async function resolveContext({
       const { data } = await supa
         .from("events")
         .select(
-          "id, title, dining_price, charity_suggested_amounts, charity_allow_custom, raffle_suggested_amounts, raffle_allow_custom, charity_name, lodge_id",
+          "id, title, dining_price, charity_suggested_amounts, charity_allow_custom, raffle_suggested_amounts, raffle_allow_custom, charity_name, church_id",
         )
         .eq("id", eventId)
-        .eq("lodge_id", lodgeId)
+        .eq("church_id", churchId)
         .maybeSingle<{
           id: string;
           title: string;
@@ -267,7 +267,7 @@ async function resolveContext({
           raffle_suggested_amounts: number[] | null;
           raffle_allow_custom: boolean | null;
           charity_name: string | null;
-          lodge_id: string;
+          church_id: string;
         }>();
       if (data) event = data;
     } catch {
@@ -280,14 +280,14 @@ async function resolveContext({
     try {
       const { data } = await supa
         .from("charity_campaigns")
-        .select("id, name, status, lodge_id")
+        .select("id, name, status, church_id")
         .eq("id", currentCharityCampaignId)
-        .eq("lodge_id", lodgeId)
+        .eq("church_id", churchId)
         .maybeSingle<{
           id: string;
           name: string;
           status: string;
-          lodge_id: string;
+          church_id: string;
         }>();
       if (data && data.status === "active") {
         campaign = { id: data.id, name: data.name };
@@ -323,7 +323,7 @@ async function resolveContext({
         campaignId: null,
         // Heading + subheading below frame this as buying physical strips
         // of raffle tickets so the QR landing is consistent with the
-        // summons form copy.
+        // notice form copy.
         eventId: event?.id ?? null,
         description: event
           ? `Raffle ticket strips — ${event.title}`
@@ -352,19 +352,19 @@ async function resolveContext({
           : "Donate",
         subheading: campaign?.name
           ? "Tap any amount to give. Pay with Apple Pay, Google Pay, or card."
-          : "Tap an amount to give to the lodge's charity collection.",
+          : "Tap an amount to give to the church's charity collection.",
         customAllowed: event?.charity_allow_custom !== false,
       };
     }
     case "general":
     default:
       return {
-        intent: "lodge_generic_standing_qr",
+        intent: "church_generic_standing_qr",
         presetAmounts: DEFAULT_PRESETS.general,
         campaignId: null,
         eventId: null,
-        description: "Lodge payment",
-        heading: "Pay the lodge",
+        description: "Church payment",
+        heading: "Pay the church",
         subheading: "Pick a preset amount or enter a custom one.",
         customAllowed: true,
       };
@@ -372,14 +372,14 @@ async function resolveContext({
 }
 
 async function mintAndGetHostedUrl({
-  lodgeId,
-  lodgeSlug,
+  churchId,
+  churchSlug,
   merchantId,
   amountPounds,
   resolved,
 }: {
-  lodgeId: string;
-  lodgeSlug: string;
+  churchId: string;
+  churchSlug: string;
   merchantId: string;
   amountPounds: number;
   resolved: ResolvedContext;
@@ -387,19 +387,19 @@ async function mintAndGetHostedUrl({
   const supa = createServiceClient();
   const amountMinor = Math.round(amountPounds * 100);
   const currency = "GBP";
-  const paymentId = `giv_${lodgeId}_${Date.now().toString(36)}_${Math.random()
+  const paymentId = `giv_${churchId}_${Date.now().toString(36)}_${Math.random()
     .toString(36)
     .slice(2, 10)}`;
   const idempotencyKey = `giv_${paymentId}`;
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const successUrl = `${siteUrl}/give/${encodeURIComponent(lodgeSlug)}/done?payment_id=${encodeURIComponent(paymentId)}`;
-  const cancelUrl = `${siteUrl}/give/${encodeURIComponent(lodgeSlug)}/cancelled`;
+  const successUrl = `${siteUrl}/give/${encodeURIComponent(churchSlug)}/done?payment_id=${encodeURIComponent(paymentId)}`;
+  const cancelUrl = `${siteUrl}/give/${encodeURIComponent(churchSlug)}/cancelled`;
 
   const initialMetadata: Record<string, unknown> = {
-    source: "lodgepay_standing_qr",
-    lodge_slug: lodgeSlug,
-    lodge_id: lodgeId,
+    source: "churchpay_standing_qr",
+    church_slug: churchSlug,
+    church_id: churchId,
     intent: resolved.intent,
     event_id: resolved.eventId,
     campaign_id: resolved.campaignId,
@@ -411,7 +411,7 @@ async function mintAndGetHostedUrl({
       .from("payment_attempts")
       .insert({
         payment_id: paymentId,
-        lodge_id: lodgeId,
+        church_id: churchId,
         member_id: null,
         amount: amountMinor,
         currency,
@@ -421,7 +421,7 @@ async function mintAndGetHostedUrl({
         metadata: initialMetadata,
         guest_descriptor: {
           source: "standing_qr",
-          lodge_slug: lodgeSlug,
+          church_slug: churchSlug,
           intent: resolved.intent,
           event_id: resolved.eventId,
           campaign_id: resolved.campaignId,
@@ -429,7 +429,7 @@ async function mintAndGetHostedUrl({
       });
   } catch (err) {
     console.error("give resolver: preflight insert failed", {
-      lodge_id: lodgeId,
+      church_id: churchId,
       payment_id: paymentId,
       message: err instanceof Error ? err.message : String(err),
     });
@@ -453,8 +453,8 @@ async function mintAndGetHostedUrl({
           description: resolved.description,
           metadata: {
             intent: resolved.intent,
-            lodge_id: lodgeId,
-            lodge_slug: lodgeSlug,
+            church_id: churchId,
+            church_slug: churchSlug,
             event_id: resolved.eventId ?? undefined,
             campaign_id: resolved.campaignId ?? undefined,
           },

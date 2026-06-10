@@ -3,7 +3,7 @@
 // Returns a ZIP (see lib/gift-aid/claim-pack.ts for layout) containing
 // the HMRC donations CSV, a new-declarations index CSV, every evidence
 // file inlined, and a verification manifest. This is what the treasurer
-// emails to the UGLE Relief Chest.
+// emails to the UGLE Gift Aid pack.
 //
 // Side effects: stamps `pack_generated_at` + `pack_generated_by_email`
 // on the batch and writes an audit log entry. Each evidence download
@@ -15,7 +15,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as db from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -40,33 +40,33 @@ export async function GET(
     );
   }
   const { id: batchId } = await params;
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("charity:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("charity:write", churchId);
   if (forbidden) return forbidden;
 
-  const [batches, lodge] = await Promise.all([
-    db.getGiftAidClaimBatches(lodgeId),
-    db.getLodgeById(lodgeId),
+  const [batches, church] = await Promise.all([
+    db.getGiftAidClaimBatches(churchId),
+    db.getChurchById(churchId),
   ]);
   const batch = batches.find((b) => b.id === batchId);
-  if (!batch || !lodge) {
+  if (!batch || !church) {
     return NextResponse.json({ error: "Batch not found." }, { status: 404 });
   }
 
   const [items, declarationLinks, previous, collections] = await Promise.all([
-    db.getGiftAidClaimItems(lodgeId, batchId),
-    db.listClaimBatchDeclarations(lodgeId, batchId),
-    db.getMostRecentClaimBatchBefore(lodgeId, batch.created_at),
-    db.getMeetingCollections(lodgeId).catch(() => []),
+    db.getGiftAidClaimItems(churchId, batchId),
+    db.listClaimBatchDeclarations(churchId, batchId),
+    db.getMostRecentClaimBatchBefore(churchId, batch.created_at),
+    db.getServiceCollections(churchId).catch(() => []),
   ]);
 
-  // GASDS lives on the meeting collection this batch was created from (if
-  // the batch came from a meeting close). Bundle the small-cash figure into
-  // the pack so the Relief Chest can reconcile it with the same meeting.
+  // GASDS lives on the service collection this batch was created from (if
+  // the batch came from a service close). Bundle the small-cash figure into
+  // the pack so the Gift Aid pack can reconcile it with the same service.
   const linkedCollection = collections.find(
     (c) => c.gift_aid_claim_batch_id === batchId,
   );
@@ -111,15 +111,15 @@ export async function GET(
   }
   const [newDeclarations, previouslySupplied, declarationAddressLookup] =
     await Promise.all([
-      db.getGiftAidDeclarationsByIds(lodgeId, newDeclarationIds),
-      db.getGiftAidDeclarationsByIds(lodgeId, previouslySuppliedIds),
-      db.getGiftAidDeclarationsByIds(lodgeId, Array.from(addressLookupIds)),
+      db.getGiftAidDeclarationsByIds(churchId, newDeclarationIds),
+      db.getGiftAidDeclarationsByIds(churchId, previouslySuppliedIds),
+      db.getGiftAidDeclarationsByIds(churchId, Array.from(addressLookupIds)),
     ]);
 
   let pack;
   try {
     pack = await buildClaimPack({
-      lodge,
+      church,
       batch,
       items,
       newDeclarations,
@@ -141,13 +141,13 @@ export async function GET(
 
   let actorEmail: string | null = null;
   try {
-    const admin = await getCurrentAdminContextAny(lodgeId);
+    const admin = await getCurrentAdminContextAny(churchId);
     actorEmail = admin?.email ?? null;
   } catch {
     /* non-fatal */
   }
   try {
-    await db.markClaimBatchPackGenerated(batchId, lodgeId, actorEmail);
+    await db.markClaimBatchPackGenerated(batchId, churchId, actorEmail);
   } catch (err) {
     console.warn("claim pack: stamp failed (non-fatal)", {
       batch_id: batchId,
@@ -156,7 +156,7 @@ export async function GET(
   }
 
   await writeAuditLog({
-    lodgeId,
+    churchId,
     action: "gift_aid_claim_pack_downloaded",
     entityType: "gift_aid_claim_batch",
     entityId: batchId,

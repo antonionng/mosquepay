@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -16,14 +16,14 @@ export async function GET(request: NextRequest) {
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ imports: [] });
   }
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("payments:write", churchId);
   if (forbidden) return forbidden;
-  const imports = await db.listBankImports(lodgeId);
+  const imports = await db.listBankImports(churchId);
   return NextResponse.json({ imports });
 }
 
@@ -38,14 +38,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const lodgeSlug = getLodgeSlugFromRequest(request);
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    if (!lodgeId) {
-      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    const churchSlug = getChurchSlugFromRequest(request);
+    const churchId = await db.resolveChurchId(churchSlug);
+    if (!churchId) {
+      return NextResponse.json({ error: "Church not found." }, { status: 404 });
     }
     const forbidden = await requireAdminApiPermission(
       "payments:write",
-      lodgeId
+      churchId
     );
     if (forbidden) return forbidden;
 
@@ -75,11 +75,11 @@ export async function POST(request: NextRequest) {
     );
     const since = new Date(earliest);
     since.setDate(since.getDate() - 30);
-    const ledger = await db.getTreasurerLedger(lodgeId, {
+    const ledger = await db.getTreasurerLedger(churchId, {
       from: since.toISOString(),
     });
 
-    const importRecord = await db.createBankImport(lodgeId, {
+    const importRecord = await db.createBankImport(churchId, {
       filename,
       account_label: accountLabel,
       imported_by_admin_user_id: null,
@@ -106,15 +106,15 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    await db.insertBankTransactions(lodgeId, txRows);
+    await db.insertBankTransactions(churchId, txRows);
 
     const matchedCount = txRows.filter((r) => r.status === "matched").length;
-    await db.updateBankImport(importRecord.id, lodgeId, {
+    await db.updateBankImport(importRecord.id, churchId, {
       matched_rows: matchedCount,
     });
 
     await writeAuditLog({
-      lodgeId,
+      churchId,
       action: "bank_statement_imported",
       entityType: "bank_import",
       entityId: importRecord.id,

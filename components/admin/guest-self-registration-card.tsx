@@ -5,15 +5,15 @@ import { useRouter } from "next/navigation";
 import { Check, Copy, Link as LinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { lodgeScopedVisitPath } from "@/lib/public-links";
+import { churchScopedVisitPath } from "@/lib/public-links";
 
 type Props = {
-  lodgeSlug: string;
+  churchSlug: string;
   initialEnabled: boolean;
 };
 
 export function GuestSelfRegistrationCard({
-  lodgeSlug,
+  churchSlug,
   initialEnabled,
 }: Props) {
   const router = useRouter();
@@ -24,8 +24,8 @@ export function GuestSelfRegistrationCard({
 
   const publicUrl =
     typeof window !== "undefined"
-      ? `${window.location.origin}${lodgeScopedVisitPath(lodgeSlug)}`
-      : lodgeScopedVisitPath(lodgeSlug);
+      ? `${window.location.origin}${churchScopedVisitPath(churchSlug)}`
+      : churchScopedVisitPath(churchSlug);
 
   async function toggle(next: boolean) {
     setError(null);
@@ -72,7 +72,7 @@ export function GuestSelfRegistrationCard({
             </h2>
           </div>
           <p className="mt-1 text-sm text-dash-muted">
-            When enabled, the URL below is publicly reachable. Visitors can
+            When enabled, the URL below is publicly reachable. Newcomers can
             self-register and book themselves into open events. Off by default.
           </p>
           {enabled ? (

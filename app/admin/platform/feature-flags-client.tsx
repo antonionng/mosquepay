@@ -8,26 +8,26 @@ const FLAGS = [
   { key: "ai", label: "AI assistant" },
   { key: "integrations", label: "Integrations" },
   { key: "charity", label: "Charity & Gift Aid" },
-  { key: "almoner", label: "Almoner welfare" },
-  { key: "mentor", label: "Mentor & progression" },
+  { key: "pastoral_care", label: "PastoralCare pastoral" },
+  { key: "mentor", label: "Discipleship mentoring" },
   { key: "site_builder", label: "Public site builder" },
 ] as const;
 
-type Lodge = { id: string; name: string };
+type Church = { id: string; name: string };
 
-export function FeatureFlagsClient({ lodges }: { lodges: Lodge[] }) {
+export function FeatureFlagsClient({ churches }: { churches: Church[] }) {
   const [open, setOpen] = useState(false);
-  const [lodgeId, setLodgeId] = useState<string>(lodges[0]?.id ?? "");
+  const [churchId, setChurchId] = useState<string>(churches[0]?.id ?? "");
   const [flags, setFlags] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open || !lodgeId) return;
+    if (!open || !churchId) return;
     let active = true;
     setLoading(true);
-    fetch(`/api/admin/platform/feature-flags?lodge_id=${lodgeId}`)
+    fetch(`/api/admin/platform/feature-flags?church_id=${churchId}`)
       .then((res) => res.json())
       .then((data) => {
         if (active) setFlags(data.flags ?? {});
@@ -39,17 +39,17 @@ export function FeatureFlagsClient({ lodges }: { lodges: Lodge[] }) {
     return () => {
       active = false;
     };
-  }, [open, lodgeId]);
+  }, [open, churchId]);
 
   async function toggle(flagKey: string) {
-    if (!lodgeId) return;
+    if (!churchId) return;
     setBusyKey(flagKey);
     try {
       const res = await fetch("/api/admin/platform/feature-flags", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          lodge_id: lodgeId,
+          church_id: churchId,
           flag_key: flagKey,
           enabled: !flags[flagKey],
         }),
@@ -79,7 +79,7 @@ export function FeatureFlagsClient({ lodges }: { lodges: Lodge[] }) {
         <div>
           <h2 className="text-base font-semibold text-slate-900">Feature flags</h2>
           <p className="text-xs text-slate-500">
-            Gate any module on or off per lodge. Disabling hides the navigation
+            Gate any module on or off per church. Disabling hides the navigation
             entry and short-circuits APIs that opt-in to checking.
           </p>
         </div>
@@ -89,16 +89,16 @@ export function FeatureFlagsClient({ lodges }: { lodges: Lodge[] }) {
       </div>
 
       <div className="mt-4 flex items-center gap-3">
-        <label htmlFor="ff-lodge" className="text-xs text-slate-500">
-          Lodge
+        <label htmlFor="ff-church" className="text-xs text-slate-500">
+          Church
         </label>
         <select
-          id="ff-lodge"
+          id="ff-church"
           className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-          value={lodgeId}
-          onChange={(e) => setLodgeId(e.target.value)}
+          value={churchId}
+          onChange={(e) => setChurchId(e.target.value)}
         >
-          {lodges.map((l) => (
+          {churches.map((l) => (
             <option key={l.id} value={l.id}>
               {l.name}
             </option>

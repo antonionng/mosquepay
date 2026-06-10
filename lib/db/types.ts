@@ -1,4 +1,4 @@
-export type Lodge = {
+export type Church = {
   id: string;
   slug: string;
   name: string;
@@ -10,70 +10,70 @@ export type Lodge = {
   secondary_color: string | null;
   support_email: string | null;
   support_phone: string | null;
-  lodge_number: string | null;
+  church_number: string | null;
   consecrated_at: string | null;
   governing_body: string | null;
-  meeting_schedule: string | null;
+  service_schedule: string | null;
   secretary_name: string | null;
   secretary_address: string | null;
   secretary_phone: string | null;
   charity_donation_url: string | null;
-  relief_chest_name: string | null;
+  gift_aid_pack_name: string | null;
   data_protection_notice: string | null;
-  visiting_notice: string | null;
+  newcomer_notice: string | null;
   loi_contact: string | null;
   wifi_details: string | null;
   /**
-   * Public-facing meeting venue (e.g. "Mark Masons Hall, 86 St James's
+   * Public-facing service venue (e.g. "Mark members Hall, 86 St James's
    * Street, London"). Distinct from `secretary_address` (used on
-   * summons). Falls back to `secretary_address` on the public site if
-   * not set, but admins are nudged to fill this in cleanly so visitors
+   * notice). Falls back to `secretary_address` on the public site if
+   * not set, but admins are nudged to fill this in cleanly so newcomers
    * see a venue rather than a correspondence address.
    */
-  meeting_location: string | null;
+  service_location: string | null;
   /**
-   * Optional URL for the meeting venue, typically a Google Maps /
-   * What3Words / venue page link. When set the public Meeting Details
+   * Optional URL for the service venue, typically a Google Maps /
+   * What3Words / venue page link. When set the public Service Details
    * card renders the venue as a tappable link.
    */
-  meeting_location_url: string | null;
+  service_location_url: string | null;
   /**
    * Short note about wheelchair access, hearing loops, parking, or
-   * other accessibility considerations for visitors. Rendered on the
-   * public Meeting Details card when set.
+   * other accessibility considerations for newcomers. Rendered on the
+   * public Service Details card when set.
    */
   accessibility_notes: string | null;
   /**
-   * Default lodge dress code shown on the public site Meeting Details
+   * Default church dress code shown on the public site Service Details
    * card and used as a fallback when an individual event has no
    * `dress_code` set.
    */
   default_dress_code: string | null;
   is_active: boolean;
-  province_id: string | null;
+  network_id: string | null;
   custom_domain: string | null;
   custom_domain_verified_at: string | null;
   custom_domain_verification_token: string | null;
   accepts_self_registration: boolean;
   current_charity_campaign_id: string | null;
   /**
-   * Gift Aid capture mode for this lodge (migration 059).
+   * Gift Aid capture mode for this church (migration 059).
    *   - `digital`: member portal self-serve only.
    *   - `paper`:   admin captures paper declarations, members are pointed at
    *                the printable form.
    *   - `both`:    member portal AND admin paper-upload paths are surfaced.
    */
   gift_aid_default_mode: "digital" | "paper" | "both";
-  /** Where to email the per-meeting Gift Aid claim pack (Relief Chest). */
-  relief_chest_email: string | null;
-  relief_chest_charity_number: string | null;
+  /** Where to email the per-service Gift Aid claim pack (Gift Aid pack). */
+  gift_aid_pack_email: string | null;
+  gift_aid_pack_charity_number: string | null;
   hmrc_charity_reference: string | null;
   created_at: string;
   updated_at: string;
 };
 
 /** Optional visual overrides per section (stored in JSONB). */
-export type LodgeSiteSectionStyle = {
+export type ChurchSiteSectionStyle = {
   primary_color?: string | null;
   background_image_url?: string | null;
   overlay_opacity?: number | null;
@@ -82,7 +82,7 @@ export type LodgeSiteSectionStyle = {
   image_alt?: string | null;
   image_position?: "left" | "right" | "top" | "bottom" | "full" | null;
   image_shape?: "rounded" | "square" | "circle" | "arch" | null;
-  form_mode?: "none" | "contact" | "lead" | null;
+  form_mode?: "none" | "contact" | "newcomer" | null;
   background_tone?: "default" | "soft" | "brand" | "dark" | null;
   content_width?: "narrow" | "standard" | "wide" | "full" | null;
   spacing?: "compact" | "normal" | "spacious" | null;
@@ -103,12 +103,12 @@ export type LodgeSiteSectionStyle = {
   faq_entries?: { question: string; answer: string }[] | null;
 };
 
-export type LodgeSiteSection = {
+export type ChurchSiteSection = {
   id: string;
   type:
     | "hero"
     | "about"
-    | "meeting_details"
+    | "service_details"
     | "officers"
     | "charity"
     | "events"
@@ -121,24 +121,24 @@ export type LodgeSiteSection = {
   cta_href: string | null;
   visible: boolean;
   order: number;
-  style?: LodgeSiteSectionStyle | null;
+  style?: ChurchSiteSectionStyle | null;
 };
 
-export type LodgeSitePage = {
+export type ChurchSitePage = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   page_key: string;
   page_title: string;
   page_description: string | null;
-  sections: LodgeSiteSection[];
-  custom_pages?: LodgeSiteCustomPage[] | null;
-  header_settings?: LodgeSiteHeaderSettings | null;
-  footer_settings?: LodgeSiteFooterSettings | null;
+  sections: ChurchSiteSection[];
+  custom_pages?: ChurchSiteCustomPage[] | null;
+  header_settings?: ChurchSiteHeaderSettings | null;
+  footer_settings?: ChurchSiteFooterSettings | null;
   published: boolean;
   updated_at: string;
 };
 
-export type LodgeSiteHeaderNavItem = {
+export type ChurchSiteHeaderNavItem = {
   id: string;
   label: string;
   href: string;
@@ -146,16 +146,16 @@ export type LodgeSiteHeaderNavItem = {
   order: number;
 };
 
-export type LodgeSiteHeaderSettings = {
+export type ChurchSiteHeaderSettings = {
   show_logo: boolean;
-  show_lodge_name: boolean;
-  show_lodge_number: boolean;
-  nav_items: LodgeSiteHeaderNavItem[];
+  show_church_name: boolean;
+  show_church_number: boolean;
+  nav_items: ChurchSiteHeaderNavItem[];
   cta_label: string | null;
   cta_href: string | null;
 };
 
-export type LodgeSiteFooterLink = {
+export type ChurchSiteFooterLink = {
   id: string;
   label: string;
   href: string;
@@ -163,32 +163,32 @@ export type LodgeSiteFooterLink = {
   order: number;
 };
 
-export type LodgeSiteFooterLinkGroup = {
+export type ChurchSiteFooterLinkGroup = {
   id: string;
   title: string;
-  links: LodgeSiteFooterLink[];
+  links: ChurchSiteFooterLink[];
   order: number;
 };
 
-export type LodgeSiteFooterSettings = {
+export type ChurchSiteFooterSettings = {
   show_logo: boolean;
-  show_lodge_name: boolean;
-  show_lodge_number: boolean;
+  show_church_name: boolean;
+  show_church_number: boolean;
   show_contact_details: boolean;
   tagline: string | null;
   badge_text: string | null;
   powered_by_text: string | null;
   /**
-   * Whether to render the "Powered by LodgePay" chip in the public site
+   * Whether to render the "Powered by ChurchPay" chip in the public site
    * hero meta strip and the footer powered-by text. Defaults to true. Set
    * to false from the admin footer settings panel on paid plans that want
    * an unbranded public surface.
    */
   show_powered_by: boolean;
-  link_groups: LodgeSiteFooterLinkGroup[];
+  link_groups: ChurchSiteFooterLinkGroup[];
 };
 
-export type LodgeSiteCustomPage = {
+export type ChurchSiteCustomPage = {
   id: string;
   slug: string;
   title: string;
@@ -196,7 +196,7 @@ export type LodgeSiteCustomPage = {
   seo_title?: string | null;
   seo_description?: string | null;
   social_image_url?: string | null;
-  sections: LodgeSiteSection[];
+  sections: ChurchSiteSection[];
   published: boolean;
   show_in_nav: boolean;
   nav_label: string | null;
@@ -205,7 +205,7 @@ export type LodgeSiteCustomPage = {
 
 export type AdminUser = {
   id: string;
-  lodge_id: string | null;
+  church_id: string | null;
   auth_user_id: string | null;
   email: string;
   full_name: string;
@@ -223,7 +223,7 @@ export type AdminUser = {
 
 export type AuditLog = {
   id: string;
-  lodge_id: string | null;
+  church_id: string | null;
   actor_email: string | null;
   actor_role: string | null;
   action: string;
@@ -246,7 +246,7 @@ export type AuditLog = {
  */
 export type EmailLog = {
   id: string;
-  lodge_id: string | null;
+  church_id: string | null;
   to_email: string;
   member_id: string | null;
   admin_user_id: string | null;
@@ -262,18 +262,18 @@ export type EmailLog = {
   created_at: string;
 };
 
-export type LodgeNotificationSetting = {
-  lodge_id: string;
-  /** admin_users.role or the sentinel '__all__' for a lodge-wide rule. */
+export type ChurchNotificationSetting = {
+  church_id: string;
+  /** admin_users.role or the sentinel '__all__' for a church-wide rule. */
   role: string;
   event_type: string;
   enabled: boolean;
   updated_at: string;
 };
 
-export type Lead = {
+export type Newcomer = {
   id: string;
-  lodge_id: string | null;
+  church_id: string | null;
   first_name: string;
   last_name: string;
   email: string;
@@ -291,7 +291,7 @@ export type Lead = {
   next_step: string | null;
   next_step_due_date: string | null;
   proposal_date: string | null;
-  ballot_date: string | null;
+  membership_decision_date: string | null;
   interview_completed_at: string | null;
   consent_given_at: string | null;
   notes: string | null;
@@ -302,14 +302,14 @@ export type Lead = {
   stage_changed_at: string;
 };
 
-export type LeadActivity = {
+export type NewcomerActivity = {
   id: string;
-  lodge_id: string | null;
-  lead_id: string;
+  church_id: string | null;
+  newcomer_id: string;
   activity_type: string;
   title: string | null;
   description: string | null;
-  meeting_date: string | null;
+  service_date: string | null;
   attendees: string[] | null;
   due_date: string | null;
   completed: boolean;
@@ -319,7 +319,7 @@ export type LeadActivity = {
 
 export type Event = {
   id: string;
-  lodge_id: string | null;
+  church_id: string | null;
   title: string;
   slug: string;
   description: string | null;
@@ -347,14 +347,14 @@ export type Event = {
   raffle_allow_custom: boolean;
   /**
    * Non-cash "bring a bottle for the raffle" pledge. Independent of
-   * enable_raffle_donation: a lodge can run a cash raffle, a wine raffle,
+   * enable_raffle_donation: a church can run a cash raffle, a wine raffle,
    * both, or neither. See migration 057.
    */
   enable_raffle_wine_pledge: boolean;
   raffle_wine_description: string | null;
-  enable_meeting_fee: boolean;
-  meeting_fee_amount: number | null;
-  meeting_fee_description: string | null;
+  enable_service_fee: boolean;
+  service_fee_amount: number | null;
+  service_fee_description: string | null;
   enable_guest_tickets: boolean;
   guest_ticket_price: number | null;
   guest_ticket_description: string | null;
@@ -364,44 +364,44 @@ export type Event = {
   created_by: string | null;
   published: boolean;
   /**
-   * Opt-in flag that promotes this event onto the public lodge website even
+   * Opt-in flag that promotes this event onto the public church website even
    * when its `event_type` is not naturally public. See
    * `lib/events/public-visibility.ts` for the full visibility rule.
    */
   feature_on_website: boolean;
   sequence_id: string | null;
   sequence_position: number | null;
-  summons_status: SummonsStatus;
-  summons_auto_drafted_at: string | null;
-  summons_approved_at: string | null;
-  summons_approved_by_email: string | null;
-  summons_last_sent_at: string | null;
+  notice_status: NoticeStatus;
+  notice_auto_drafted_at: string | null;
+  notice_approved_at: string | null;
+  notice_approved_by_email: string | null;
+  notice_last_sent_at: string | null;
   /**
-   * Per-meeting close (migration 059). When a treasurer hits "Close
-   * meeting and send Gift Aid" we stamp these and create a same-day
+   * Per-service close (migration 059). When a treasurer hits "Close
+   * service and send Gift Aid" we stamp these and create a same-day
    * Gift Aid claim batch for everything attributed to this event_id.
    */
-  meeting_closed_at: string | null;
-  meeting_closed_by_email: string | null;
-  meeting_close_notes: string | null;
+  service_closed_at: string | null;
+  service_closed_by_email: string | null;
+  service_close_notes: string | null;
   created_at: string;
   updated_at: string;
 };
 
-export type SummonsStatus = "none" | "draft" | "approved" | "sent";
+export type NoticeStatus = "none" | "draft" | "approved" | "sent";
 
 /**
  * Per-event override of fee resolution for a single member or honorary
  * guest. Used when a recipient should pay a different amount (or
- * complimentary) for one specific meeting only, distinct from their
+ * complimentary) for one specific service only, distinct from their
  * profile-level levy_waived/dining_waived flags.
  *
  * Resolution order is: event_fee_overrides -> event.dining_waived_for_all
- * -> profile waivers -> profile custom amount -> event price -> lodge default.
+ * -> profile waivers -> profile custom amount -> event price -> church default.
  */
 export type EventFeeOverride = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   event_id: string;
   subject_type: "member" | "guest";
   subject_id: string;
@@ -416,18 +416,18 @@ export type EventFeeOverride = {
 };
 
 /**
- * A recurring meeting recipe for a lodge. The sequence captures the
+ * A recurring service recipe for a church. The sequence captures the
  * standard "third Saturday in Jan/Mar/Jun/Sep/Nov" rhythm so the
- * secretary can generate a year of regular meetings in one go and have
- * draft summons auto-created within the configured lead window.
+ * secretary can generate a year of regular services in one go and have
+ * draft notice auto-created within the configured newcomer window.
  *
- * Sends are NEVER automatic. The send route checks summons_status on
+ * Sends are NEVER automatic. The send route checks notice_status on
  * the event and refuses to dispatch unless an admin has explicitly
  * approved the draft.
  */
-export type MeetingSequence = {
+export type ServiceSequence = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   name: string;
   description: string | null;
   event_type: string;
@@ -440,7 +440,7 @@ export type MeetingSequence = {
   /**
    * Per-month overrides keyed by month number as a string ("1".."12"). Each
    * entry may override week_of_month and/or day_of_week. Anything unset
-   * falls back to the sequence default. Lets lodges express patterns like
+   * falls back to the sequence default. Lets churches express patterns like
    * "3rd Saturday most months but 2nd Saturday in June".
    */
   month_overrides: Record<
@@ -452,20 +452,20 @@ export type MeetingSequence = {
   default_temple_room: string | null;
   default_dress_code: string | null;
   default_dining_price: number | null;
-  default_meeting_fee_amount: number | null;
+  default_service_fee_amount: number | null;
   default_enable_dining_rsvp: boolean;
-  default_enable_meeting_fee: boolean;
+  default_enable_service_fee: boolean;
   default_enable_charity_donation: boolean;
   default_charity_name: string | null;
   default_enable_raffle_donation: boolean;
   default_raffle_description: string | null;
   default_enable_raffle_wine_pledge: boolean;
   default_raffle_wine_description: string | null;
-  /** Max lead time in weeks for auto-creating a draft summons. */
-  summons_lead_weeks: number;
+  /** Max newcomer time in weeks for auto-creating a draft notice. */
+  notice_newcomer_weeks: number;
   /** UI warning threshold: anything inside this is overdue. */
-  summons_min_lead_weeks: number;
-  auto_draft_summons: boolean;
+  notice_min_newcomer_weeks: number;
+  auto_draft_notice: boolean;
   active: boolean;
   created_by_email: string | null;
   created_at: string;
@@ -474,7 +474,7 @@ export type MeetingSequence = {
 
 export type Rsvp = {
   id: string;
-  lodge_id: string | null;
+  church_id: string | null;
   event_id: string;
   user_name: string;
   user_email: string;
@@ -503,7 +503,7 @@ export type Rsvp = {
 
 export type Payment = {
   id: string;
-  lodge_id: string | null;
+  church_id: string | null;
   rsvp_id: string | null;
   event_id: string | null;
   user_email: string;
@@ -511,14 +511,14 @@ export type Payment = {
   stripe_payment_intent_id: string | null;
   stripe_charge_id: string | null;
   stripe_customer_id: string | null;
-  // Mooov-side caller-generated payment id (e.g. don_<lodge>_<rand>). Set on
+  // Mooov-side caller-generated payment id (e.g. don_<church>_<rand>). Set on
   // payments projected from Mooov webhook events. Mutually exclusive in
   // practice with stripe_payment_intent_id during the Stripe -> Mooov cutover.
   mooov_payment_id?: string | null;
   dining_amount: number;
   charity_amount: number;
   raffle_amount: number;
-  meeting_fee_amount: number;
+  service_fee_amount: number;
   guest_ticket_amount: number;
   total_amount: number;
   currency: string;
@@ -545,7 +545,7 @@ export type Payment = {
 
 export type Donation = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   event_id: string | null;
   payment_id: string | null;
   campaign_id: string | null;
@@ -568,7 +568,7 @@ export type Donation = {
 
 export type GiftAidDeclaration = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   donor_name: string;
   donor_email: string;
   donor_address_line_1: string | null;
@@ -614,7 +614,7 @@ export type GiftAidDeclaration = {
  */
 export type GiftAidDeclarationEvent = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   declaration_id: string;
   event_type:
     | "created_digital"
@@ -638,9 +638,9 @@ export type GiftAidDeclarationEvent = {
   created_at: string;
 };
 
-export type LodgeSubscription = {
+export type ChurchSubscription = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
   plan_code: string;
@@ -653,14 +653,14 @@ export type LodgeSubscription = {
   current_period_end: string | null;
   requested_plan_code: string | null;
   last_upgrade_requested_at: string | null;
-  lodge_limit: number | null;
+  church_limit: number | null;
   created_at: string;
   updated_at: string;
 };
 
 export type BlogPost = {
   id: string;
-  lodge_id: string | null;
+  church_id: string | null;
   title: string;
   slug: string;
   excerpt: string | null;
@@ -680,7 +680,7 @@ export type BlogPost = {
 
 export type ContentPage = {
   id: string;
-  lodge_id: string | null;
+  church_id: string | null;
   page_key: string;
   title: string | null;
   content: string | null;
@@ -690,7 +690,7 @@ export type ContentPage = {
 
 export type CharityCampaign = {
   id: string;
-  lodge_id: string | null;
+  church_id: string | null;
   name: string;
   description: string | null;
   target_amount: number;
@@ -702,8 +702,8 @@ export type CharityCampaign = {
   updated_at: string;
 };
 
-export type LodgeFeeDefaults = {
-  lodge_id: string;
+export type ChurchFeeDefaults = {
+  church_id: string;
   default_member_levy_amount: number | null;
   default_member_dining_amount: number | null;
   default_guest_dining_amount: number | null;
@@ -711,13 +711,13 @@ export type LodgeFeeDefaults = {
   updated_at: string;
 };
 
-export type LodgeMasonicYear = {
+export type ChurchGivingYear = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   label: string;
   start_date: string;
   end_date: string;
-  annual_dues_amount: number | null;
+  annual_giving_amount: number | null;
   is_current: boolean;
   created_at: string;
   updated_at: string;
@@ -725,9 +725,9 @@ export type LodgeMasonicYear = {
 
 export type GuestCategory = "guest" | "honorary_guest";
 
-export type LodgeDues = {
+export type ChurchGiving = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   name: string;
   amount: number;
   currency: string;
@@ -750,13 +750,13 @@ export type LodgeDues = {
   updated_at: string;
 };
 
-export type MemberDues = {
+export type MemberGiving = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   member_email: string;
   member_name: string | null;
   member_id: string | null;
-  dues_id: string | null;
+  giving_id: string | null;
   amount: number;
   currency: string;
   period_start: string;
@@ -778,12 +778,12 @@ export type MemberDues = {
   is_advance: boolean;
   advance_for_year_id: string | null;
   /**
-   * How this member is paying this year's dues. NULL = not yet tagged
+   * How this member is paying this year's giving. NULL = not yet tagged
    * (treasurer dashboard counts these as "outstanding / unset"). See
-   * supabase/migrations/063_member_dues_payment_method.sql.
+   * supabase/migrations/063_member_giving_payment_method.sql.
    */
-  dues_payment_method: DuesPaymentMethod | null;
-  /** Standing-order amount when dues_payment_method='bacs'. */
+  giving_payment_method: GivingPaymentMethod | null;
+  /** Standing-order amount when giving_payment_method='bacs'. */
   bacs_monthly_amount: number | null;
   /** Optional BACS reference (e.g. "BRO ANTONIO 25/26"). */
   bacs_reference: string | null;
@@ -794,16 +794,16 @@ export type MemberDues = {
   updated_at: string;
 };
 
-export type DuesPaymentMethod =
+export type GivingPaymentMethod =
   | "online_subscription"
   | "bacs"
   | "paid_in_full"
   | "fee_waived";
 
-export type MemberDuesInstalment = {
+export type MemberGivingInstalment = {
   id: string;
-  lodge_id: string;
-  member_dues_id: string;
+  church_id: string;
+  member_giving_id: string;
   sequence: number;
   due_date: string;
   amount: number;
@@ -818,14 +818,14 @@ export type MemberDuesInstalment = {
   updated_at: string;
 };
 
-export type DuesSplitStrategy =
+export type GivingSplitStrategy =
   | "pro_rata"
   | "even_full_year"
   | "catch_up_lump_then_monthly"
   | "monthly_then_balloon"
   | "reslice_remaining";
 
-export type DuesScheduleStatus =
+export type GivingScheduleStatus =
   | "pending"
   | "active"
   | "action_required"
@@ -835,20 +835,20 @@ export type DuesScheduleStatus =
   | "completed"
   | "active_stripe";
 
-export type DuesSchedule = {
+export type GivingSchedule = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   member_id: string | null;
-  member_dues_id: string;
+  member_giving_id: string;
   member_email: string;
   customer_ref: string;
   mooov_payment_method_id: string | null;
   stripe_customer_id: string | null;
   mooov_subscription_id: string | null;
   cadence: "monthly" | "quarterly";
-  split_strategy: DuesSplitStrategy;
+  split_strategy: GivingSplitStrategy;
   auto_renew: boolean;
-  status: DuesScheduleStatus;
+  status: GivingScheduleStatus;
   consecutive_failures: number;
   last_failure_code: string | null;
   last_failure_category: string | null;
@@ -865,9 +865,9 @@ export type DuesSchedule = {
   updated_at: string;
 };
 
-export type MeetingCollection = {
+export type ServiceCollection = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   event_id: string | null;
   campaign_id: string | null;
   collection_date: string;
@@ -883,20 +883,20 @@ export type MeetingCollection = {
   notes: string | null;
   recorded_by_email: string | null;
   /**
-   * Set by the per-meeting close flow (migration 059) when the meeting
+   * Set by the per-service close flow (migration 059) when the service
    * collection has been rolled into a Gift Aid claim batch for the same
-   * date. Lets the meeting detail page show "submitted to Relief Chest".
+   * date. Lets the service detail page show "submitted to Gift Aid pack".
    */
   gift_aid_claim_batch_id: string | null;
-  relief_chest_delivered_at: string | null;
-  relief_chest_delivered_to: string | null;
+  gift_aid_pack_delivered_at: string | null;
+  gift_aid_pack_delivered_to: string | null;
   created_at: string;
   updated_at: string;
 };
 
 export type GasdsClaim = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   tax_year: string;
   eligible_cash_amount: number;
   claimed_cash_amount: number;
@@ -912,7 +912,7 @@ export type GasdsClaim = {
 
 export type GiftAidClaimBatch = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   claim_reference: string | null;
   period_start: string;
   period_end: string;
@@ -942,7 +942,7 @@ export type GiftAidClaimBatch = {
 /** Per-batch linkage of a declaration that was included in the claim pack. */
 export type GiftAidClaimDeclaration = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   claim_batch_id: string;
   gift_aid_declaration_id: string;
   inclusion_reason: "new_in_window" | "donor_in_batch" | "manual";
@@ -951,7 +951,7 @@ export type GiftAidClaimDeclaration = {
 
 export type GiftAidClaimItem = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   claim_batch_id: string;
   donation_id: string | null;
   gift_aid_declaration_id: string | null;
@@ -966,7 +966,7 @@ export type GiftAidClaimItem = {
 
 export type BankStatementImport = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   filename: string;
   account_label: string | null;
   total_rows: number;
@@ -978,7 +978,7 @@ export type BankStatementImport = {
 
 export type BankTransaction = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   import_id: string;
   posted_date: string;
   description: string;
@@ -987,7 +987,7 @@ export type BankTransaction = {
   balance: number | null;
   reference: string | null;
   status: 'unmatched' | 'matched' | 'ignored';
-  matched_source_type: 'payment' | 'dues' | 'donation' | 'manual' | null;
+  matched_source_type: 'payment' | 'giving' | 'donation' | 'manual' | null;
   matched_source_id: string | null;
   matched_confidence: number | null;
   matched_by_admin_user_id: string | null;
@@ -999,9 +999,9 @@ export type BankTransaction = {
 
 export type ProgressionSignoff = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   member_id: string;
-  degree: 'initiation' | 'passing' | 'raising';
+  degree: 'membership' | 'passing' | 'raising';
   signed_off: boolean;
   signed_off_by_admin_user_id: string | null;
   signed_off_by_member_id: string | null;
@@ -1011,7 +1011,7 @@ export type ProgressionSignoff = {
 
 export type MentorAssignment = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   mentor_member_id: string;
   mentee_member_id: string;
   started_at: string;
@@ -1023,12 +1023,12 @@ export type MentorAssignment = {
 
 export type MentorContact = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   assignment_id: string | null;
   mentor_member_id: string | null;
   mentee_member_id: string | null;
   contacted_at: string;
-  contact_method: 'meeting' | 'phone' | 'video' | 'email' | 'visit';
+  contact_method: 'service' | 'phone' | 'video' | 'email' | 'visit';
   topic: string | null;
   notes: string | null;
   created_at: string;
@@ -1036,7 +1036,7 @@ export type MentorContact = {
 
 export type EventRitualRole = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   event_id: string;
   role_title: string;
   member_id: string | null;
@@ -1048,7 +1048,7 @@ export type EventRitualRole = {
 
 export type OfficerLadderRung = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   rung_label: string;
   sort_order: number;
   current_member_id: string | null;
@@ -1058,7 +1058,7 @@ export type OfficerLadderRung = {
   updated_at: string;
 };
 
-export type Province = {
+export type Network = {
   id: string;
   slug: string;
   name: string;
@@ -1075,9 +1075,9 @@ export type Province = {
 
 export type MemberRank = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   member_id: string;
-  scope: 'lodge' | 'provincial' | 'grand' | 'other';
+  scope: 'church' | 'network' | 'grand' | 'other';
   rank_label: string;
   conferred_on: string | null;
   conferred_by: string | null;
@@ -1086,11 +1086,11 @@ export type MemberRank = {
   updated_at: string;
 };
 
-export type LodgeVisit = {
+export type ChurchVisit = {
   id: string;
-  visiting_lodge_id: string;
-  host_lodge_id: string | null;
-  host_lodge_name: string | null;
+  newcomer_church_id: string;
+  host_church_id: string | null;
+  host_church_name: string | null;
   member_id: string | null;
   member_name: string | null;
   visit_date: string;
@@ -1100,11 +1100,11 @@ export type LodgeVisit = {
   created_at: string;
 };
 
-export type ProvinceOfficerDirectoryEntry = {
-  province_id: string | null;
-  lodge_id: string;
-  lodge_name: string;
-  lodge_number: string | null;
+export type NetworkOfficerDirectoryEntry = {
+  network_id: string | null;
+  church_id: string;
+  church_name: string;
+  church_number: string | null;
   member_id: string;
   full_name: string;
   office_title: string;
@@ -1113,22 +1113,22 @@ export type ProvinceOfficerDirectoryEntry = {
   rank: string | null;
 };
 
-export type LodgeAnnualReturn = {
-  lodge_id: string;
-  province_id: string | null;
-  lodge_name: string;
-  lodge_number: string | null;
+export type ChurchAnnualReturn = {
+  church_id: string;
+  network_id: string | null;
+  church_name: string;
+  church_number: string | null;
   active_members: number;
   resigned_members: number;
   excluded_members: number;
-  initiations_ytd: number;
+  memberships_ytd: number;
   passings_ytd: number;
   raisings_ytd: number;
 };
 
 export type MemberConsent = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   member_id: string;
   consent_key: string;
   granted: boolean;
@@ -1144,10 +1144,10 @@ export type MemberConsent = {
 
 export type DataRetentionSettings = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   resigned_member_retention_months: number;
   deceased_member_retention_months: number;
-  lead_inactive_retention_months: number;
+  newcomer_inactive_retention_months: number;
   audit_log_retention_months: number;
   archive_strategy: 'soft_delete' | 'anonymise' | 'hard_delete';
   notes: string | null;
@@ -1158,7 +1158,7 @@ export type DataRetentionSettings = {
 
 export type SubjectAccessRequest = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   member_id: string | null;
   requester_email: string;
   requester_name: string | null;
@@ -1180,7 +1180,7 @@ export type JobStatus =
 
 export type Job = {
   id: string;
-  lodge_id: string | null;
+  church_id: string | null;
   job_type: string;
   payload: Record<string, unknown>;
   status: JobStatus;
@@ -1205,7 +1205,7 @@ export type IntegrationProvider =
 
 export type IntegrationCredentials = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   provider: IntegrationProvider;
   access_token: string | null;
   refresh_token: string | null;
@@ -1218,7 +1218,7 @@ export type IntegrationCredentials = {
 
 export type MessageTemplate = {
   id: string;
-  lodge_id: string | null;
+  church_id: string | null;
   template_key: string;
   name: string;
   subject: string;
@@ -1232,7 +1232,7 @@ export type MessageTemplate = {
 
 export type Message = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   channel: 'email' | 'sms';
   template_key: string | null;
   subject: string | null;
@@ -1240,7 +1240,7 @@ export type Message = {
   recipient_email: string | null;
   recipient_name: string | null;
   recipient_member_id: string | null;
-  recipient_lead_id: string | null;
+  recipient_newcomer_id: string | null;
   audience_label: string | null;
   status: 'queued' | 'sent' | 'failed' | 'skipped';
   error_message: string | null;
@@ -1252,7 +1252,7 @@ export type Message = {
 
 export type AutomationSetting = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   automation_key: string;
   enabled: boolean;
   last_run_at: string | null;
@@ -1260,9 +1260,9 @@ export type AutomationSetting = {
   updated_at: string;
 };
 
-export type WelfareCase = {
+export type PastoralCareCase = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   member_id: string | null;
   contact_name: string;
   contact_email: string | null;
@@ -1280,9 +1280,9 @@ export type WelfareCase = {
   updated_at: string;
 };
 
-export type WelfareVisit = {
+export type PastoralCareVisit = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   case_id: string;
   visited_at: string;
   contact_method: 'visit' | 'phone' | 'video' | 'email' | 'letter';
@@ -1293,9 +1293,9 @@ export type WelfareVisit = {
   created_at: string;
 };
 
-export type WelfareRegisterEntry = {
+export type PastoralCareRegisterEntry = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   member_id: string | null;
   register_type: 'bereavement' | 'widow' | 'family';
   full_name: string;
@@ -1310,11 +1310,11 @@ export type WelfareRegisterEntry = {
   updated_at: string;
 };
 
-export type WelfareAlert = {
+export type PastoralCareAlert = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   member_id: string | null;
-  alert_type: 'missed_meetings' | 'overdue_dues' | 'silent' | 'manual';
+  alert_type: 'missed_services' | 'overdue_giving' | 'silent' | 'manual';
   severity: 'low' | 'standard' | 'high' | 'urgent';
   message: string;
   metadata: Record<string, unknown>;
@@ -1328,8 +1328,8 @@ export type WelfareAlert = {
 
 export type LedgerEntry = {
   source_id: string;
-  source_type: 'payment' | 'dues' | 'donation';
-  lodge_id: string;
+  source_type: 'payment' | 'giving' | 'donation';
+  church_id: string;
   occurred_at: string;
   contact_email: string | null;
   contact_name: string | null;
@@ -1343,7 +1343,7 @@ export type LedgerEntry = {
 
 export type Settings = {
   id: string;
-  lodge_id: string | null;
+  church_id: string | null;
   setting_key: string;
   setting_value: string | null;
   setting_type: string;
@@ -1353,7 +1353,7 @@ export type Settings = {
 
 export type EventGuest = {
   id: string;
-  lodge_id: string | null;
+  church_id: string | null;
   rsvp_id: string | null;
   event_id: string;
   guest_name: string;
@@ -1369,34 +1369,35 @@ export type EventGuest = {
 
 export type Guest = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   full_name: string;
   email: string | null;
   phone: string | null;
-  mother_lodge_name: string | null;
-  mother_lodge_number: string | null;
+  mother_church_name: string | null;
+  mother_church_number: string | null;
   constitution: string | null;
   rank: string | null;
   dietary_requirements: string | null;
   guest_category: GuestCategory;
   guest_dining_amount: number | null;
   dining_waived: boolean;
-  is_mason: boolean;
+  is_member: boolean;
   first_seen_event_id: string | null;
   last_seen_event_id: string | null;
   visit_count: number;
   notes: string | null;
   archived_at: string | null;
-  visitor_token_hash: string | null;
+  newcomer_token_hash: string | null;
   source: "admin" | "member_invite" | "self_invite_event" | "self_register";
   email_confirmed_at: string | null;
+  gift_aid_consent_status: "unknown" | "declared" | "declined";
   created_at: string;
   updated_at: string;
 };
 
 export type GuestInvitation = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   event_id: string;
   inviter_member_id: string | null;
   inviter_admin_user_id: string | null;
@@ -1415,7 +1416,7 @@ export type GuestInvitation = {
 
 export type Member = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   auth_user_id: string | null;
   email: string;
   full_name: string;
@@ -1439,21 +1440,21 @@ export type Member = {
   levy_waived: boolean;
   dining_waived: boolean;
   fee_use_custom: boolean;
-  annual_dues_waived: boolean;
-  annual_dues_waiver_reason: string | null;
-  date_of_initiation: string | null;
+  annual_giving_waived: boolean;
+  annual_giving_waiver_reason: string | null;
+  date_of_membership: string | null;
   date_of_birth: string | null;
   date_of_passing: string | null;
   date_of_raising: string | null;
-  progression_signed_off_initiation: boolean;
-  progression_signed_off_passing: boolean;
-  progression_signed_off_raising: boolean;
-  initiation_email_sent: boolean;
+  discipleship_signed_off_membership: boolean;
+  discipleship_signed_off_passing: boolean;
+  discipleship_signed_off_raising: boolean;
+  membership_email_sent: boolean;
   membership_status: 'active' | 'suspended' | 'resigned' | 'excluded';
   stripe_customer_id: string | null;
   portal_token: string;
   /**
-   * Per-member opt-in for the public lodge website. Defaults to false.
+   * Per-member opt-in for the public church website. Defaults to false.
    * Even when this member holds an officer rung in `officer_ladder`,
    * their name, photo, and bio stay private until they explicitly opt
    * in via the admin member detail page. Revocable at any time.
@@ -1486,9 +1487,9 @@ export type Member = {
   updated_at: string;
 };
 
-export type EventSummons = {
+export type ServiceNotice = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   event_id: string;
   issue_date: string;
   opening_text: string | null;
@@ -1497,31 +1498,31 @@ export type EventSummons = {
   dining_time: string | null;
   notices: string[];
   include_member_directory: boolean;
-  visiting_officer_name: string | null;
-  visiting_officer_email: string | null;
-  visiting_officer_phone: string | null;
-  visiting_officers: VisitingOfficer[];
-  next_meeting_date: string | null;
-  next_meeting_note: string | null;
-  master_elect_name: string | null;
-  master_elect_qualification: string | null;
+  newcomer_contact_name: string | null;
+  newcomer_contact_email: string | null;
+  newcomer_contact_phone: string | null;
+  newcomer_contacts: NewcomerOfficer[];
+  next_service_date: string | null;
+  next_service_note: string | null;
+  service_lead_name: string | null;
+  service_lead_role: string | null;
   include_honorary_guests: boolean;
   recipient_snapshot: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 };
 
-export type VisitingOfficer = {
+export type NewcomerOfficer = {
   name: string;
   email?: string | null;
   phone?: string | null;
 };
 
-export type EventSummonsSend = {
+export type ServiceNoticeSend = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   event_id: string;
-  summons_id: string | null;
+  notice_id: string | null;
   sent_by: string | null;
   recipient_count: number;
   sent_count: number;
@@ -1530,11 +1531,11 @@ export type EventSummonsSend = {
   created_at: string;
 };
 
-export type EventSummonsAccessLink = {
+export type ServiceNoticeAccessLink = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   event_id: string;
-  summons_id: string | null;
+  notice_id: string | null;
   send_id: string | null;
   recipient_email: string;
   recipient_name: string | null;
@@ -1545,9 +1546,9 @@ export type EventSummonsAccessLink = {
   created_at: string;
 };
 
-export type LodgeFeatureFlag = {
+export type ChurchFeatureFlag = {
   id: string;
-  lodge_id: string;
+  church_id: string;
   flag_key: string;
   enabled: boolean;
   notes: string | null;

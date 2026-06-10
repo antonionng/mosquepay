@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -20,24 +20,24 @@ export async function POST(
     );
   }
   const { id: assignmentId } = await params;
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("members:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("members:write", churchId);
   if (forbidden) return forbidden;
   const body = await request.json();
 
-  const assignments = await db.listMentorAssignments(lodgeId);
+  const assignments = await db.listMentorAssignments(churchId);
   const assignment = assignments.find((a) => a.id === assignmentId);
 
-  const contact = await db.createMentorContact(lodgeId, {
+  const contact = await db.createMentorContact(churchId, {
     assignment_id: assignmentId,
     mentor_member_id: assignment?.mentor_member_id ?? null,
     mentee_member_id: assignment?.mentee_member_id ?? null,
     contacted_at: body.contacted_at ?? new Date().toISOString(),
-    contact_method: body.contact_method ?? "meeting",
+    contact_method: body.contact_method ?? "service",
     topic: body.topic ?? null,
     notes: body.notes ?? null,
   });

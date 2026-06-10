@@ -5,7 +5,7 @@ import "./globals.css";
 import { CookieConsent } from "@/components/legal/cookie-consent";
 import { PageViewTracker } from "@/components/telemetry/page-view-tracker";
 import {
-  lodgePayStructuredData,
+  churchPayStructuredData,
   marketingMetadata,
   SOCIAL_SHARE_IMAGE,
   SITE_ORIGIN,
@@ -28,40 +28,40 @@ function siteUrl(): URL {
   const raw =
     process.env.NEXT_PUBLIC_SITE_URL ??
     process.env.VERCEL_PROJECT_PRODUCTION_URL ??
-    "https://www.lodgepayments.co.uk";
+    "https://www.churchpay.co.uk";
   const normalized = raw.startsWith("http") ? raw : `https://${raw}`;
   try {
     return new URL(normalized);
   } catch {
-    return new URL("https://www.lodgepayments.co.uk");
+    return new URL("https://www.churchpay.co.uk");
   }
 }
 
 export const metadata: Metadata = {
   ...marketingMetadata({
-    title: "LodgePay | Masonic Lodge Websites, Payments, Events, and Member CRM",
+    title: "ChurchPay | Church Websites, Giving, Events, and Member CRM",
     description:
-      "LodgePay is an all-in-one platform for Masonic lodges, Provinces, and hall groups. Build lodge websites, collect dues and donations, manage events, send summons, claim Gift Aid, run member portals, and nurture candidates.",
+      "ChurchPay is an all-in-one platform for churches, networks, and hall groups. Build church websites, collect giving and donations, manage services and events, send service notices, claim Gift Aid, run member portals, and nurture newcomers.",
     path: "/",
   }),
   metadataBase: siteUrl(),
-  applicationName: "LodgePay",
-  authors: [{ name: "LodgePay", url: SITE_ORIGIN }],
-  creator: "LodgePay",
-  publisher: "LodgePay",
-  category: "Masonic lodge management software",
+  applicationName: "ChurchPay",
+  authors: [{ name: "ChurchPay", url: SITE_ORIGIN }],
+  creator: "ChurchPay",
+  publisher: "ChurchPay",
+  category: "Church management software",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Lodge",
+    title: "Church",
   },
   icons: {
     icon: "/icon.png",
     apple: "/icon.png",
   },
   // format-detection:none stops iOS Safari from auto-linking phone numbers,
-  // addresses, and dates in admin/lodge content (they show up as ugly blue
+  // addresses, and dates in admin/church content (they show up as ugly blue
   // underlined "tap to call" affordances on numeric IDs and reference codes).
   formatDetection: {
     telephone: false,
@@ -72,6 +72,10 @@ export const metadata: Metadata = {
   },
   other: {
     "og:image:secure_url": SOCIAL_SHARE_IMAGE.url,
+    "og:image:alt": SOCIAL_SHARE_IMAGE.alt,
+    "og:image:type": SOCIAL_SHARE_IMAGE.type,
+    "og:image:width": String(SOCIAL_SHARE_IMAGE.width),
+    "og:image:height": String(SOCIAL_SHARE_IMAGE.height),
     "article:publisher": SITE_ORIGIN,
     // Hint to Chromium PWAs that landscape is also acceptable on tablets.
     "mobile-web-app-capable": "yes",
@@ -103,7 +107,7 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           suppressHydrationWarning
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(lodgePayStructuredData) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(churchPayStructuredData) }}
         />
         {children}
         <CookieConsent />

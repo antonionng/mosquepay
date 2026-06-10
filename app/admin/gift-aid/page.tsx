@@ -4,23 +4,24 @@ import { getAdminReadContext } from "@/lib/admin/read-context";
 import { GiftAidClient } from "./gift-aid-client";
 import { isSuccessfulPaymentStatus } from "@/lib/reports";
 import type { GiftAidDeclaration } from "@/lib/db/types";
+import { eligibleDonationRows } from "@/lib/gift-aid/eligible";
 
 export const dynamic = "force-dynamic";
 
 export default async function GiftAidPage() {
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
-  const lodgeId = ctx.mode === "database" ? ctx.lodgeId : null;
+  const churchId = ctx.mode === "database" ? ctx.churchId : null;
 
   const declarations = useMock
     ? mockDb.getGiftAidDeclarations()
-    : lodgeId
-      ? await db.getGiftAidDeclarations(lodgeId)
+    : churchId
+      ? await db.getGiftAidDeclarations(churchId)
       : [];
-  const donations = useMock || !lodgeId ? [] : await db.getDonations(lodgeId);
-  const claims = useMock || !lodgeId
+  const donations = useMock || !churchId ? [] : await db.getDonations(churchId);
+  const claims = useMock || !churchId
     ? []
-    : await db.getGiftAidClaimBatches(lodgeId).catch(() => []);
+    : await db.getGiftAidClaimBatches(churchId).catch(() => []);
   const declarationsByEmail = new Map(
     declarations
       .filter((d) => !("donor_address" in d))
@@ -36,7 +37,7 @@ export default async function GiftAidPage() {
   // from historical charity payments) carry only the donor email -- the
   // declaration is matched at claim time -- so an id-only join would show
   // £0 against a donor who has in fact given. This mirrors the email match
-  // the claim batcher and per-meeting close use, so the per-donor totals
+  // the claim batcher and per-service close use, so the per-donor totals
   // agree with what is actually reclaimable.
   const donationsByDeclaration = new Map<
     string,
@@ -94,22 +95,13 @@ export default async function GiftAidPage() {
     };
   });
 
-  const eligibleRows = donations
-    .filter((donation) => isSuccessfulPaymentStatus(donation.status))
-    .filter((donation) => !donation.gift_aid_claim_batch_id)
-    .map((donation) => {
+  const eligibleRows = eligibleDonationRows(
+    donations,
+    declarations.filter((d) => !("donor_address" in d)) as GiftAidDeclaration[],
+  ).map((donation) => {
       const declaration = donation.gift_aid_declaration_id
-        ? (declarations.find((item) => item.id === donation.gift_aid_declaration_id) as GiftAidDeclaration | undefined)
+        ? declarationById.get(donation.gift_aid_declaration_id)
         : declarationsByEmail.get(donation.donor_email.toLowerCase());
-      const declared =
-        donation.gift_aid_status === "declared" ||
-        Boolean(declaration && !declaration.revoked_at);
-      const eligibleAmount =
-        donation.gift_aid_eligible_amount && donation.gift_aid_eligible_amount > 0
-          ? donation.gift_aid_eligible_amount
-          : declared
-            ? donation.amount
-            : 0;
       return {
         id: donation.id,
         donor_name: donation.donor_name ?? "Anonymous",
@@ -120,11 +112,10 @@ export default async function GiftAidPage() {
         donation_date: donation.created_at,
         source: donation.source,
         amount: donation.amount,
-        eligible_amount: eligibleAmount,
-        reclaimable_amount: eligibleAmount * 0.25,
+        eligible_amount: donation.eligible_amount,
+        reclaimable_amount: donation.eligible_amount * 0.25,
       };
-    })
-    .filter((row) => row.eligible_amount > 0);
+    });
 
   return (
     <GiftAidClient

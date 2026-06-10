@@ -1,8 +1,8 @@
 export const PLAN_CODES = [
-  "lodge_essentials",
-  "lodge_complete",
-  "lodge_group",
-  "province",
+  "church_essentials",
+  "church_complete",
+  "church_group",
+  "network",
 ] as const;
 
 export type PlanCode = (typeof PLAN_CODES)[number];
@@ -10,29 +10,29 @@ export type PlanCode = (typeof PLAN_CODES)[number];
 export const ENTITLEMENT_KEYS = [
   "site_builder",
   "member_portal",
-  "digital_lodge_card",
+  "digital_church_card",
   "payments",
-  "dues",
+  "giving",
   "gift_aid",
   "gasds",
-  "meetings",
-  "summons",
+  "services",
+  "notice",
   "events",
   "treasurer_reports",
   "secretary_reports",
   "charity",
-  "candidate_crm",
-  "almoner",
+  "newcomer_crm",
+  "pastoral_care",
   "charity_campaigns",
   "charity_reports",
   "recruitment_reports",
   "audit",
   "bulk_import",
   "advanced_members",
-  "multi_lodge",
-  "cross_lodge_reporting",
+  "multi_church",
+  "cross_church_reporting",
   "central_billing",
-  "province_dashboards",
+  "network_dashboards",
   "migration_planning",
   "named_support",
   "ai",
@@ -63,13 +63,13 @@ export type PlanDefinition = {
 const ESSENTIALS_ENTITLEMENTS: EntitlementKey[] = [
   "site_builder",
   "member_portal",
-  "digital_lodge_card",
+  "digital_church_card",
   "payments",
-  "dues",
+  "giving",
   "gift_aid",
   "gasds",
-  "meetings",
-  "summons",
+  "services",
+  "notice",
   "events",
   "treasurer_reports",
   "secretary_reports",
@@ -78,8 +78,8 @@ const ESSENTIALS_ENTITLEMENTS: EntitlementKey[] = [
   // The /admin/integrations page is the only UI surface that exposes
   // Mooov Connect (connect, reconnect, disconnect, repair). Mooov is the
   // payments rail and `payments` is already an Essentials entitlement, so
-  // gating its setup UI to Province made it impossible for any paying
-  // Essentials/Complete/Group lodge to actually administer their own
+  // gating its setup UI to Network made it impossible for any paying
+  // Essentials/Complete/Group church to actually administer their own
   // Mooov merchant. Calendar / email / accounting connectors on this
   // page are non-destructive (each one is its own toggle), so promoting
   // the page itself doesn't auto-enable a paid integration.
@@ -87,8 +87,8 @@ const ESSENTIALS_ENTITLEMENTS: EntitlementKey[] = [
 ];
 
 const COMPLETE_EXTRA_ENTITLEMENTS: EntitlementKey[] = [
-  "candidate_crm",
-  "almoner",
+  "newcomer_crm",
+  "pastoral_care",
   "charity_campaigns",
   "charity_reports",
   "recruitment_reports",
@@ -100,32 +100,32 @@ const COMPLETE_EXTRA_ENTITLEMENTS: EntitlementKey[] = [
 ];
 
 const GROUP_EXTRA_ENTITLEMENTS: EntitlementKey[] = [
-  "multi_lodge",
-  "cross_lodge_reporting",
+  "multi_church",
+  "cross_church_reporting",
   "central_billing",
 ];
 
 const PROVINCE_EXTRA_ENTITLEMENTS: EntitlementKey[] = [
-  "province_dashboards",
+  "network_dashboards",
   "migration_planning",
   "named_support",
 ];
 
 export const PLAN_DEFINITIONS: Record<PlanCode, PlanDefinition> = {
-  lodge_essentials: {
-    code: "lodge_essentials",
+  church_essentials: {
+    code: "church_essentials",
     name: "Essentials",
-    tag: "Single Lodge",
+    tag: "Single Church",
     price: "From £149/mo",
     subPrice: "billed annually, or £169 monthly",
     description:
-      "Everything an officer team needs to run the lodge, take payments, and reclaim every penny of Gift Aid the lodge is owed.",
+      "Everything a church team needs to run the church, take payments, and reclaim every penny of Gift Aid the church is owed.",
     cta: "Get a walkthrough",
-    upgradeTo: "lodge_complete",
+    upgradeTo: "church_complete",
     featureGroups: [
       {
-        title: "The lodge, online",
-        items: ["Public lodge website", "Member portal & PWA", "Digital lodge card"],
+        title: "The church, online",
+        items: ["Public church website", "Member portal & PWA", "Digital church card"],
       },
       {
         title: "The money, handled",
@@ -138,49 +138,49 @@ export const PLAN_DEFINITIONS: Record<PlanCode, PlanDefinition> = {
       {
         title: "Gift Aid, everywhere",
         items: [
-          "Gift Aid on dues & donations",
+          "Gift Aid on giving & donations",
           "GASDS cash tracking",
           "HMRC-ready exports",
         ],
       },
       {
-        title: "Meetings & dues",
+        title: "Services & giving",
         items: [
-          "Summons workflow",
+          "Service notice workflow",
           "RSVPs & dietary tracking",
-          "Bulk dues & reminders",
+          "Bulk giving & reminders",
         ],
       },
     ],
     entitlements: ESSENTIALS_ENTITLEMENTS,
   },
-  lodge_complete: {
-    code: "lodge_complete",
+  church_complete: {
+    code: "church_complete",
     name: "Complete",
-    tag: "Most Lodges Choose This",
+    tag: "Most Churches Choose This",
     price: "From £229/mo",
     subPrice: "billed annually, or £259 monthly",
     description:
-      "Everything in Essentials, plus the AI assistant, candidate pipeline, Almoner welfare, and full reporting suite.",
+      "Everything in Essentials, plus the AI assistant, newcomer pipeline, pastoral care, and full reporting suite.",
     cta: "Get a walkthrough",
     recommended: true,
-    upgradeTo: "lodge_group",
+    upgradeTo: "church_group",
     featureGroups: [
       {
         title: "Everything in Essentials, plus:",
         items: [
           "AI assistant for drafting",
           "Members-at-risk insights",
-          "Post-meeting summaries",
+          "Post-service summaries",
           "Data quality checks",
         ],
       },
       {
         title: "Membership & care",
         items: [
-          "Candidate CRM & pipeline",
-          "Almoner welfare cases",
-          "Mentor assignment & sign-off",
+          "Newcomer CRM & pipeline",
+          "Pastoral care cases",
+          "Discipleship mentoring",
           "Charity campaigns",
         ],
       },
@@ -198,26 +198,26 @@ export const PLAN_DEFINITIONS: Record<PlanCode, PlanDefinition> = {
       ...COMPLETE_EXTRA_ENTITLEMENTS,
     ],
   },
-  lodge_group: {
-    code: "lodge_group",
+  church_group: {
+    code: "church_group",
     name: "Group",
-    tag: "2 to 6 lodges",
+    tag: "2 to 6 churches",
     price: "From £349/mo",
-    subPrice: "2 lodges, then £119 per extra",
+    subPrice: "2 churches, then £119 per extra",
     description:
-      "Everything in Complete for halls, groups, or connected lodges with shared oversight and central billing.",
+      "Everything in Complete for halls, groups, or connected churches with shared oversight and central billing.",
     cta: "Get a walkthrough",
-    upgradeTo: "province",
+    upgradeTo: "network",
     featureGroups: [
       {
         title: "Everything in Complete, plus:",
         items: [
-          "Separate lodge records",
-          "Per-lodge branding & site",
-          "Cross-lodge reporting",
+          "Separate church records",
+          "Per-church branding & site",
+          "Cross-church reporting",
           "Central billing, one invoice",
-          "Lodge context switching",
-          "Multi-lodge member visibility",
+          "Church context switching",
+          "Multi-church member visibility",
           "Shared rollout support",
         ],
       },
@@ -228,26 +228,26 @@ export const PLAN_DEFINITIONS: Record<PlanCode, PlanDefinition> = {
       ...GROUP_EXTRA_ENTITLEMENTS,
     ],
   },
-  province: {
-    code: "province",
-    name: "Province",
-    tag: "Provincial Rollout",
+  network: {
+    code: "network",
+    name: "Network",
+    tag: "Network Rollout",
     price: "From £2k/mo",
-    subPrice: "+ £35 per lodge, typically £4,500/mo",
+    subPrice: "+ £35 per church, typically £4,500/mo",
     description:
-      "Province-wide rollout, central oversight, migration planning, and ongoing support.",
+      "Network-wide rollout, central oversight, migration planning, and ongoing support.",
     cta: "Talk to us",
     featureGroups: [
       {
         title: "Everything in Complete, plus:",
         items: [
           "Operator console",
-          "Province-wide dashboards",
+          "Network-wide dashboards",
           "Annual returns CSV (one click)",
-          "Bulk lodge operations",
+          "Bulk church operations",
           "Health-style portfolio signals",
           "Migration planning included",
-          "Named provincial contact",
+          "Named network contact",
         ],
       },
     ],
@@ -266,12 +266,12 @@ export function isPlanCode(value: string | null | undefined): value is PlanCode 
 
 export function normalizePlanCode(value: string | null | undefined): PlanCode {
   if (isPlanCode(value)) return value;
-  if (value === "starter" || value === "single_lodge" || value === "single") {
-    return "lodge_essentials";
+  if (value === "starter" || value === "single_church" || value === "single") {
+    return "church_essentials";
   }
-  if (value === "complete") return "lodge_complete";
-  if (value === "group") return "lodge_group";
-  return "lodge_essentials";
+  if (value === "complete") return "church_complete";
+  if (value === "group") return "church_group";
+  return "church_essentials";
 }
 
 export function getPlanDefinition(value: string | null | undefined) {

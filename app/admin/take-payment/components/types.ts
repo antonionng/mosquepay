@@ -9,9 +9,9 @@ export type MemberOption = {
   email: string | null;
 };
 
-// Light-weight event option for the optional "Link to meeting" picker.
+// Light-weight event option for the optional "Link to service" picker.
 // Loaded by the take-payment page (eu90d horizon, small list) so the
-// charge/cash forms can attribute the payment to a specific meeting.
+// charge/cash forms can attribute the payment to a specific service.
 export type EventOption = {
   id: string;
   title: string;
@@ -23,23 +23,23 @@ export type GuestOption = {
   full_name: string;
   email: string | null;
   phone: string | null;
-  mother_lodge_name: string | null;
-  mother_lodge_number: string | null;
+  mother_church_name: string | null;
+  mother_church_number: string | null;
 };
 
 export type GuestInlineDraft = {
   full_name: string;
   email: string | null;
   phone: string | null;
-  mother_lodge_name: string | null;
-  mother_lodge_number: string | null;
+  mother_church_name: string | null;
+  mother_church_number: string | null;
 };
 
 // Discriminated union for the payer selection. The take-payment shell owns
 // the active selection and passes it down to both Charge and Cash tabs; each
 // tab posts the correct payload shape to its respective endpoint.
 //   - "anonymous": no attribution (default).
-//   - "member": existing Lodgepay member from the members list.
+//   - "member": existing Churchpay member from the members list.
 //   - "guest": existing guest from the guest directory.
 //   - "guest_inline": a brand-new guest typed inline; the server will find-
 //                     or-create on the guests table when the payment lands.
@@ -149,23 +149,23 @@ export type HistoryItem = {
  *
  * `giftAidable` marks the lines HMRC will accept as donations under the
  * Gift Aid scheme. Dining and raffle tickets are explicitly NOT eligible
- * (they're "benefits in return" under HMRC rules); meeting fees and
- * subscriptions are member dues, not donations. `explainer` is the
+ * (they're "benefits in return" under HMRC rules); service fees and
+ * subscriptions are member giving, not donations. `explainer` is the
  * one-line note shown under the dropdown so the treasurer sees why.
  */
 export const CATEGORIES = [
   {
     id: "general",
-    label: "General lodge payment",
+    label: "General church payment",
     giftAidable: false,
     explainer:
-      "General lodge income (admin, miscellaneous). Not a charitable donation.",
+      "General church income (admin, miscellaneous). Not a charitable donation.",
   },
   {
-    id: "meeting_fee",
-    label: "Meeting fee",
+    id: "service_fee",
+    label: "Service fee",
     giftAidable: false,
-    explainer: "Per-meeting dues. Member receives a benefit, not Gift Aid eligible.",
+    explainer: "Per-service giving. Member receives a benefit, not Gift Aid eligible.",
   },
   {
     id: "guest_ticket",
@@ -175,7 +175,7 @@ export const CATEGORIES = [
   },
   {
     id: "dining",
-    label: "Dining / festive board",
+    label: "Dining / fellowship meal",
     giftAidable: false,
     explainer: "Dining is a benefit in return, so not eligible for Gift Aid.",
   },
@@ -184,7 +184,7 @@ export const CATEGORIES = [
     label: "Charity collection",
     giftAidable: true,
     explainer:
-      "Voluntary donation to a registered Masonic charity. Eligible for Gift Aid with a declaration.",
+      "Voluntary donation to a registered Church charity. Eligible for Gift Aid with a declaration.",
   },
   {
     id: "raffle",
@@ -195,9 +195,9 @@ export const CATEGORIES = [
   },
   {
     id: "subscriptions",
-    label: "Subscriptions / dues top-up",
+    label: "Subscriptions / giving top-up",
     giftAidable: false,
-    explainer: "Subscriptions are member dues, not donations.",
+    explainer: "Subscriptions are member giving, not donations.",
   },
   {
     id: "other",

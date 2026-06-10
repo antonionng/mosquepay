@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -10,7 +10,7 @@ import {
 import { writeAuditLog } from "@/lib/audit";
 
 const DOMAIN_PATTERN = /^(?!:\/\/)([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/;
-const PRODUCTION_PLATFORM_HOSTNAME = "lodgepayments.co.uk";
+const PRODUCTION_PLATFORM_HOSTNAME = "churchpay.co.uk";
 
 function normalizeHostname(value?: string | null): string | null {
   if (!value) return null;
@@ -32,15 +32,15 @@ function isLocalHostname(hostname: string | null) {
 }
 
 function platformHostname(): string {
-  const candidates = [
+  const newcomers = [
     process.env.CUSTOM_DOMAIN_CNAME_TARGET,
     process.env.NEXT_PUBLIC_CUSTOM_DOMAIN_CNAME_TARGET,
     process.env.NEXT_PUBLIC_SITE_URL,
     process.env.VERCEL_PROJECT_PRODUCTION_URL,
     PRODUCTION_PLATFORM_HOSTNAME,
   ];
-  for (const candidate of candidates) {
-    const hostname = normalizeHostname(candidate);
+  for (const newcomer of newcomers) {
+    const hostname = normalizeHostname(newcomer);
     if (hostname && !isLocalHostname(hostname)) {
       return hostname;
     }
@@ -49,7 +49,7 @@ function platformHostname(): string {
 }
 
 function freshToken(): string {
-  return `lodgepay-domain-verify-${crypto.randomBytes(12).toString("hex")}`;
+  return `churchpay-domain-verify-${crypto.randomBytes(12).toString("hex")}`;
 }
 
 export async function GET(request: NextRequest) {
@@ -58,18 +58,18 @@ export async function GET(request: NextRequest) {
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ error: "Database not configured." }, { status: 503 });
   }
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodge = await db.getLodgeBySlug(lodgeSlug);
-  if (!lodge) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const church = await db.getChurchBySlug(churchSlug);
+  if (!church) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("admin:all", lodge.id);
+  const forbidden = await requireAdminApiPermission("admin:all", church.id);
   if (forbidden) return forbidden;
 
   return NextResponse.json({
-    custom_domain: lodge.custom_domain,
-    custom_domain_verified_at: lodge.custom_domain_verified_at,
-    custom_domain_verification_token: lodge.custom_domain_verification_token,
+    custom_domain: church.custom_domain,
+    custom_domain_verified_at: church.custom_domain_verified_at,
+    custom_domain_verification_token: church.custom_domain_verification_token,
     cname_target: platformHostname(),
   });
 }
@@ -80,12 +80,12 @@ export async function PATCH(request: NextRequest) {
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ error: "Database not configured." }, { status: 503 });
   }
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodge = await db.getLodgeBySlug(lodgeSlug);
-  if (!lodge) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const church = await db.getChurchBySlug(churchSlug);
+  if (!church) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("admin:all", lodge.id);
+  const forbidden = await requireAdminApiPermission("admin:all", church.id);
   if (forbidden) return forbidden;
 
   const body = await request.json().catch(() => ({}));
@@ -93,29 +93,29 @@ export async function PATCH(request: NextRequest) {
   const domainRaw = typeof body.domain === "string" ? body.domain.trim().toLowerCase() : "";
 
   if (action === "remove") {
-    const updated = await db.updateLodge(lodge.id, {
+    const updated = await db.updateChurch(church.id, {
       custom_domain: null,
       custom_domain_verified_at: null,
       custom_domain_verification_token: null,
     });
     await writeAuditLog({
-      lodgeId: lodge.id,
+      churchId: church.id,
       action: "custom_domain_removed",
-      entityType: "lodge",
-      entityId: lodge.id,
+      entityType: "church",
+      entityId: church.id,
       summary: "Custom domain removed",
     });
-    return NextResponse.json({ ok: true, lodge: updated });
+    return NextResponse.json({ ok: true, church: updated });
   }
 
   if (action === "verify") {
-    if (!lodge.custom_domain) {
+    if (!church.custom_domain) {
       return NextResponse.json({ error: "No domain to verify." }, { status: 400 });
     }
     let target = "";
     try {
       const dns = await import("node:dns/promises");
-      const records = await dns.resolveCname(lodge.custom_domain);
+      const records = await dns.resolveCname(church.custom_domain);
       target = records[0] ?? "";
     } catch {
       target = "";
@@ -126,49 +126,49 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json(
         {
           ok: false,
-          error: `CNAME for ${lodge.custom_domain} should point to ${expected}. Resolved to: ${target || "(no record)"}`,
+          error: `CNAME for ${church.custom_domain} should point to ${expected}. Resolved to: ${target || "(no record)"}`,
         },
         { status: 400 }
       );
     }
-    const updated = await db.updateLodge(lodge.id, {
+    const updated = await db.updateChurch(church.id, {
       custom_domain_verified_at: new Date().toISOString(),
     });
     await writeAuditLog({
-      lodgeId: lodge.id,
+      churchId: church.id,
       action: "custom_domain_verified",
-      entityType: "lodge",
-      entityId: lodge.id,
-      summary: `Custom domain ${lodge.custom_domain} verified`,
+      entityType: "church",
+      entityId: church.id,
+      summary: `Custom domain ${church.custom_domain} verified`,
     });
-    return NextResponse.json({ ok: true, lodge: updated });
+    return NextResponse.json({ ok: true, church: updated });
   }
 
   // Default action: set domain
   if (!domainRaw || !DOMAIN_PATTERN.test(domainRaw)) {
     return NextResponse.json(
-      { error: "Enter a valid domain like lodge.example.com." },
+      { error: "Enter a valid domain like church.example.com." },
       { status: 400 }
     );
   }
 
-  const updated = await db.updateLodge(lodge.id, {
+  const updated = await db.updateChurch(church.id, {
     custom_domain: domainRaw,
     custom_domain_verification_token: freshToken(),
     custom_domain_verified_at: null,
   });
 
   await writeAuditLog({
-    lodgeId: lodge.id,
+    churchId: church.id,
     action: "custom_domain_added",
-    entityType: "lodge",
-    entityId: lodge.id,
+    entityType: "church",
+    entityId: church.id,
     summary: `Custom domain set to ${domainRaw}`,
   });
 
   return NextResponse.json({
     ok: true,
-    lodge: updated,
+    church: updated,
     cname_target: platformHostname(),
   });
 }

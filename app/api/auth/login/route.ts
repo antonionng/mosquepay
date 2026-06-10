@@ -8,7 +8,7 @@ import {
   signStaffAdminCookie,
 } from "@/lib/auth/staff-cookie";
 import { isPlatformOwnerEmail } from "@/lib/auth/platform-owner";
-import { ADMIN_LODGE_COOKIE } from "@/lib/tenant";
+import { ADMIN_CHURCH_COOKIE } from "@/lib/tenant";
 
 export async function POST(request: NextRequest) {
   try {
@@ -81,18 +81,18 @@ export async function POST(request: NextRequest) {
       path: "/",
     });
 
-    // Anchor ADMIN_LODGE_COOKIE to the admin's actual lodge so subsequent
-    // API calls that resolve the lodge via getLodgeSlugFromRequest land on
-    // the right tenant. Without this, a lodge-scoped admin who never used
-    // the lodge switcher would fall back to DEFAULT_LODGE_SLUG -- which is
+    // Anchor ADMIN_CHURCH_COOKIE to the admin's actual church so subsequent
+    // API calls that resolve the church via getChurchSlugFromRequest land on
+    // the right tenant. Without this, a church-scoped admin who never used
+    // the church switcher would fall back to DEFAULT_CHURCH_SLUG -- which is
     // the source of the recurring "page renders but POST/PATCH 401s" class
     // of bugs. For platform owners we explicitly clear the cookie so they
-    // see the global view by default and can pick a lodge via the switcher.
-    if (admin?.lodge_id) {
+    // see the global view by default and can pick a church via the switcher.
+    if (admin?.church_id) {
       try {
-        const adminLodge = await db.getLodgeById(admin.lodge_id);
-        if (adminLodge?.slug) {
-          response.cookies.set(ADMIN_LODGE_COOKIE, adminLodge.slug, {
+        const adminChurch = await db.getChurchById(admin.church_id);
+        if (adminChurch?.slug) {
+          response.cookies.set(ADMIN_CHURCH_COOKIE, adminChurch.slug, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: "lax",
@@ -101,14 +101,14 @@ export async function POST(request: NextRequest) {
           });
         }
       } catch (error) {
-        console.error("[login] failed to anchor ADMIN_LODGE_COOKIE", {
+        console.error("[login] failed to anchor ADMIN_CHURCH_COOKIE", {
           email: cookieEmail,
-          lodgeId: admin.lodge_id,
+          churchId: admin.church_id,
           error,
         });
       }
-    } else if (isPlatformOwner || (admin && admin.lodge_id == null)) {
-      response.cookies.delete(ADMIN_LODGE_COOKIE);
+    } else if (isPlatformOwner || (admin && admin.church_id == null)) {
+      response.cookies.delete(ADMIN_CHURCH_COOKIE);
     }
 
     return response;

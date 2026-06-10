@@ -2,7 +2,7 @@ import type { LedgerEntry } from "@/lib/db/types";
 import type { ParsedBankRow } from "./csv-parser";
 
 export type MatchProposal = {
-  source_type: "payment" | "dues" | "donation";
+  source_type: "payment" | "giving" | "donation";
   source_id: string;
   confidence: number;
 };

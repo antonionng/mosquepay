@@ -55,7 +55,7 @@ type GuestEntry = { guest_name: string; dietary_requirements?: string };
 
 type EventRsvpFormProps = {
   eventId: string;
-  lodgeSlug?: string;
+  churchSlug?: string;
   enableDining: boolean;
   diningPrice: number | null;
   diningDescription: string | null;
@@ -66,9 +66,9 @@ type EventRsvpFormProps = {
   enableRaffle: boolean;
   raffleSuggestedAmounts: number[];
   raffleAllowCustom: boolean;
-  enableMeetingFee: boolean;
-  meetingFeeAmount: number | null;
-  meetingFeeDescription: string | null;
+  enableServiceFee: boolean;
+  serviceFeeAmount: number | null;
+  serviceFeeDescription: string | null;
   enableGuestTickets: boolean;
   guestTicketPrice: number | null;
   guestTicketDescription: string | null;
@@ -77,7 +77,7 @@ type EventRsvpFormProps = {
 
 export function EventRsvpForm({
   eventId,
-  lodgeSlug,
+  churchSlug,
   enableDining,
   diningPrice,
   diningDescription,
@@ -88,9 +88,9 @@ export function EventRsvpForm({
   enableRaffle,
   raffleSuggestedAmounts,
   raffleAllowCustom,
-  enableMeetingFee,
-  meetingFeeAmount,
-  meetingFeeDescription,
+  enableServiceFee,
+  serviceFeeAmount,
+  serviceFeeDescription,
   enableGuestTickets,
   guestTicketPrice,
   guestTicketDescription,
@@ -100,9 +100,9 @@ export function EventRsvpForm({
   const [error, setError] = useState<string | null>(null);
   const [guests, setGuests] = useState<GuestEntry[]>([]);
   const searchParams = useSearchParams();
-  const lodgeFromQuery = searchParams.get("lodge");
-  const effectiveLodge = lodgeSlug ?? lodgeFromQuery ?? undefined;
-  const lodgeQuery = effectiveLodge ? `?lodge=${encodeURIComponent(effectiveLodge)}` : "";
+  const churchFromQuery = searchParams.get("church");
+  const effectiveChurch = churchSlug ?? churchFromQuery ?? undefined;
+  const churchQuery = effectiveChurch ? `?church=${encodeURIComponent(effectiveChurch)}` : "";
 
   const {
     register,
@@ -131,13 +131,13 @@ export function EventRsvpForm({
       ? diningPrice * (1 + (enableGuestTickets ? 0 : (number_of_guests ?? 0)))
       : 0;
 
-  const meetingFee =
-    enableMeetingFee && meetingFeeAmount != null ? meetingFeeAmount : 0;
+  const serviceFee =
+    enableServiceFee && serviceFeeAmount != null ? serviceFeeAmount : 0;
 
   const guestTotal =
     enableGuestTickets && guestTicketPrice != null ? guests.length * guestTicketPrice : 0;
 
-  const total = meetingFee + diningTotal + guestTotal + charityAmount + raffleAmount;
+  const total = serviceFee + diningTotal + guestTotal + charityAmount + raffleAmount;
 
   function addGuest() {
     if (guests.length >= 10) return;
@@ -171,14 +171,14 @@ export function EventRsvpForm({
 
     try {
       if (hasPayments && total > 0) {
-        const res = await fetch(`/api/payments/create-checkout-session${lodgeQuery}`, {
+        const res = await fetch(`/api/payments/create-checkout-session${churchQuery}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             event_id: eventId,
             ...data,
             dining_total: diningTotal,
-            meeting_fee: meetingFee,
+            service_fee: serviceFee,
             guest_total: guestTotal,
             guests: enableGuestTickets ? guests : [],
             number_of_guests: enableGuestTickets ? guests.length : (data.number_of_guests ?? 0),
@@ -200,7 +200,7 @@ export function EventRsvpForm({
         return;
       }
 
-      const res = await fetch(`/api/rsvps${lodgeQuery}`, {
+      const res = await fetch(`/api/rsvps${churchQuery}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -361,12 +361,12 @@ export function EventRsvpForm({
         <Textarea id="special_requests" {...register("special_requests")} rows={2} />
       </div>
 
-      {hasPayments && (meetingFee > 0 || enableCharity || enableRaffle || (enableDining && attendingDining) || guestTotal > 0) && (
+      {hasPayments && (serviceFee > 0 || enableCharity || enableRaffle || (enableDining && attendingDining) || guestTotal > 0) && (
         <div className="space-y-4 rounded-[1.25rem] border border-slate-200 bg-slate-50 p-5">
           <h4 className="font-semibold text-slate-950">Payment summary</h4>
-          {meetingFee > 0 && (
+          {serviceFee > 0 && (
             <p className="text-sm">
-              {meetingFeeDescription ?? "Meeting fee"}: £{meetingFee.toFixed(2)}
+              {serviceFeeDescription ?? "Service fee"}: £{serviceFee.toFixed(2)}
             </p>
           )}
           {enableDining && attendingDining && diningPrice != null && (

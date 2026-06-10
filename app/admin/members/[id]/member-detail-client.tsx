@@ -31,9 +31,9 @@ import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { MemberSubscriptionPanel } from "@/components/admin/member-subscription-panel";
 import { MemberGiftAidPanel } from "@/components/admin/member-gift-aid-panel";
 import {
-  DuesMethodPanel,
-  type DuesMethodPanelProps,
-} from "@/components/admin/dues-method-panel";
+  GivingMethodPanel,
+  type GivingMethodPanelProps,
+} from "@/components/admin/giving-method-panel";
 import {
   Dialog,
   DialogContent,
@@ -47,7 +47,7 @@ import { cn } from "@/lib/utils";
 import {
   RANK_CODES,
   RANK_LABELS,
-  masonicTitleFor,
+  churchTitleFor,
   rankLabel,
 } from "@/lib/members/rank";
 
@@ -76,14 +76,15 @@ interface Member {
   levy_waived: boolean;
   dining_waived: boolean;
   fee_use_custom: boolean;
-  annual_dues_waived: boolean;
-  annual_dues_waiver_reason: string | null;
-  date_of_initiation: string | null;
-  initiation_email_sent: boolean;
+  annual_giving_waived: boolean;
+  annual_giving_waiver_reason: string | null;
+  date_of_membership: string | null;
+  membership_email_sent: boolean;
   membership_status: string;
   stripe_customer_id: string | null;
   show_on_website: boolean;
   public_bio: string | null;
+  gift_aid_consent_status: "unknown" | "declared" | "declined";
   created_at: string;
   updated_at: string;
 }
@@ -105,11 +106,11 @@ interface PaymentEntry {
   dining_amount: number;
   charity_amount: number;
   raffle_amount: number;
-  meeting_fee_amount: number;
+  service_fee_amount: number;
   guest_ticket_amount: number;
 }
 
-interface DuesEntry {
+interface GivingEntry {
   id: string;
   amount: number;
   currency: string;
@@ -134,7 +135,7 @@ const STATUS_VARIANTS: Record<string, string> = {
   excluded: "bg-red-50 text-red-700 border-red-200",
 };
 
-const DUES_VARIANTS: Record<string, string> = {
+const GIVING_VARIANTS: Record<string, string> = {
   paid: "bg-emerald-50 text-emerald-700 border-emerald-200",
   outstanding: "bg-amber-50 text-amber-700 border-amber-200",
   overdue: "bg-red-50 text-red-700 border-red-200",
@@ -148,12 +149,12 @@ interface OfficeRung {
   current_member_id: string | null;
 }
 
-interface NextDuesSummary {
+interface NextGivingSummary {
   status:
     | "owed_current_year"
     | "billed_current_year"
-    | "no_masonic_year"
-    | "no_dues_template"
+    | "no_giving_year"
+    | "no_giving_template"
     | "waived_at_profile";
   nextDueDate: string | null;
   nextYearLabel: string | null;
@@ -163,25 +164,25 @@ interface NextDuesSummary {
 }
 
 interface SubscriptionData {
-  schedule: import("@/lib/db/types").DuesSchedule;
-  instalments: import("@/lib/db/types").MemberDuesInstalment[];
+  schedule: import("@/lib/db/types").GivingSchedule;
+  instalments: import("@/lib/db/types").MemberGivingInstalment[];
 }
 
 interface Props {
   member: Member;
   dietaryHistory: DietaryEntry[];
   paymentHistory: PaymentEntry[];
-  duesRecords: DuesEntry[];
+  givingRecords: GivingEntry[];
   offices?: OfficeRung[];
-  nextDues: NextDuesSummary | null;
+  nextGiving: NextGivingSummary | null;
   subscription?: SubscriptionData | null;
   /** Active (non-revoked) Gift Aid declaration if one is on file for this
-   *  member. Drives the post-meeting paper-upload panel. */
+   *  member. Drives the post-service paper-upload panel. */
   giftAidDeclaration?: import("@/lib/db/types").GiftAidDeclaration | null;
-  /** Initial state for the new Dues Method panel — current-year row,
+  /** Initial state for the new Giving Method panel — current-year row,
    *  current method tag, copyable subscription link. Server-computed in
    *  page.tsx so the panel renders without a client roundtrip. */
-  duesMethod?: DuesMethodPanelProps["initial"] | null;
+  givingMethod?: GivingMethodPanelProps["initial"] | null;
   /** Last 10 emails LP sent to this member. Drives the "Recent emails"
    *  panel — best-effort log so admins can verify a notification went
    *  out without leaving the page. */
@@ -211,9 +212,9 @@ function buildEditForm(member: Member) {
     member_dining_amount: member.member_dining_amount?.toString() ?? "",
     levy_waived: member.levy_waived ?? false,
     dining_waived: member.dining_waived ?? false,
-    annual_dues_waived: member.annual_dues_waived ?? false,
-    annual_dues_waiver_reason: member.annual_dues_waiver_reason ?? "",
-    date_of_initiation: member.date_of_initiation ?? "",
+    annual_giving_waived: member.annual_giving_waived ?? false,
+    annual_giving_waiver_reason: member.annual_giving_waiver_reason ?? "",
+    date_of_membership: member.date_of_membership ?? "",
     membership_status: member.membership_status,
     show_on_website: member.show_on_website ?? false,
     public_bio: member.public_bio ?? "",
@@ -248,17 +249,17 @@ export function MemberDetailClient({
   member: initialMember,
   dietaryHistory,
   paymentHistory,
-  duesRecords: initialDues,
+  givingRecords: initialGiving,
   offices: initialOffices = [],
-  nextDues,
+  nextGiving,
   subscription = null,
   giftAidDeclaration = null,
-  duesMethod = null,
+  givingMethod = null,
   recentEmails = [],
 }: Props) {
   const router = useRouter();
   const [member, setMember] = useState(initialMember);
-  const [duesRecords, setDuesRecords] = useState(initialDues);
+  const [givingRecords, setGivingRecords] = useState(initialGiving);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [inviteSending, setInviteSending] = useState(false);
@@ -268,12 +269,12 @@ export function MemberDetailClient({
     type: "success" | "error";
     message: string;
   } | null>(null);
-  const [pendingDuesAction, setPendingDuesAction] = useState<{
-    duesId: string;
+  const [pendingGivingAction, setPendingGivingAction] = useState<{
+    givingId: string;
     action: "waive" | "mark_paid" | "mark_outstanding";
   } | null>(null);
-  const [duesActionLoading, setDuesActionLoading] = useState(false);
-  const [duesWaiverNote, setDuesWaiverNote] = useState("");
+  const [givingActionLoading, setGivingActionLoading] = useState(false);
+  const [givingWaiverNote, setGivingWaiverNote] = useState("");
   const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [pendingEmailChange, setPendingEmailChange] = useState<{
@@ -342,11 +343,11 @@ export function MemberDetailClient({
           : null,
         levy_waived: editForm.levy_waived,
         dining_waived: editForm.dining_waived,
-        annual_dues_waived: editForm.annual_dues_waived,
-        annual_dues_waiver_reason: editForm.annual_dues_waived
-          ? emptyToNull(editForm.annual_dues_waiver_reason)
+        annual_giving_waived: editForm.annual_giving_waived,
+        annual_giving_waiver_reason: editForm.annual_giving_waived
+          ? emptyToNull(editForm.annual_giving_waiver_reason)
           : null,
-        date_of_initiation: editForm.date_of_initiation || null,
+        date_of_membership: editForm.date_of_membership || null,
         membership_status: editForm.membership_status,
         show_on_website: editForm.show_on_website,
         public_bio: editForm.show_on_website
@@ -372,14 +373,14 @@ export function MemberDetailClient({
       const toAssign = [...next].filter((id) => !previous.has(id));
       await Promise.all([
         ...toClear.map((id) =>
-          fetch(`/api/officer-ladder/${id}`, {
+          fetch(`/api/members/${id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ current_member_id: null }),
           })
         ),
         ...toAssign.map((id) =>
-          fetch(`/api/officer-ladder/${id}`, {
+          fetch(`/api/members/${id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ current_member_id: member.id }),
@@ -395,7 +396,7 @@ export function MemberDetailClient({
         | {
             payments_updated?: number;
             rsvps_updated?: number;
-            dues_updated?: number;
+            giving_updated?: number;
             auth_user_updated?: boolean;
             stripe_customer_updated?: boolean;
             warnings?: string[];
@@ -410,8 +411,8 @@ export function MemberDetailClient({
         if ((change.rsvps_updated ?? 0) > 0) {
           counts.push(`${change.rsvps_updated} RSVP(s)`);
         }
-        if ((change.dues_updated ?? 0) > 0) {
-          counts.push(`${change.dues_updated} dues record(s)`);
+        if ((change.giving_updated ?? 0) > 0) {
+          counts.push(`${change.giving_updated} giving record(s)`);
         }
         if (counts.length > 0) {
           parts.push(`Re-linked ${counts.join(", ")}.`);
@@ -446,17 +447,17 @@ export function MemberDetailClient({
       const res = await fetch(`/api/members/${member.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ initiation_email_sent: false }),
+        body: JSON.stringify({ membership_email_sent: false }),
       });
       if (!res.ok) {
-        throw new Error("Could not queue initiation email.");
+        throw new Error("Could not queue membership email.");
       }
       setFeedback({ type: "success", message: "Initiation email queued for the next cron run." });
       router.refresh();
     } catch (emailError) {
       setFeedback({
         type: "error",
-        message: emailError instanceof Error ? emailError.message : "Could not queue initiation email.",
+        message: emailError instanceof Error ? emailError.message : "Could not queue membership email.",
       });
     }
   }
@@ -549,69 +550,69 @@ export function MemberDetailClient({
     }
   }
 
-  async function handleDuesAction(
-    duesId: string,
+  async function handleGivingAction(
+    givingId: string,
     action: "waive" | "mark_paid" | "mark_outstanding"
   ) {
-    setDuesActionLoading(true);
+    setGivingActionLoading(true);
     setFeedback(null);
     try {
-      const trimmedNote = duesWaiverNote.trim();
-      const res = await fetch("/api/dues", {
+      const trimmedNote = givingWaiverNote.trim();
+      const res = await fetch("/api/giving", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action,
-          dues_id: duesId,
+          giving_id: givingId,
           ...(action === "waive" && trimmedNote
             ? { waiver_reason: trimmedNote }
             : {}),
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.dues) {
-        throw new Error(data.error ?? "Could not update dues.");
+      if (!res.ok || !data.giving) {
+        throw new Error(data.error ?? "Could not update giving.");
       }
-      setDuesRecords((prev) =>
-        prev.map((d) => (d.id === duesId ? data.dues : d))
+      setGivingRecords((prev) =>
+        prev.map((d) => (d.id === givingId ? data.giving : d))
       );
-      setFeedback({ type: "success", message: "Dues record updated." });
-      setPendingDuesAction(null);
-      setDuesWaiverNote("");
-    } catch (duesError) {
+      setFeedback({ type: "success", message: "Giving record updated." });
+      setPendingGivingAction(null);
+      setGivingWaiverNote("");
+    } catch (givingError) {
       setFeedback({
         type: "error",
-        message: duesError instanceof Error ? duesError.message : "Could not update dues.",
+        message: givingError instanceof Error ? givingError.message : "Could not update giving.",
       });
     } finally {
-      setDuesActionLoading(false);
+      setGivingActionLoading(false);
     }
   }
 
-  const pendingDuesRecord = pendingDuesAction
-    ? duesRecords.find((dues) => dues.id === pendingDuesAction.duesId)
+  const pendingGivingRecord = pendingGivingAction
+    ? givingRecords.find((giving) => giving.id === pendingGivingAction.givingId)
     : null;
-  const duesActionCopy = pendingDuesAction
+  const givingActionCopy = pendingGivingAction
     ? {
         mark_paid: {
-          title: "Mark dues as paid?",
-          description: "This updates the member dues record and records the action in the audit trail.",
+          title: "Mark giving as paid?",
+          description: "This updates the member giving record and records the action in the audit trail.",
           confirmLabel: "Mark paid",
           tone: "success" as const,
         },
         waive: {
-          title: "Waive dues?",
-          description: "This marks the dues as waived. Use this only when the lodge has agreed the member does not need to pay this period.",
-          confirmLabel: "Waive dues",
+          title: "Waive giving?",
+          description: "This marks the giving as waived. Use this only when the church has agreed the member does not need to pay this period.",
+          confirmLabel: "Waive giving",
           tone: "danger" as const,
         },
         mark_outstanding: {
-          title: "Reopen dues?",
-          description: "This makes the dues outstanding again so the member can pay or be chased by the treasurer.",
-          confirmLabel: "Reopen dues",
+          title: "Reopen giving?",
+          description: "This makes the giving outstanding again so the member can pay or be chased by the treasurer.",
+          confirmLabel: "Reopen giving",
           tone: "default" as const,
         },
-      }[pendingDuesAction.action]
+      }[pendingGivingAction.action]
     : null;
 
   return (
@@ -745,7 +746,7 @@ export function MemberDetailClient({
                 <p className="text-xs text-dash-muted">
                   Changing this updates the member&apos;s portal login,
                   Stripe customer, and re-links their payments, RSVPs, and
-                  dues history. You&apos;ll be asked to confirm before
+                  giving history. You&apos;ll be asked to confirm before
                   saving.
                 </p>
               </div>
@@ -816,11 +817,11 @@ export function MemberDetailClient({
                     </option>
                   ))}
                 </select>
-                {editForm.rank && masonicTitleFor(editForm.rank) && (
+                {editForm.rank && churchTitleFor(editForm.rank) && (
                   <p className="text-xs text-dash-muted">
-                    Masonic title:{" "}
+                    Church title:{" "}
                     <span className="font-medium text-dash-text">
-                      {masonicTitleFor(editForm.rank)}
+                      {churchTitleFor(editForm.rank)}
                     </span>{" "}
                     (derived automatically from rank)
                   </p>
@@ -829,7 +830,7 @@ export function MemberDetailClient({
               <div className="space-y-2 sm:col-span-2">
                 <Label>Offices held</Label>
                 <p className="text-xs text-dash-muted">
-                  Tick every office this brother currently holds. Leave all
+                  Tick every office this member currently holds. Leave all
                   unticked if he holds no office.
                 </p>
                 <div className="grid max-h-72 grid-cols-1 gap-1 overflow-y-auto rounded-xl border border-dash-border bg-dash-surface p-3 sm:grid-cols-2">
@@ -889,7 +890,7 @@ export function MemberDetailClient({
                 />
               </div>
               <div className="space-y-3 rounded-xl border border-dash-border bg-dash-surface-subtle p-4 sm:col-span-2">
-                <p className="text-sm font-medium text-dash-text">Summons directory flags</p>
+                <p className="text-sm font-medium text-dash-text">Notice directory flags</p>
                 <label className="flex items-center gap-2 text-sm text-dash-muted">
                   <input
                     type="checkbox"
@@ -938,7 +939,7 @@ export function MemberDetailClient({
                   </p>
                   <p className="mt-1 text-xs text-dash-muted">
                     Per-member opt-in. When on, this member can be rendered on
-                    the public Officers section of the lodge website if they
+                    the public Officers section of the church website if they
                     hold an office. Off by default; revocable at any time.
                   </p>
                 </div>
@@ -955,7 +956,7 @@ export function MemberDetailClient({
                     className="mt-1 h-4 w-4 rounded border-dash-border"
                   />
                   <span>
-                    Show this member on the public lodge website
+                    Show this member on the public church website
                     <span className="block text-xs font-normal text-dash-muted">
                       Requires the member&apos;s explicit consent. Their name,
                       rank, and bio below appear on the Officers section only
@@ -989,7 +990,7 @@ export function MemberDetailClient({
                     checked={!editForm.fee_use_custom}
                     onChange={() => setEditForm({ ...editForm, fee_use_custom: false })}
                   />
-                  Use lodge defaults
+                  Use church defaults
                 </label>
                 <label className="flex items-center gap-2 text-sm">
                   <input
@@ -1002,7 +1003,7 @@ export function MemberDetailClient({
                 {editForm.fee_use_custom && (
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label>Meeting levy (£)</Label>
+                      <Label>Service levy (£)</Label>
                       <Input
                         type="number"
                         step="0.01"
@@ -1051,33 +1052,33 @@ export function MemberDetailClient({
                   <label className="flex items-center gap-2 text-sm font-medium text-amber-900">
                     <input
                       type="checkbox"
-                      checked={editForm.annual_dues_waived}
+                      checked={editForm.annual_giving_waived}
                       onChange={(e) =>
                         setEditForm({
                           ...editForm,
-                          annual_dues_waived: e.target.checked,
-                          annual_dues_waiver_reason: e.target.checked
-                            ? editForm.annual_dues_waiver_reason
+                          annual_giving_waived: e.target.checked,
+                          annual_giving_waiver_reason: e.target.checked
+                            ? editForm.annual_giving_waiver_reason
                             : "",
                         })
                       }
                     />
-                    Annual dues waived
+                    Annual giving waived
                   </label>
                   <p className="text-xs text-amber-800">
-                    Treats this member as exempt from the lodge&apos;s annual
-                    dues bill. The next dues panel and bulk dues run will
+                    Treats this member as exempt from the church&apos;s annual
+                    giving bill. The next giving panel and bulk giving run will
                     skip them until this is turned off.
                   </p>
-                  {editForm.annual_dues_waived && (
+                  {editForm.annual_giving_waived && (
                     <Textarea
                       rows={2}
-                      placeholder="Reason for the waiver (e.g. long service, ill health, lodge resolution)"
-                      value={editForm.annual_dues_waiver_reason}
+                      placeholder="Reason for the waiver (e.g. long service, ill health, church resolution)"
+                      value={editForm.annual_giving_waiver_reason}
                       onChange={(e) =>
                         setEditForm({
                           ...editForm,
-                          annual_dues_waiver_reason: e.target.value,
+                          annual_giving_waiver_reason: e.target.value,
                         })
                       }
                       maxLength={500}
@@ -1086,11 +1087,11 @@ export function MemberDetailClient({
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Date of initiation</Label>
+                <Label>Date of membership</Label>
                 <Input
                   type="date"
-                  value={editForm.date_of_initiation}
-                  onChange={(e) => setEditForm({ ...editForm, date_of_initiation: e.target.value })}
+                  value={editForm.date_of_membership}
+                  onChange={(e) => setEditForm({ ...editForm, date_of_membership: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
@@ -1135,7 +1136,7 @@ export function MemberDetailClient({
               <div className="flex items-start gap-3 lg:col-span-2">
                 <Mail className="h-4 w-4 mt-0.5 text-dash-muted shrink-0" />
                 <div>
-                  <p className="text-xs text-dash-muted">Summons directory address</p>
+                  <p className="text-xs text-dash-muted">Notice directory address</p>
                   <p className="text-sm font-medium text-dash-text">
                     {formatAddress(member) || "Not recorded"}
                   </p>
@@ -1148,9 +1149,9 @@ export function MemberDetailClient({
                   <p className="text-sm font-medium text-dash-text">
                     {rankLabel(member.rank) ?? "Not recorded"}
                   </p>
-                  {masonicTitleFor(member.rank) && (
+                  {churchTitleFor(member.rank) && (
                     <p className="text-xs text-dash-muted">
-                      Masonic title: {masonicTitleFor(member.rank)}
+                      Church title: {churchTitleFor(member.rank)}
                     </p>
                   )}
                 </div>
@@ -1202,16 +1203,16 @@ export function MemberDetailClient({
                     {member.dining_waived
                       ? "Dines complimentary"
                       : member.fee_use_custom
-                        ? `Custom levy${member.member_levy_amount != null ? ` £${member.member_levy_amount}` : ""}, dining${member.member_dining_amount != null ? ` £${member.member_dining_amount}` : " per lodge default"}`
-                        : "Lodge defaults"}
+                        ? `Custom levy${member.member_levy_amount != null ? ` £${member.member_levy_amount}` : ""}, dining${member.member_dining_amount != null ? ` £${member.member_dining_amount}` : " per church default"}`
+                        : "Church defaults"}
                     {member.levy_waived ? " · Levy waived" : ""}
                   </p>
-                  {member.annual_dues_waived && (
+                  {member.annual_giving_waived && (
                     <div className="mt-1 inline-flex max-w-full flex-col rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800">
-                      <span className="font-semibold">Annual dues waived</span>
-                      {member.annual_dues_waiver_reason && (
+                      <span className="font-semibold">Annual giving waived</span>
+                      {member.annual_giving_waiver_reason && (
                         <span className="italic text-amber-700">
-                          {member.annual_dues_waiver_reason}
+                          {member.annual_giving_waiver_reason}
                         </span>
                       )}
                     </div>
@@ -1221,10 +1222,10 @@ export function MemberDetailClient({
               <div className="flex items-start gap-3">
                 <Calendar className="h-4 w-4 mt-0.5 text-dash-muted shrink-0" />
                 <div>
-                  <p className="text-xs text-dash-muted">Date of initiation</p>
+                  <p className="text-xs text-dash-muted">Date of membership</p>
                   <p className="text-sm font-medium text-dash-text">
-                    {member.date_of_initiation
-                      ? new Date(member.date_of_initiation).toLocaleDateString("en-GB", {
+                    {member.date_of_membership
+                      ? new Date(member.date_of_membership).toLocaleDateString("en-GB", {
                           day: "numeric",
                           month: "long",
                           year: "numeric",
@@ -1237,7 +1238,7 @@ export function MemberDetailClient({
           )}
         </div>
 
-        {!editing && member.date_of_initiation && !member.initiation_email_sent && (
+        {!editing && member.date_of_membership && !member.membership_email_sent && (
           <div className="border-t border-dash-border px-6 py-3 bg-blue-50/50">
             <div className="flex items-center justify-between">
               <p className="text-sm text-blue-700">
@@ -1299,12 +1300,12 @@ export function MemberDetailClient({
           />
         ) : null}
 
-        {duesMethod ? (
-          <DuesMethodPanel
+        {givingMethod ? (
+          <GivingMethodPanel
             memberId={member.id}
             memberEmail={member.email}
             memberName={member.full_name}
-            initial={duesMethod}
+            initial={givingMethod}
           />
         ) : null}
 
@@ -1319,6 +1320,7 @@ export function MemberDetailClient({
             address_line_2: member.address_line_2 ?? null,
             city: member.city ?? null,
             postcode: member.postcode ?? null,
+            gift_aid_consent_status: member.gift_aid_consent_status ?? "unknown",
           }}
           declaration={
             giftAidDeclaration
@@ -1347,35 +1349,35 @@ export function MemberDetailClient({
           <div className="border-b border-dash-border px-6 py-4">
             <h3 className="text-base font-semibold text-dash-text flex items-center gap-2">
               <Wallet className="h-4 w-4 text-dash-muted" />
-              Membership Dues
+              Membership Giving
             </h3>
           </div>
-          {nextDues && (
+          {nextGiving && (
             <div
               className={cn(
                 "border-b border-dash-border px-6 py-4",
-                nextDues.status === "owed_current_year"
+                nextGiving.status === "owed_current_year"
                   ? "bg-amber-50/60"
                   : "bg-slate-50/60"
               )}
             >
               <p className="text-xs font-semibold uppercase tracking-wider text-dash-muted">
-                Next dues
+                Next giving
               </p>
-              {nextDues.status === "waived_at_profile" ? (
+              {nextGiving.status === "waived_at_profile" ? (
                 <p className="mt-1 text-sm text-dash-text">
-                  <span className="font-semibold">Annual dues waived.</span>{" "}
-                  Bulk dues runs and next-due reminders will skip this member
+                  <span className="font-semibold">Annual giving waived.</span>{" "}
+                  Bulk giving runs and next-due reminders will skip this member
                   until the waiver is removed from their profile.
-                  {nextDues.waiverReason && (
+                  {nextGiving.waiverReason && (
                     <span className="ml-1 italic text-slate-500">
-                      Reason: {nextDues.waiverReason}
+                      Reason: {nextGiving.waiverReason}
                     </span>
                   )}
                 </p>
-              ) : nextDues.status === "no_masonic_year" ? (
+              ) : nextGiving.status === "no_giving_year" ? (
                 <p className="mt-1 text-sm text-dash-text">
-                  No masonic year configured.{" "}
+                  No giving year configured.{" "}
                   <Link
                     href="/admin/treasurer"
                     className="underline hover:text-dash-ring"
@@ -1384,43 +1386,43 @@ export function MemberDetailClient({
                   </Link>{" "}
                   to drive next due dates.
                 </p>
-              ) : nextDues.status === "owed_current_year" ? (
+              ) : nextGiving.status === "owed_current_year" ? (
                 <p className="mt-1 text-sm text-dash-text">
                   <span className="font-semibold">
-                    Owed for {nextDues.nextYearLabel ?? "the current year"}
+                    Owed for {nextGiving.nextYearLabel ?? "the current year"}
                   </span>
-                  {nextDues.nextDueDate && (
+                  {nextGiving.nextDueDate && (
                     <>
                       {" "}— due from{" "}
                       <span className="font-medium">
-                        {new Date(nextDues.nextDueDate).toLocaleDateString(
+                        {new Date(nextGiving.nextDueDate).toLocaleDateString(
                           "en-GB",
                           { day: "numeric", month: "long", year: "numeric" }
                         )}
                       </span>
                     </>
                   )}
-                  {nextDues.expectedAmount != null && (
-                    <> at £{nextDues.expectedAmount.toFixed(2)}</>
+                  {nextGiving.expectedAmount != null && (
+                    <> at £{nextGiving.expectedAmount.toFixed(2)}</>
                   )}
                   . Not yet billed.
                 </p>
               ) : (
                 <p className="mt-1 text-sm text-dash-text">
-                  Next bill ({nextDues.nextYearLabel ?? "next year"}) falls due{" "}
+                  Next bill ({nextGiving.nextYearLabel ?? "next year"}) falls due{" "}
                   <span className="font-medium">
-                    {nextDues.nextDueDate
-                      ? new Date(nextDues.nextDueDate).toLocaleDateString(
+                    {nextGiving.nextDueDate
+                      ? new Date(nextGiving.nextDueDate).toLocaleDateString(
                           "en-GB",
                           { day: "numeric", month: "long", year: "numeric" }
                         )
                       : "next year"}
                   </span>
-                  {nextDues.expectedAmount != null && (
-                    <> at £{nextDues.expectedAmount.toFixed(2)}</>
+                  {nextGiving.expectedAmount != null && (
+                    <> at £{nextGiving.expectedAmount.toFixed(2)}</>
                   )}
                   .
-                  {nextDues.currentYearOutstanding && (
+                  {nextGiving.currentYearOutstanding && (
                     <span className="ml-1 text-amber-700">
                       Current year still outstanding.
                     </span>
@@ -1430,13 +1432,13 @@ export function MemberDetailClient({
             </div>
           )}
           <div className="divide-y divide-dash-border">
-            {duesRecords.length === 0 ? (
+            {givingRecords.length === 0 ? (
               <div className="flex flex-col items-center py-10 text-center">
                 <Wallet className="h-8 w-8 text-dash-faint mb-2" />
-                <p className="text-sm text-dash-muted">No dues records</p>
+                <p className="text-sm text-dash-muted">No giving records</p>
               </div>
             ) : (
-              duesRecords.map((d) => (
+              givingRecords.map((d) => (
                 <div key={d.id} className="flex items-center gap-3 px-6 py-3.5">
                   <div
                     className={cn(
@@ -1475,7 +1477,7 @@ export function MemberDetailClient({
                     <span
                       className={cn(
                         "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium",
-                        DUES_VARIANTS[d.status] ?? DUES_VARIANTS.outstanding
+                        GIVING_VARIANTS[d.status] ?? GIVING_VARIANTS.outstanding
                       )}
                     >
                       {d.status.charAt(0).toUpperCase() + d.status.slice(1)}
@@ -1483,7 +1485,7 @@ export function MemberDetailClient({
                     {d.status !== "paid" && (
                       <button
                         onClick={() =>
-                          setPendingDuesAction({ duesId: d.id, action: "mark_paid" })
+                          setPendingGivingAction({ givingId: d.id, action: "mark_paid" })
                         }
                         className="text-xs text-dash-muted underline hover:text-dash-text"
                       >
@@ -1493,7 +1495,7 @@ export function MemberDetailClient({
                     {d.status === "outstanding" && (
                       <button
                         onClick={() =>
-                          setPendingDuesAction({ duesId: d.id, action: "waive" })
+                          setPendingGivingAction({ givingId: d.id, action: "waive" })
                         }
                         className="text-xs text-dash-muted underline hover:text-dash-text"
                       >
@@ -1503,7 +1505,7 @@ export function MemberDetailClient({
                     {d.status !== "outstanding" && (
                       <button
                         onClick={() =>
-                          setPendingDuesAction({ duesId: d.id, action: "mark_outstanding" })
+                          setPendingGivingAction({ givingId: d.id, action: "mark_outstanding" })
                         }
                         className="text-xs text-dash-muted underline hover:text-dash-text"
                       >
@@ -1583,36 +1585,36 @@ export function MemberDetailClient({
         </div>
       </div>
 
-      {pendingDuesAction && duesActionCopy && pendingDuesAction.action !== "waive" && (
+      {pendingGivingAction && givingActionCopy && pendingGivingAction.action !== "waive" && (
         <ConfirmActionDialog
-          open={Boolean(pendingDuesAction)}
+          open={Boolean(pendingGivingAction)}
           onOpenChange={(open) => {
-            if (!open) setPendingDuesAction(null);
+            if (!open) setPendingGivingAction(null);
           }}
-          title={duesActionCopy.title}
-          description={`${duesActionCopy.description} Amount: £${(pendingDuesRecord?.amount ?? 0).toFixed(2)}.`}
-          confirmLabel={duesActionCopy.confirmLabel}
-          loading={duesActionLoading}
-          tone={duesActionCopy.tone}
+          title={givingActionCopy.title}
+          description={`${givingActionCopy.description} Amount: £${(pendingGivingRecord?.amount ?? 0).toFixed(2)}.`}
+          confirmLabel={givingActionCopy.confirmLabel}
+          loading={givingActionLoading}
+          tone={givingActionCopy.tone}
           onConfirm={() =>
-            handleDuesAction(pendingDuesAction.duesId, pendingDuesAction.action)
+            handleGivingAction(pendingGivingAction.givingId, pendingGivingAction.action)
           }
         />
       )}
 
-      {pendingDuesAction?.action === "waive" && (
+      {pendingGivingAction?.action === "waive" && (
         <Dialog
           open
           onOpenChange={(open) => {
-            if (duesActionLoading) return;
+            if (givingActionLoading) return;
             if (!open) {
-              setPendingDuesAction(null);
-              setDuesWaiverNote("");
+              setPendingGivingAction(null);
+              setGivingWaiverNote("");
             }
           }}
         >
           <DialogContent
-            showClose={!duesActionLoading}
+            showClose={!givingActionLoading}
             className="border-dash-border bg-dash-surface p-0 text-dash-text shadow-2xl"
           >
             <DialogHeader className="space-y-3 border-b border-dash-border px-6 py-5 text-left">
@@ -1621,39 +1623,39 @@ export function MemberDetailClient({
               </div>
               <div>
                 <DialogTitle className="text-lg font-semibold text-dash-text">
-                  Waive dues?
+                  Waive giving?
                 </DialogTitle>
                 <DialogDescription className="mt-2 text-sm leading-6 text-dash-muted">
                   Marks the £
-                  {(pendingDuesRecord?.amount ?? 0).toFixed(2)} dues record as
+                  {(pendingGivingRecord?.amount ?? 0).toFixed(2)} giving record as
                   waived. The note is optional but recommended for the audit
                   trail and is shown in the treasurer ledger.
                 </DialogDescription>
               </div>
             </DialogHeader>
             <div className="space-y-2 px-6 py-4">
-              <Label htmlFor="dues-waiver-note">Waiver reason (optional)</Label>
+              <Label htmlFor="giving-waiver-note">Waiver reason (optional)</Label>
               <Textarea
-                id="dues-waiver-note"
+                id="giving-waiver-note"
                 rows={3}
                 placeholder="e.g. Long service, ill health, board approval 12 May."
-                value={duesWaiverNote}
-                onChange={(event) => setDuesWaiverNote(event.target.value)}
+                value={givingWaiverNote}
+                onChange={(event) => setGivingWaiverNote(event.target.value)}
                 maxLength={500}
-                disabled={duesActionLoading}
+                disabled={givingActionLoading}
               />
               <p className="text-xs text-dash-muted">
-                {duesWaiverNote.length}/500
+                {givingWaiverNote.length}/500
               </p>
             </div>
             <DialogFooter className="gap-2 border-t border-dash-border px-6 py-4 sm:justify-end [&_button]:w-full sm:[&_button]:w-auto">
               <Button
                 type="button"
                 variant="secondary"
-                disabled={duesActionLoading}
+                disabled={givingActionLoading}
                 onClick={() => {
-                  setPendingDuesAction(null);
-                  setDuesWaiverNote("");
+                  setPendingGivingAction(null);
+                  setGivingWaiverNote("");
                 }}
               >
                 Cancel
@@ -1661,15 +1663,15 @@ export function MemberDetailClient({
               <Button
                 type="button"
                 variant="destructive"
-                disabled={duesActionLoading}
+                disabled={givingActionLoading}
                 onClick={() =>
-                  handleDuesAction(pendingDuesAction.duesId, "waive")
+                  handleGivingAction(pendingGivingAction.givingId, "waive")
                 }
               >
-                {duesActionLoading && (
+                {givingActionLoading && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
-                Waive dues
+                Waive giving
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1682,7 +1684,7 @@ export function MemberDetailClient({
           if (!teamSending) setConfirmTeamOpen(open);
         }}
         title={`Let ${member.full_name} take payments?`}
-        description={`This gives ${member.full_name} treasurer-level admin access (payments, dues, and the in-person Take payment screen) for this lodge and emails ${member.email} a link to set their password and sign in. They can take payments once they accept.`}
+        description={`This gives ${member.full_name} treasurer-level admin access (payments, giving, and the in-person Take payment screen) for this church and emails ${member.email} a link to set their password and sign in. They can take payments once they accept.`}
         confirmLabel="Grant access & email"
         loading={teamSending}
         onConfirm={handleMakeTeamMember}
@@ -1710,7 +1712,7 @@ export function MemberDetailClient({
         title="Change member email?"
         description={
           pendingEmailChange
-            ? `This will change ${member.full_name}'s email from ${pendingEmailChange.from} to ${pendingEmailChange.to}. The new address becomes their portal login, the Stripe customer is updated, and their historical payments, RSVPs, and dues records get re-linked to the new email. They may need to sign in again.`
+            ? `This will change ${member.full_name}'s email from ${pendingEmailChange.from} to ${pendingEmailChange.to}. The new address becomes their portal login, the Stripe customer is updated, and their historical payments, RSVPs, and giving records get re-linked to the new email. They may need to sign in again.`
             : ""
         }
         confirmLabel="Change email"
@@ -1724,22 +1726,22 @@ export function MemberDetailClient({
 
 function emailTypeLabel(type: string): string {
   switch (type) {
-    case "dues_subscription_activated_member":
+    case "giving_subscription_activated_member":
       return "Subscription activated";
-    case "dues_subscription_invoice_paid_member":
+    case "giving_subscription_invoice_paid_member":
       return "Subscription cycle receipt";
-    case "dues_subscription_invoice_failed_member":
+    case "giving_subscription_invoice_failed_member":
       return "Subscription cycle failed";
-    case "dues_subscription_canceled_member":
+    case "giving_subscription_canceled_member":
       return "Subscription cancelled";
-    case "dues_method_changed_bacs_member":
+    case "giving_method_changed_bacs_member":
       return "BACS recorded";
-    case "dues_method_changed_paid_in_full_member":
+    case "giving_method_changed_paid_in_full_member":
       return "Paid in full";
-    case "dues_method_changed_fee_waived_member":
+    case "giving_method_changed_fee_waived_member":
       return "Fee waived";
-    case "payment_receipt_dues_full":
-      return "Dues receipt";
+    case "payment_receipt_giving_full":
+      return "Giving receipt";
     case "payment_receipt_donation":
       return "Donation receipt";
     case "payment_receipt_event":

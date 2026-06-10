@@ -184,7 +184,7 @@ export default function MemberNotificationsPage() {
               <li>Failed subscription payments</li>
               <li>Subscription cancellations</li>
               <li>Account invites and password resets</li>
-              <li>Lodge summons</li>
+              <li>Church notice</li>
             </ul>
           </section>
         </div>

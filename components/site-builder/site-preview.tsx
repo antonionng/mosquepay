@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { Monitor, Tablet, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { LodgeSiteSection } from "@/lib/db/types";
+import type { ChurchSiteSection } from "@/lib/db/types";
 import { SectionPreview } from "./section-preview";
 
-type SiteSection = LodgeSiteSection;
+type SiteSection = ChurchSiteSection;
 
 type Viewport = "desktop" | "tablet" | "phone";
 
@@ -35,7 +35,7 @@ export function SitePreview({
       {/* Toolbar */}
       <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.02] px-4 py-2.5">
         <span className="text-xs font-medium text-slate-400 truncate max-w-[180px]">
-          {pageTitle || "Lodge Preview"}
+          {pageTitle || "Church Preview"}
         </span>
         <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] p-0.5">
           {(Object.keys(viewportConfig) as Viewport[]).map((vp) => {
@@ -85,7 +85,7 @@ export function SitePreview({
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-950">
-                      {pageTitle || "Lodge website"}
+                      {pageTitle || "Church website"}
                     </p>
                     <p className="truncate text-xs text-slate-500">
                       Draft site preview
@@ -115,10 +115,10 @@ export function SitePreview({
                     <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-2xl text-xs font-bold tracking-[0.18em] text-white" style={{ backgroundColor: primaryColor }}>
                       LG
                     </div>
-                    <p className="text-base font-semibold">{pageTitle || "Lodge website"}</p>
+                    <p className="text-base font-semibold">{pageTitle || "Church website"}</p>
                     <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-400">
                       {pageDescription ||
-                        "A public lodge website with meetings, charity, candidate enquiries, and contact details."}
+                        "A public church website with services, charity, newcomer enquiries, and contact details."}
                     </p>
                   </div>
                   <div>
@@ -126,7 +126,7 @@ export function SitePreview({
                       Explore
                     </p>
                     <div className="mt-3 grid gap-2 text-sm text-slate-400">
-                      <span>Meetings</span>
+                      <span>Services</span>
                       <span>Charity</span>
                       <span>Join</span>
                     </div>
@@ -136,7 +136,7 @@ export function SitePreview({
                       Contact
                     </p>
                     <p className="mt-3 text-sm text-slate-400">
-                      Footer details pull from lodge settings on the published site.
+                      Footer details pull from church settings on the published site.
                     </p>
                   </div>
                 </div>

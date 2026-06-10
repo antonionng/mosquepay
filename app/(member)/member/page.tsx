@@ -16,7 +16,7 @@ import {
   User,
   IdCard,
 } from "lucide-react";
-import { NextMeetingCard } from "@/components/member/next-meeting-card";
+import { NextServiceCard } from "@/components/member/next-service-card";
 
 interface DashboardData {
   user: {
@@ -46,10 +46,10 @@ interface DashboardData {
     } | null;
   } | null;
   upcomingEvents: number;
-  outstandingDues: number;
+  outstandingGiving: number;
   recentPaymentsTotal: number;
   donationTotal: number;
-  summonsLinks: {
+  noticeLinks: {
     id: string;
     eventId: string;
     title: string;
@@ -78,7 +78,7 @@ interface DashboardData {
   }[];
   recentActivity: {
     id: string;
-    type: "payment" | "event" | "donation" | "dues";
+    type: "payment" | "event" | "donation" | "giving";
     description: string;
     date: string;
     amount?: number;
@@ -131,14 +131,14 @@ const activityIcons = {
   payment: CreditCard,
   event: Calendar,
   donation: Heart,
-  dues: Wallet,
+  giving: Wallet,
 };
 
 const activityColors = {
   payment: "bg-emerald-50 text-emerald-600",
   event: "bg-[hsl(var(--dash-ring)/0.1)] text-[hsl(var(--dash-ring))]",
   donation: "bg-pink-50 text-pink-600",
-  dues: "bg-amber-50 text-amber-600",
+  giving: "bg-amber-50 text-amber-600",
 };
 
 export default function MemberDashboardPage() {
@@ -156,10 +156,10 @@ export default function MemberDashboardPage() {
             user: null,
             nextEvent: null,
             upcomingEvents: 0,
-            outstandingDues: 0,
+            outstandingGiving: 0,
             recentPaymentsTotal: 0,
             donationTotal: 0,
-            summonsLinks: [],
+            noticeLinks: [],
             rsvps: [],
             notices: [],
             recentActivity: [],
@@ -170,10 +170,10 @@ export default function MemberDashboardPage() {
           user: null,
           nextEvent: null,
           upcomingEvents: 0,
-          outstandingDues: 0,
+          outstandingGiving: 0,
           recentPaymentsTotal: 0,
           donationTotal: 0,
-          summonsLinks: [],
+          noticeLinks: [],
           rsvps: [],
           notices: [],
           recentActivity: [],
@@ -225,9 +225,9 @@ export default function MemberDashboardPage() {
             />
             <StatCard
               icon={Wallet}
-              label="Outstanding Dues"
-              value={`£${(data?.outstandingDues ?? 0).toFixed(2)}`}
-              subtext={data?.outstandingDues ? "Payment due" : "All clear"}
+              label="Outstanding Giving"
+              value={`£${(data?.outstandingGiving ?? 0).toFixed(2)}`}
+              subtext={data?.outstandingGiving ? "Payment due" : "All clear"}
               iconBg="bg-amber-50"
               iconColor="text-amber-600"
             />
@@ -250,7 +250,7 @@ export default function MemberDashboardPage() {
         )}
       </div>
 
-      {!loading && <NextMeetingCard nextEvent={data?.nextEvent ?? null} />}
+      {!loading && <NextServiceCard nextEvent={data?.nextEvent ?? null} />}
 
       {/* Quick actions: 2-up tile grid on phone (compact, thumb-friendly),
           becomes a 4-up row at lg. Tiles are vertical (icon top, label
@@ -272,15 +272,15 @@ export default function MemberDashboardPage() {
         </Link>
 
         <Link
-          href="/member/dues"
+          href="/member/giving"
           className="group flex flex-col gap-2 rounded-2xl border border-dash-border bg-dash-surface p-4 shadow-[var(--dash-shadow)] transition-all hover:border-amber-200 hover:shadow-[var(--dash-shadow-raised)] sm:flex-row sm:items-center sm:gap-4 sm:p-5"
         >
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 transition-colors group-hover:bg-amber-100 sm:h-12 sm:w-12">
             <Wallet className="h-5 w-5 text-amber-600 sm:h-6 sm:w-6" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-dash-text">Pay dues</p>
-            <p className="hidden text-xs text-dash-muted sm:block">View and pay outstanding dues</p>
+            <p className="text-sm font-semibold text-dash-text">Pay giving</p>
+            <p className="hidden text-xs text-dash-muted sm:block">View and pay outstanding giving</p>
           </div>
           <ArrowRight className="hidden h-4 w-4 text-dash-faint transition-colors group-hover:text-amber-500 sm:block" />
         </Link>
@@ -294,7 +294,7 @@ export default function MemberDashboardPage() {
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-dash-text">Make donation</p>
-            <p className="hidden text-xs text-dash-muted sm:block">Support the lodge</p>
+            <p className="hidden text-xs text-dash-muted sm:block">Support the church</p>
           </div>
           <ArrowRight className="hidden h-4 w-4 text-dash-faint transition-colors group-hover:text-pink-500 sm:block" />
         </Link>
@@ -318,31 +318,31 @@ export default function MemberDashboardPage() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="admin-surface">
             <div className="flex items-center justify-between border-b border-dash-border px-6 py-4">
-              <h2 className="text-base font-semibold text-dash-text">Summons</h2>
+              <h2 className="text-base font-semibold text-dash-text">Notice</h2>
               <FileText className="h-4 w-4 text-dash-faint" />
             </div>
             <div className="divide-y divide-dash-border">
-              {data?.summonsLinks.length ? (
-                data.summonsLinks.map((summons) => (
+              {data?.noticeLinks.length ? (
+                data.noticeLinks.map((notice) => (
                   <Link
-                    key={summons.id}
-                    href={`/member/events/${summons.eventId}/summons`}
+                    key={notice.id}
+                    href={`/member/events/${notice.eventId}/notice`}
                     className="block px-6 py-4 transition-colors hover:bg-dash-surface-subtle"
                   >
-                    <p className="text-sm font-medium text-dash-text">{summons.title}</p>
+                    <p className="text-sm font-medium text-dash-text">{notice.title}</p>
                     <p className="mt-1 text-xs text-dash-muted">
-                      {summons.eventDate
-                        ? new Date(summons.eventDate).toLocaleDateString("en-GB")
+                      {notice.eventDate
+                        ? new Date(notice.eventDate).toLocaleDateString("en-GB")
                         : "Date to be confirmed"}
                     </p>
                     <p className="mt-1 text-xs text-dash-faint">
-                      Viewed {summons.accessCount} time{summons.accessCount === 1 ? "" : "s"}
+                      Viewed {notice.accessCount} time{notice.accessCount === 1 ? "" : "s"}
                     </p>
                   </Link>
                 ))
               ) : (
                 <div className="px-6 py-8 text-sm text-dash-muted">
-                  Summons sent by email will appear here after you sign up.
+                  Notice sent by email will appear here after you sign up.
                 </div>
               )}
             </div>
@@ -417,7 +417,7 @@ export default function MemberDashboardPage() {
 
       {!loading && data?.notices.length ? (
         <div className="rounded-2xl border border-[hsl(var(--dash-ring)/0.25)] bg-[hsl(var(--dash-ring)/0.06)] px-6 py-5">
-          <h2 className="text-base font-semibold text-[hsl(var(--dash-ring-dark))]">Lodge Notices</h2>
+          <h2 className="text-base font-semibold text-[hsl(var(--dash-ring-dark))]">Church Notices</h2>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             {data.notices.map((notice) => (
               <div key={notice.id} className="rounded-xl bg-dash-surface/90 p-4 shadow-[var(--dash-shadow)]">
@@ -484,18 +484,18 @@ export default function MemberDashboardPage() {
         </div>
       </div>
 
-      {!loading && data?.outstandingDues != null && data.outstandingDues > 0 && (
+      {!loading && data?.outstandingGiving != null && data.outstandingGiving > 0 && (
         <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-6 py-4">
           <AlertCircle className="h-5 w-5 shrink-0 text-amber-600" />
           <div className="flex-1">
             <p className="text-sm font-medium text-amber-900">
-              You have outstanding dues of £{data.outstandingDues.toFixed(2)}
+              You have outstanding giving of £{data.outstandingGiving.toFixed(2)}
             </p>
             <p className="mt-0.5 text-xs text-amber-700">
               Please pay at your earliest convenience.
             </p>
           </div>
-          <Link href="/member/dues">
+          <Link href="/member/giving">
             <button className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-700">
               Pay Now
             </button>

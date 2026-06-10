@@ -7,14 +7,15 @@ import { CalendarPlus, CheckCircle2, RotateCcw, ShieldAlert } from "lucide-react
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TabBar } from "./components/tab-bar";
+import { KioskLinkCard } from "./components/kiosk-link-card";
 import { ChargeTab, generateQrForUrl } from "./components/charge-tab";
 import { CashTab } from "./components/cash-tab";
 import { HistoryTab } from "./components/history-tab";
 import {
-  AdvanceDuesDialog,
-  type AdvanceDuesCashResult,
-  type AdvanceDuesQrResult,
-} from "./components/advance-dues-dialog";
+  AdvanceGivingDialog,
+  type AdvanceGivingCashResult,
+  type AdvanceGivingQrResult,
+} from "./components/advance-giving-dialog";
 import type { ActiveSessionState } from "./components/active-session";
 import type {
   CategoryId,
@@ -32,8 +33,10 @@ type Props = {
   connected: boolean;
   mooovStatus: string | null;
   members: MemberOption[];
-  /** Recent + upcoming events for the optional "Link to meeting" picker. */
+  /** Recent + upcoming events for the optional "Link to service" picker. */
   events: EventOption[];
+  /** Slug for the public self-service kiosk link card. */
+  churchSlug: string | null;
 };
 
 // Take-payment shell. Owns:
@@ -48,6 +51,7 @@ export function TakePaymentClient({
   mooovStatus,
   members,
   events,
+  churchSlug,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -64,14 +68,14 @@ export function TakePaymentClient({
   const focusId = searchParams.get("focus");
 
   // Optional deep-link params:
-  //   ?event_id=<uuid>  preselects the meeting on the picker
+  //   ?event_id=<uuid>  preselects the service on the picker
   //   ?category=<id>    preselects the contribution category
-  // Both come from the meeting detail page's "Take a payment for this
-  // meeting" CTAs so the duty officer lands on a pre-filled form.
-  // Auto-suggest today's meeting when there's exactly one on, so the operator
+  // Both come from the service detail page's "Take a payment for this
+  // service" CTAs so the duty officer lands on a pre-filled form.
+  // Auto-suggest today's service when there's exactly one on, so the operator
   // confirms rather than has to remember. A deep-linked ?event_id wins; an
   // explicit choice later overrides either.
-  const todaysMeetingId = (() => {
+  const todaysServiceId = (() => {
     const today = new Date().toISOString().slice(0, 10);
     const todays = events.filter(
       (event) => event.event_date.slice(0, 10) === today,
@@ -81,7 +85,7 @@ export function TakePaymentClient({
   const initialEventId = (() => {
     const raw = searchParams.get("event_id");
     if (raw) return events.find((event) => event.id === raw) ? raw : null;
-    return todaysMeetingId;
+    return todaysServiceId;
   })();
   const initialCategory: CategoryId = (() => {
     const raw = searchParams.get("category");
@@ -127,7 +131,7 @@ export function TakePaymentClient({
   // tabs, like the rest of the form state. Empty array == single-amount mode.
   const [lineItems, setLineItems] = useState<LineItemDraft[]>([]);
   // Optional event linkage shared across tabs so switching Charge/Cash
-  // doesn't lose the picked meeting. Driven by deep-link params on mount.
+  // doesn't lose the picked service. Driven by deep-link params on mount.
   const [eventId, setEventId] = useState<string | null>(initialEventId);
   // Unified payer state — member, existing guest, inline-new guest, or
   // anonymous. Shared between Charge and Cash so a treasurer who picked a
@@ -143,14 +147,14 @@ export function TakePaymentClient({
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  // Advance dues dialog state. The dialog handles next-year resolution
-  // server-side via /api/admin/take-payment/advance-dues. On QR mint we
+  // Advance giving dialog state. The dialog handles next-year resolution
+  // server-side via /api/admin/take-payment/advance-giving. On QR mint we
   // promote the result into a regular ActiveSessionState so the existing
   // Charge tab QR card renders it; on cash record we surface a
   // dismissible green toast.
   const [advanceOpen, setAdvanceOpen] = useState(false);
   const [advanceCashToast, setAdvanceCashToast] =
-    useState<AdvanceDuesCashResult | null>(null);
+    useState<AdvanceGivingCashResult | null>(null);
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -177,7 +181,7 @@ export function TakePaymentClient({
 
   const handleAdvanceQrReady = useCallback(
     async (
-      result: AdvanceDuesQrResult,
+      result: AdvanceGivingQrResult,
       member: { id: string; full_name: string; email: string | null }
     ) => {
       try {
@@ -188,8 +192,8 @@ export function TakePaymentClient({
           qrDataUrl,
           amountMinor: Math.round(result.amount * 100),
           currency: result.currency,
-          reference: "Advance dues",
-          description: "Advance dues for next year",
+          reference: "Advance giving",
+          description: "Advance giving for next year",
           memberName: member.full_name,
           giftAidEligible: false,
           payerKind: "member",
@@ -200,14 +204,14 @@ export function TakePaymentClient({
         setStatus(null);
         setTab("charge");
       } catch (err) {
-        console.error("advance dues QR mount failed", err);
+        console.error("advance giving QR mount failed", err);
       }
     },
     [setTab]
   );
 
   const handleAdvanceCashRecorded = useCallback(
-    (result: AdvanceDuesCashResult) => {
+    (result: AdvanceGivingCashResult) => {
       setAdvanceCashToast(result);
       void loadHistory();
     },
@@ -297,7 +301,7 @@ export function TakePaymentClient({
             <ShieldAlert className="h-5 w-5 flex-none" />
             <div className="space-y-2">
               <p className="font-medium">
-                This lodge has not connected its payment processor yet.
+                This church has not connected its payment processor yet.
               </p>
               <p className="text-sm">
                 {mooovStatus === "needs_repair"
@@ -321,7 +325,7 @@ export function TakePaymentClient({
           <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none" />
           <div className="flex-1">
             <div className="font-medium">
-              Advance dues recorded for {advanceCashToast.payer_name ?? "member"}
+              Advance giving recorded for {advanceCashToast.payer_name ?? "member"}
             </div>
             <div className="text-xs text-emerald-800">
               {advanceCashToast.next_year_label} ·{" "}
@@ -345,11 +349,11 @@ export function TakePaymentClient({
           onClick={() => setAdvanceOpen(true)}
         >
           <CalendarPlus className="mr-2 h-4 w-4" />
-          Charge advance dues
+          Charge advance giving
         </Button>
       </div>
 
-      <AdvanceDuesDialog
+      <AdvanceGivingDialog
         open={advanceOpen}
         onOpenChange={setAdvanceOpen}
         members={members}
@@ -379,7 +383,7 @@ export function TakePaymentClient({
           setDescription={setDescription}
           eventId={eventId}
           setEventId={setEventId}
-          eventAutoSelected={eventId != null && eventId === todaysMeetingId}
+          eventAutoSelected={eventId != null && eventId === todaysServiceId}
           payer={payer}
           setPayer={setPayer}
           lineItems={lineItems}
@@ -405,7 +409,7 @@ export function TakePaymentClient({
           setDescription={setDescription}
           eventId={eventId}
           setEventId={setEventId}
-          eventAutoSelected={eventId != null && eventId === todaysMeetingId}
+          eventAutoSelected={eventId != null && eventId === todaysServiceId}
           payer={payer}
           setPayer={setPayer}
           lineItems={lineItems}
@@ -426,6 +430,8 @@ export function TakePaymentClient({
           focusId={focusId}
         />
       ) : null}
+
+      {churchSlug ? <KioskLinkCard churchSlug={churchSlug} /> : null}
     </Shell>
   );
 }
@@ -447,7 +453,7 @@ function Shell({
       <div className="flex items-center justify-between gap-3 px-1 lg:hidden">
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-dash-faint">
-            Lodge admin
+            Church admin
           </p>
           <h1 className="truncate text-base font-semibold text-dash-text">
             Take payment

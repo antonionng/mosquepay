@@ -14,7 +14,7 @@ const ROLES = new Set([
   "treasurer",
   "charity_steward",
   "membership_officer",
-  "almoner",
+  "pastoral_care",
   "master",
 ]);
 
@@ -30,56 +30,56 @@ function cleanRole(value: unknown) {
   return typeof value === "string" && ROLES.has(value) ? value : "secretary";
 }
 
-async function selectedLodgeId(_request: NextRequest) {
-  // Resolve the lodge from the admin's scope (same logic the page uses), not
-  // from the request host/cookie/default. Otherwise a lodge-scoped admin
-  // whose ADMIN_LODGE_COOKIE has not been set yet (e.g. a single-lodge
-  // secretary who never used the lodge switcher) lands on the DEFAULT lodge
+async function selectedChurchId(_request: NextRequest) {
+  // Resolve the church from the admin's scope (same logic the page uses), not
+  // from the request host/cookie/default. Otherwise a church-scoped admin
+  // whose ADMIN_CHURCH_COOKIE has not been set yet (e.g. a single-church
+  // secretary who never used the church switcher) lands on the DEFAULT church
   // here, fails the admin:all permission check, and gets a 401 even though
-  // the page rendered fine using their actual lodge.
+  // the page rendered fine using their actual church.
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.lodgeId) {
-    return { lodgeSlug: ctx.mode === "database" ? ctx.lodgeSlug : "", lodgeId: null };
+  if (ctx.mode !== "database" || !ctx.churchId) {
+    return { churchSlug: ctx.mode === "database" ? ctx.churchSlug : "", churchId: null };
   }
-  return { lodgeSlug: ctx.lodgeSlug, lodgeId: ctx.lodgeId };
+  return { churchSlug: ctx.churchSlug, churchId: ctx.churchId };
 }
 
 async function sendStaffInvite({
   request,
   staff,
-  lodgeSlug,
+  churchSlug,
 }: {
   request: NextRequest;
   staff: db.AdminUser;
-  lodgeSlug: string;
+  churchSlug: string;
 }) {
-  return sendInvite({ request, staff, lodgeName: lodgeSlug });
+  return sendInvite({ request, staff, churchName: churchSlug });
 }
 
 export async function GET(request: NextRequest) {
-  const { lodgeId } = await selectedLodgeId(request);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const { churchId } = await selectedChurchId(request);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
 
-  const forbidden = await requireAdminApiPermission("admin:all", lodgeId);
+  const forbidden = await requireAdminApiPermission("admin:all", churchId);
   if (forbidden) return forbidden;
 
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ staff: [] });
   }
 
-  const staff = await db.listAdminUsersForLodge(lodgeId);
+  const staff = await db.listAdminUsersForChurch(churchId);
   return NextResponse.json({ staff });
 }
 
 export async function POST(request: NextRequest) {
-  const { lodgeSlug, lodgeId } = await selectedLodgeId(request);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const { churchSlug, churchId } = await selectedChurchId(request);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
 
-  const forbidden = await requireAdminApiPermission("admin:all", lodgeId);
+  const forbidden = await requireAdminApiPermission("admin:all", churchId);
   if (forbidden) return forbidden;
 
   if (!isSupabaseConfigured()) {
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
   }
 
   const staff = await db.createAdminUser({
-    lodge_id: lodgeId,
+    church_id: churchId,
     email,
     full_name: fullName,
     role,
@@ -110,12 +110,12 @@ export async function POST(request: NextRequest) {
   });
 
   await writeAuditLog({
-    lodgeId,
+    churchId,
     action: "created",
     entityType: "admin_user",
     entityId: staff.id,
     summary: `Created staff user ${staff.email}`,
-    metadata: { role: staff.role, scoped_lodge_id: staff.lodge_id },
+    metadata: { role: staff.role, scoped_church_id: staff.church_id },
   });
 
   let invite: { sent: boolean; error: string | null } = {
@@ -123,10 +123,10 @@ export async function POST(request: NextRequest) {
     error: null,
   };
   if (sendInvite) {
-    invite = await sendStaffInvite({ request, staff, lodgeSlug });
+    invite = await sendStaffInvite({ request, staff, churchSlug });
     if (invite.sent) {
       await writeAuditLog({
-        lodgeId,
+        churchId,
         action: "invited",
         entityType: "admin_user",
         entityId: staff.id,
@@ -140,12 +140,12 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const { lodgeSlug, lodgeId } = await selectedLodgeId(request);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const { churchSlug, churchId } = await selectedChurchId(request);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
 
-  const forbidden = await requireAdminApiPermission("admin:all", lodgeId);
+  const forbidden = await requireAdminApiPermission("admin:all", churchId);
   if (forbidden) return forbidden;
 
   if (!isSupabaseConfigured()) {
@@ -159,13 +159,13 @@ export async function PATCH(request: NextRequest) {
   }
 
   if (body.action === "send_invite") {
-    const existing = (await db.listAdminUsersForLodge(lodgeId)).find(
+    const existing = (await db.listAdminUsersForChurch(churchId)).find(
       (member) => member.id === id
     );
     if (!existing) {
       return NextResponse.json({ error: "Staff user not found." }, { status: 404 });
     }
-    const invite = await sendStaffInvite({ request, staff: existing, lodgeSlug });
+    const invite = await sendStaffInvite({ request, staff: existing, churchSlug });
     if (!invite.sent) {
       return NextResponse.json(
         { error: invite.error ?? "Could not send invite." },
@@ -173,7 +173,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
     await writeAuditLog({
-      lodgeId,
+      churchId,
       action: "invited",
       entityType: "admin_user",
       entityId: existing.id,
@@ -184,17 +184,17 @@ export async function PATCH(request: NextRequest) {
   }
 
   if (body.action === "send_password_reset") {
-    const existing = (await db.listAdminUsersForLodge(lodgeId)).find(
+    const existing = (await db.listAdminUsersForChurch(churchId)).find(
       (member) => member.id === id
     );
     if (!existing) {
       return NextResponse.json({ error: "Staff user not found." }, { status: 404 });
     }
-    const lodge = await db.getLodgeById(lodgeId).catch(() => null);
+    const church = await db.getChurchById(churchId).catch(() => null);
     const reset = await sendStaffPasswordReset({
       request,
       staff: existing,
-      lodgeName: lodge?.name ?? lodgeSlug,
+      churchName: church?.name ?? churchSlug,
     });
     if (!reset.sent) {
       return NextResponse.json(
@@ -203,7 +203,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
     await writeAuditLog({
-      lodgeId,
+      churchId,
       action: "password_reset_sent",
       entityType: "admin_user",
       entityId: existing.id,
@@ -219,7 +219,7 @@ export async function PATCH(request: NextRequest) {
     full_name: fullName,
     role,
     active: body.active !== false,
-    lodge_id: lodgeId,
+    church_id: churchId,
     permissions: Array.isArray(body.permissions) ? body.permissions : [],
   };
 
@@ -233,12 +233,12 @@ export async function PATCH(request: NextRequest) {
   }
 
   await writeAuditLog({
-    lodgeId,
+    churchId,
     action: "updated",
     entityType: "admin_user",
     entityId: staff.id,
     summary: `Updated staff user ${staff.email}`,
-    metadata: { role: staff.role, active: staff.active, scoped_lodge_id: staff.lodge_id },
+    metadata: { role: staff.role, active: staff.active, scoped_church_id: staff.church_id },
   });
 
   return NextResponse.json({ staff });

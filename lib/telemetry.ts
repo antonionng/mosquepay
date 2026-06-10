@@ -7,7 +7,7 @@
  *  - Vercel Analytics `va` global if present
  *
  * Usage:
- *   trackEvent("dues.bulk_run", { count: 42 });
+ *   trackEvent("giving.bulk_run", { count: 42 });
  *   trackPageView(pathname);
  */
 

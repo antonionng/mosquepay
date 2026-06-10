@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 
 export async function GET(request: NextRequest) {
@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     const unauthorized = await requireAdminApiAuth();
     if (unauthorized) return unauthorized;
 
-    const lodgeSlug = getLodgeSlugFromRequest(request);
+    const churchSlug = getChurchSlugFromRequest(request);
 
     if (!isSupabaseConfigured()) {
       return NextResponse.json({
@@ -29,19 +29,19 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    if (!lodgeId) {
-      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    const churchId = await db.resolveChurchId(churchSlug);
+    if (!churchId) {
+      return NextResponse.json({ error: "Church not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
+    const forbidden = await requireAdminApiPermission("payments:write", churchId);
     if (forbidden) return forbidden;
 
-    const dues = await db.getLodgeDues(lodgeId);
-    if (dues.length === 0) {
+    const giving = await db.getChurchGiving(churchId);
+    if (giving.length === 0) {
       return NextResponse.json({ fees: null });
     }
 
-    return NextResponse.json({ fees: dues[0] });
+    return NextResponse.json({ fees: giving[0] });
   } catch (e) {
     console.error("Membership fees GET error:", e);
     return NextResponse.json({ error: "Failed to fetch fees." }, { status: 500 });
@@ -57,12 +57,12 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Database not configured." }, { status: 503 });
     }
 
-    const lodgeSlug = getLodgeSlugFromRequest(request);
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    if (!lodgeId) {
-      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    const churchSlug = getChurchSlugFromRequest(request);
+    const churchId = await db.resolveChurchId(churchSlug);
+    if (!churchId) {
+      return NextResponse.json({ error: "Church not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("payments:write", lodgeId);
+    const forbidden = await requireAdminApiPermission("payments:write", churchId);
     if (forbidden) return forbidden;
 
     const body = await request.json();
@@ -112,7 +112,7 @@ export async function PUT(request: NextRequest) {
         ? Math.min(50, Math.max(0, advance_discount_percent))
         : undefined;
 
-    const fees = await db.upsertLodgeDues(lodgeId, {
+    const fees = await db.upsertChurchGiving(churchId, {
       name,
       amount: Number(amount),
       currency: currency ?? "gbp",

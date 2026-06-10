@@ -24,7 +24,7 @@ type Role =
   | "operator"
   | "secretary"
   | "treasurer"
-  | "almoner"
+  | "pastoral_care"
   | "charity_steward"
   | "membership_officer";
 
@@ -43,7 +43,7 @@ const TOURS: Record<Role, { greeting: string; steps: TourStep[] } | null> = {
       {
         icon: Sparkles,
         title: "Finish onboarding",
-        description: "Run the 15-minute setup to import members, dues, and your first summons.",
+        description: "Run the 15-minute setup to import members, giving, and your first notice.",
         href: "/admin/onboarding",
         cta: "Open onboarding",
       },
@@ -57,19 +57,19 @@ const TOURS: Record<Role, { greeting: string; steps: TourStep[] } | null> = {
       {
         icon: Wallet,
         title: "Treasurer ledger",
-        description: "Single source of truth across payments, dues, and donations.",
+        description: "Single source of truth across payments, giving, and donations.",
         href: "/admin/treasurer",
         cta: "Open treasurer",
       },
     ],
   },
   operator: {
-    greeting: "Welcome. As an operator you have platform-wide access across lodges.",
+    greeting: "Welcome. As an operator you have platform-wide access across churches.",
     steps: [
       {
         icon: Sparkles,
         title: "Onboarding wizard",
-        description: "Walk a new lodge through the 15-minute setup.",
+        description: "Walk a new church through the 15-minute setup.",
         href: "/admin/onboarding",
         cta: "Open onboarding",
       },
@@ -87,22 +87,22 @@ const TOURS: Record<Role, { greeting: string; steps: TourStep[] } | null> = {
     steps: [
       {
         icon: Calendar,
-        title: "Schedule meetings",
-        description: "Add the next regular meeting, festive board, or installation.",
-        href: "/admin/meetings",
-        cta: "Open meetings",
+        title: "Schedule services",
+        description: "Add the next regular service, fellowship meal, or special_service.",
+        href: "/admin/services",
+        cta: "Open services",
       },
       {
         icon: Users,
         title: "Members register",
-        description: "Maintain the roll book, addresses, dietary requirements, and progressions.",
+        description: "Maintain the roll book, addresses, dietary requirements, and discipleships.",
         href: "/admin/members",
         cta: "Open members",
       },
       {
         icon: Megaphone,
         title: "Communications",
-        description: "Send summons, newsletters, and run automations like birthday greetings.",
+        description: "Send notice, newsletters, and run automations like birthday greetings.",
         href: "/admin/communications",
         cta: "Open communications",
       },
@@ -114,7 +114,7 @@ const TOURS: Record<Role, { greeting: string; steps: TourStep[] } | null> = {
       {
         icon: Wallet,
         title: "Treasurer ledger",
-        description: "See payments, dues, donations and refunds in one place.",
+        description: "See payments, giving, donations and refunds in one place.",
         href: "/admin/treasurer",
         cta: "Open treasurer",
       },
@@ -127,20 +127,20 @@ const TOURS: Record<Role, { greeting: string; steps: TourStep[] } | null> = {
       },
     ],
   },
-  almoner: {
-    greeting: "Welcome, Almoner. The Almoner module helps you stay close to brethren in need.",
+  pastoral_care: {
+    greeting: "Welcome, PastoralCare. The PastoralCare module helps you stay close to members in need.",
     steps: [
       {
         icon: HeartHandshake,
-        title: "Welfare cases",
+        title: "PastoralCare cases",
         description: "Open cases, log visits, and keep the bereavement register up to date.",
-        href: "/admin/almoner",
-        cta: "Open almoner",
+        href: "/admin/pastoral_care",
+        cta: "Open pastoral_care",
       },
       {
         icon: Users,
         title: "Members directory",
-        description: "Look up addresses, dates, and family contacts for any brother.",
+        description: "Look up addresses, dates, and family contacts for any member.",
         href: "/admin/members",
         cta: "Open members",
       },
@@ -166,14 +166,14 @@ const TOURS: Record<Role, { greeting: string; steps: TourStep[] } | null> = {
     ],
   },
   membership_officer: {
-    greeting: "Welcome, Membership Officer. Manage candidates, members, and progression.",
+    greeting: "Welcome, Membership Officer. Manage newcomers, members, and discipleship.",
     steps: [
       {
         icon: Users,
-        title: "Leads pipeline",
-        description: "Move candidates from enquiry through interview to initiation.",
-        href: "/admin/leads",
-        cta: "Open leads",
+        title: "Newcomers pipeline",
+        description: "Move newcomers from enquiry through interview to membership.",
+        href: "/admin/newcomers",
+        cta: "Open newcomers",
       },
       {
         icon: Users,
@@ -185,7 +185,7 @@ const TOURS: Record<Role, { greeting: string; steps: TourStep[] } | null> = {
       {
         icon: GraduationCap,
         title: "Mentoring",
-        description: "Assign mentors and track progression through the three degrees.",
+        description: "Assign mentors and track discipleship through the discipleship steps.",
         href: "/admin/mentoring",
         cta: "Open mentoring",
       },
@@ -194,7 +194,7 @@ const TOURS: Record<Role, { greeting: string; steps: TourStep[] } | null> = {
 };
 
 function storageKey(role: Role) {
-  return `lodge.tour.dismissed.${role}`;
+  return `church.tour.dismissed.${role}`;
 }
 
 export function RoleTour() {

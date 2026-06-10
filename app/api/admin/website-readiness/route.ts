@@ -7,14 +7,14 @@ import * as db from "@/lib/db";
 
 const BUCKET = "site-assets";
 
-function countFormSections(site: Awaited<ReturnType<typeof db.getLodgeSite>>) {
+function countFormSections(site: Awaited<ReturnType<typeof db.getChurchSite>>) {
   const sections = [
     ...(site?.sections ?? []),
     ...((site?.custom_pages ?? []).flatMap((page) => page.sections) ?? []),
   ];
   return sections.filter((section) => {
     const mode = section.style?.form_mode;
-    return mode === "contact" || mode === "lead";
+    return mode === "contact" || mode === "newcomer";
   }).length;
 }
 
@@ -23,21 +23,21 @@ export async function GET() {
   if (unauthorized) return unauthorized;
 
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.lodgeId) {
+  if (ctx.mode !== "database" || !ctx.churchId) {
     return NextResponse.json({
       supabaseConfigured: isSupabaseConfigured(),
       databaseMode: false,
-      selectedLodge: false,
+      selectedChurch: false,
       checks: [],
     });
   }
 
-  const forbidden = await requireAdminApiPermission("website:write", ctx.lodgeId);
+  const forbidden = await requireAdminApiPermission("website:write", ctx.churchId);
   if (forbidden) return forbidden;
 
-  const [lodge, site] = await Promise.all([
-    db.getLodgeById(ctx.lodgeId),
-    db.getLodgeSite(ctx.lodgeId),
+  const [church, site] = await Promise.all([
+    db.getChurchById(ctx.churchId),
+    db.getChurchSite(ctx.churchId),
   ]);
 
   let schemaReady = false;
@@ -49,7 +49,7 @@ export async function GET() {
     try {
       const service = createServiceClient();
       const { error } = await service
-        .from("lodge_site_pages")
+        .from("church_site_pages")
         .select("custom_pages,header_settings,footer_settings")
         .limit(1);
       schemaReady = !error;
@@ -76,8 +76,8 @@ export async function GET() {
     {
       id: "database",
       label: "Supabase database connected",
-      ready: isSupabaseConfigured() && Boolean(lodge),
-      detail: lodge ? `Editing ${lodge.name}.` : "No lodge is selected.",
+      ready: isSupabaseConfigured() && Boolean(church),
+      detail: church ? `Editing ${church.name}.` : "No church is selected.",
     },
     {
       id: "migrations",
@@ -95,10 +95,10 @@ export async function GET() {
     },
     {
       id: "logo",
-      label: "Lodge logo uploaded",
-      ready: Boolean(lodge?.logo_url),
-      detail: lodge?.logo_url
-        ? "Logo is saved and feeds the site header, footer, member card, and summons."
+      label: "Church logo uploaded",
+      ready: Boolean(church?.logo_url),
+      detail: church?.logo_url
+        ? "Logo is saved and feeds the site header, footer, member card, and notice."
         : "Upload a logo in Website > Brand.",
     },
     {
@@ -130,12 +130,12 @@ export async function GET() {
     },
     {
       id: "forms",
-      label: "Contact and lead forms present",
+      label: "Contact and newcomer forms present",
       ready: formSections > 0,
       detail:
         formSections > 0
           ? `${formSections} form block${formSections === 1 ? "" : "s"} configured.`
-          : "Add a contact or pipeline lead form block to a page.",
+          : "Add a contact or pipeline newcomer form block to a page.",
     },
     {
       id: "published",
@@ -148,7 +148,7 @@ export async function GET() {
   return NextResponse.json({
     supabaseConfigured: isSupabaseConfigured(),
     databaseMode: true,
-    selectedLodge: true,
+    selectedChurch: true,
     checks,
   });
 }

@@ -40,8 +40,8 @@ export default async function AdminGuestProfilePage({
   const guest =
     ctx.mode === "mock"
       ? mockDb.getGuestById(id) ?? null
-      : ctx.lodgeId
-        ? await db.getGuestById(id, ctx.lodgeId)
+      : ctx.churchId
+        ? await db.getGuestById(id, ctx.churchId)
         : null;
 
   if (!guest) {
@@ -50,9 +50,9 @@ export default async function AdminGuestProfilePage({
 
   const eventGuests =
     ctx.mode === "mock"
-      ? mockDb.listEventGuestsForLodge({ guestId: id })
-      : ctx.lodgeId
-        ? await db.listEventGuestsForLodge(ctx.lodgeId, { guestId: id })
+      ? mockDb.listEventGuestsForChurch({ guestId: id })
+      : ctx.churchId
+        ? await db.listEventGuestsForChurch(ctx.churchId, { guestId: id })
         : [];
 
   const eventIds = Array.from(
@@ -74,10 +74,10 @@ export default async function AdminGuestProfilePage({
         });
       }
     }
-  } else if (ctx.lodgeId) {
+  } else if (ctx.churchId) {
     await Promise.all(
       eventIds.map(async (eid) => {
-        const event = await db.getEventById(eid, ctx.lodgeId!);
+        const event = await db.getEventById(eid, ctx.churchId!);
         if (event) {
           eventMap.set(eid, {
             id: event.id,
@@ -107,18 +107,18 @@ export default async function AdminGuestProfilePage({
           <p className="admin-page-copy">
             {guest.guest_category === "honorary_guest"
               ? "Honorary guest"
-              : guest.is_mason
-                ? "Visiting brother"
+              : guest.is_member
+                ? "Newcomer member"
                 : "Guest"}
             {guest.dining_waived
               ? " · dines complimentary"
               : guest.guest_dining_amount != null
                 ? ` · dining £${guest.guest_dining_amount}`
                 : ""}
-            {guest.mother_lodge_name
-              ? ` - ${guest.mother_lodge_name}${
-                  guest.mother_lodge_number
-                    ? ` No. ${guest.mother_lodge_number}`
+            {guest.mother_church_name
+              ? ` - ${guest.mother_church_name}${
+                  guest.mother_church_number
+                    ? ` No. ${guest.mother_church_number}`
                     : ""
                 }`
               : ""}
@@ -131,20 +131,24 @@ export default async function AdminGuestProfilePage({
           guestEmail={guest.email}
           visitCount={guest.visit_count}
           archivedAt={guest.archived_at}
-          hasVisitorToken={Boolean(guest.visitor_token_hash)}
+          hasNewcomerToken={Boolean(guest.newcomer_token_hash)}
           initialValues={{
             full_name: guest.full_name,
             email: guest.email ?? "",
             phone: guest.phone ?? "",
-            mother_lodge_name: guest.mother_lodge_name ?? "",
-            mother_lodge_number: guest.mother_lodge_number ?? "",
+            mother_church_name: guest.mother_church_name ?? "",
+            mother_church_number: guest.mother_church_number ?? "",
             constitution: guest.constitution ?? "",
             rank: guest.rank ?? "",
             dietary_requirements: guest.dietary_requirements ?? "",
             guest_category: guest.guest_category ?? "guest",
             guest_dining_amount: guest.guest_dining_amount?.toString() ?? "",
             dining_waived: guest.dining_waived ?? false,
-            is_mason: guest.is_mason,
+            gift_aid_consent_status:
+              "gift_aid_consent_status" in guest
+                ? guest.gift_aid_consent_status
+                : "unknown",
+            is_member: guest.is_member,
             notes: guest.notes ?? "",
           }}
         />
@@ -178,12 +182,12 @@ export default async function AdminGuestProfilePage({
               <Building2 className="mt-0.5 h-4 w-4 text-dash-muted" />
               <div>
                 <dt className="text-xs uppercase tracking-wider text-dash-muted">
-                  Mother lodge
+                  Mother church
                 </dt>
                 <dd className="text-dash-text">
-                  {guest.mother_lodge_name ?? "-"}
-                  {guest.mother_lodge_number
-                    ? ` No. ${guest.mother_lodge_number}`
+                  {guest.mother_church_name ?? "-"}
+                  {guest.mother_church_number
+                    ? ` No. ${guest.mother_church_number}`
                     : ""}
                 </dd>
                 {guest.constitution ? (
@@ -246,7 +250,7 @@ export default async function AdminGuestProfilePage({
                       <p className="text-sm font-medium text-dash-text">
                         {event ? (
                           <Link
-                            href={`/admin/meetings/${event.id}`}
+                            href={`/admin/services/${event.id}`}
                             className="hover:text-dash-ring"
                           >
                             {event.title}

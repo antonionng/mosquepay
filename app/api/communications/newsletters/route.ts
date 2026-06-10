@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -19,18 +19,18 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("members:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("members:write", churchId);
   if (forbidden) return forbidden;
 
   const body = await request.json();
-  const subject: string = body.subject ?? "Lodge update";
+  const subject: string = body.subject ?? "Church update";
   const html: string = body.html_body ?? "";
-  const audience: "active_members" | "all_members" | "leads" =
+  const audience: "active_members" | "all_members" | "newcomers" =
     body.audience ?? "active_members";
   const templateKey: string | null = body.template_key ?? null;
   const dryRun: boolean = body.dry_run === true;
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
   const recipientName =
     typeof body.recipient_name === "string" ? body.recipient_name.trim() : "";
 
-  const lodge = await db.getLodgeById(lodgeId);
+  const church = await db.getChurchById(churchId);
   let recipients: Awaited<ReturnType<typeof sendBatch>> | null = null;
 
   if (recipientEmail) {
@@ -52,13 +52,13 @@ export async function POST(request: NextRequest) {
         email: recipientEmail,
         name,
         member_id: null,
-        lead_id: null,
+        newcomer_id: null,
         context: {
           first_name: firstName,
           last_name: name.split(/\s+/).slice(1).join(" "),
           full_name: name,
           email: recipientEmail,
-          lodge_name: lodge?.name ?? "the lodge",
+          church_name: church?.name ?? "the church",
         },
       },
     ];
@@ -69,31 +69,31 @@ export async function POST(request: NextRequest) {
       });
     }
     recipients = await sendBatch({
-      lodgeId,
+      churchId,
       templateKey,
       subject,
       htmlBody: html,
       recipients: list,
       audienceLabel: "selected_recipient",
     });
-  } else if (audience === "leads") {
+  } else if (audience === "newcomers") {
 
-    const leads = await db.getLeads(lodgeId);
-    const list = leads
+    const newcomers = await db.getNewcomers(churchId);
+    const list = newcomers
       .filter((l) => l.email)
-      .map((lead) => {
-        const fullName = `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim() || lead.email;
+      .map((newcomer) => {
+        const fullName = `${newcomer.first_name ?? ""} ${newcomer.last_name ?? ""}`.trim() || newcomer.email;
         return {
-          email: lead.email,
+          email: newcomer.email,
           name: fullName,
           member_id: null,
-          lead_id: lead.id,
+          newcomer_id: newcomer.id,
           context: {
-            first_name: lead.first_name || fullName.split(/\s+/)[0],
-            last_name: lead.last_name ?? "",
+            first_name: newcomer.first_name || fullName.split(/\s+/)[0],
+            last_name: newcomer.last_name ?? "",
             full_name: fullName,
-            email: lead.email,
-            lodge_name: lodge?.name ?? "the lodge",
+            email: newcomer.email,
+            church_name: church?.name ?? "the church",
           },
         };
       });
@@ -104,15 +104,15 @@ export async function POST(request: NextRequest) {
       });
     }
     recipients = await sendBatch({
-      lodgeId,
+      churchId,
       templateKey,
       subject,
       htmlBody: html,
       recipients: list,
-      audienceLabel: "leads",
+      audienceLabel: "newcomers",
     });
   } else {
-    const allMembers = await db.getMembers(lodgeId);
+    const allMembers = await db.getMembers(churchId);
     const filtered =
       audience === "active_members"
         ? allMembers.filter((m) => m.membership_status === "active")
@@ -121,8 +121,8 @@ export async function POST(request: NextRequest) {
       email: member.email,
       name: member.full_name,
       member_id: member.id,
-      lead_id: null,
-      context: buildMemberContext(member, lodge),
+      newcomer_id: null,
+      context: buildMemberContext(member, church),
     }));
     if (dryRun) {
       return NextResponse.json({
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
       });
     }
     recipients = await sendBatch({
-      lodgeId,
+      churchId,
       templateKey,
       subject,
       htmlBody: html,
@@ -141,10 +141,10 @@ export async function POST(request: NextRequest) {
   }
 
   await writeAuditLog({
-    lodgeId,
+    churchId,
     action: "newsletter_sent",
     entityType: "newsletter",
-    entityId: lodgeId,
+    entityId: churchId,
     summary: `Sent ${recipients.sent} newsletter emails`,
     metadata: {
       audience,

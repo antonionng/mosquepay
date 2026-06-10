@@ -174,8 +174,8 @@ export default function MemberGuestsPage() {
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">My guests</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Invite a brother or visitor to a lodge event. Choose whether your
-          guest pays for their own dining and meeting fees or you cover them,
+          Invite a member or newcomer to a church event. Choose whether your
+          guest pays for their own dining and service fees or you cover them,
           and keep an audit trail of every link you have shared.
         </p>
       </div>
@@ -209,7 +209,7 @@ export default function MemberGuestsPage() {
                     {formatDate(event.event_date)}
                     {event.guest_policy === "blue_table" ? (
                       <Badge variant="default" className="ml-2">
-                        Masons only
+                        members only
                       </Badge>
                     ) : (
                       <Badge variant="secondary" className="ml-2">

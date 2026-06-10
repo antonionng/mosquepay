@@ -11,11 +11,23 @@ export default function PublicLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  // Marketing/legal routes render their own MarketingShell (or, in tenant
+  // mode, the page itself wraps with PublicHeader/PublicFooter).
   const isMarketingRoute =
     pathname === "/" ||
     pathname === "/features" ||
+    pathname === "/pricing" ||
+    pathname === "/faq" ||
+    pathname === "/about" ||
     pathname === "/contact" ||
-    pathname === "/book-demo";
+    pathname === "/book-demo" ||
+    pathname === "/news" ||
+    pathname === "/join" ||
+    pathname === "/login" ||
+    pathname === "/terms" ||
+    pathname === "/privacy" ||
+    pathname === "/gdpr" ||
+    pathname === "/cookies";
 
   if (isMarketingRoute) {
     return <>{children}</>;

@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { LodgeSiteHeaderSettings } from "@/lib/db/types";
+import type { ChurchSiteHeaderSettings } from "@/lib/db/types";
 import { defaultHeaderSettings } from "@/lib/site-section-style";
 import { cn } from "@/lib/utils";
 
@@ -35,14 +35,14 @@ function initialsFromName(name: string) {
 
 function HeaderPreview({
   settings,
-  lodgeName,
-  lodgeNumber,
+  churchName,
+  churchNumber,
   logoUrl,
   primaryColor,
 }: {
-  settings: LodgeSiteHeaderSettings;
-  lodgeName: string;
-  lodgeNumber?: string | null;
+  settings: ChurchSiteHeaderSettings;
+  churchName: string;
+  churchNumber?: string | null;
   logoUrl?: string | null;
   primaryColor: string;
 }) {
@@ -78,24 +78,24 @@ function HeaderPreview({
                 {logoUrl ? (
                   <Image
                     src={logoUrl}
-                    alt={`${lodgeName} logo`}
+                    alt={`${churchName} logo`}
                     width={44}
                     height={44}
                     unoptimized
                     className="h-full w-full bg-white object-contain p-1"
                   />
                 ) : (
-                  initialsFromName(lodgeName)
+                  initialsFromName(churchName)
                 )}
               </div>
             ) : null}
-            {(settings.show_lodge_name || settings.show_lodge_number) ? (
+            {(settings.show_church_name || settings.show_church_number) ? (
               <div className="min-w-0">
-                {settings.show_lodge_name ? (
-                  <p className="truncate text-sm font-semibold text-slate-950">{lodgeName}</p>
+                {settings.show_church_name ? (
+                  <p className="truncate text-sm font-semibold text-slate-950">{churchName}</p>
                 ) : null}
-                {settings.show_lodge_number && lodgeNumber ? (
-                  <p className="text-xs text-slate-500">No. {lodgeNumber}</p>
+                {settings.show_church_number && churchNumber ? (
+                  <p className="text-xs text-slate-500">No. {churchNumber}</p>
                 ) : null}
               </div>
             ) : null}
@@ -123,7 +123,7 @@ function HeaderPreview({
             Page starts below header
           </p>
           <p className="mx-auto mt-3 max-w-md text-2xl font-semibold tracking-tight text-white">
-            Visitors see this navigation before your first section.
+            Newcomers see this navigation before your first section.
           </p>
         </div>
       </div>
@@ -136,11 +136,11 @@ function HeaderPreview({
                 className="flex h-8 w-8 items-center justify-center rounded-xl text-[10px] font-bold tracking-[0.16em] text-white"
                 style={{ backgroundColor: primaryColor }}
               >
-                {initialsFromName(lodgeName)}
+                {initialsFromName(churchName)}
               </div>
             ) : null}
             <span className="text-xs font-semibold text-slate-950">
-              {settings.show_lodge_name ? lodgeName : "Lodge website"}
+              {settings.show_church_name ? churchName : "Church website"}
             </span>
           </div>
           <span className="rounded-lg border border-slate-200 px-3 py-1 text-xs text-slate-700">
@@ -153,22 +153,22 @@ function HeaderPreview({
 }
 
 export function HeaderSettingsManager({
-  lodgeSlug,
+  churchSlug,
   initialSettings,
-  lodgeName,
-  lodgeNumber,
+  churchName,
+  churchNumber,
   logoUrl,
   primaryColor = "#3b82f6",
 }: {
-  lodgeSlug: string;
-  initialSettings?: LodgeSiteHeaderSettings | null;
-  lodgeName?: string;
-  lodgeNumber?: string | null;
+  churchSlug: string;
+  initialSettings?: ChurchSiteHeaderSettings | null;
+  churchName?: string;
+  churchNumber?: string | null;
   logoUrl?: string | null;
   primaryColor?: string;
 }) {
-  const previewLodgeName = lodgeName ?? "Covenant Lodge";
-  const [settings, setSettings] = useState<LodgeSiteHeaderSettings>(
+  const previewChurchName = churchName ?? "St Mary's Church";
+  const [settings, setSettings] = useState<ChurchSiteHeaderSettings>(
     initialSettings ?? defaultHeaderSettings()
   );
   const [saving, setSaving] = useState(false);
@@ -232,7 +232,7 @@ export function HeaderSettingsManager({
     setSaving(true);
     setMessage(null);
     try {
-      const response = await fetch(`/api/lodges/${lodgeSlug}/site`, {
+      const response = await fetch(`/api/churches/${churchSlug}/site`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ header_settings: settings }),
@@ -254,7 +254,7 @@ export function HeaderSettingsManager({
         <div>
           <h2 className="text-lg font-semibold text-dash-text">Website header</h2>
           <p className="mt-1 text-sm text-dash-muted">
-            Control what appears in the public lodge site header.
+            Control what appears in the public church site header.
           </p>
         </div>
         <Button type="button" onClick={save} disabled={saving} variant="primary">
@@ -279,28 +279,28 @@ export function HeaderSettingsManager({
             <label className="flex items-center gap-2 rounded-xl border border-dash-border bg-dash-surface-subtle p-3 text-sm text-dash-text">
               <input
                 type="checkbox"
-                checked={settings.show_lodge_name}
+                checked={settings.show_church_name}
                 onChange={(event) =>
                   setSettings((current) => ({
                     ...current,
-                    show_lodge_name: event.target.checked,
+                    show_church_name: event.target.checked,
                   }))
                 }
               />
-              Show lodge name
+              Show church name
             </label>
             <label className="flex items-center gap-2 rounded-xl border border-dash-border bg-dash-surface-subtle p-3 text-sm text-dash-text">
               <input
                 type="checkbox"
-                checked={settings.show_lodge_number}
+                checked={settings.show_church_number}
                 onChange={(event) =>
                   setSettings((current) => ({
                     ...current,
-                    show_lodge_number: event.target.checked,
+                    show_church_number: event.target.checked,
                   }))
                 }
               />
-              Show lodge number
+              Show church number
             </label>
           </div>
 
@@ -309,7 +309,7 @@ export function HeaderSettingsManager({
               <div>
                 <h3 className="text-sm font-semibold text-dash-text">Menu items</h3>
                 <p className="mt-1 text-xs text-dash-muted">
-                  Choose where each menu item should take visitors. No website paths needed.
+                  Choose where each menu item should take newcomers. No website paths needed.
                 </p>
               </div>
               <Button type="button" variant="dashboard" size="sm" onClick={addNavItem}>
@@ -440,8 +440,8 @@ export function HeaderSettingsManager({
         </div>
         <HeaderPreview
           settings={settings}
-          lodgeName={previewLodgeName}
-          lodgeNumber={lodgeNumber}
+          churchName={previewChurchName}
+          churchNumber={churchNumber}
           logoUrl={logoUrl}
           primaryColor={primaryColor}
         />

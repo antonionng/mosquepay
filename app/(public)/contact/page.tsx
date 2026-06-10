@@ -1,51 +1,59 @@
 import { Suspense } from "react";
+import { Clock, Mail, MessageCircle } from "lucide-react";
 import { ContactForm } from "@/components/forms/contact-form";
 import { PublicFooter } from "@/components/layout/public-footer";
 import { PublicHeader } from "@/components/layout/public-header";
-import { StaticMarketingSite } from "@/components/marketing/static-marketing-site";
-import { resolveLodgeSlug } from "@/lib/tenant";
+import {
+  MarketingShell,
+  MarketingSection,
+  MarketingKicker,
+} from "@/components/marketing/marketing-shell";
+import { resolveChurchSlug } from "@/lib/tenant";
 import { marketingMetadata } from "@/lib/seo";
 
-const contactInfo = [
+const SAAS_CONTACT_INFO = [
   {
+    Icon: Mail,
     title: "Email",
     content: "ag@experrt.com",
     href: "mailto:ag@experrt.com",
   },
   {
-    title: "Location",
-    content: "Mark Masons' Hall, 86 St James's Street, Mayfair, London",
+    Icon: Clock,
+    title: "Response time",
+    content: "We aim to reply within one working day",
   },
   {
-    title: "Response Time",
-    content: "We aim to respond within 48 hours",
+    Icon: MessageCircle,
+    title: "What to include",
+    content: "Your church name, congregation size, and what you'd like to solve first",
   },
 ];
 
 export async function generateMetadata({
   searchParams,
 }: {
-  searchParams: Promise<{ lodge?: string }>;
+  searchParams: Promise<{ church?: string }>;
 }) {
-  const { lodge } = await searchParams;
-  if (lodge) {
+  const { church } = await searchParams;
+  if (church) {
     return {
-      title: "Contact the Lodge",
+      title: "Contact the Church",
       description:
-        "Contact the lodge secretary about membership enquiries, visiting, events, meetings, charity, or general lodge information.",
+        "Contact the church team about services, membership, giving, events, or general information.",
     };
   }
 
   return marketingMetadata({
-    title: "Contact LodgePay | Masonic Lodge Software Support and Sales",
+    title: "Contact ChurchPay | Sales and Support for Church Software",
     description:
-      "Contact LodgePay to discuss Masonic lodge websites, payments, event RSVPs, dues, donations, Gift Aid, member portals, candidate CRM, Province administration, and lodge operations software.",
+      "Contact ChurchPay about giving, Gift Aid, church websites, member records, service notices, newcomer follow-up, pastoral care, and network rollouts for UK churches.",
     path: "/contact",
     keywords: [
-      "contact LodgePay",
-      "Masonic software support",
-      "lodge software sales",
-      "lodge website enquiry",
+      "contact ChurchPay",
+      "church software support",
+      "church software sales",
+      "church giving platform enquiry",
     ],
   });
 }
@@ -53,14 +61,65 @@ export async function generateMetadata({
 export default async function ContactPage({
   searchParams,
 }: {
-  searchParams: Promise<{ lodge?: string }>;
+  searchParams: Promise<{ church?: string }>;
 }) {
-  const { lodge } = await searchParams;
-  const isTenantMode = Boolean(lodge);
-  const lodgeSlug = resolveLodgeSlug(lodge);
+  const { church } = await searchParams;
+  const isTenantMode = Boolean(church);
+  const churchSlug = resolveChurchSlug(church);
 
   if (!isTenantMode) {
-    return <StaticMarketingSite initialPage="contact" />;
+    return (
+      <MarketingShell>
+        <section className="px-5 pb-4 pt-16 lg:px-8 lg:pt-24">
+          <div className="mx-auto max-w-7xl">
+            <div className="max-w-3xl">
+              <MarketingKicker>Contact</MarketingKicker>
+              <h1 className="mt-4 font-heading text-4xl font-bold leading-tight tracking-tight text-slate-900 sm:text-5xl">
+                Talk to a human who knows church admin.
+              </h1>
+              <p className="mt-6 text-lg leading-8 text-slate-600">
+                Questions about giving, Gift Aid, migration, pricing, or anything else? Tell us
+                about your church and we&apos;ll point you in the right direction.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <MarketingSection>
+          <div className="grid gap-10 lg:grid-cols-[minmax(280px,0.7fr)_minmax(0,1.3fr)] lg:gap-14">
+            <div className="space-y-4">
+              {SAAS_CONTACT_INFO.map(({ Icon, title, content, href }) => (
+                <div key={title} className="rounded-3xl border border-[#e9e2d4] bg-white p-6">
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand/8 text-brand">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    {title}
+                  </p>
+                  {href ? (
+                    <a href={href} className="mt-2 block font-medium text-brand hover:underline">
+                      {content}
+                    </a>
+                  ) : (
+                    <p className="mt-2 text-sm leading-6 text-slate-700">{content}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div id="contact-form" className="rounded-3xl border border-[#e9e2d4] bg-white p-8 shadow-sm lg:p-10">
+              <h2 className="font-heading text-2xl font-semibold text-slate-900">Send a message</h2>
+              <p className="mb-8 mt-3 text-slate-600">
+                Fill out the form and we&apos;ll get back to you as soon as we can.
+              </p>
+              <Suspense>
+                <ContactForm />
+              </Suspense>
+            </div>
+          </div>
+        </MarketingSection>
+      </MarketingShell>
+    );
   }
 
   return (
@@ -73,11 +132,11 @@ export default async function ContactPage({
           <section className="public-hero">
             <div className="public-hero-shell">
               <div className="public-hero-copy">
-                <p className="public-kicker">Contact Covenant Lodge</p>
-                <h1 className="public-hero-title">Talk to us directly.</h1>
+                <p className="public-kicker">Contact the church</p>
+                <h1 className="public-hero-title">We&apos;d love to hear from you.</h1>
                 <p className="public-hero-body">
-                  If you have a question about the lodge, membership, or an event,
-                  we&apos;d be glad to hear from you.
+                  Questions about services, membership, giving, or anything else? Send us a
+                  message and someone from the team will reply.
                 </p>
               </div>
               <div className="public-hero-panel">
@@ -85,9 +144,8 @@ export default async function ContactPage({
                   Response approach
                 </p>
                 <p className="mt-4 text-sm leading-relaxed text-slate-300">
-                  We aim to respond promptly, clearly, and with enough context to be
-                  useful. If you&apos;re enquiring about joining, we&apos;ll help you
-                  understand the next step.
+                  We aim to respond promptly and personally. If you&apos;re enquiring about
+                  visiting or joining, we&apos;ll help you understand the next step.
                 </p>
               </div>
             </div>
@@ -95,34 +153,15 @@ export default async function ContactPage({
 
           <section className="public-section">
             <div className="container-full">
-              <div className="grid gap-10 lg:grid-cols-[minmax(280px,0.7fr)_minmax(0,1.3fr)] lg:gap-16">
-                <div className="space-y-4">
-                  {contactInfo.map((info) => (
-                    <div key={info.title} className="public-grid-card-muted">
-                      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                        {info.title}
-                      </p>
-                      {info.href ? (
-                        <a
-                          href={info.href}
-                          className="mt-3 block font-medium text-blue-600 hover:underline"
-                        >
-                          {info.content}
-                        </a>
-                      ) : (
-                        <p className="mt-3 text-slate-700">{info.content}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
+              <div className="mx-auto max-w-2xl">
                 <div className="public-grid-card">
                   <h2 className="text-2xl font-semibold text-slate-950">Send a message</h2>
                   <p className="mb-8 mt-3 text-slate-600">
-                    Fill out the form below and we&apos;ll get back to you as soon as we
-                    can.
+                    Fill out the form below and we&apos;ll get back to you as soon as we can.
                   </p>
-                  <ContactForm lodgeSlug={lodgeSlug} />
+                  <Suspense>
+                    <ContactForm churchSlug={churchSlug} />
+                  </Suspense>
                 </div>
               </div>
             </div>

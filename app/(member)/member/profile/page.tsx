@@ -25,8 +25,8 @@ interface UserProfile {
   email: string;
   phone?: string;
   dietary_requirements?: string;
-  lodge_name?: string;
-  lodge_number?: string;
+  church_name?: string;
+  church_number?: string;
   member_since?: string;
   gift_aid_declared: boolean;
 }
@@ -78,8 +78,8 @@ export default function MemberProfilePage() {
             email: data.user?.email ?? "",
             phone: data.user?.phone ?? "",
             dietary_requirements: data.user?.dietary_requirements ?? "",
-            lodge_name: data.user?.lodge_name ?? "Covenant Lodge",
-            lodge_number: data.user?.lodge_number ?? "4344",
+            church_name: data.user?.church_name ?? "St Mary's Church",
+            church_number: data.user?.church_number ?? "4344",
             member_since: data.user?.member_since,
             gift_aid_declared: data.user?.gift_aid_declared ?? false,
           };
@@ -118,8 +118,8 @@ export default function MemberProfilePage() {
             email: data.user.email ?? email,
             phone: data.user.phone ?? "",
             dietary_requirements: data.user.dietary_requirements ?? "",
-            lodge_name: profile?.lodge_name,
-            lodge_number: profile?.lodge_number,
+            church_name: profile?.church_name,
+            church_number: profile?.church_number,
             member_since: profile?.member_since,
             gift_aid_declared: profile?.gift_aid_declared ?? false,
           });
@@ -255,7 +255,7 @@ export default function MemberProfilePage() {
                   />
                 </div>
                 <p className="text-xs text-slate-400">
-                  Contact your lodge administrator to change your email
+                  Contact your church administrator to change your email
                 </p>
               </div>
 
@@ -320,7 +320,7 @@ export default function MemberProfilePage() {
         <div className="border-b border-slate-100 px-6 py-4">
           <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2">
             <Building className="h-4 w-4 text-slate-400" />
-            Lodge Membership
+            Church Membership
           </h2>
         </div>
         <div className="p-6">
@@ -329,15 +329,15 @@ export default function MemberProfilePage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
-                <p className="text-sm text-slate-500">Lodge</p>
+                <p className="text-sm text-slate-500">Church</p>
                 <p className="text-base font-medium text-slate-900 mt-0.5">
-                  {profile?.lodge_name ?? "Not recorded"}
+                  {profile?.church_name ?? "Not recorded"}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-slate-500">Lodge Number</p>
+                <p className="text-sm text-slate-500">Church Number</p>
                 <p className="text-base font-medium text-slate-900 mt-0.5">
-                  No. {profile?.lodge_number ?? "Not recorded"}
+                  No. {profile?.church_number ?? "Not recorded"}
                 </p>
               </div>
               {profile?.member_since && (
@@ -473,7 +473,7 @@ export default function MemberProfilePage() {
           Secured
         </Badge>
         <p className="text-xs text-slate-400">
-          Your data is encrypted and protected. Contact your lodge administrator for account issues.
+          Your data is encrypted and protected. Contact your church administrator for account issues.
         </p>
       </div>
     </div>

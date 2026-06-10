@@ -27,23 +27,23 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const member = await db.getMemberByEmailAcrossLodges(email);
+    const member = await db.getMemberByEmailAcrossChurches(email);
     if (!member) {
       return NextResponse.json(GENERIC_RESPONSE);
     }
 
-    let lodgeName = "your lodge";
+    let churchName = "your church";
     try {
-      const lodge = await db.getLodgeById(member.lodge_id);
-      if (lodge?.name) lodgeName = lodge.name;
+      const church = await db.getChurchById(member.church_id);
+      if (church?.name) churchName = church.name;
     } catch {
-      // Non-fatal: fall back to the generic lodge name.
+      // Non-fatal: fall back to the generic church name.
     }
 
     const result = await sendMemberPasswordReset({
       request,
       member,
-      lodgeName,
+      churchName,
     });
     if (!result.sent) {
       console.warn("[member forgot-password] reset send failed", {

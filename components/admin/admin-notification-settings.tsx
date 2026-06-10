@@ -98,7 +98,7 @@ export function AdminNotificationSettings() {
       <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
         <Bell className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
         <p>
-          Choose which lodge officers receive subscription and dues
+          Choose which church officers receive subscription and giving
           notifications. Defaults are sensible — turn things off here if a
           notification stream is too chatty for a particular role.
         </p>

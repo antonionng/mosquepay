@@ -1,34 +1,23 @@
 /**
- * Member rank and Masonic title helpers.
+ * Legacy leadership label helpers.
  *
- * The canonical rank stored on `members.rank` is one of five short codes:
- *
- *   EA      Entered Apprentice
- *   FC      Fellow Craft
- *   MM      Master Mason
- *   Master  Master (a brother in his year as Worshipful Master)
- *   PM      Past Master
- *
- * The Masonic title (Bro / W Bro / VW Bro / RW Bro) is derived from the
- * rank. We never store it directly. Bro is for unattained brethren and
- * Master Masons. W Bro is for sitting and Past Masters. VW Bro and RW Bro
- * are conferred by Provincial / Grand Lodge appointments and are tracked
- * separately via `member_ranks` rows; they are not derivable from craft
- * rank alone, so this helper returns at most "W Bro".
+ * ChurchPay no longer uses legacy rank-based titles. These helpers remain so older
+ * screens can render legacy data safely while new records should use
+ * leadership roles and ministry/team labels instead.
  */
 
-export const RANK_CODES = ["EA", "FC", "MM", "Master", "PM"] as const;
+export const RANK_CODES = ["Member", "Leader", "Deacon", "Elder", "Pastor"] as const;
 export type Rank = (typeof RANK_CODES)[number];
 
-export type MasonicTitle = "Bro" | "W Bro" | "VW Bro" | "RW Bro";
+export type ChurchTitle = string;
 
 /** Human-readable label for each rank, in the order shown to users. */
 export const RANK_LABELS: Record<Rank, string> = {
-  EA: "Entered Apprentice",
-  FC: "Fellow Craft",
-  MM: "Master Mason",
-  Master: "Master",
-  PM: "Past Master",
+  Member: "Member",
+  Leader: "Ministry leader",
+  Deacon: "Deacon",
+  Elder: "Elder",
+  Pastor: "Pastor",
 };
 
 /** True if the value is a recognised canonical rank code. */
@@ -40,27 +29,16 @@ export function isRank(value: unknown): value is Rank {
 }
 
 /**
- * Map a stored rank value to its Masonic title.
+ * Map a stored rank value to its Church title.
  *
  * Returns null when the rank is missing, blank, or not recognised. Callers
  * should fall back to omitting the title prefix in that case rather than
  * inventing one.
  */
-export function masonicTitleFor(
+export function churchTitleFor(
   rank: string | null | undefined
-): MasonicTitle | null {
-  if (!rank) return null;
-  switch (rank) {
-    case "EA":
-    case "FC":
-    case "MM":
-      return "Bro";
-    case "Master":
-    case "PM":
-      return "W Bro";
-    default:
-      return null;
-  }
+): ChurchTitle | null {
+  return rankLabel(rank);
 }
 
 /**

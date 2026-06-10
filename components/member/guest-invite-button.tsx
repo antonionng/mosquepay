@@ -113,7 +113,7 @@ export function MemberGuestInviteButton({
                   Invite a guest
                 </h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  Generate a private link to invite a brother or visitor to
+                  Generate a private link to invite a member or newcomer to
                   {" "}
                   <span className="font-medium text-slate-700">{eventTitle}</span>.
                 </p>
@@ -170,7 +170,7 @@ export function MemberGuestInviteButton({
                     type="email"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
-                    placeholder="brother@example.com"
+                    placeholder="member@example.com"
                   />
                 </div>
                 <fieldset className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -189,7 +189,7 @@ export function MemberGuestInviteButton({
                     <span>
                       <span className="font-medium">Guest pays</span>
                       <span className="block text-xs text-slate-500">
-                        Your guest will be charged for their dining and meeting fees.
+                        Your guest will be charged for their dining and service fees.
                       </span>
                     </span>
                   </label>

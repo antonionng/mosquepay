@@ -105,11 +105,11 @@ function parseAmount(value: string): number | null {
   return Number.isFinite(num) ? num : null;
 }
 
-function findHeaderIndex(headers: string[], candidates: string[]): number {
+function findHeaderIndex(headers: string[], newcomers: string[]): number {
   for (let i = 0; i < headers.length; i++) {
     const header = headers[i].toLowerCase();
-    for (const candidate of candidates) {
-      if (header === candidate || header.includes(candidate)) {
+    for (const newcomer of newcomers) {
+      if (header === newcomer || header.includes(newcomer)) {
         return i;
       }
     }

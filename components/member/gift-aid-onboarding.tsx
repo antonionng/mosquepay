@@ -13,7 +13,7 @@
 //
 // Decision tree (intentionally cheap to reason about):
 //   - declaration exists & active            -> nothing
-//   - consent_status === "declined"          -> nothing
+//   - consent_status === "declined"          -> refused state with undo
 //   - !prompted                              -> modal (first time only)
 //   - prompted but no declaration            -> banner
 //
@@ -131,6 +131,23 @@ export function GiftAidOnboarding({ profile }: { profile?: ProfileSeed }) {
     }
   }
 
+  async function clearRefusal() {
+    try {
+      await fetch("/api/member/gift-aid", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "clear" }),
+      });
+    } catch {
+      /* non-fatal */
+    } finally {
+      setStatus((s) =>
+        s ? { ...s, prompted: false, consent_status: "unknown" } : s
+      );
+      setOpen(true);
+    }
+  }
+
   if (!loaded || !status) return null;
 
   const showBanner =
@@ -164,7 +181,32 @@ export function GiftAidOnboarding({ profile }: { profile?: ProfileSeed }) {
           onDecline={decline}
         />
       ) : null}
+      {!open && !status.declaration && status.consent_status === "declined" ? (
+        <GiftAidRefusedBanner onClear={clearRefusal} />
+      ) : null}
     </>
+  );
+}
+
+export function GiftAidRefusedBanner({ onClear }: { onClear: () => void }) {
+  return (
+    <div className="mb-4 flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100">
+          <X className="h-4 w-4 text-slate-600" />
+        </div>
+        <div>
+          <p className="font-semibold text-slate-800">Gift Aid refused</p>
+          <p className="mt-0.5 text-slate-600">
+            You told us not to Gift Aid your donations. You can change this
+            and complete a declaration at any time.
+          </p>
+        </div>
+      </div>
+      <Button size="sm" variant="secondary" onClick={onClear}>
+        Change my mind
+      </Button>
+    </div>
   );
 }
 
@@ -186,7 +228,7 @@ export function GiftAidBanner({
             Boost your donations by 25 percent with Gift Aid
           </p>
           <p className="mt-0.5 text-emerald-800">
-            One short form. Then every donation you make to the lodge is
+            One short form. Then every donation you make to the church is
             Gift Aided automatically.
           </p>
         </div>
@@ -289,7 +331,7 @@ export function GiftAidDeclarationDialog({
           </div>
           <DialogTitle>Set up Gift Aid</DialogTitle>
           <DialogDescription>
-            If you are a UK taxpayer, the lodge can reclaim 25p for every £1
+            If you are a UK taxpayer, the church can reclaim 25p for every £1
             you give. This declaration covers past, present, and future
             donations until you choose to revoke it.
           </DialogDescription>
@@ -452,6 +494,28 @@ export function GiftAidStatusPanel() {
     }
   }
 
+  async function clearRefusal() {
+    setWorking(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/member/gift-aid", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "clear" }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.error ?? "Could not clear refusal.");
+      }
+      setMessage("Gift Aid refusal cleared. You can now set up a declaration.");
+      refresh();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
   return (
     <div className="space-y-3">
       {message ? (
@@ -486,6 +550,26 @@ export function GiftAidStatusPanel() {
                 Revoke declaration
               </button>
             </div>
+          </div>
+        </div>
+      ) : status?.consent_status === "declined" ? (
+        <div className="flex items-start gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <X className="mt-0.5 h-5 w-5 text-slate-500" />
+          <div className="flex-1">
+            <p className="font-medium text-slate-700">Gift Aid refused</p>
+            <p className="mt-1 text-sm text-slate-500">
+              We will not Gift Aid your donations while this status is set.
+              Clear it if you become eligible or change your mind.
+            </p>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-3"
+              onClick={clearRefusal}
+              disabled={working}
+            >
+              Clear refusal
+            </Button>
           </div>
         </div>
       ) : (
@@ -528,6 +612,3 @@ export function GiftAidStatusPanel() {
     </div>
   );
 }
-
-// Tiny no-op so eslint doesn't flag unused imports we left for future use.
-void X;

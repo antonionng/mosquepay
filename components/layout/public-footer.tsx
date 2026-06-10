@@ -6,8 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { reopenCookieConsent } from "@/lib/cookie-consent";
 import { COMPANY_NAME } from "@/lib/legal";
-import { resolveLodgeSlug } from "@/lib/tenant";
-import type { LodgeSiteFooterSettings } from "@/lib/db/types";
+import { resolveChurchSlug } from "@/lib/tenant";
+import type { ChurchSiteFooterSettings } from "@/lib/db/types";
 import { defaultFooterSettings } from "@/lib/site-section-style";
 
 const marketingLinks = {
@@ -23,13 +23,13 @@ const marketingLinks = {
   ],
 };
 
-type LodgeBranding = {
+type ChurchBranding = {
   slug: string;
   name: string;
   city: string | null;
   tagline: string | null;
   logo_url: string | null;
-  lodge_number: string | null;
+  church_number: string | null;
   support_email: string | null;
   support_phone: string | null;
 };
@@ -49,22 +49,22 @@ export function PublicFooter({
   initialFooterSettings = null,
   initialTenantSlug = null,
 }: {
-  initialBranding?: LodgeBranding | null;
-  initialFooterSettings?: LodgeSiteFooterSettings | null;
+  initialBranding?: ChurchBranding | null;
+  initialFooterSettings?: ChurchSiteFooterSettings | null;
   initialTenantSlug?: string | null;
 }) {
   const searchParams = useSearchParams();
-  const [branding, setBranding] = useState<LodgeBranding | null>(initialBranding);
+  const [branding, setBranding] = useState<ChurchBranding | null>(initialBranding);
   const [hostTenantSlug, setHostTenantSlug] = useState<string | null>(initialTenantSlug);
-  const [footerSettings, setFooterSettings] = useState<LodgeSiteFooterSettings | null>(
+  const [footerSettings, setFooterSettings] = useState<ChurchSiteFooterSettings | null>(
     initialFooterSettings
   );
-  const rawLodgeQuery = searchParams.get("lodge");
-  const queryTenantMode = Boolean(rawLodgeQuery);
+  const rawChurchQuery = searchParams.get("church");
+  const queryTenantMode = Boolean(rawChurchQuery);
   const isTenantMode = queryTenantMode || Boolean(hostTenantSlug);
-  const lodgeSlug = useMemo(
-    () => hostTenantSlug ?? resolveLodgeSlug(rawLodgeQuery),
-    [hostTenantSlug, rawLodgeQuery]
+  const churchSlug = useMemo(
+    () => hostTenantSlug ?? resolveChurchSlug(rawChurchQuery),
+    [hostTenantSlug, rawChurchQuery]
   );
   const settings = footerSettings ?? defaultFooterSettings();
   const tenantFooterGroups = settings.link_groups
@@ -85,31 +85,31 @@ export function PublicFooter({
   const footerGroups = isTenantMode ? tenantFooterGroups : marketingFooterGroups;
   const withTenantQuery = (href: string) =>
     isTenantMode && href.startsWith("/")
-      ? `${href}${href.includes("?") ? "&" : "?"}lodge=${encodeURIComponent(lodgeSlug)}`
+      ? `${href}${href.includes("?") ? "&" : "?"}church=${encodeURIComponent(churchSlug)}`
       : href;
 
   useEffect(() => {
-    if (initialBranding && initialTenantSlug === lodgeSlug) return;
+    if (initialBranding && initialTenantSlug === churchSlug) return;
 
     let active = true;
     async function loadBranding() {
       try {
         const res = await fetch(
           queryTenantMode
-            ? `/api/lodges/${lodgeSlug}/site`
-            : "/api/lodges/current/site"
+            ? `/api/churches/${churchSlug}/site`
+            : "/api/churches/current/site"
         );
         if (!res.ok) return;
         const data = await res.json();
         if (!active) return;
-        const lodge = data.lodge as LodgeBranding | null;
+        const church = data.church as ChurchBranding | null;
         const siteFooterSettings = data.site?.footer_settings as
-          | LodgeSiteFooterSettings
+          | ChurchSiteFooterSettings
           | null
           | undefined;
-        if (lodge) {
-          setBranding(lodge);
-          if (!queryTenantMode) setHostTenantSlug(lodge.slug);
+        if (church) {
+          setBranding(church);
+          if (!queryTenantMode) setHostTenantSlug(church.slug);
         }
         setFooterSettings(siteFooterSettings ?? null);
       } catch {
@@ -120,7 +120,7 @@ export function PublicFooter({
     return () => {
       active = false;
     };
-  }, [initialBranding, initialTenantSlug, lodgeSlug, queryTenantMode]);
+  }, [initialBranding, initialTenantSlug, churchSlug, queryTenantMode]);
 
   return (
     <footer
@@ -148,20 +148,20 @@ export function PublicFooter({
                     </div>
                   ) : settings.show_logo ? (
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-[11px] font-semibold tracking-[0.2em]">
-                      {initialsFromName(branding?.name ?? "Covenant Lodge")}
+                      {initialsFromName(branding?.name ?? "St Mary's Church")}
                     </div>
                   ) : null}
-                  {(settings.show_lodge_name || settings.show_lodge_number) ? (
+                  {(settings.show_church_name || settings.show_church_number) ? (
                     <div>
-                      {settings.show_lodge_name ? (
+                      {settings.show_church_name ? (
                         <p className="text-base font-semibold tracking-tight">
-                          {branding?.name ?? "Covenant Lodge"}
+                          {branding?.name ?? "St Mary's Church"}
                         </p>
                       ) : null}
                       <p className="text-sm text-slate-400">
                         {[
-                          settings.show_lodge_number && branding?.lodge_number
-                            ? `No. ${branding.lodge_number}`
+                          settings.show_church_number && branding?.church_number
+                            ? `No. ${branding.church_number}`
                             : null,
                           branding?.city ?? "Mayfair, London",
                         ]
@@ -173,8 +173,8 @@ export function PublicFooter({
                 </>
               ) : (
                 <Image
-                  src="/brand/lodgepay-sidebar-logo.png"
-                  alt="LodgePay"
+                  src="/brand/churchpay-sidebar-logo.png"
+                  alt="ChurchPay"
                   width={1032}
                   height={245}
                   className="h-9 w-auto max-w-[10rem] object-contain opacity-90"
@@ -191,8 +191,8 @@ export function PublicFooter({
               {isTenantMode
                 ? settings.tagline ??
                   branding?.tagline ??
-                  "A complete lodge website with visitor information, meetings, charity, membership enquiries, and lodge contact details."
-                : "Websites, meetings, summons, dues, charity, Gift Aid, member portal, digital card, candidate CRM, mentoring, Almoner, communications, Treasurer reconciliation, and reporting for Masonic lodges."}
+                  "A complete church website with newcomer information, services, charity, membership enquiries, and church contact details."
+                : "Websites, services, notices, giving, charity, Gift Aid, member portal, digital card, newcomer CRM, pastoral care, communications, treasurer reconciliation, and reporting for churches."}
             </p>
             {isTenantMode && (settings.badge_text || settings.show_contact_details) ? (
               <div className="mt-6 flex flex-wrap gap-3 text-xs text-slate-400">
@@ -262,18 +262,18 @@ export function PublicFooter({
             <p className={isTenantMode ? "text-xs text-slate-500" : "text-xs text-dash-faint"}>
               © {new Date().getFullYear()}{" "}
               {isTenantMode
-                ? `${branding?.name ?? "Covenant Lodge No. 4344"}.`
-                : `LodgePay, operated by ${COMPANY_NAME}.`}{" "}
+                ? `${branding?.name ?? "St Mary's Church"}.`
+                : `ChurchPay, operated by ${COMPANY_NAME}.`}{" "}
               All rights reserved.
             </p>
             <div className={isTenantMode ? "flex flex-wrap gap-5 text-xs text-slate-500" : "flex flex-wrap gap-5 text-xs text-dash-faint"}>
               {isTenantMode ? (
                 settings.show_powered_by !== false ? (
                   <Link
-                    href="https://lodgepayments.co.uk"
+                    href="https://churchpay.co.uk"
                     className="transition-colors hover:text-slate-300"
                   >
-                    Powered by LodgePay
+                    Powered by ChurchPay
                   </Link>
                 ) : null
               ) : (

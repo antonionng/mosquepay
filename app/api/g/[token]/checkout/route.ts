@@ -3,8 +3,8 @@
 // Updates and deletions to the resulting guest/rsvp rows happen elsewhere.
 //
 // Payment surface: 100% Mooov (Mooov Connect -> hosted Stripe Checkout on
-// the lodge's connected PSP). No direct Stripe SDK calls and no fallback.
-// If the lodge has not connected Mooov the guest sees a 503 + clear copy
+// the church's connected PSP). No direct Stripe SDK calls and no fallback.
+// If the church has not connected Mooov the guest sees a 503 + clear copy
 // and the RSVP is rolled back to payment_pending without a Stripe session.
 import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
@@ -14,22 +14,22 @@ import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { sendGuestWelcomeEmail } from "@/lib/email/guest";
 import {
-  lodgeScopedGuestPath,
-  lodgeScopedGuestSuccessPath,
-  lodgeScopedVisitorPath,
+  churchScopedGuestPath,
+  churchScopedGuestSuccessPath,
+  churchScopedNewcomerPath,
 } from "@/lib/public-links";
 import { createServiceClient } from "@/lib/supabase/server";
 import { callMooovConnect, MooovApiError } from "@/lib/mooov";
 
 async function loadMooovMerchant(
   supa: ReturnType<typeof createServiceClient>,
-  lodgeId: string,
+  churchId: string,
 ): Promise<string | null> {
   const { data, error } = await supa
     .schema("mooov")
-    .from("lodges")
+    .from("churches")
     .select("merchant_id, status")
-    .eq("id", lodgeId)
+    .eq("id", churchId)
     .maybeSingle<{ merchant_id: string; status: string }>();
   if (error) throw error;
   if (!data) return null;
@@ -62,15 +62,15 @@ export async function POST(
     const fullName = String(body.full_name ?? "").trim();
     const email = String(body.email ?? "").trim() || null;
     const phone = String(body.phone ?? "").trim() || null;
-    const motherLodgeName = String(body.mother_lodge_name ?? "").trim() || null;
-    const motherLodgeNumber = String(body.mother_lodge_number ?? "").trim() || null;
+    const motherChurchName = String(body.mother_church_name ?? "").trim() || null;
+    const motherChurchNumber = String(body.mother_church_number ?? "").trim() || null;
     const constitution = String(body.constitution ?? "").trim() || null;
     const rank = String(body.rank ?? "").trim() || null;
     const partnerName = String(body.partner_name ?? "").trim() || null;
     const dietary = String(body.dietary_requirements ?? "").trim() || null;
     const attendingDining = body.attending_dining === true;
     const charityAmount = Math.max(0, Number(body.charity_amount ?? 0) || 0);
-    const meetingFee = Math.max(0, Number(body.meeting_fee ?? 0) || 0);
+    const serviceFee = Math.max(0, Number(body.service_fee ?? 0) || 0);
     const diningTotal = Math.max(0, Number(body.dining_total ?? 0) || 0);
 
     if (!fullName) {
@@ -90,15 +90,15 @@ export async function POST(
         fullName,
         email,
         phone,
-        motherLodgeName,
-        motherLodgeNumber,
+        motherChurchName,
+        motherChurchNumber,
         constitution,
         rank,
         partnerName,
         dietary,
         attendingDining,
         charityAmount,
-        meetingFee,
+        serviceFee,
         diningTotal,
       });
     }
@@ -117,7 +117,7 @@ export async function POST(
       dietary,
       attendingDining,
       charityAmount,
-      meetingFee,
+      serviceFee,
       diningTotal,
     });
   } catch (error) {
@@ -136,15 +136,15 @@ type DbArgs = {
   fullName: string;
   email: string | null;
   phone: string | null;
-  motherLodgeName: string | null;
-  motherLodgeNumber: string | null;
+  motherChurchName: string | null;
+  motherChurchNumber: string | null;
   constitution: string | null;
   rank: string | null;
   partnerName: string | null;
   dietary: string | null;
   attendingDining: boolean;
   charityAmount: number;
-  meetingFee: number;
+  serviceFee: number;
   diningTotal: number;
 };
 
@@ -163,7 +163,7 @@ async function handleDb(args: DbArgs) {
     return NextResponse.json({ error: "This invitation has reached its limit." }, { status: 410 });
   }
 
-  const event = await db.getEventById(invitation.event_id, invitation.lodge_id);
+  const event = await db.getEventById(invitation.event_id, invitation.church_id);
   if (!event) {
     return NextResponse.json({ error: "Event no longer available." }, { status: 404 });
   }
@@ -171,11 +171,11 @@ async function handleDb(args: DbArgs) {
     return NextResponse.json({ error: "Guests are not accepted for this event." }, { status: 403 });
   }
 
-  const lodge = await db.getLodgeById(invitation.lodge_id);
+  const church = await db.getChurchById(invitation.church_id);
 
   const payerIsGuest = invitation.payer === "guest";
   // Server-side safety: when the event is flagged "dining waived for all"
-  // (lodge is covering dining), force the dining total to zero even if the
+  // (church is covering dining), force the dining total to zero even if the
   // client posted a non-zero amount. Per-guest event overrides are applied
   // for honorary guests in the recipients panel; the one-off guest at this
   // checkout point does not yet have a stable guest_id so we honour only
@@ -183,44 +183,44 @@ async function handleDb(args: DbArgs) {
   const effectiveDining =
     event.dining_waived_for_all === true ? 0 : args.diningTotal;
   const total = payerIsGuest
-    ? args.meetingFee + effectiveDining + args.charityAmount
+    ? args.serviceFee + effectiveDining + args.charityAmount
     : args.charityAmount;
 
-  const guestRecord = await db.upsertGuest(invitation.lodge_id, {
+  const guestRecord = await db.upsertGuest(invitation.church_id, {
     full_name: args.fullName,
     email: args.email,
     phone: args.phone,
-    mother_lodge_name: args.motherLodgeName,
-    mother_lodge_number: args.motherLodgeNumber,
+    mother_church_name: args.motherChurchName,
+    mother_church_number: args.motherChurchNumber,
     constitution: args.constitution,
     rank: args.rank,
     dietary_requirements: args.dietary,
-    is_mason: event.guest_policy === "blue_table",
+    is_member: event.guest_policy === "blue_table",
     event_id: event.id,
     source: invitation.inviter_member_id ? "member_invite" : "self_invite_event",
   });
 
-  let visitorPortalUrl: string | null = null;
-  if (!guestRecord.visitor_token_hash) {
-    const { generateVisitorToken, hashVisitorToken } = await import(
+  let newcomerPortalUrl: string | null = null;
+  if (!guestRecord.newcomer_token_hash) {
+    const { generateNewcomerToken, hashNewcomerToken } = await import(
       "@/lib/guest-tokens"
     );
-    const visitorToken = generateVisitorToken();
-    await db.setGuestVisitorTokenHash(
+    const newcomerToken = generateNewcomerToken();
+    await db.setGuestNewcomerTokenHash(
       guestRecord.id,
-      invitation.lodge_id,
-      hashVisitorToken(visitorToken)
+      invitation.church_id,
+      hashNewcomerToken(newcomerToken)
     );
     const origin = (
       process.env.NEXT_PUBLIC_SITE_URL ?? args.request.nextUrl.origin
     ).replace(/\/$/, "");
-    visitorPortalUrl = `${origin}${lodgeScopedVisitorPath(
-      lodge?.slug ?? "lodge",
-      visitorToken
+    newcomerPortalUrl = `${origin}${churchScopedNewcomerPath(
+      church?.slug ?? "church",
+      newcomerToken
     )}`;
   }
 
-  const rsvp = await db.addRsvp(invitation.lodge_id, {
+  const rsvp = await db.addRsvp(invitation.church_id, {
     event_id: event.id,
     user_name: args.fullName,
     user_email: args.email ?? "",
@@ -236,7 +236,7 @@ async function handleDb(args: DbArgs) {
     status: total > 0 ? "payment_pending" : "confirmed",
   });
 
-  await db.addEventGuests(invitation.lodge_id, [
+  await db.addEventGuests(invitation.church_id, [
     {
       rsvp_id: rsvp.id,
       event_id: event.id,
@@ -252,7 +252,7 @@ async function handleDb(args: DbArgs) {
   ]);
 
   if (args.partnerName) {
-    await db.addEventGuests(invitation.lodge_id, [
+    await db.addEventGuests(invitation.church_id, [
       {
         rsvp_id: rsvp.id,
         event_id: event.id,
@@ -275,13 +275,13 @@ async function handleDb(args: DbArgs) {
       await sendGuestWelcomeEmail({
         toEmail: args.email,
         toName: args.fullName,
-        lodgeName: lodge?.name ?? "the lodge",
+        churchName: church?.name ?? "the church",
         eventTitle: event.title,
         eventDate: event.event_date,
         eventTime: event.event_time,
         location: event.location,
         dressCode: event.dress_code,
-        visitorPortalUrl,
+        newcomerPortalUrl,
       }).catch((err) => console.error("Guest welcome email failed:", err));
     }
     return NextResponse.json({ ok: true, rsvp_id: rsvp.id });
@@ -295,34 +295,34 @@ async function handleDb(args: DbArgs) {
       message: err instanceof Error ? err.message : String(err),
     });
     return NextResponse.json(
-      { error: "Payments are not configured for this lodge." },
+      { error: "Payments are not configured for this church." },
       { status: 503 }
     );
   }
 
   let merchantId: string | null;
   try {
-    merchantId = await loadMooovMerchant(supa, invitation.lodge_id);
+    merchantId = await loadMooovMerchant(supa, invitation.church_id);
   } catch (err) {
     console.error("guest checkout: mooov merchant lookup failed", {
-      lodge_id: invitation.lodge_id,
+      church_id: invitation.church_id,
       message: err instanceof Error ? err.message : String(err),
     });
     return NextResponse.json(
-      { error: "Could not look up payment processor for this lodge." },
+      { error: "Could not look up payment processor for this church." },
       { status: 500 }
     );
   }
   if (!merchantId) {
-    // The lodge has not finished Mooov Connect. The RSVP was already
+    // The church has not finished Mooov Connect. The RSVP was already
     // persisted above with status='payment_pending'; we surface a 503 so
     // the public guest page can render a clear message and an admin can
     // complete onboarding before re-sharing the invite link.
     return NextResponse.json(
       {
         error:
-          "This lodge has not finished setting up online payments yet. Please contact the lodge directly.",
-        code: "lodge_not_connected",
+          "This church has not finished setting up online payments yet. Please contact the church directly.",
+        code: "church_not_connected",
       },
       { status: 503 }
     );
@@ -330,27 +330,27 @@ async function handleDb(args: DbArgs) {
 
   const siteUrl = siteUrlFor(args.request);
   // Mooov takes amount in minor units (pence). Aggregate the line items
-  // (meeting_fee + dining + charity) into a single total -- Mooov's
+  // (service_fee + dining + charity) into a single total -- Mooov's
   // hosted Stripe Checkout shows the description we pass plus the total.
   // We keep the split on payment_attempts.guest_descriptor so the Mooov
   // webhook handler can write the LP `payments` row with the same
   // breakdown the legacy Stripe webhook used to (dining_amount /
-  // meeting_fee_amount / charity_amount on public.payments).
+  // service_fee_amount / charity_amount on public.payments).
   const totalMinor = Math.round(
-    (args.meetingFee + effectiveDining + args.charityAmount) * 100
+    (args.serviceFee + effectiveDining + args.charityAmount) * 100
   );
   const currency = "GBP";
-  const paymentId = `evt_${invitation.lodge_id}_${rsvp.id}_${Date.now().toString(36)}`;
+  const paymentId = `evt_${invitation.church_id}_${rsvp.id}_${Date.now().toString(36)}`;
   const idempotencyKey = `evt_rsvp_${rsvp.id}_${Date.now().toString(36)}`;
   const description = event.title
     ? `${event.title}${args.fullName ? ` -- ${args.fullName}` : ""}`
     : "Event booking";
-  const lodgeSlug = lodge?.slug ?? "lodge";
-  const successUrl = `${siteUrl}${lodgeScopedGuestSuccessPath(
-    lodgeSlug,
+  const churchSlug = church?.slug ?? "church";
+  const successUrl = `${siteUrl}${churchScopedGuestSuccessPath(
+    churchSlug,
     args.token
   )}`;
-  const cancelUrl = `${siteUrl}${lodgeScopedGuestPath(lodgeSlug, args.token)}`;
+  const cancelUrl = `${siteUrl}${churchScopedGuestPath(churchSlug, args.token)}`;
 
   // guest_descriptor carries everything the Mooov webhook handler needs to
   // project this charge into LP-side rows when payment.captured arrives.
@@ -361,20 +361,20 @@ async function handleDb(args: DbArgs) {
     event_id: event.id,
     guest_id: guestRecord.id,
     guest_invitation_id: invitation.id,
-    lodge_slug: lodgeSlug,
+    church_slug: churchSlug,
     donor_email: args.email,
     donor_name: args.fullName,
     dining_total: effectiveDining,
-    meeting_fee: args.meetingFee,
+    service_fee: args.serviceFee,
     charity_amount: args.charityAmount,
     guest_total: 0,
     raffle_amount: 0,
     standalone: false,
   };
   const initialMetadata: Record<string, unknown> = {
-    source: "lodgepay_guest_checkout",
-    lodge_slug: lodgeSlug,
-    lodge_id: invitation.lodge_id,
+    source: "churchpay_guest_checkout",
+    church_slug: churchSlug,
+    church_id: invitation.church_id,
     intent: "event",
     rsvp_id: rsvp.id,
     event_id: event.id,
@@ -384,7 +384,7 @@ async function handleDb(args: DbArgs) {
     .from("payment_attempts")
     .insert({
       payment_id: paymentId,
-      lodge_id: invitation.lodge_id,
+      church_id: invitation.church_id,
       member_id: null,
       amount: totalMinor,
       currency,
@@ -396,7 +396,7 @@ async function handleDb(args: DbArgs) {
     });
   if (insertError) {
     console.error("guest checkout: preflight insert failed", {
-      lodge_id: invitation.lodge_id,
+      church_id: invitation.church_id,
       payment_id: paymentId,
       code: insertError.code,
       message: insertError.message,
@@ -431,8 +431,8 @@ async function handleDb(args: DbArgs) {
         customer_email: args.email ?? undefined,
         metadata: {
           intent: "event",
-          lodge_id: invitation.lodge_id,
-          lodge_slug: lodgeSlug,
+          church_id: invitation.church_id,
+          church_slug: churchSlug,
           rsvp_id: rsvp.id,
           event_id: event.id,
         },
@@ -492,8 +492,8 @@ async function handleDb(args: DbArgs) {
         return NextResponse.json(
           {
             error:
-              "This lodge has not finished setting up online payments yet. Please contact the lodge directly.",
-            code: "lodge_setup_incomplete",
+              "This church has not finished setting up online payments yet. Please contact the church directly.",
+            code: "church_setup_incomplete",
             setup_url: err.setupHint.setupUrl,
           },
           { status: 503 }
@@ -527,7 +527,7 @@ type MockArgs = {
   dietary: string | null;
   attendingDining: boolean;
   charityAmount: number;
-  meetingFee: number;
+  serviceFee: number;
   diningTotal: number;
 };
 
@@ -544,7 +544,7 @@ async function handleMock(args: MockArgs) {
   }
 
   const event = mockDb.getEventById(invitation.event_id, {
-    lodge_slug: invitation.lodge_slug,
+    church_slug: invitation.church_slug,
   });
   if (!event) {
     return NextResponse.json({ error: "Event no longer available." }, { status: 404 });
@@ -558,15 +558,15 @@ async function handleMock(args: MockArgs) {
     email: args.email,
     phone: args.phone,
     dietary_requirements: args.dietary,
-    is_mason: event.guest_policy === "blue_table",
+    is_member: event.guest_policy === "blue_table",
     event_id: event.id,
     source: invitation.inviter_member_id ? "member_invite" : "self_invite_event",
-    lodge_slug: invitation.lodge_slug,
+    church_slug: invitation.church_slug,
   });
 
   const total =
     invitation.payer === "guest"
-      ? args.meetingFee + args.diningTotal + args.charityAmount
+      ? args.serviceFee + args.diningTotal + args.charityAmount
       : args.charityAmount;
 
   const rsvp = mockDb.addRsvp({
@@ -583,7 +583,7 @@ async function handleMock(args: MockArgs) {
     payment_completed: total === 0,
     payment_id: null,
     status: total > 0 ? "payment_pending" : "confirmed",
-    lodge_slug: invitation.lodge_slug,
+    church_slug: invitation.church_slug,
   });
 
   mockDb.addEventGuests(
@@ -600,7 +600,7 @@ async function handleMock(args: MockArgs) {
         source: invitation.inviter_member_id ? "member_party" : "self_invite",
       },
     ],
-    invitation.lodge_slug
+    invitation.church_slug
   );
   if (args.partnerName) {
     mockDb.addEventGuests(
@@ -617,7 +617,7 @@ async function handleMock(args: MockArgs) {
           source: invitation.inviter_member_id ? "member_party" : "self_invite",
         },
       ],
-      invitation.lodge_slug
+      invitation.church_slug
     );
   }
   mockDb.recordGuestInvitationUse(invitation.id);

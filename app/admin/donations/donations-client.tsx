@@ -38,7 +38,7 @@ import {
   Check,
   ExternalLink,
 } from "lucide-react";
-import { DEFAULT_LODGE_SLUG } from "@/lib/tenant";
+import { DEFAULT_CHURCH_SLUG } from "@/lib/tenant";
 
 type Donation = {
   id: string;
@@ -93,12 +93,12 @@ function donationStatusBadge(status: string) {
 export function AdminDonationsClient({
   donations,
   giftAidDeclarations,
-  lodgeSlug,
+  churchSlug,
   paymentsConnected,
 }: {
   donations: Donation[];
   giftAidDeclarations: GiftAidDeclaration[];
-  lodgeSlug: string;
+  churchSlug: string;
   paymentsConnected: boolean;
 }) {
   const [sourceFilter, setSourceFilter] = useState("all");
@@ -108,19 +108,19 @@ export function AdminDonationsClient({
   const [linkCopied, setLinkCopied] = useState(false);
 
   useEffect(() => {
-    // Always include ?lodge=<slug> -- even when the lodge happens to be the
+    // Always include ?church=<slug> -- even when the church happens to be the
     // platform default. This makes the donation URL explicit (donors and the
-    // PublicHeader can see exactly which lodge it routes to), survives any
-    // future change to DEFAULT_LODGE_SLUG, and ensures the public /donate
-    // page renders this lodge's branding (PublicHeader auto-switches into
-    // tenant mode whenever ?lodge= is present). Without the param the donor
-    // would see the platform's generic "LodgePay" header instead of the
-    // lodge's name + logo.
-    const slug = lodgeSlug || DEFAULT_LODGE_SLUG;
+    // PublicHeader can see exactly which church it routes to), survives any
+    // future change to DEFAULT_CHURCH_SLUG, and ensures the public /donate
+    // page renders this church's branding (PublicHeader auto-switches into
+    // tenant mode whenever ?church= is present). Without the param the donor
+    // would see the platform's generic "ChurchPay" header instead of the
+    // church's name + logo.
+    const slug = churchSlug || DEFAULT_CHURCH_SLUG;
     setDonationUrl(
-      `${window.location.origin}/donate?lodge=${encodeURIComponent(slug)}`
+      `${window.location.origin}/donate?church=${encodeURIComponent(slug)}`
     );
-  }, [lodgeSlug]);
+  }, [churchSlug]);
 
   async function copyDonationLink() {
     if (!donationUrl) return;
@@ -303,7 +303,7 @@ export function AdminDonationsClient({
             <div>
               <h2 className="dash-panel-header-title">Donation link</h2>
               <p className="dash-panel-header-description">
-                Share this page with donors. Payments route to your lodge&rsquo;s
+                Share this page with donors. Payments route to your church&rsquo;s
                 connected payment account.
               </p>
             </div>
@@ -317,7 +317,7 @@ export function AdminDonationsClient({
                 <p className="font-medium">Connect payments to accept donations.</p>
                 <p className="mt-0.5 text-xs text-amber-800">
                   Donors who follow this link won&rsquo;t be able to complete a
-                  donation until this lodge connects Mooov in Integrations.
+                  donation until this church connects Mooov in Integrations.
                 </p>
               </div>
               <Button asChild size="sm" variant="outline" className="shrink-0">

@@ -10,7 +10,7 @@ import { Banknote } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-// Point this route at its own PWA manifest so admins can install "LodgePay
+// Point this route at its own PWA manifest so admins can install "ChurchPay
 // POS" as a standalone app from /admin/take-payment without it being
 // confused with the member portal manifest (which scopes to /member).
 export const metadata: Metadata = {
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "LodgePay POS",
+    title: "ChurchPay POS",
   },
 };
 
@@ -51,13 +51,13 @@ function buildReturnPath(params: SearchParams): string {
   return `${RETURN_PATH}?${search}`;
 }
 
-async function getMooovConnection(lodgeId: string) {
+async function getMooovConnection(churchId: string) {
   try {
     const { data } = await createServiceClient()
       .schema("mooov")
-      .from("lodges")
+      .from("churches")
       .select("merchant_id,status")
-      .eq("id", lodgeId)
+      .eq("id", churchId)
       .maybeSingle<{ merchant_id: string; status: string }>();
     return data;
   } catch {
@@ -65,13 +65,13 @@ async function getMooovConnection(lodgeId: string) {
   }
 }
 
-async function getLodgeMembers(lodgeId: string) {
+async function getChurchMembers(churchId: string) {
   // Light-weight list for the in-form picker. We deliberately fetch all
-  // active members in one go (lodges are small — typically <100 members) so
+  // active members in one go (churches are small — typically <100 members) so
   // the client can run the filter locally without a debounced API round-trip
-  // mid-meeting on flaky venue Wi-Fi.
+  // mid-service on flaky venue Wi-Fi.
   try {
-    const members = await db.getMembers(lodgeId, { status: "active" });
+    const members = await db.getMembers(churchId, { status: "active" });
     return members.map((m) => ({
       id: m.id,
       full_name: m.full_name,
@@ -83,17 +83,17 @@ async function getLodgeMembers(lodgeId: string) {
 }
 
 /**
- * Events for the optional "Link to meeting" picker on the take-payment
- * form. We include every upcoming meeting (no forward horizon — secretaries
- * routinely schedule installations 6-12 months out) plus a 90-day back-tail
+ * Events for the optional "Link to service" picker on the take-payment
+ * form. We include every upcoming service (no forward horizon — secretaries
+ * routinely schedule special_services 6-12 months out) plus a 90-day back-tail
  * for treasurers reconciling cash a few weeks after the night, then cap to
  * the 20 closest entries to "now" so the dropdown stays scannable on a
- * phone. Older meetings can still be attached retroactively from the
+ * phone. Older services can still be attached retroactively from the
  * payment detail page.
  */
-async function getLodgeEventsForPicker(lodgeId: string) {
+async function getChurchEventsForPicker(churchId: string) {
   try {
-    const events = await db.getEvents(lodgeId);
+    const events = await db.getEvents(churchId);
     const now = Date.now();
     const horizonBackMs = 90 * 24 * 60 * 60 * 1000;
     return events
@@ -105,7 +105,7 @@ async function getLodgeEventsForPicker(lodgeId: string) {
       })
       .sort((a, b) => {
         // Prefer the closest event to "now" first so the next upcoming
-        // meeting tops the list, and recent past meetings follow.
+        // service tops the list, and recent past services follow.
         const aDist = Math.abs(new Date(a.event_date).getTime() - now);
         const bDist = Math.abs(new Date(b.event_date).getTime() - now);
         return aDist - bDist;
@@ -126,7 +126,7 @@ export default async function TakePaymentPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  // Custom auth gate so an unauthenticated visitor lands BACK here after
+  // Custom auth gate so an unauthenticated newcomer lands BACK here after
   // logging in. The shared getAdminReadContext redirects to /admin/login
   // without a return URL, which is fine for nav-tab landings but defeats
   // the "bookmark this page on your phone home screen" use case the take-
@@ -139,7 +139,7 @@ export default async function TakePaymentPage({
   }
 
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.lodgeId) {
+  if (ctx.mode !== "database" || !ctx.churchId) {
     return (
       <div className="space-y-4 sm:space-y-6">
         <div className="admin-page-head">
@@ -153,17 +153,17 @@ export default async function TakePaymentPage({
         </div>
         <EmptyState
           icon={Banknote}
-          title="Take payment needs a live lodge"
-          description="Connect Supabase and choose a lodge to use the in-person QR flow. Demo mode does not mint live payment sessions."
+          title="Take payment needs a live church"
+          description="Connect Supabase and choose a church to use the in-person QR flow. Demo mode does not mint live payment sessions."
         />
       </div>
     );
   }
 
   const [connection, members, events] = await Promise.all([
-    getMooovConnection(ctx.lodgeId),
-    getLodgeMembers(ctx.lodgeId),
-    getLodgeEventsForPicker(ctx.lodgeId),
+    getMooovConnection(ctx.churchId),
+    getChurchMembers(ctx.churchId),
+    getChurchEventsForPicker(ctx.churchId),
   ]);
   const connected = !!connection && connection.status === "active";
 
@@ -173,6 +173,7 @@ export default async function TakePaymentPage({
       mooovStatus={connection?.status ?? null}
       members={members}
       events={events}
+      churchSlug={ctx.churchSlug ?? null}
     />
   );
 }

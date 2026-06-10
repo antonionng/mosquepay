@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
 } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
-import { generateSequenceDates } from "@/lib/meetings/sequences";
+import { generateSequenceDates } from "@/lib/services/sequences";
 import type { Event } from "@/lib/db/types";
 
 type Params = { params: Promise<{ id: string }> };
@@ -59,15 +59,15 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   try {
     const { id } = await params;
-    const lodgeSlug = getLodgeSlugFromRequest(request);
-    const lodgeId = await db.resolveLodgeId(lodgeSlug);
-    if (!lodgeId) {
-      return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+    const churchSlug = getChurchSlugFromRequest(request);
+    const churchId = await db.resolveChurchId(churchSlug);
+    if (!churchId) {
+      return NextResponse.json({ error: "Church not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("meetings:write", lodgeId);
+    const forbidden = await requireAdminApiPermission("services:write", churchId);
     if (forbidden) return forbidden;
 
-    const sequence = await db.getMeetingSequenceById(id, lodgeId);
+    const sequence = await db.getServiceSequenceById(id, churchId);
     if (!sequence) {
       return NextResponse.json(
         { error: "Sequence not found." },
@@ -98,9 +98,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ created: [], skipped: [] });
     }
 
-    const existingEvents = await db.getEvents(lodgeId);
+    const existingEvents = await db.getEvents(churchId);
     const existingSlugs = new Set(existingEvents.map((event) => event.slug));
-    const existingForSequence = await db.getEventsBySequenceId(id, lodgeId);
+    const existingForSequence = await db.getEventsBySequenceId(id, churchId);
     const datesAlreadyTaken = new Set(
       existingForSequence.map((event) => event.event_date.slice(0, 10))
     );
@@ -108,29 +108,29 @@ export async function POST(request: NextRequest, { params }: Params) {
     const created: Array<Pick<Event, "id" | "slug" | "event_date">> = [];
     const skipped: Array<{ date: string; reason: string }> = [];
 
-    for (const candidate of dates) {
-      if (datesAlreadyTaken.has(candidate.date)) {
+    for (const newcomer of dates) {
+      if (datesAlreadyTaken.has(newcomer.date)) {
         skipped.push({
-          date: candidate.date,
+          date: newcomer.date,
           reason: "Already generated for this date.",
         });
         continue;
       }
 
       const slug = ensureUniqueSlug(
-        buildSlug(sequence.name, candidate.year, candidate.month),
+        buildSlug(sequence.name, newcomer.year, newcomer.month),
         existingSlugs
       );
       existingSlugs.add(slug);
 
-      const event = await db.addEvent(lodgeId, {
-        title: `${sequence.name} (${MONTH_SHORT[candidate.month]?.toUpperCase() ?? candidate.month} ${candidate.year})`,
+      const event = await db.addEvent(churchId, {
+        title: `${sequence.name} (${MONTH_SHORT[newcomer.month]?.toUpperCase() ?? newcomer.month} ${newcomer.year})`,
         slug,
         description: sequence.description,
         event_type: sequence.event_type,
-        event_date: candidate.iso,
+        event_date: newcomer.iso,
         event_time: sequence.default_event_time,
-        location: sequence.default_location ?? "Mark Masons' Hall",
+        location: sequence.default_location ?? "Mark members' Hall",
         temple_room: sequence.default_temple_room,
         dress_code: sequence.default_dress_code,
         enable_rsvp: true,
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         max_attendees: null,
         enable_payments:
           sequence.default_enable_dining_rsvp ||
-          sequence.default_enable_meeting_fee ||
+          sequence.default_enable_service_fee ||
           sequence.default_enable_raffle_donation,
         enable_dining_rsvp: sequence.default_enable_dining_rsvp,
         dining_price: sequence.default_dining_price,
@@ -156,9 +156,9 @@ export async function POST(request: NextRequest, { params }: Params) {
         raffle_allow_custom: sequence.default_enable_raffle_donation,
         enable_raffle_wine_pledge: sequence.default_enable_raffle_wine_pledge,
         raffle_wine_description: sequence.default_raffle_wine_description,
-        enable_meeting_fee: sequence.default_enable_meeting_fee,
-        meeting_fee_amount: sequence.default_meeting_fee_amount,
-        meeting_fee_description: null,
+        enable_service_fee: sequence.default_enable_service_fee,
+        service_fee_amount: sequence.default_service_fee_amount,
+        service_fee_description: null,
         enable_guest_tickets: false,
         guest_ticket_price: null,
         guest_ticket_description: null,
@@ -168,23 +168,23 @@ export async function POST(request: NextRequest, { params }: Params) {
         published: false,
         feature_on_website: false,
         sequence_id: sequence.id,
-        sequence_position: candidate.position,
-        summons_status: "none",
-        summons_auto_drafted_at: null,
-        summons_approved_at: null,
-        summons_approved_by_email: null,
-        summons_last_sent_at: null,
+        sequence_position: newcomer.position,
+        notice_status: "none",
+        notice_auto_drafted_at: null,
+        notice_approved_at: null,
+        notice_approved_by_email: null,
+        notice_last_sent_at: null,
       });
 
       created.push({ id: event.id, slug: event.slug, event_date: event.event_date });
     }
 
     await writeAuditLog({
-      lodgeId,
+      churchId,
       action: "generated",
-      entityType: "meeting_sequence",
+      entityType: "service_sequence",
       entityId: sequence.id,
-      summary: `Generated ${created.length} meeting${created.length === 1 ? "" : "s"} from sequence ${sequence.name}`,
+      summary: `Generated ${created.length} service${created.length === 1 ? "" : "s"} from sequence ${sequence.name}`,
       metadata: { created: created.length, skipped: skipped.length },
     });
 
@@ -192,7 +192,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   } catch (error) {
     console.error("Sequence generate error:", error);
     return NextResponse.json(
-      { error: "Failed to generate meetings." },
+      { error: "Failed to generate services." },
       { status: 500 }
     );
   }

@@ -1,50 +1,50 @@
 import type {
   Member,
-  Lead,
+  Newcomer,
   Event,
   Rsvp,
   Payment,
   Donation,
   GiftAidDeclaration,
   CharityCampaign,
-  MemberDues,
-  Lodge,
-  EventSummonsSend,
-  MeetingCollection,
+  MemberGiving,
+  Church,
+  ServiceNoticeSend,
+  ServiceCollection,
 } from "@/lib/db/types";
 
 export type SecretaryReport = {
-  totalMeetings: number;
-  upcomingMeetings: number;
-  publishedMeetings: number;
-  meetingsWithSummons: number;
-  totalSummonsSends: number;
+  totalServices: number;
+  upcomingServices: number;
+  publishedServices: number;
+  servicesWithNotice: number;
+  totalNoticeSends: number;
   totalRsvps: number;
   attendingCeremony: number;
   attendingDining: number;
   apologies: number;
   membersMissingAddress: number;
   membersMissingDietary: number;
-  meetingTable: Array<{
+  serviceTable: Array<{
     id: string;
     title: string;
     date: string;
     rsvpCount: number;
     diningCount: number;
     ceremonyCount: number;
-    summonsSent: number;
+    noticeSent: number;
     published: boolean;
   }>;
 };
 
-export type DuesPaymentMethodBreakdown = {
+export type GivingPaymentMethodBreakdown = {
   online_subscription: number;
   bacs: number;
   paid_in_full: number;
   fee_waived: number;
   unset: number;
   bacs_monthly_total: number;
-  /** Sum of `amount` of dues rows in each bucket (paid status not
+  /** Sum of `amount` of giving rows in each bucket (paid status not
    *  considered — this is *expected* income by method).  */
   bacs_annual_expected: number;
   paid_in_full_total: number;
@@ -56,22 +56,22 @@ export type DuesPaymentMethodBreakdown = {
 export type TreasurerReport = {
   totalPaid: number;
   totalRefunded: number;
-  unpaidDuesTotal: number;
-  paidDuesTotal: number;
+  unpaidGivingTotal: number;
+  paidGivingTotal: number;
   diningIncome: number;
-  meetingFees: number;
+  serviceFees: number;
   guestTickets: number;
   charityFromPayments: number;
-  duesGiftAidEligible: number;
-  duesGiftAidReclaimable: number;
-  duesPaymentMethodBreakdown: DuesPaymentMethodBreakdown;
-  outstandingDues: Array<{
+  givingGiftAidEligible: number;
+  givingGiftAidReclaimable: number;
+  givingPaymentMethodBreakdown: GivingPaymentMethodBreakdown;
+  outstandingGiving: Array<{
     member_email: string;
     member_name: string | null;
     amount: number;
     period_end: string;
     status: string;
-    dues_payment_method:
+    giving_payment_method:
       | "online_subscription"
       | "bacs"
       | "paid_in_full"
@@ -115,7 +115,7 @@ export type CharityReport = {
     donations: number;
     giftAid: boolean;
   }>;
-  meetingCollections: Array<{
+  serviceCollections: Array<{
     eventId: string;
     eventTitle: string;
     total: number;
@@ -124,10 +124,10 @@ export type CharityReport = {
 };
 
 export type RecruitmentReport = {
-  totalLeads: number;
+  totalNewcomers: number;
   newThisMonth: number;
   conversionRate: number;
-  staleLeads: number;
+  staleNewcomers: number;
   bySource: Array<{ source: string; count: number; converted: number }>;
   byStage: Array<{ stage: string; count: number; avgAgeDays: number }>;
   staleList: Array<{
@@ -140,16 +140,16 @@ export type RecruitmentReport = {
 };
 
 export type OperatorReport = {
-  totalLodges: number;
-  activeLodges: number;
-  inactiveLodges: number;
-  lodgeRows: Array<{
+  totalChurches: number;
+  activeChurches: number;
+  inactiveChurches: number;
+  churchRows: Array<{
     id: string;
     name: string;
     slug: string;
     healthScore: number;
     members: number;
-    upcomingMeetings: number;
+    upcomingServices: number;
     paymentsLast30: number;
     risk: "ok" | "watch" | "at-risk";
   }>;
@@ -159,24 +159,24 @@ export function buildSecretaryReport({
   events,
   rsvpsByEvent,
   members,
-  summonsSendsByEvent,
-  hasSummonsByEvent,
+  noticeSendsByEvent,
+  hasNoticeByEvent,
 }: {
   events: Event[];
   rsvpsByEvent: Map<string, Rsvp[]>;
   members: Member[];
-  summonsSendsByEvent: Map<string, EventSummonsSend[]>;
-  hasSummonsByEvent: Set<string>;
+  noticeSendsByEvent: Map<string, ServiceNoticeSend[]>;
+  hasNoticeByEvent: Set<string>;
 }): SecretaryReport {
   const now = new Date();
   const allRsvps = events.flatMap((e) => rsvpsByEvent.get(e.id) ?? []);
   return {
-    totalMeetings: events.length,
-    upcomingMeetings: events.filter((e) => new Date(e.event_date) >= now).length,
-    publishedMeetings: events.filter((e) => e.published).length,
-    meetingsWithSummons: events.filter((e) => hasSummonsByEvent.has(e.id)).length,
-    totalSummonsSends: events.reduce(
-      (s, e) => s + (summonsSendsByEvent.get(e.id)?.length ?? 0),
+    totalServices: events.length,
+    upcomingServices: events.filter((e) => new Date(e.event_date) >= now).length,
+    publishedServices: events.filter((e) => e.published).length,
+    servicesWithNotice: events.filter((e) => hasNoticeByEvent.has(e.id)).length,
+    totalNoticeSends: events.reduce(
+      (s, e) => s + (noticeSendsByEvent.get(e.id)?.length ?? 0),
       0
     ),
     totalRsvps: allRsvps.length,
@@ -185,7 +185,7 @@ export function buildSecretaryReport({
     apologies: allRsvps.filter((r) => !r.attending_ceremony).length,
     membersMissingAddress: members.filter((m) => !m.address_line_1).length,
     membersMissingDietary: members.filter((m) => !m.dietary_requirements).length,
-    meetingTable: events
+    serviceTable: events
       .slice()
       .sort(
         (a, b) =>
@@ -201,7 +201,7 @@ export function buildSecretaryReport({
           rsvpCount: rsvps.length,
           diningCount: rsvps.filter((r) => r.attending_dining).length,
           ceremonyCount: rsvps.filter((r) => r.attending_ceremony).length,
-          summonsSent: summonsSendsByEvent.get(e.id)?.length ?? 0,
+          noticeSent: noticeSendsByEvent.get(e.id)?.length ?? 0,
           published: e.published,
         };
       }),
@@ -221,10 +221,10 @@ export function isSuccessfulPaymentStatus(status: string): boolean {
 
 export function buildTreasurerReport({
   payments,
-  memberDues,
+  memberGiving,
 }: {
   payments: Payment[];
-  memberDues: MemberDues[];
+  memberGiving: MemberGiving[];
 }): TreasurerReport {
   const completed = payments.filter((p) => isSuccessfulPaymentStatus(p.status));
   const totalPaid = completed.reduce((s, p) => s + p.total_amount, 0);
@@ -232,24 +232,24 @@ export function buildTreasurerReport({
   return {
     totalPaid,
     totalRefunded,
-    unpaidDuesTotal: memberDues
+    unpaidGivingTotal: memberGiving
       .filter((d) => d.status !== "paid" && d.status !== "waived")
       .reduce((s, d) => s + d.amount, 0),
-    paidDuesTotal: memberDues
+    paidGivingTotal: memberGiving
       .filter((d) => d.status === "paid")
       .reduce((s, d) => s + d.amount, 0),
     diningIncome: completed.reduce((s, p) => s + p.dining_amount, 0),
-    meetingFees: completed.reduce((s, p) => s + p.meeting_fee_amount, 0),
+    serviceFees: completed.reduce((s, p) => s + p.service_fee_amount, 0),
     guestTickets: completed.reduce((s, p) => s + p.guest_ticket_amount, 0),
     charityFromPayments: completed.reduce((s, p) => s + p.charity_amount, 0),
-    duesGiftAidEligible: memberDues
+    givingGiftAidEligible: memberGiving
       .filter((d) => d.status === "paid" && d.gift_aid_status === "declared")
       .reduce((s, d) => s + d.gift_aid_eligible_amount, 0),
-    duesGiftAidReclaimable: memberDues
+    givingGiftAidReclaimable: memberGiving
       .filter((d) => d.status === "paid" && d.gift_aid_status === "declared")
       .reduce((s, d) => s + d.gift_aid_eligible_amount * 0.25, 0),
-    duesPaymentMethodBreakdown: (() => {
-      const acc: DuesPaymentMethodBreakdown = {
+    givingPaymentMethodBreakdown: (() => {
+      const acc: GivingPaymentMethodBreakdown = {
         online_subscription: 0,
         bacs: 0,
         paid_in_full: 0,
@@ -262,10 +262,10 @@ export function buildTreasurerReport({
         online_subscription_expected: 0,
         unset_outstanding_total: 0,
       };
-      for (const d of memberDues) {
+      for (const d of memberGiving) {
         // Skip advances so we don't double-count next-year rows.
         if (d.is_advance) continue;
-        const method = d.dues_payment_method ?? null;
+        const method = d.giving_payment_method ?? null;
         if (method === "online_subscription") {
           acc.online_subscription += 1;
           acc.online_subscription_expected += Number(d.amount) || 0;
@@ -290,7 +290,7 @@ export function buildTreasurerReport({
       }
       return acc;
     })(),
-    outstandingDues: memberDues
+    outstandingGiving: memberGiving
       .filter((d) => d.status !== "paid" && d.status !== "waived")
       .slice(0, 50)
       .map((d) => ({
@@ -299,7 +299,7 @@ export function buildTreasurerReport({
         amount: d.amount,
         period_end: d.period_end,
         status: d.status,
-        dues_payment_method: d.dues_payment_method ?? null,
+        giving_payment_method: d.giving_payment_method ?? null,
         bacs_monthly_amount:
           d.bacs_monthly_amount != null ? Number(d.bacs_monthly_amount) : null,
       })),
@@ -321,13 +321,13 @@ export function buildCharityReport({
   donations,
   giftAid,
   events,
-  meetingCollections = [],
+  serviceCollections = [],
 }: {
   campaigns: CharityCampaign[];
   donations: Donation[];
   giftAid: GiftAidDeclaration[];
   events: Event[];
-  meetingCollections?: MeetingCollection[];
+  serviceCollections?: ServiceCollection[];
 }): CharityReport {
   const eventTitleMap = new Map(events.map((e) => [e.id, e.title] as const));
   const giftAidEmails = new Set(
@@ -367,7 +367,7 @@ export function buildCharityReport({
     (a, b) => b.total - a.total
   );
   const consentGap = donorHistory.filter((d) => !d.giftAid).length;
-  const gasdsEligible = meetingCollections.reduce(
+  const gasdsEligible = serviceCollections.reduce(
     (sum, collection) => sum + collection.gasds_eligible_amount,
     0
   );
@@ -382,7 +382,7 @@ export function buildCharityReport({
       collectionsMap.get(d.event_id) ??
       {
         eventId: d.event_id,
-        eventTitle: eventTitleMap.get(d.event_id) ?? "Meeting",
+        eventTitle: eventTitleMap.get(d.event_id) ?? "Service",
         total: 0,
         count: 0,
       };
@@ -412,24 +412,24 @@ export function buildCharityReport({
       };
     }),
     donorHistory: donorHistory.slice(0, 50),
-    meetingCollections: Array.from(collectionsMap.values()).sort(
+    serviceCollections: Array.from(collectionsMap.values()).sort(
       (a, b) => b.total - a.total
     ),
   };
 }
 
 export function buildRecruitmentReport({
-  leads,
+  newcomers,
 }: {
-  leads: Lead[];
+  newcomers: Newcomer[];
 }): RecruitmentReport {
   const now = Date.now();
   const monthAgo = now - 30 * 24 * 60 * 60 * 1000;
-  const newThisMonth = leads.filter(
+  const newThisMonth = newcomers.filter(
     (l) => new Date(l.created_at).getTime() >= monthAgo
   ).length;
-  const converted = leads.filter((l) => l.converted_member_id).length;
-  const stale = leads.filter((l) => {
+  const converted = newcomers.filter((l) => l.converted_member_id).length;
+  const stale = newcomers.filter((l) => {
     if (l.converted_member_id) return false;
     const updated = new Date(l.updated_at).getTime();
     return now - updated > 30 * 24 * 60 * 60 * 1000;
@@ -439,7 +439,7 @@ export function buildRecruitmentReport({
     string,
     { source: string; count: number; converted: number }
   >();
-  for (const l of leads) {
+  for (const l of newcomers) {
     const src = l.source ?? "unknown";
     const cur = bySourceMap.get(src) ?? { source: src, count: 0, converted: 0 };
     cur.count += 1;
@@ -451,7 +451,7 @@ export function buildRecruitmentReport({
     string,
     { stage: string; count: number; totalAge: number }
   >();
-  for (const l of leads) {
+  for (const l of newcomers) {
     const cur = byStageMap.get(l.stage) ?? {
       stage: l.stage,
       count: 0,
@@ -465,10 +465,10 @@ export function buildRecruitmentReport({
   }
 
   return {
-    totalLeads: leads.length,
+    totalNewcomers: newcomers.length,
     newThisMonth,
-    conversionRate: leads.length === 0 ? 0 : Math.round((converted / leads.length) * 100),
-    staleLeads: stale.length,
+    conversionRate: newcomers.length === 0 ? 0 : Math.round((converted / newcomers.length) * 100),
+    staleNewcomers: stale.length,
     bySource: Array.from(bySourceMap.values()).sort((a, b) => b.count - a.count),
     byStage: Array.from(byStageMap.values()).map((s) => ({
       stage: s.stage,
@@ -488,20 +488,20 @@ export function buildRecruitmentReport({
 }
 
 export function buildOperatorReport({
-  lodges,
-  membersByLodge,
-  upcomingByLodge,
-  paymentsLast30ByLodge,
+  churches,
+  membersByChurch,
+  upcomingByChurch,
+  paymentsLast30ByChurch,
 }: {
-  lodges: Lodge[];
-  membersByLodge: Map<string, number>;
-  upcomingByLodge: Map<string, number>;
-  paymentsLast30ByLodge: Map<string, number>;
+  churches: Church[];
+  membersByChurch: Map<string, number>;
+  upcomingByChurch: Map<string, number>;
+  paymentsLast30ByChurch: Map<string, number>;
 }): OperatorReport {
-  const lodgeRows = lodges.map((l) => {
-    const members = membersByLodge.get(l.id) ?? 0;
-    const upcoming = upcomingByLodge.get(l.id) ?? 0;
-    const payments = paymentsLast30ByLodge.get(l.id) ?? 0;
+  const churchRows = churches.map((l) => {
+    const members = membersByChurch.get(l.id) ?? 0;
+    const upcoming = upcomingByChurch.get(l.id) ?? 0;
+    const payments = paymentsLast30ByChurch.get(l.id) ?? 0;
     let healthScore = 0;
     if (l.is_active) healthScore += 30;
     if (members >= 10) healthScore += 25;
@@ -518,16 +518,16 @@ export function buildOperatorReport({
       slug: l.slug,
       healthScore,
       members,
-      upcomingMeetings: upcoming,
+      upcomingServices: upcoming,
       paymentsLast30: payments,
       risk,
     };
   });
   return {
-    totalLodges: lodges.length,
-    activeLodges: lodges.filter((l) => l.is_active).length,
-    inactiveLodges: lodges.filter((l) => !l.is_active).length,
-    lodgeRows: lodgeRows.sort((a, b) => b.healthScore - a.healthScore),
+    totalChurches: churches.length,
+    activeChurches: churches.filter((l) => l.is_active).length,
+    inactiveChurches: churches.filter((l) => !l.is_active).length,
+    churchRows: churchRows.sort((a, b) => b.healthScore - a.healthScore),
   };
 }
 
@@ -535,14 +535,14 @@ export function buildOperatorReport({
 // Membership Annual Return
 // ---------------------------------------------------------------------------
 //
-// A lodge-level membership return in the shape a Secretary needs for the
-// UGLE / Provincial annual return: a roll of every member with their craft
-// progression dates and current standing, plus the movements (initiations,
+// A church-level membership return in the shape a Secretary needs for the
+// UGLE / Network annual return: a roll of every member with their craft
+// discipleship dates and current standing, plus the movements (memberships,
 // passings, raisings, resignations, exclusions) inside the reporting year.
 //
-// The reporting year is the masonic/return year, configurable via
+// The reporting year is the church/return year, configurable via
 // `yearStartMonth` (1-12, default September = 9), so figures align with the
-// lodge's return cadence rather than the calendar year.
+// church's return cadence rather than the calendar year.
 
 export type AnnualReturnMemberRow = {
   id: string;
@@ -571,7 +571,7 @@ export type AnnualReturn = {
   royalArch: number;
   honorary: number;
   averageAge: number | null;
-  initiationsInYear: number;
+  membershipsInYear: number;
   passingsInYear: number;
   raisingsInYear: number;
   members: AnnualReturnMemberRow[];
@@ -621,7 +621,7 @@ export function buildAnnualReturn({
     status: m.membership_status,
     royalArch: Boolean(m.royal_arch),
     honorary: Boolean(m.honorary),
-    dateOfInitiation: m.date_of_initiation,
+    dateOfInitiation: m.date_of_membership,
     dateOfPassing: m.date_of_passing,
     dateOfRaising: m.date_of_raising,
     age: ageFromDob(m.date_of_birth, now),
@@ -650,7 +650,7 @@ export function buildAnnualReturn({
     royalArch: members.filter((m) => m.royal_arch).length,
     honorary: members.filter((m) => m.honorary).length,
     averageAge,
-    initiationsInYear: members.filter((m) => inYear(m.date_of_initiation)).length,
+    membershipsInYear: members.filter((m) => inYear(m.date_of_membership)).length,
     passingsInYear: members.filter((m) => inYear(m.date_of_passing)).length,
     raisingsInYear: members.filter((m) => inYear(m.date_of_raising)).length,
     members: rows.sort((a, b) => a.name.localeCompare(b.name)),

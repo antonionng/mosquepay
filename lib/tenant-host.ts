@@ -1,33 +1,33 @@
 import {
-  DEFAULT_LODGE_SLUG,
-  getLodgeSlugFromHost,
-  resolveLodgeSlug,
+  DEFAULT_CHURCH_SLUG,
+  getChurchSlugFromHost,
+  resolveChurchSlug,
 } from "@/lib/tenant";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 
 /**
- * Server-only helper. Resolves a request hostname to a lodge slug, including
+ * Server-only helper. Resolves a request hostname to a church slug, including
  * custom domain lookups. Do NOT import from middleware; use only from server
  * components and route handlers.
  */
-export async function resolveLodgeSlugForHost(
+export async function resolveChurchSlugForHost(
   host?: string | null,
   fallback?: string | null
 ): Promise<string> {
-  if (!host) return fallback ? resolveLodgeSlug(fallback) : DEFAULT_LODGE_SLUG;
+  if (!host) return fallback ? resolveChurchSlug(fallback) : DEFAULT_CHURCH_SLUG;
   const hostname = host.split(":")[0]?.toLowerCase();
-  if (!hostname) return fallback ? resolveLodgeSlug(fallback) : DEFAULT_LODGE_SLUG;
-  const subdomainSlug = getLodgeSlugFromHost(host);
+  if (!hostname) return fallback ? resolveChurchSlug(fallback) : DEFAULT_CHURCH_SLUG;
+  const subdomainSlug = getChurchSlugFromHost(host);
   if (subdomainSlug) return subdomainSlug;
   if (!isSupabaseConfigured()) {
-    return fallback ? resolveLodgeSlug(fallback) : DEFAULT_LODGE_SLUG;
+    return fallback ? resolveChurchSlug(fallback) : DEFAULT_CHURCH_SLUG;
   }
   try {
-    const lodge = await db.getLodgeByCustomDomain(hostname);
-    if (lodge?.slug) return lodge.slug;
+    const church = await db.getChurchByCustomDomain(hostname);
+    if (church?.slug) return church.slug;
   } catch {
     // ignore and fall through
   }
-  return fallback ? resolveLodgeSlug(fallback) : DEFAULT_LODGE_SLUG;
+  return fallback ? resolveChurchSlug(fallback) : DEFAULT_CHURCH_SLUG;
 }

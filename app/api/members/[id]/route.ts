@@ -4,7 +4,7 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -23,37 +23,37 @@ export async function GET(request: NextRequest, { params }: Params) {
     if (unauthorized) return unauthorized;
 
     const { id } = await params;
-    const lodgeSlug = getLodgeSlugFromRequest(request);
+    const churchSlug = getChurchSlugFromRequest(request);
 
     if (isSupabaseConfigured()) {
-      const lodgeId = await db.resolveLodgeId(lodgeSlug);
-      if (!lodgeId) {
-        return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+      const churchId = await db.resolveChurchId(churchSlug);
+      if (!churchId) {
+        return NextResponse.json({ error: "Church not found." }, { status: 404 });
       }
 
-      const member = await db.getMemberById(id, lodgeId);
+      const member = await db.getMemberById(id, churchId);
       if (!member) {
         return NextResponse.json({ error: "Member not found." }, { status: 404 });
       }
 
-      const [dietaryHistory, paymentHistory, duesRecords] = await Promise.all([
-        db.getRsvpDietaryByEmail(member.email, lodgeId),
-        db.getPaymentsByEmail(member.email, lodgeId),
-        db.getMemberDues(lodgeId, { memberEmail: member.email }),
+      const [dietaryHistory, paymentHistory, givingRecords] = await Promise.all([
+        db.getRsvpDietaryByEmail(member.email, churchId),
+        db.getPaymentsByEmail(member.email, churchId),
+        db.getMemberGiving(churchId, { memberEmail: member.email }),
       ]);
 
-      return NextResponse.json({ member, dietaryHistory, paymentHistory, duesRecords });
+      return NextResponse.json({ member, dietaryHistory, paymentHistory, givingRecords });
     }
 
-    const member = mockDb.getMemberById(id, { lodge_slug: lodgeSlug });
+    const member = mockDb.getMemberById(id, { church_slug: churchSlug });
     if (!member) {
       return NextResponse.json({ error: "Member not found." }, { status: 404 });
     }
 
-    const dietaryHistory = mockDb.getRsvpDietaryByEmail(member.email, { lodge_slug: lodgeSlug });
-    const paymentHistory = mockDb.getPaymentsByEmail(member.email, { lodge_slug: lodgeSlug });
+    const dietaryHistory = mockDb.getRsvpDietaryByEmail(member.email, { church_slug: churchSlug });
+    const paymentHistory = mockDb.getPaymentsByEmail(member.email, { church_slug: churchSlug });
 
-    return NextResponse.json({ member, dietaryHistory, paymentHistory, duesRecords: [] });
+    return NextResponse.json({ member, dietaryHistory, paymentHistory, givingRecords: [] });
   } catch (e) {
     console.error("Member GET error:", e);
     return NextResponse.json({ error: "Failed to fetch member." }, { status: 500 });
@@ -69,7 +69,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (unauthorized) return unauthorized;
 
     const { id } = await params;
-    const lodgeSlug = getLodgeSlugFromRequest(request);
+    const churchSlug = getChurchSlugFromRequest(request);
     const body = await request.json();
 
     if (
@@ -87,17 +87,17 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
 
     if (isSupabaseConfigured()) {
-      const lodgeId = await db.resolveLodgeId(lodgeSlug);
-      if (!lodgeId) {
-        return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+      const churchId = await db.resolveChurchId(churchSlug);
+      if (!churchId) {
+        return NextResponse.json({ error: "Church not found." }, { status: 404 });
       }
-      const forbidden = await requireAdminApiPermission("members:write", lodgeId);
+      const forbidden = await requireAdminApiPermission("members:write", churchId);
       if (forbidden) return forbidden;
 
       const { email: rawEmail, ...otherFields } = body as Record<string, unknown>;
       const emailChange = await applyMemberEmailChange({
         memberId: id,
-        lodgeId,
+        churchId,
         rawEmail,
       });
       if (emailChange.kind === "error") {
@@ -109,7 +109,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
       let updated: db.Member | null = emailChange.member;
       if (Object.keys(otherFields).length > 0) {
-        updated = await db.updateMember(id, lodgeId, otherFields);
+        updated = await db.updateMember(id, churchId, otherFields);
       }
 
       if (!updated) {
@@ -117,7 +117,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       }
 
       await writeAuditLog({
-        lodgeId,
+        churchId,
         action: "updated",
         entityType: "member",
         entityId: updated.id,
@@ -133,7 +133,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
                   stripe_customer_updated: emailChange.stripeCustomerUpdated,
                   payments_updated: emailChange.paymentsUpdated,
                   rsvps_updated: emailChange.rsvpsUpdated,
-                  dues_updated: emailChange.duesUpdated,
+                  giving_updated: emailChange.givingUpdated,
                   warnings: emailChange.warnings,
                 },
               }
@@ -149,7 +149,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
                 to: emailChange.newEmail,
                 payments_updated: emailChange.paymentsUpdated,
                 rsvps_updated: emailChange.rsvpsUpdated,
-                dues_updated: emailChange.duesUpdated,
+                giving_updated: emailChange.givingUpdated,
                 auth_user_updated: emailChange.authUserUpdated,
                 stripe_customer_updated: emailChange.stripeCustomerUpdated,
                 warnings: emailChange.warnings,
@@ -159,7 +159,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       });
     }
 
-    const updated = mockDb.updateMember(id, body, { lodge_slug: lodgeSlug });
+    const updated = mockDb.updateMember(id, body, { church_slug: churchSlug });
     if (!updated) {
       return NextResponse.json({ error: "Member not found." }, { status: 404 });
     }
@@ -179,7 +179,7 @@ type EmailChangeResult =
       newEmail: string;
       paymentsUpdated: number;
       rsvpsUpdated: number;
-      duesUpdated: number;
+      givingUpdated: number;
       authUserUpdated: boolean;
       stripeCustomerUpdated: boolean;
       warnings: string[];
@@ -190,7 +190,7 @@ type EmailChangeResult =
  * Apply a member email change end-to-end: validate, sync the Supabase auth
  * user (so they can still log in), best-effort sync the Stripe customer
  * record, then rewrite the email in `members` and every email-keyed
- * historical table (payments, rsvps, member_dues) so the admin detail view
+ * historical table (payments, rsvps, member_giving) so the admin detail view
  * stays joined up.
  *
  * Returns `noop` when no email change is being requested so the caller can
@@ -198,15 +198,15 @@ type EmailChangeResult =
  */
 async function applyMemberEmailChange({
   memberId,
-  lodgeId,
+  churchId,
   rawEmail,
 }: {
   memberId: string;
-  lodgeId: string;
+  churchId: string;
   rawEmail: unknown;
 }): Promise<EmailChangeResult> {
   if (rawEmail === undefined) {
-    const current = await db.getMemberById(memberId, lodgeId);
+    const current = await db.getMemberById(memberId, churchId);
     if (!current) {
       return { kind: "error", status: 404, message: "Member not found." };
     }
@@ -226,7 +226,7 @@ async function applyMemberEmailChange({
     };
   }
 
-  const current = await db.getMemberById(memberId, lodgeId);
+  const current = await db.getMemberById(memberId, churchId);
   if (!current) {
     return { kind: "error", status: 404, message: "Member not found." };
   }
@@ -235,12 +235,12 @@ async function applyMemberEmailChange({
     return { kind: "noop", member: current };
   }
 
-  const collision = await db.getMemberByEmail(normalised, lodgeId);
+  const collision = await db.getMemberByEmail(normalised, churchId);
   if (collision && collision.id !== memberId) {
     return {
       kind: "error",
       status: 409,
-      message: "Another member in this lodge already has that email.",
+      message: "Another member in this church already has that email.",
     };
   }
 
@@ -291,7 +291,7 @@ async function applyMemberEmailChange({
     }
   }
 
-  const change = await db.changeMemberEmail(memberId, lodgeId, normalised);
+  const change = await db.changeMemberEmail(memberId, churchId, normalised);
   if (!change.member) {
     return { kind: "error", status: 404, message: "Member not found." };
   }
@@ -303,7 +303,7 @@ async function applyMemberEmailChange({
     newEmail: change.member.email,
     paymentsUpdated: change.paymentsUpdated,
     rsvpsUpdated: change.rsvpsUpdated,
-    duesUpdated: change.duesUpdated,
+    givingUpdated: change.givingUpdated,
     authUserUpdated,
     stripeCustomerUpdated,
     warnings,
@@ -319,22 +319,22 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     if (unauthorized) return unauthorized;
 
     const { id } = await params;
-    const lodgeSlug = getLodgeSlugFromRequest(request);
+    const churchSlug = getChurchSlugFromRequest(request);
 
     if (isSupabaseConfigured()) {
-      const lodgeId = await db.resolveLodgeId(lodgeSlug);
-      if (!lodgeId) {
-        return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+      const churchId = await db.resolveChurchId(churchSlug);
+      if (!churchId) {
+        return NextResponse.json({ error: "Church not found." }, { status: 404 });
       }
-      const forbidden = await requireAdminApiPermission("members:write", lodgeId);
+      const forbidden = await requireAdminApiPermission("members:write", churchId);
       if (forbidden) return forbidden;
 
-      const updated = await db.updateMember(id, lodgeId, { membership_status: "excluded" });
+      const updated = await db.updateMember(id, churchId, { membership_status: "excluded" });
       if (!updated) {
         return NextResponse.json({ error: "Member not found." }, { status: 404 });
       }
       await writeAuditLog({
-        lodgeId,
+        churchId,
         action: "excluded",
         entityType: "member",
         entityId: updated.id,
@@ -343,7 +343,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       return NextResponse.json({ member: updated });
     }
 
-    const updated = mockDb.updateMember(id, { membership_status: "excluded" }, { lodge_slug: lodgeSlug });
+    const updated = mockDb.updateMember(id, { membership_status: "excluded" }, { church_slug: churchSlug });
     if (!updated) {
       return NextResponse.json({ error: "Member not found." }, { status: 404 });
     }

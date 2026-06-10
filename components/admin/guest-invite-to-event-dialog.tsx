@@ -192,7 +192,7 @@ export function GuestInviteToEventDialog({
                     <option key={event.id} value={event.id}>
                       {event.title} - {formatDate(event.event_date)}{" "}
                       {event.guest_policy === "blue_table"
-                        ? "(Masons only)"
+                        ? "(members only)"
                         : "(Open guests)"}
                     </option>
                   ))}
@@ -201,7 +201,7 @@ export function GuestInviteToEventDialog({
             </div>
 
             <fieldset className="space-y-2">
-              <Label>Who pays the dining and meeting fees?</Label>
+              <Label>Who pays the dining and service fees?</Label>
               <div className="flex flex-col gap-2 text-sm text-dash-text">
                 <label className="flex items-center gap-2">
                   <input
@@ -210,7 +210,7 @@ export function GuestInviteToEventDialog({
                     checked={payer === "guest"}
                     onChange={() => setPayer("guest")}
                   />
-                  The guest pays through their lodge-branded guest link
+                  The guest pays through their church-branded guest link
                   (default)
                 </label>
                 <label className="flex items-center gap-2">
@@ -220,7 +220,7 @@ export function GuestInviteToEventDialog({
                     checked={payer === "inviter"}
                     onChange={() => setPayer("inviter")}
                   />
-                  The lodge will cover the fees (no payment screen)
+                  The church will cover the fees (no payment screen)
                 </label>
               </div>
             </fieldset>
@@ -278,7 +278,7 @@ export function GuestInviteToEventDialog({
           <p className="border-t border-dash-border pt-3 text-xs text-dash-muted">
             {selected.title} - {formatDate(selected.event_date)} -{" "}
             {selected.guest_policy === "blue_table"
-              ? "Blue table (Masons only)"
+              ? "Blue table (members only)"
               : "White table (open guests)"}
           </p>
         ) : null}

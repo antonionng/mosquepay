@@ -1,30 +1,30 @@
 #!/usr/bin/env node
-// Seed Gift Aid demo data for a tenant lodge so the treasurer can play with
-// meeting close + Gift Aid claim packs end-to-end.
+// Seed Gift Aid demo data for a tenant church so the treasurer can play with
+// service close + Gift Aid claim packs end-to-end.
 //
-// What it creates (against LODGE_SLUG, default: lodgepay-test-9999):
+// What it creates (against CHURCH_SLUG, default: churchpay-test-9999):
 //
-//   * Fills in the lodge's Gift Aid + Relief Chest config (reference, email).
+//   * Fills in the church's Gift Aid + Gift Aid pack config (reference, email).
 //   * Ensures the private `gift-aid-evidence` Supabase Storage bucket exists.
 //   * 30 demo members with realistic UK addresses.
 //   * 30 declarations spread across three windows so consecutive claim packs
 //     show different "new in window" counts:
-//       - 22 historic paper declarations dated weeks before meeting #1
-//       -  4 paper declarations collected on meeting #2 / meeting #3
-//       -  3 digital declarations signed via the portal between meetings
+//       - 22 historic paper declarations dated weeks before service #1
+//       -  4 paper declarations collected on service #2 / service #3
+//       -  3 digital declarations signed via the portal between services
 //       -  1 revoked declaration (so the panel + pack manifest show it)
 //   * Real evidence artefacts uploaded to Storage:
 //       - paper  -> deterministic minimal PDF rendered in JS
 //       - digital -> identical HTML to lib/gift-aid/evidence.ts so a
 //                    re-render reproduces the same SHA-256 (the pack
 //                    endpoint's defence-in-depth re-hash will pass).
-//   * 5 past meetings + 1 future meeting. Each past meeting gets:
+//   * 5 past services + 1 future service. Each past service gets:
 //       - 18 to 32 charitable donations (mix of cash, charge, online)
-//       - 1 meeting_collection row
+//       - 1 service_collection row
 //       - 1 gift_aid_claim_batch with claim_reference LP-DEMO-MEET-<date>
 //       - 1 claim item per donation with eligible_amount + reclaimable_amount
 //       - declaration link rows for declarations newly in window
-//       - meeting_closed_at + meeting_closed_by_email set
+//       - service_closed_at + service_closed_by_email set
 //
 // Every demo entity is keyed off "DEMO-" / "demo-" / "demo+" so a re-run
 // with --reset cleanly wipes and re-creates. Without --reset the script
@@ -33,7 +33,7 @@
 // Usage:
 //   node scripts/seed-gift-aid-demo.mjs           # fresh seed (errors if exists)
 //   node scripts/seed-gift-aid-demo.mjs --reset   # wipe + reseed
-//   LODGE_SLUG=other-lodge node scripts/seed-gift-aid-demo.mjs --reset
+//   CHURCH_SLUG=other-church node scripts/seed-gift-aid-demo.mjs --reset
 
 import { createClient } from "@supabase/supabase-js";
 import { createHash, randomUUID } from "node:crypto";
@@ -72,11 +72,11 @@ if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
   process.exit(1);
 }
 
-const LODGE_SLUG = process.env.LODGE_SLUG ?? "lodgepay-test-9999";
+const CHURCH_SLUG = process.env.CHURCH_SLUG ?? "churchpay-test-9999";
 const RESET = process.argv.includes("--reset");
 const DEMO_REF_PREFIX = "LP-DEMO";
 const DEMO_EMAIL_PREFIX = "demo+";
-const DEMO_EMAIL_DOMAIN = "lodgepay-test.test";
+const DEMO_EMAIL_DOMAIN = "churchpay-test.test";
 const DEMO_PAYMENT_PREFIX = "LP-DEMO-PAY";
 const DEMO_EVENT_SLUG_PREFIX = "demo-";
 
@@ -93,12 +93,12 @@ const HMRC_DECLARATION_TEXT_V1 =
 
 const EVIDENCE_BUCKET = "gift-aid-evidence";
 
-const LODGE_CONFIG_PATCH = {
+const CHURCH_CONFIG_PATCH = {
   gift_aid_default_mode: "both",
   hmrc_charity_reference: "GA-12345-LP",
-  relief_chest_name: "LodgePay Test Lodge Relief Chest",
-  relief_chest_email: "relief.chest+demo@example.org",
-  relief_chest_charity_number: "1066327-LP",
+  gift_aid_pack_name: "ChurchPay Test Church Gift Aid pack",
+  gift_aid_pack_email: "relief.chest+demo@example.org",
+  gift_aid_pack_charity_number: "1066327-LP",
 };
 
 // 30 donor profiles. Names and addresses are obviously synthetic to keep
@@ -108,7 +108,7 @@ const MEMBERS = [
   { full_name: "W Bro Bernard Holloway", address: "47 Brockley Road", city: "London", postcode: "SE4 2RA" },
   { full_name: "W Bro Cyril Pemberton", address: "9 Steyne Avenue, Hayling Island", city: "Hampshire", postcode: "PO11 0LS" },
   { full_name: "W Bro Derek Whitmore", address: "23 The Crescent, Twickenham", city: "London", postcode: "TW1 2DU" },
-  { full_name: "W Bro Edward Fairbrother", address: "5 Old Park Lane, Mayfair", city: "London", postcode: "W1K 1QR" },
+  { full_name: "W Bro Edward Fairmember", address: "5 Old Park Lane, Mayfair", city: "London", postcode: "W1K 1QR" },
   { full_name: "Bro Felix Marston", address: "78 Acacia Avenue, Surbiton", city: "Surrey", postcode: "KT6 4NA" },
   { full_name: "Bro Gareth Llewellyn", address: "31 Penlan Drive, Mumbles", city: "Swansea", postcode: "SA3 4HS" },
   { full_name: "W Bro Harold Tindall", address: "6 St Augustine's Road, Camden", city: "London", postcode: "NW1 9RP" },
@@ -142,7 +142,7 @@ const MEMBERS = [
   country: "United Kingdom",
 }));
 
-// 5 past meetings (closed) + 1 upcoming. Dates are chosen so they straddle
+// 5 past services (closed) + 1 upcoming. Dates are chosen so they straddle
 // the boundaries of the declaration windows below.
 const TODAY = new Date("2026-05-30T19:00:00+01:00");
 function isoAt(date, hour = 18) {
@@ -152,72 +152,72 @@ function isoAt(date, hour = 18) {
 }
 const MEETINGS = [
   {
-    title: "Regular Meeting (DEMO Sep 2025)",
+    title: "Regular Service (DEMO Sep 2025)",
     slug: `${DEMO_EVENT_SLUG_PREFIX}2025-09-16`,
     event_date: isoAt("2025-09-16"),
-    event_type: "regular_meeting",
-    description: "First regular meeting of the season. Almoner's appeal collection.",
-    location: "Mark Masons' Hall",
+    event_type: "regular_service",
+    description: "First regular service of the season. PastoralCare's appeal collection.",
+    location: "Mark members' Hall",
     donations: 22,
     cashRatio: 0.45,
     closed: true,
     chargeAmounts: [10, 20, 25, 50],
   },
   {
-    title: "Regular Meeting (DEMO Oct 2025)",
+    title: "Regular Service (DEMO Oct 2025)",
     slug: `${DEMO_EVENT_SLUG_PREFIX}2025-10-21`,
     event_date: isoAt("2025-10-21"),
-    event_type: "regular_meeting",
-    description: "Festive board with charity steward's appeal for the Provincial Grand Charity.",
-    location: "Mark Masons' Hall",
+    event_type: "regular_service",
+    description: "Festive board with charity steward's appeal for the Network Grand Charity.",
+    location: "Mark members' Hall",
     donations: 18,
     cashRatio: 0.55,
     closed: true,
     chargeAmounts: [5, 10, 20, 30, 50],
   },
   {
-    title: "Installation Meeting (DEMO Dec 2025)",
+    title: "Special service Service (DEMO Dec 2025)",
     slug: `${DEMO_EVENT_SLUG_PREFIX}2025-12-11`,
     event_date: isoAt("2025-12-11"),
-    event_type: "installation",
-    description: "Installation of W Bro Sebastian Quirk. Substantial attendance, larger collection.",
-    location: "Mark Masons' Hall",
+    event_type: "special_service",
+    description: "Special service of W Bro Sebastian Quirk. Substantial attendance, larger collection.",
+    location: "Mark members' Hall",
     donations: 32,
     cashRatio: 0.35,
     closed: true,
     chargeAmounts: [10, 25, 50, 100, 250],
   },
   {
-    title: "Regular Meeting (DEMO Feb 2026)",
+    title: "Regular Service (DEMO Feb 2026)",
     slug: `${DEMO_EVENT_SLUG_PREFIX}2026-02-17`,
     event_date: isoAt("2026-02-17"),
-    event_type: "regular_meeting",
-    description: "Quiet meeting, smaller alms collection.",
-    location: "Mark Masons' Hall",
+    event_type: "regular_service",
+    description: "Quiet service, smaller alms collection.",
+    location: "Mark members' Hall",
     donations: 14,
     cashRatio: 0.50,
     closed: true,
     chargeAmounts: [5, 10, 20],
   },
   {
-    title: "Regular Meeting (DEMO Apr 2026)",
+    title: "Regular Service (DEMO Apr 2026)",
     slug: `${DEMO_EVENT_SLUG_PREFIX}2026-04-21`,
     event_date: isoAt("2026-04-21"),
-    event_type: "regular_meeting",
-    description: "Spring meeting with RMBI appeal and a top-up donation for the Master's List.",
-    location: "Mark Masons' Hall",
+    event_type: "regular_service",
+    description: "Spring service with RMBI appeal and a top-up donation for the Master's List.",
+    location: "Mark members' Hall",
     donations: 26,
     cashRatio: 0.40,
     closed: true,
     chargeAmounts: [10, 20, 50, 100],
   },
   {
-    title: "Regular Meeting (DEMO Jun 2026)",
+    title: "Regular Service (DEMO Jun 2026)",
     slug: `${DEMO_EVENT_SLUG_PREFIX}2026-06-16`,
     event_date: isoAt("2026-06-16"),
-    event_type: "regular_meeting",
-    description: "Upcoming meeting -- not yet closed, no donations yet.",
-    location: "Mark Masons' Hall",
+    event_type: "regular_service",
+    description: "Upcoming service -- not yet closed, no donations yet.",
+    location: "Mark members' Hall",
     donations: 0,
     cashRatio: 0,
     closed: false,
@@ -230,23 +230,23 @@ const MEETINGS = [
 // claim batch using each declaration's created_at vs the previous claim
 // batch's created_at.
 const DECLARATIONS = [
-  // 22 historic paper declarations filed in the lead-up to meeting #1.
+  // 22 historic paper declarations filed in the newcomer-up to service #1.
   ...Array.from({ length: 22 }, (_, i) => ({
     memberIndex: i,
     source: "paper",
     signedAt: `2025-08-${String(10 + (i % 18) + 1).padStart(2, "0")}T12:00:00Z`,
   })),
-  // 3 paper declarations collected on the day at meeting #2 (Oct).
+  // 3 paper declarations collected on the day at service #2 (Oct).
   { memberIndex: 22, source: "paper", signedAt: "2025-10-21T19:30:00Z" },
   { memberIndex: 23, source: "paper", signedAt: "2025-10-21T19:35:00Z" },
   { memberIndex: 24, source: "paper", signedAt: "2025-10-21T19:40:00Z" },
-  // 1 paper collected on the day at meeting #3 (Dec).
+  // 1 paper collected on the day at service #3 (Dec).
   { memberIndex: 25, source: "paper", signedAt: "2025-12-11T19:45:00Z" },
-  // 3 digital declarations signed via the portal between meetings.
+  // 3 digital declarations signed via the portal between services.
   { memberIndex: 26, source: "digital", signedAt: "2026-01-08T20:14:00Z" },
   { memberIndex: 27, source: "digital", signedAt: "2026-03-02T08:55:00Z" },
   { memberIndex: 28, source: "digital", signedAt: "2026-04-10T13:22:00Z" },
-  // 1 revoked declaration -- created early but revoked before meeting #5.
+  // 1 revoked declaration -- created early but revoked before service #5.
   { memberIndex: 29, source: "paper", signedAt: "2025-08-04T10:00:00Z", revokedAt: "2026-04-15T09:00:00Z", revokedReason: "Member ceased to be a UK taxpayer." },
 ];
 
@@ -297,11 +297,11 @@ function wrapText(text, width) {
  * file is genuinely useful as evidence. Helvetica is a PDF base font so
  * no embedded font data is required.
  */
-function buildPaperScanPdf({ donor, address, dateSigned, signatureName, charityRef, lodgeName }) {
+function buildPaperScanPdf({ donor, address, dateSigned, signatureName, charityRef, churchName }) {
   const lines = [
     "GIFT AID DECLARATION (scanned wet-ink original)",
     "",
-    `Charity: ${lodgeName}`,
+    `Charity: ${churchName}`,
     `HMRC reference: ${charityRef}`,
     "",
     "Donor:",
@@ -316,7 +316,7 @@ function buildPaperScanPdf({ donor, address, dateSigned, signatureName, charityR
     "",
     "  [ Wet-ink signature scan reproduction -- demo evidence file ]",
     "",
-    "This file was generated by the LodgePay demo seeder to represent",
+    "This file was generated by the ChurchPay demo seeder to represent",
     "a scanned paper Gift Aid declaration. In production this would be",
     "the actual upload (PDF or image of the signed slip).",
   ];
@@ -392,8 +392,8 @@ function renderDigitalDeclarationHtml(ctx) {
     "</head>",
     "<body>",
     `<h1>Gift Aid declaration</h1>`,
-    `<div class=\"meta\">${safe(ctx.lodgeName)}${
-      ctx.lodgeNumber ? ` No. ${safe(ctx.lodgeNumber)}` : ""
+    `<div class=\"meta\">${safe(ctx.churchName)}${
+      ctx.churchNumber ? ` No. ${safe(ctx.churchNumber)}` : ""
     }${
       ctx.charityReference ? ` &middot; HMRC ref ${safe(ctx.charityReference)}` : ""
     }</div>`,
@@ -413,7 +413,7 @@ function renderDigitalDeclarationHtml(ctx) {
     `<div>IP address: ${safe(ctx.ipAddress ?? "not recorded")}</div>`,
     `<div>User agent: ${safe(ctx.userAgent ?? "not recorded")}</div>`,
     `</div>`,
-    `<footer>This document was generated by LodgePay as a tamper-evident record of an electronic Gift Aid declaration. The SHA-256 of these bytes is recorded against the declaration row in the LodgePay database; re-hashing this file should produce the same digest. To verify: <code>shasum -a 256 thisfile.html</code>.</footer>`,
+    `<footer>This document was generated by ChurchPay as a tamper-evident record of an electronic Gift Aid declaration. The SHA-256 of these bytes is recorded against the declaration row in the ChurchPay database; re-hashing this file should produce the same digest. To verify: <code>shasum -a 256 thisfile.html</code>.</footer>`,
     "</body></html>",
   ].join("\n");
 }
@@ -438,14 +438,14 @@ async function ensureBucket() {
   log(`  Created storage bucket "${EVIDENCE_BUCKET}".`);
 }
 
-function buildEvidencePath({ lodgeId, declarationId, sha256, extension }) {
+function buildEvidencePath({ churchId, declarationId, sha256, extension }) {
   const ext = extension.replace(/^\.+/, "").toLowerCase().replace(/[^a-z0-9]/g, "") || "bin";
-  return `${lodgeId}/${declarationId}/${declarationId}__${sha256.slice(0, 8)}.${ext}`;
+  return `${churchId}/${declarationId}/${declarationId}__${sha256.slice(0, 8)}.${ext}`;
 }
 
-async function uploadEvidenceFile({ lodgeId, declarationId, bytes, mime, extension }) {
+async function uploadEvidenceFile({ churchId, declarationId, bytes, mime, extension }) {
   const sha = sha256Hex(bytes);
-  const path = buildEvidencePath({ lodgeId, declarationId, sha256: sha, extension });
+  const path = buildEvidencePath({ churchId, declarationId, sha256: sha, extension });
   const { error } = await supabase.storage
     .from(EVIDENCE_BUCKET)
     .upload(path, bytes, { contentType: mime, upsert: true });
@@ -467,14 +467,14 @@ function fmtDateIso(iso) {
 // Reset
 // ---------------------------------------------------------------------------
 
-async function resetDemoData(lodgeId) {
+async function resetDemoData(churchId) {
   log("Resetting existing demo data via _demo_reset_gift_aid_data RPC...");
   // The RPC bypasses the gift_aid_declaration_events append-only trigger
   // (which would otherwise block deletion of demo declarations) and deletes
   // everything in the right FK order. Defined in
   // supabase/migrations/061_demo_reset_gift_aid_function.sql.
   const { error } = await supabase.rpc("_demo_reset_gift_aid_data", {
-    p_lodge_id: lodgeId,
+    p_church_id: churchId,
   });
   if (error) {
     throw new Error(
@@ -485,11 +485,11 @@ async function resetDemoData(lodgeId) {
   log("  Reset complete.");
 }
 
-async function detectExistingDemo(lodgeId) {
+async function detectExistingDemo(churchId) {
   const { data } = await supabase
     .from("gift_aid_claim_batches")
     .select("id")
-    .eq("lodge_id", lodgeId)
+    .eq("church_id", churchId)
     .like("claim_reference", `${DEMO_REF_PREFIX}-MEET-%`)
     .limit(1);
   return (data ?? []).length > 0;
@@ -500,39 +500,39 @@ async function detectExistingDemo(lodgeId) {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  log(`Resolving lodge "${LODGE_SLUG}"...`);
-  const { data: lodge, error: lodgeErr } = await supabase
-    .from("lodges")
-    .select("id, name, lodge_number")
-    .eq("slug", LODGE_SLUG)
+  log(`Resolving church "${CHURCH_SLUG}"...`);
+  const { data: church, error: churchErr } = await supabase
+    .from("churches")
+    .select("id, name, church_number")
+    .eq("slug", CHURCH_SLUG)
     .maybeSingle();
-  if (lodgeErr) throw lodgeErr;
-  if (!lodge) throw new Error(`Lodge ${LODGE_SLUG} not found.`);
-  log(`  Lodge: ${lodge.name} (${lodge.id})`);
+  if (churchErr) throw churchErr;
+  if (!church) throw new Error(`Church ${CHURCH_SLUG} not found.`);
+  log(`  Church: ${church.name} (${church.id})`);
 
-  if (await detectExistingDemo(lodge.id)) {
+  if (await detectExistingDemo(church.id)) {
     if (!RESET) {
       console.error(
-        "Demo data already exists for this lodge. Re-run with --reset to wipe and reseed."
+        "Demo data already exists for this church. Re-run with --reset to wipe and reseed."
       );
       process.exit(2);
     }
-    await resetDemoData(lodge.id);
+    await resetDemoData(church.id);
   }
 
-  log("Updating lodge Gift Aid + Relief Chest config...");
-  const { error: lodgeUpdErr } = await supabase
-    .from("lodges")
-    .update({ ...LODGE_CONFIG_PATCH, updated_at: new Date().toISOString() })
-    .eq("id", lodge.id);
-  if (lodgeUpdErr) throw lodgeUpdErr;
+  log("Updating church Gift Aid + Gift Aid pack config...");
+  const { error: churchUpdErr } = await supabase
+    .from("churches")
+    .update({ ...CHURCH_CONFIG_PATCH, updated_at: new Date().toISOString() })
+    .eq("id", church.id);
+  if (churchUpdErr) throw churchUpdErr;
 
   await ensureBucket();
 
   // --- Members ----------------------------------------------------------
   log(`Inserting ${MEMBERS.length} demo members...`);
   const memberRows = MEMBERS.map((m) => ({
-    lodge_id: lodge.id,
+    church_id: church.id,
     email: m.email,
     full_name: m.full_name,
     rank: m.rank,
@@ -546,40 +546,40 @@ async function main() {
   }));
   const { data: insertedMembers, error: memErr } = await supabase
     .from("members")
-    .upsert(memberRows, { onConflict: "lodge_id,email" })
+    .upsert(memberRows, { onConflict: "church_id,email" })
     .select("id, email");
   if (memErr) throw memErr;
   const memberByEmail = new Map(insertedMembers.map((m) => [m.email, m]));
   log(`  Members ready: ${insertedMembers.length}`);
 
   // --- Events -----------------------------------------------------------
-  log(`Inserting ${MEETINGS.length} meetings...`);
-  const eventByMeeting = new Map();
-  for (const meeting of MEETINGS) {
+  log(`Inserting ${MEETINGS.length} services...`);
+  const eventByService = new Map();
+  for (const service of MEETINGS) {
     const { data, error } = await supabase
       .from("events")
       .insert({
-        lodge_id: lodge.id,
-        title: meeting.title,
-        slug: meeting.slug,
-        description: meeting.description,
-        event_type: meeting.event_type,
-        event_date: meeting.event_date,
-        location: meeting.location,
+        church_id: church.id,
+        title: service.title,
+        slug: service.slug,
+        description: service.description,
+        event_type: service.event_type,
+        event_date: service.event_date,
+        location: service.location,
         enable_rsvp: true,
-        enable_payments: meeting.donations > 0,
-        enable_charity_donation: meeting.donations > 0,
+        enable_payments: service.donations > 0,
+        enable_charity_donation: service.donations > 0,
         enable_raffle_donation: false,
         enable_dining_rsvp: false,
         enable_guest_tickets: false,
-        enable_meeting_fee: false,
+        enable_service_fee: false,
       })
       .select("id")
       .single();
     if (error) throw error;
-    eventByMeeting.set(meeting.slug, data.id);
+    eventByService.set(service.slug, data.id);
   }
-  log(`  Events created: ${eventByMeeting.size}`);
+  log(`  Events created: ${eventByService.size}`);
 
   // --- Declarations ----------------------------------------------------
   log(`Filing ${DECLARATIONS.length} Gift Aid declarations + evidence...`);
@@ -599,11 +599,11 @@ async function main() {
         address: `${member.address}\n${member.city}\n${member.postcode}\n${member.country}`,
         dateSigned: fmtDateIso(d.signedAt),
         signatureName: member.full_name,
-        charityRef: LODGE_CONFIG_PATCH.hmrc_charity_reference,
-        lodgeName: lodge.name,
+        charityRef: CHURCH_CONFIG_PATCH.hmrc_charity_reference,
+        churchName: church.name,
       });
       evidence = await uploadEvidenceFile({
-        lodgeId: lodge.id,
+        churchId: church.id,
         declarationId,
         bytes: pdf,
         mime: "application/pdf",
@@ -623,13 +623,13 @@ async function main() {
         signedAtIso: d.signedAt,
         ipAddress: "203.0.113.42",
         userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605 LP-Demo",
-        lodgeName: lodge.name,
-        lodgeNumber: lodge.lodge_number ?? null,
-        charityReference: LODGE_CONFIG_PATCH.hmrc_charity_reference,
+        churchName: church.name,
+        churchNumber: church.church_number ?? null,
+        charityReference: CHURCH_CONFIG_PATCH.hmrc_charity_reference,
         source: "member_portal",
       });
       evidence = await uploadEvidenceFile({
-        lodgeId: lodge.id,
+        churchId: church.id,
         declarationId,
         bytes: Buffer.from(html, "utf8"),
         mime: "text/html",
@@ -642,7 +642,7 @@ async function main() {
       .from("gift_aid_declarations")
       .insert({
         id: declarationId,
-        lodge_id: lodge.id,
+        church_id: church.id,
         member_id: memberRow.id,
         donor_name: member.full_name,
         donor_email: member.email,
@@ -663,7 +663,7 @@ async function main() {
         evidence_size_bytes: evidence.size,
         evidence_mime_type: evidence.mime,
         evidence_uploaded_at: d.signedAt,
-        evidence_uploaded_by_email: isDigital ? member.email : "treasurer+demo@lodgepay-test.test",
+        evidence_uploaded_by_email: isDigital ? member.email : "treasurer+demo@churchpay-test.test",
         paper_received_date: isDigital ? null : fmtDateIso(d.signedAt),
         paper_filing_reference: filingRef,
         digital_signature_ip: isDigital ? "203.0.113.42" : null,
@@ -681,11 +681,11 @@ async function main() {
     // Audit events: created + (revoked if applicable)
     const eventsToInsert = [
       {
-        lodge_id: lodge.id,
+        church_id: church.id,
         declaration_id: declarationId,
         event_type: isDigital ? "created_digital" : "created_paper",
         actor_kind: isDigital ? "member" : "admin",
-        actor_email: isDigital ? member.email : "treasurer+demo@lodgepay-test.test",
+        actor_email: isDigital ? member.email : "treasurer+demo@churchpay-test.test",
         after_state: {
           source: isDigital ? "member_portal" : "paper_upload",
           evidence_sha256: evidence.sha256,
@@ -699,11 +699,11 @@ async function main() {
     ];
     if (d.revokedAt) {
       eventsToInsert.push({
-        lodge_id: lodge.id,
+        church_id: church.id,
         declaration_id: declarationId,
         event_type: "revoked",
         actor_kind: "admin",
-        actor_email: "treasurer+demo@lodgepay-test.test",
+        actor_email: "treasurer+demo@churchpay-test.test",
         notes: d.revokedReason,
         created_at: d.revokedAt,
       });
@@ -746,9 +746,9 @@ async function main() {
   }
   log(`  Declarations + evidence: ${declRecords.length}`);
 
-  // --- Donations + meeting close per past meeting ----------------------
-  log("Generating donations, meeting collections, claim batches per meeting...");
-  // Sort meetings chronologically so each subsequent claim batch's "new in
+  // --- Donations + service close per past service ----------------------
+  log("Generating donations, service collections, claim batches per service...");
+  // Sort services chronologically so each subsequent claim batch's "new in
   // window" sweep is anchored to the previous batch's created_at.
   const sortedClosed = MEETINGS.filter((m) => m.closed).slice().sort(
     (a, b) => new Date(a.event_date) - new Date(b.event_date),
@@ -758,12 +758,12 @@ async function main() {
   let cumulativeDonationCount = 0;
   let cumulativeReclaim = 0;
   for (let mi = 0; mi < sortedClosed.length; mi++) {
-    const meeting = sortedClosed[mi];
-    const eventId = eventByMeeting.get(meeting.slug);
-    const meetingDate = fmtDateIso(meeting.event_date);
+    const service = sortedClosed[mi];
+    const eventId = eventByService.get(service.slug);
+    const serviceDate = fmtDateIso(service.event_date);
 
-    // Pick donors deterministically per meeting. Use members whose
-    // declaration was filed BEFORE the meeting (active or not yet revoked)
+    // Pick donors deterministically per service. Use members whose
+    // declaration was filed BEFORE the service (active or not yet revoked)
     // for the "Gift Aid eligible" subset; mix in some without to make the
     // breakdown realistic.
     const declarationsByEmail = new Map();
@@ -771,8 +771,8 @@ async function main() {
       const declCreated = new Date(decl.signedAt);
       const revoked = decl.revokedAt ? new Date(decl.revokedAt) : null;
       const declUsable =
-        declCreated <= new Date(meeting.event_date) &&
-        (!revoked || revoked > new Date(meeting.event_date));
+        declCreated <= new Date(service.event_date) &&
+        (!revoked || revoked > new Date(service.event_date));
       if (declUsable) declarationsByEmail.set(decl.memberEmail, decl);
     }
 
@@ -782,7 +782,7 @@ async function main() {
       (e) => !declarationsByEmail.has(e),
     );
 
-    const donationsToMake = meeting.donations;
+    const donationsToMake = service.donations;
     const donations = [];
     for (let i = 0; i < donationsToMake; i++) {
       // Deterministic ratio
@@ -791,8 +791,8 @@ async function main() {
       const donorEmail = pool[(i * 17 + mi * 7) % pool.length];
       const donor = MEMBERS.find((m) => m.email === donorEmail);
       const memberRow = memberByEmail.get(donorEmail);
-      const isCash = ((i * 13 + mi) % 100) / 100 < meeting.cashRatio;
-      const amount = pickFrom(meeting.chargeAmounts, `${meeting.slug}-${i}`);
+      const isCash = ((i * 13 + mi) % 100) / 100 < service.cashRatio;
+      const amount = pickFrom(service.chargeAmounts, `${service.slug}-${i}`);
       const decl = declarationsByEmail.get(donorEmail) ?? null;
       const giftAidEligibleAmount = decl ? amount : null;
       donations.push({
@@ -807,33 +807,33 @@ async function main() {
     }
 
     // Insert payment per donation (mixture of cash and charge).
-    log(`  ${meeting.title}: ${donations.length} donations`);
+    log(`  ${service.title}: ${donations.length} donations`);
     const payments = [];
     for (let i = 0; i < donations.length; i++) {
       const d = donations[i];
       const paymentMethod = d.isCash ? "cash" : "card_qr";
-      const mooovId = `${DEMO_PAYMENT_PREFIX}-${meeting.slug}-${String(i + 1).padStart(3, "0")}`;
-      const completedAt = new Date(meeting.event_date);
+      const mooovId = `${DEMO_PAYMENT_PREFIX}-${service.slug}-${String(i + 1).padStart(3, "0")}`;
+      const completedAt = new Date(service.event_date);
       completedAt.setUTCMinutes(i % 60);
       const { data: payRow, error: payErr } = await supabase
         .from("payments")
         .insert({
-          lodge_id: lodge.id,
+          church_id: church.id,
           event_id: eventId,
           user_email: d.donorEmail,
           user_name: d.donorName,
           charity_amount: d.amount,
           dining_amount: 0,
           raffle_amount: 0,
-          meeting_fee_amount: 0,
+          service_fee_amount: 0,
           guest_ticket_amount: 0,
           total_amount: d.amount,
           currency: "GBP",
-          charity_name: "Lodge Charity Appeal",
+          charity_name: "Church Charity Appeal",
           status: "succeeded",
           mooov_payment_id: mooovId,
           payment_method: paymentMethod,
-          recorded_by_email: "treasurer+demo@lodgepay-test.test",
+          recorded_by_email: "treasurer+demo@churchpay-test.test",
           created_at: completedAt.toISOString(),
           completed_at: completedAt.toISOString(),
           updated_at: completedAt.toISOString(),
@@ -846,7 +846,7 @@ async function main() {
 
     // Insert donation rows.
     const donationRows = payments.map((d) => ({
-      lodge_id: lodge.id,
+      church_id: church.id,
       event_id: eventId,
       payment_id: d.paymentId,
       donor_name: d.donorName,
@@ -867,7 +867,7 @@ async function main() {
       .select("id, donor_email, gift_aid_declaration_id, gift_aid_eligible_amount, amount, created_at");
     if (donErr) throw donErr;
 
-    // Meeting collection summary.
+    // Service collection summary.
     const cashAmt = payments.filter((p) => p.isCash).reduce((s, p) => s + p.amount, 0);
     const cardAmt = payments.filter((p) => !p.isCash).reduce((s, p) => s + p.amount, 0);
     const donorLinkedAmt = payments.filter((p) => p.declId).reduce((s, p) => s + p.amount, 0);
@@ -876,29 +876,29 @@ async function main() {
     const gasdsCap = 8000;
     const gasdsEligibleAmt = Math.min(anonAmt, gasdsCap);
 
-    const closedAt = new Date(meeting.event_date);
+    const closedAt = new Date(service.event_date);
     closedAt.setUTCHours(22, 0, 0, 0);
 
     // Claim batch -- create with created_at = closedAt so subsequent batches
     // can compute "declarations newly in window since previous batch" using
     // (previousBatchCreatedAt, closedAt].
-    const claimRef = `${DEMO_REF_PREFIX}-MEET-${meetingDate}`;
+    const claimRef = `${DEMO_REF_PREFIX}-MEET-${serviceDate}`;
     const periodStart = previousBatchCreatedAt
       ? fmtDateIso(previousBatchCreatedAt)
-      : fmtDateIso(new Date(meeting.event_date).setUTCDate(new Date(meeting.event_date).getUTCDate() - 90));
+      : fmtDateIso(new Date(service.event_date).setUTCDate(new Date(service.event_date).getUTCDate() - 90));
     const { data: batch, error: batchErr } = await supabase
       .from("gift_aid_claim_batches")
       .insert({
-        lodge_id: lodge.id,
+        church_id: church.id,
         claim_reference: claimRef,
         period_start: periodStart,
-        period_end: meetingDate,
+        period_end: serviceDate,
         status: "draft",
         donation_count: donations.length,
         eligible_amount: donorLinkedAmt,
         reclaimable_amount: giftAidReclaim,
-        notes: `Per-meeting Gift Aid pack for ${meeting.title} (demo seed).`,
-        created_by_email: "treasurer+demo@lodgepay-test.test",
+        notes: `Per-service Gift Aid pack for ${service.title} (demo seed).`,
+        created_by_email: "treasurer+demo@churchpay-test.test",
         created_at: closedAt.toISOString(),
         updated_at: closedAt.toISOString(),
       })
@@ -910,7 +910,7 @@ async function main() {
     const claimItemRows = insertedDons
       .filter((d) => d.gift_aid_declaration_id)
       .map((d) => ({
-        lodge_id: lodge.id,
+        church_id: church.id,
         claim_batch_id: batch.id,
         donation_id: d.id,
         gift_aid_declaration_id: d.gift_aid_declaration_id,
@@ -950,14 +950,14 @@ async function main() {
 
     const claimDeclRows = [
       ...newDeclsInWindow.map((decl) => ({
-        lodge_id: lodge.id,
+        church_id: church.id,
         claim_batch_id: batch.id,
         gift_aid_declaration_id: decl.id,
         inclusion_reason: "new_in_window",
         created_at: closedAt.toISOString(),
       })),
       ...donorInBatchIds.map((id) => ({
-        lodge_id: lodge.id,
+        church_id: church.id,
         claim_batch_id: batch.id,
         gift_aid_declaration_id: id,
         inclusion_reason: "donor_in_batch",
@@ -995,22 +995,22 @@ async function main() {
         .in("id", gasdsIds);
     }
 
-    // Meeting collection row pointing at the claim batch.
-    const { error: collErr } = await supabase.from("meeting_collections").insert({
-      lodge_id: lodge.id,
+    // Service collection row pointing at the claim batch.
+    const { error: collErr } = await supabase.from("service_collections").insert({
+      church_id: church.id,
       event_id: eventId,
-      collection_date: meetingDate,
-      collection_type: meeting.event_type === "installation" ? "installation" : "festive_board",
-      title: `${meeting.title} -- alms collection`,
+      collection_date: serviceDate,
+      collection_type: service.event_type === "special_service" ? "special_service" : "festive_board",
+      title: `${service.title} -- alms collection`,
       cash_amount: cashAmt,
       card_amount: cardAmt,
       donor_linked_amount: donorLinkedAmt,
       anonymous_cash_amount: anonAmt,
       gift_aid_reclaimable_amount: giftAidReclaim,
       gasds_eligible_amount: gasdsEligibleAmt,
-      gasds_tax_year: meetingDate >= "2026-04-06" ? "2026-27" : "2025-26",
+      gasds_tax_year: serviceDate >= "2026-04-06" ? "2026-27" : "2025-26",
       notes: `Auto-generated by demo seed. Donations: ${donations.length}. Cash: \u00a3${cashAmt.toFixed(2)}, Card: \u00a3${cardAmt.toFixed(2)}.`,
-      recorded_by_email: "treasurer+demo@lodgepay-test.test",
+      recorded_by_email: "treasurer+demo@churchpay-test.test",
       gift_aid_claim_batch_id: batch.id,
       created_at: closedAt.toISOString(),
       updated_at: closedAt.toISOString(),
@@ -1021,9 +1021,9 @@ async function main() {
     await supabase
       .from("events")
       .update({
-        meeting_closed_at: closedAt.toISOString(),
-        meeting_closed_by_email: "treasurer+demo@lodgepay-test.test",
-        meeting_close_notes: `Meeting closed via demo seeder. ${donations.length} donations, \u00a3${giftAidReclaim.toFixed(2)} reclaimable.`,
+        service_closed_at: closedAt.toISOString(),
+        service_closed_by_email: "treasurer+demo@churchpay-test.test",
+        service_close_notes: `Service closed via demo seeder. ${donations.length} donations, \u00a3${giftAidReclaim.toFixed(2)} reclaimable.`,
       })
       .eq("id", eventId);
 
@@ -1038,7 +1038,7 @@ async function main() {
   log(`  Total reclaimable Gift Aid across batches: \u00a3${cumulativeReclaim.toFixed(2)}`);
   log("");
   log("Try it:");
-  log(`  http://localhost:3000/admin/meetings           # closed meetings show pack badges`);
+  log(`  http://localhost:3000/admin/services           # closed services show pack badges`);
   log(`  http://localhost:3000/admin/gift-aid           # claim batches list + pack downloads`);
   log(`  http://localhost:3000/admin/members            # 'Missing Gift Aid' filter populated`);
 }

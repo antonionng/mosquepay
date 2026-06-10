@@ -1,16 +1,16 @@
 "use client";
 
 import { Render, type Data } from "@measured/puck";
-import type { LodgeSiteSection } from "@/lib/db/types";
+import type { ChurchSiteSection } from "@/lib/db/types";
 import { mergeHeroPrimaryColor } from "@/lib/site-section-style";
 import { puckConfig } from "./puck-config";
 
-type SiteSection = LodgeSiteSection;
+type SiteSection = ChurchSiteSection;
 
 const SECTION_TO_COMPONENT: Record<string, string> = {
   hero: "Hero",
   about: "About",
-  meeting_details: "MeetingDetails",
+  service_details: "ServiceDetails",
   officers: "Officers",
   charity: "Charity",
   events: "Events",

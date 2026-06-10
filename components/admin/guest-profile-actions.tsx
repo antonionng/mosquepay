@@ -20,7 +20,7 @@ type Props = {
   guestEmail: string | null;
   visitCount: number;
   archivedAt: string | null;
-  hasVisitorToken: boolean;
+  hasNewcomerToken: boolean;
   initialValues: Partial<GuestFormValues>;
 };
 
@@ -30,7 +30,7 @@ export function GuestProfileActions({
   guestEmail,
   visitCount,
   archivedAt,
-  hasVisitorToken,
+  hasNewcomerToken,
   initialValues,
 }: Props) {
   const router = useRouter();
@@ -83,10 +83,10 @@ export function GuestProfileActions({
     }
   }
 
-  async function revokeVisitorToken() {
+  async function revokeNewcomerToken() {
     if (
       !confirm(
-        "Revoke this guest's private visitor link? Any bookmarked URL they have will stop working. A new one will be created the next time they self-register or book."
+        "Revoke this guest's private newcomer link? Any bookmarked URL they have will stop working. A new one will be created the next time they self-register or book."
       )
     ) {
       return;
@@ -95,12 +95,12 @@ export function GuestProfileActions({
     setBusy("revoke_token");
     try {
       const res = await fetch(
-        `/api/admin/guests/${guestId}/visitor-token`,
+        `/api/admin/guests/${guestId}/newcomersor-token`,
         { method: "DELETE" }
       );
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data?.error ?? "Could not revoke visitor link.");
+        throw new Error(data?.error ?? "Could not revoke newcomer link.");
       }
       router.refresh();
     } catch (err) {
@@ -183,16 +183,16 @@ export function GuestProfileActions({
             {busy === "archive" ? "Archiving..." : "Archive"}
           </Button>
         )}
-        {hasVisitorToken ? (
+        {hasNewcomerToken ? (
           <Button
             type="button"
             size="sm"
             variant="outline"
-            onClick={revokeVisitorToken}
+            onClick={revokeNewcomerToken}
             disabled={busy !== null}
           >
             <KeyRound className="mr-1.5 h-3.5 w-3.5" />
-            {busy === "revoke_token" ? "Revoking..." : "Revoke visitor link"}
+            {busy === "revoke_token" ? "Revoking..." : "Revoke newcomer link"}
           </Button>
         ) : null}
         {visitCount === 0 ? (

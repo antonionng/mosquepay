@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 export default async function CommunicationsPage() {
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.lodgeId) {
+  if (ctx.mode !== "database" || !ctx.churchId) {
     return (
       <div className="space-y-4 sm:space-y-6">
         <div className="admin-page-head">
@@ -27,19 +27,19 @@ export default async function CommunicationsPage() {
         <EmptyState
           icon={Megaphone}
           title="Communications needs a database"
-          description="Connect Supabase and choose a lodge to send newsletters and manage templates."
+          description="Connect Supabase and choose a church to send newsletters and manage templates."
         />
       </div>
     );
   }
-  const lodgeId = ctx.lodgeId;
+  const churchId = ctx.churchId;
 
   const [templates, recentMessages, settings, members, events] = await Promise.all([
-    db.listMessageTemplates(lodgeId),
-    db.listMessages(lodgeId, { limit: 50 }),
-    db.listAutomationSettings(lodgeId),
-    db.getMembers(lodgeId, { status: "active" }),
-    db.getEvents(lodgeId),
+    db.listMessageTemplates(churchId),
+    db.listMessages(churchId, { limit: 50 }),
+    db.listAutomationSettings(churchId),
+    db.getMembers(churchId, { status: "active" }),
+    db.getEvents(churchId),
   ]);
 
   const automations = AUTOMATION_KEYS.map((key) => ({

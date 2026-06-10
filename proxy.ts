@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   STAFF_ADMIN_COOKIE,
   verifyStaffAdminCookie,
 } from "@/lib/auth/staff-cookie";
 
-const SESSION_COOKIE = "covenant_admin_session";
+const SESSION_COOKIE = "churchpay_admin_session";
 const SESSION_SECRET =
-  process.env.SESSION_SECRET ?? "covenant-dummy-secret-change-in-production";
+  process.env.SESSION_SECRET ?? "churchpay-dummy-secret-change-in-production";
 
 const SUPABASE_AUTH_COOKIE_PREFIX = "sb-";
 
@@ -30,10 +30,10 @@ function hasSupabaseSession(request: NextRequest): boolean {
 
 export function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
-  const lodgeSlug = getLodgeSlugFromRequest(request);
+  const churchSlug = getChurchSlugFromRequest(request);
 
   const response = NextResponse.next();
-  response.headers.set("x-lodge-slug", lodgeSlug);
+  response.headers.set("x-church-slug", churchSlug);
 
   if (
     path.startsWith("/admin") &&

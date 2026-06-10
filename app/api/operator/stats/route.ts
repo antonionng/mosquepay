@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import { listLodges, getLodgeSubscription, getPayments } from "@/lib/db";
+import { listChurches, getChurchSubscription, getPayments } from "@/lib/db";
 import { requireOperatorApiAuth } from "@/lib/auth/api";
 
 export async function GET() {
@@ -9,8 +9,8 @@ export async function GET() {
 
   if (!isSupabaseConfigured()) {
     return NextResponse.json({
-      lodgeCount: 0,
-      activeLodges: 0,
+      churchCount: 0,
+      activeChurches: 0,
       activeSubscriptions: 0,
       trialingSubscriptions: 0,
       totalRevenue: 0,
@@ -18,11 +18,11 @@ export async function GET() {
   }
 
   try {
-    const lodges = await listLodges();
-    const activeLodges = lodges.filter((l) => l.is_active).length;
+    const churches = await listChurches();
+    const activeChurches = churches.filter((l) => l.is_active).length;
 
     const subs = await Promise.all(
-      lodges.map((l) => getLodgeSubscription(l.id).catch(() => null))
+      churches.map((l) => getChurchSubscription(l.id).catch(() => null))
     );
     const activeSubscriptions = subs.filter(
       (s) => s?.status === "active"
@@ -31,17 +31,17 @@ export async function GET() {
       (s) => s?.status === "trialing"
     ).length;
 
-    const paymentsByLodge = await Promise.all(
-      lodges.map((l) => getPayments(l.id).catch(() => []))
+    const paymentsByChurch = await Promise.all(
+      churches.map((l) => getPayments(l.id).catch(() => []))
     );
-    const totalRevenue = paymentsByLodge
+    const totalRevenue = paymentsByChurch
       .flat()
       .filter((p) => p.status === "succeeded" || p.status === "completed")
       .reduce((sum, p) => sum + p.total_amount, 0);
 
     return NextResponse.json({
-      lodgeCount: lodges.length,
-      activeLodges,
+      churchCount: churches.length,
+      activeChurches,
       activeSubscriptions,
       trialingSubscriptions,
       totalRevenue,

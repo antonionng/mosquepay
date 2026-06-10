@@ -4,7 +4,7 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import { writeAuditLog } from "@/lib/audit";
 
 const VALID_STATUSES = new Set(["active", "completed", "paused"]);
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
   if (unauthorized) return unauthorized;
 
   try {
-    const lodgeSlug = getLodgeSlugFromRequest(request);
+    const churchSlug = getChurchSlugFromRequest(request);
     const body = await request.json();
     const name = body.name?.trim();
     const targetAmount = Number(body.target_amount);
@@ -43,15 +43,15 @@ export async function POST(request: NextRequest) {
     };
 
     if (isSupabaseConfigured()) {
-      const lodgeId = await db.resolveLodgeId(lodgeSlug);
-      if (!lodgeId) {
-        return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+      const churchId = await db.resolveChurchId(churchSlug);
+      if (!churchId) {
+        return NextResponse.json({ error: "Church not found." }, { status: 404 });
       }
-      const forbidden = await requireAdminApiPermission("charity:write", lodgeId);
+      const forbidden = await requireAdminApiPermission("charity:write", churchId);
       if (forbidden) return forbidden;
-      const campaign = await db.addCharityCampaign(lodgeId, input);
+      const campaign = await db.addCharityCampaign(churchId, input);
       await writeAuditLog({
-        lodgeId,
+        churchId,
         action: "created",
         entityType: "charity_campaign",
         entityId: campaign.id,
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
 
     const campaign = mockDb.addCharityCampaign({
       ...input,
-      lodge_slug: lodgeSlug,
+      church_slug: churchSlug,
     });
     return NextResponse.json({ campaign }, { status: 201 });
   } catch (error) {

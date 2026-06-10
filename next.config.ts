@@ -30,8 +30,8 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
-        source: "/visit/:slug",
-        destination: "/:slug/visit",
+        source: "/newcomers/:slug",
+        destination: "/:slug/newcomers",
         permanent: false,
       },
     ];

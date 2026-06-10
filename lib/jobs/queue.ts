@@ -12,14 +12,14 @@ const HANDLERS: Record<string, Handler> = {
       audience: Array<{ email: string; full_name?: string }>;
       mergeData?: Record<string, string>;
     };
-    if (!job.lodge_id) throw new Error("email.batch requires lodge_id");
+    if (!job.church_id) throw new Error("email.batch requires church_id");
     const template = await db.getMessageTemplateByKey(
-      job.lodge_id,
+      job.church_id,
       payload.templateKey
     );
     if (!template) throw new Error(`Template ${payload.templateKey} not found`);
     await sendBatch({
-      lodgeId: job.lodge_id,
+      churchId: job.church_id,
       templateKey: payload.templateKey,
       subject: template.subject ?? "",
       htmlBody: template.html_body ?? "",
@@ -32,23 +32,23 @@ const HANDLERS: Record<string, Handler> = {
   },
   "automation.run": async (job) => {
     const payload = job.payload as { key: string };
-    if (!job.lodge_id) throw new Error("automation.run requires lodge_id");
+    if (!job.church_id) throw new Error("automation.run requires church_id");
     const { AUTOMATION_KEYS } = await import("@/lib/communications/automations");
     if (!(AUTOMATION_KEYS as readonly string[]).includes(payload.key)) {
       throw new Error(`Unknown automation key: ${payload.key}`);
     }
     await runAutomation(
-      job.lodge_id,
+      job.church_id,
       payload.key as (typeof AUTOMATION_KEYS)[number]
     );
   },
-  "dues.reminders": async (job) => {
-    if (!job.lodge_id) throw new Error("dues.reminders requires lodge_id");
-    const overdue = await db.getMemberDues(job.lodge_id, { status: "overdue" });
-    for (const dues of overdue) {
-      await db.updateMemberDuesStatus(dues.id, job.lodge_id, {
+  "giving.reminders": async (job) => {
+    if (!job.church_id) throw new Error("giving.reminders requires church_id");
+    const overdue = await db.getMemberGiving(job.church_id, { status: "overdue" });
+    for (const giving of overdue) {
+      await db.updateMemberGivingStatus(giving.id, job.church_id, {
         reminder_sent_at: new Date().toISOString(),
-        reminder_count: (dues.reminder_count ?? 0) + 1,
+        reminder_count: (giving.reminder_count ?? 0) + 1,
       });
     }
   },
@@ -57,68 +57,68 @@ const HANDLERS: Record<string, Handler> = {
     // Useful as a checkpoint if you want to schedule an export and notify.
     void job;
   },
-  "welfare.alerts": async (job) => {
-    if (!job.lodge_id) throw new Error("welfare.alerts requires lodge_id");
-    const { generateWelfareAlerts } = await import("@/lib/welfare/alerts");
-    await generateWelfareAlerts(job.lodge_id);
+  "pastoral.alerts": async (job) => {
+    if (!job.church_id) throw new Error("pastoral.alerts requires church_id");
+    const { generatePastoralCareAlerts } = await import("@/lib/pastoral/alerts");
+    await generatePastoralCareAlerts(job.church_id);
   },
   // Daily cron: drives the saved-charge subscription cycles. Mooov-side
   // contract: 2026-05-28 reply, task L1.3. The handler scans for
-  // dues_schedules due today across ALL lodges in a single pass.
-  // payload.day is just an idempotency stamp; lodge_id is intentionally
+  // giving_schedules due today across ALL churches in a single pass.
+  // payload.day is just an idempotency stamp; church_id is intentionally
   // null on the job row.
-  "dues.schedule.charge": async (_job) => {
-    const { runDuesScheduleCharge } = await import(
-      "@/lib/jobs/handlers/dues-schedule-charge"
+  "giving.schedule.charge": async (_job) => {
+    const { runGivingScheduleCharge } = await import(
+      "@/lib/jobs/handlers/giving-schedule-charge"
     );
-    const summary = await runDuesScheduleCharge();
-    console.log("dues.schedule.charge summary", summary);
+    const summary = await runGivingScheduleCharge();
+    console.log("giving.schedule.charge summary", summary);
   },
-  // Daily cron: ensures member_dues rows exist for the current masonic
+  // Daily cron: ensures member_giving rows exist for the current church
   // year for every active member, the day after the year flips. Audit
   // entries flag schedules that need rolling forward (auto_renew=true
   // schedules that completed last year). v1: just flags; v2: actually
-  // re-creates the schedule against the new dues row.
-  "dues.year_start_create": async (_job) => {
-    const { runDuesYearStartCreate } = await import(
-      "@/lib/jobs/handlers/dues-year-start"
+  // re-creates the schedule against the new giving row.
+  "giving.year_start_create": async (_job) => {
+    const { runGivingYearStartCreate } = await import(
+      "@/lib/jobs/handlers/giving-year-start"
     );
-    const summary = await runDuesYearStartCreate();
-    console.log("dues.year_start_create summary", summary);
+    const summary = await runGivingYearStartCreate();
+    console.log("giving.year_start_create summary", summary);
   },
   // Daily cron: emails members in the run-up to the year flip so they
-  // can prepay or set up monthly before dues fall due. Lead time comes
-  // from lodge_dues.year_start_prompt_days. Idempotent on
+  // can prepay or set up monthly before giving fall due. Newcomer time comes
+  // from church_giving.year_start_prompt_days. Idempotent on
   // (year_id, member_email) via audit_log dedup.
-  "dues.year_start_prompt": async (_job) => {
-    const { runDuesYearStartPrompt } = await import(
-      "@/lib/jobs/handlers/dues-year-start"
+  "giving.year_start_prompt": async (_job) => {
+    const { runGivingYearStartPrompt } = await import(
+      "@/lib/jobs/handlers/giving-year-start"
     );
-    const summary = await runDuesYearStartPrompt();
-    console.log("dues.year_start_prompt summary", summary);
+    const summary = await runGivingYearStartPrompt();
+    console.log("giving.year_start_prompt summary", summary);
   },
 };
 
 /**
- * Enqueue per-lodge recurring jobs (welfare alerts daily, dues reminders weekly)
+ * Enqueue per-church recurring jobs (pastoral alerts daily, giving reminders weekly)
  * if they have not been scheduled in the current period yet. Idempotent and
  * cheap enough to run on every queue drain.
  */
 async function scheduleRecurringJobs(): Promise<void> {
-  const lodges = await db.listLodges();
+  const churches = await db.listChurches();
   const now = new Date();
   const dayKey = now.toISOString().slice(0, 10);
   const isMonday = now.getUTCDay() === 1;
   const weekKey = isMonday ? dayKey : null;
 
-  // Global (lodge_id = null) daily crons. Each handler scans all lodges
+  // Global (church_id = null) daily crons. Each handler scans all churches
   // in a single pass so we only need ONE job row per day, not one per
-  // lodge. payload.day is the dedup key.
-  const recentGlobal = await db.listJobs({ lodgeId: null, limit: 100 });
+  // church. payload.day is the dedup key.
+  const recentGlobal = await db.listJobs({ churchId: null, limit: 100 });
   const globalJobsToday: Array<{ jobType: string }> = [
-    { jobType: "dues.schedule.charge" },
-    { jobType: "dues.year_start_create" },
-    { jobType: "dues.year_start_prompt" },
+    { jobType: "giving.schedule.charge" },
+    { jobType: "giving.year_start_create" },
+    { jobType: "giving.year_start_prompt" },
   ];
   for (const { jobType } of globalJobsToday) {
     const already = recentGlobal.some(
@@ -128,7 +128,7 @@ async function scheduleRecurringJobs(): Promise<void> {
     );
     if (!already) {
       await db.enqueueJob({
-        lodge_id: null,
+        church_id: null,
         job_type: jobType,
         payload: { day: dayKey },
         scheduled_at: now.toISOString(),
@@ -138,18 +138,18 @@ async function scheduleRecurringJobs(): Promise<void> {
     }
   }
 
-  for (const lodge of lodges) {
-    const recent = await db.listJobs({ lodgeId: lodge.id, limit: 50 });
+  for (const church of churches) {
+    const recent = await db.listJobs({ churchId: church.id, limit: 50 });
 
-    const hasWelfareToday = recent.some(
+    const hasPastoralCareToday = recent.some(
       (job) =>
-        job.job_type === "welfare.alerts" &&
+        job.job_type === "pastoral.alerts" &&
         (job.payload as { day?: string } | null)?.day === dayKey
     );
-    if (!hasWelfareToday) {
+    if (!hasPastoralCareToday) {
       await db.enqueueJob({
-        lodge_id: lodge.id,
-        job_type: "welfare.alerts",
+        church_id: church.id,
+        job_type: "pastoral.alerts",
         payload: { day: dayKey },
         scheduled_at: now.toISOString(),
         max_attempts: 3,
@@ -158,15 +158,15 @@ async function scheduleRecurringJobs(): Promise<void> {
     }
 
     if (weekKey) {
-      const hasDuesThisWeek = recent.some(
+      const hasGivingThisWeek = recent.some(
         (job) =>
-          job.job_type === "dues.reminders" &&
+          job.job_type === "giving.reminders" &&
           (job.payload as { week?: string } | null)?.week === weekKey
       );
-      if (!hasDuesThisWeek) {
+      if (!hasGivingThisWeek) {
         await db.enqueueJob({
-          lodge_id: lodge.id,
-          job_type: "dues.reminders",
+          church_id: church.id,
+          job_type: "giving.reminders",
           payload: { week: weekKey },
           scheduled_at: now.toISOString(),
           max_attempts: 3,

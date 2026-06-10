@@ -7,8 +7,8 @@ import { useState, useEffect, useMemo } from "react";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { resolveLodgeSlug } from "@/lib/tenant";
-import type { LodgeSiteHeaderSettings } from "@/lib/db/types";
+import { resolveChurchSlug } from "@/lib/tenant";
+import type { ChurchSiteHeaderSettings } from "@/lib/db/types";
 import { defaultHeaderSettings } from "@/lib/site-section-style";
 import { useViewerSession } from "@/lib/hooks/use-viewer-session";
 
@@ -22,13 +22,13 @@ const marketingNavLinks = [
   { href: "/contact", label: "Contact" },
 ];
 
-type LodgeBranding = {
+type ChurchBranding = {
   slug: string;
   name: string;
   city: string | null;
   tagline: string | null;
   logo_url: string | null;
-  lodge_number: string | null;
+  church_number: string | null;
 };
 
 type TenantNavPage = {
@@ -94,8 +94,8 @@ export function PublicHeader({
   initialCustomPages = [],
   initialTenantSlug = null,
 }: {
-  initialBranding?: LodgeBranding | null;
-  initialHeaderSettings?: LodgeSiteHeaderSettings | null;
+  initialBranding?: ChurchBranding | null;
+  initialHeaderSettings?: ChurchSiteHeaderSettings | null;
   initialCustomPages?: TenantNavPage[];
   initialTenantSlug?: string | null;
 }) {
@@ -105,7 +105,7 @@ export function PublicHeader({
   const [scrolled, setScrolled] = useState(false);
   const viewer = useViewerSession();
   const isAuthed = viewer.status === "admin" || viewer.status === "member";
-  const [branding, setBranding] = useState<LodgeBranding | null>(initialBranding);
+  const [branding, setBranding] = useState<ChurchBranding | null>(initialBranding);
   const [hostTenantSlug, setHostTenantSlug] = useState<string | null>(initialTenantSlug);
   const [customNavLinks, setCustomNavLinks] = useState<NavLink[]>(
     initialCustomPages
@@ -116,16 +116,16 @@ export function PublicHeader({
         label: page.nav_label || page.title,
       }))
   );
-  const [headerSettings, setHeaderSettings] = useState<LodgeSiteHeaderSettings>(
+  const [headerSettings, setHeaderSettings] = useState<ChurchSiteHeaderSettings>(
     initialHeaderSettings ?? defaultHeaderSettings()
   );
   const isHome = pathname === "/";
-  const rawLodgeQuery = searchParams.get("lodge");
-  const queryTenantMode = Boolean(rawLodgeQuery);
+  const rawChurchQuery = searchParams.get("church");
+  const queryTenantMode = Boolean(rawChurchQuery);
   const isTenantMode = queryTenantMode || Boolean(hostTenantSlug);
-  const lodgeSlug = useMemo(
-    () => hostTenantSlug ?? resolveLodgeSlug(rawLodgeQuery),
-    [hostTenantSlug, rawLodgeQuery]
+  const churchSlug = useMemo(
+    () => hostTenantSlug ?? resolveChurchSlug(rawChurchQuery),
+    [hostTenantSlug, rawChurchQuery]
   );
   const navLinks = isTenantMode
     ? uniqueNavLinks([
@@ -139,7 +139,7 @@ export function PublicHeader({
 
   const withTenantQuery = (href: string) =>
     isTenantMode && href.startsWith("/")
-      ? `${href}${href.includes("?") ? "&" : "?"}lodge=${encodeURIComponent(lodgeSlug)}`
+      ? `${href}${href.includes("?") ? "&" : "?"}church=${encodeURIComponent(churchSlug)}`
       : href;
 
   useEffect(() => {
@@ -151,25 +151,25 @@ export function PublicHeader({
   }, []);
 
   useEffect(() => {
-    if (initialBranding && initialTenantSlug === lodgeSlug) return;
+    if (initialBranding && initialTenantSlug === churchSlug) return;
 
     let active = true;
     async function loadBranding() {
       try {
         const res = await fetch(
           queryTenantMode
-            ? `/api/lodges/${lodgeSlug}/site`
-            : "/api/lodges/current/site"
+            ? `/api/churches/${churchSlug}/site`
+            : "/api/churches/current/site"
         );
         if (!res.ok) return;
         const data = await res.json();
         if (!active) return;
-        const lodge = data.lodge as LodgeBranding | null;
+        const church = data.church as ChurchBranding | null;
         const pages = (data.site?.custom_pages ?? []) as TenantNavPage[];
-        const settings = (data.site?.header_settings ?? null) as LodgeSiteHeaderSettings | null;
-        if (lodge) {
-          setBranding(lodge);
-          if (!queryTenantMode) setHostTenantSlug(lodge.slug);
+        const settings = (data.site?.header_settings ?? null) as ChurchSiteHeaderSettings | null;
+        if (church) {
+          setBranding(church);
+          if (!queryTenantMode) setHostTenantSlug(church.slug);
         }
         setHeaderSettings(settings ?? defaultHeaderSettings());
         setCustomNavLinks(
@@ -189,7 +189,7 @@ export function PublicHeader({
     return () => {
       active = false;
     };
-  }, [initialBranding, initialTenantSlug, lodgeSlug, queryTenantMode]);
+  }, [initialBranding, initialTenantSlug, churchSlug, queryTenantMode]);
 
   const solidHeader = scrolled || !isHome;
 
@@ -199,8 +199,8 @@ export function PublicHeader({
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-6 px-5 lg:h-[4.25rem] lg:px-8">
           <Link href="/" className="flex shrink-0 items-center gap-3">
             <Image
-              src="/brand/lodgepay-sidebar-logo.png"
-              alt="LodgePay"
+              src="/brand/churchpay-sidebar-logo.png"
+              alt="ChurchPay"
               width={1032}
               height={245}
               className="h-9 w-auto max-w-[11.5rem] object-contain lg:h-10"
@@ -349,22 +349,22 @@ export function PublicHeader({
                       : "border-slate-200 bg-slate-950 text-white"
                   )}
                 >
-                  {initialsFromName(branding?.name ?? "Covenant Lodge")}
+                  {initialsFromName(branding?.name ?? "St Mary's Church")}
                 </div>
               ) : null}
-              {headerSettings.show_lodge_name || headerSettings.show_lodge_number ? (
+              {headerSettings.show_church_name || headerSettings.show_church_number ? (
                 <div className="min-w-0">
-                  {headerSettings.show_lodge_name ? (
+                  {headerSettings.show_church_name ? (
                     <p
                       className={cn(
                         "text-sm font-semibold tracking-tight transition-colors",
                         isTenantMode && !solidHeader ? "text-white" : "text-slate-950"
                       )}
                     >
-                      {branding?.name ?? "Covenant Lodge"}
+                      {branding?.name ?? "St Mary's Church"}
                     </p>
                   ) : null}
-                  {headerSettings.show_lodge_number ? (
+                  {headerSettings.show_church_number ? (
                     <p
                       className={cn(
                         "text-xs transition-colors",
@@ -372,7 +372,7 @@ export function PublicHeader({
                       )}
                     >
                       {[
-                        branding?.lodge_number ? `No. ${branding.lodge_number}` : null,
+                        branding?.church_number ? `No. ${branding.church_number}` : null,
                         branding?.city ?? "Mayfair, London",
                       ]
                         .filter(Boolean)
@@ -384,8 +384,8 @@ export function PublicHeader({
             </>
           ) : (
             <Image
-              src="/brand/lodgepay-sidebar-logo.png"
-              alt="LodgePay"
+              src="/brand/churchpay-sidebar-logo.png"
+              alt="ChurchPay"
               width={1032}
               height={245}
               className="h-9 w-auto max-w-[11.5rem] object-contain lg:h-10"
@@ -484,8 +484,8 @@ export function PublicHeader({
           {!isTenantMode ? (
             <div className="mb-2 flex items-center gap-2 px-3 py-2">
               <Image
-                src="/brand/lodgepay-sidebar-logo.png"
-                alt="LodgePay"
+                src="/brand/churchpay-sidebar-logo.png"
+                alt="ChurchPay"
                 width={1032}
                 height={245}
                 className="h-8 w-auto max-w-[10rem] object-contain"

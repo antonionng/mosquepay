@@ -8,29 +8,29 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-type LodgeOption = {
+type ChurchOption = {
   id: string;
   name: string;
   slug: string;
-  lodge_number: string | null;
-  province_id: string | null;
+  church_number: string | null;
+  network_id: string | null;
 };
 
-type ProvinceOption = {
+type NetworkOption = {
   id: string;
   name: string;
 };
 
 type AdminUser = {
   id: string;
-  lodge_id: string | null;
+  church_id: string | null;
   email: string;
   full_name: string;
   role: string;
   active: boolean;
 };
 
-type ScopeType = "lodge" | "province" | "platform";
+type ScopeType = "church" | "network" | "platform";
 
 const TENANT_ROLES = [
   ["super_admin", "Tenant owner"],
@@ -38,7 +38,7 @@ const TENANT_ROLES = [
   ["treasurer", "Treasurer"],
   ["charity_steward", "Charity Steward"],
   ["membership_officer", "Membership Officer"],
-  ["almoner", "Almoner"],
+  ["pastoral_care", "PastoralCare"],
   ["master", "Master"],
 ];
 
@@ -48,14 +48,14 @@ const PLATFORM_ROLES = [
 ];
 
 export function PlatformConsoleManager({
-  lodges,
-  provinces,
+  churches,
+  networks,
   tenantAdmins,
   platformAdmins,
   isOwner,
 }: {
-  lodges: LodgeOption[];
-  provinces: ProvinceOption[];
+  churches: ChurchOption[];
+  networks: NetworkOption[];
   tenantAdmins: AdminUser[];
   platformAdmins: AdminUser[];
   isOwner: boolean;
@@ -63,19 +63,19 @@ export function PlatformConsoleManager({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [scopeType, setScopeType] = useState<ScopeType>("lodge");
+  const [scopeType, setScopeType] = useState<ScopeType>("church");
   const [form, setForm] = useState({
     full_name: "",
     email: "",
     role: "super_admin",
-    lodge_id: lodges[0]?.id ?? "",
-    province_id: provinces[0]?.id ?? "",
+    church_id: churches[0]?.id ?? "",
+    network_id: networks[0]?.id ?? "",
     send_invite: false,
   });
 
-  const lodgeById = useMemo(
-    () => new Map(lodges.map((lodge) => [lodge.id, lodge])),
-    [lodges]
+  const churchById = useMemo(
+    () => new Map(churches.map((church) => [church.id, church])),
+    [churches]
   );
 
   function setField<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
@@ -96,8 +96,8 @@ export function PlatformConsoleManager({
           full_name: form.full_name,
           email: form.email,
           role: form.role,
-          lodge_id: form.lodge_id || null,
-          province_id: form.province_id || null,
+          church_id: form.church_id || null,
+          network_id: form.network_id || null,
           send_invite: form.send_invite,
         }),
       });
@@ -165,15 +165,15 @@ export function PlatformConsoleManager({
               Invite an admin owner
             </h2>
             <p className="mt-1 text-sm leading-relaxed text-dash-muted">
-              Add an owner to one lodge, every lodge in a province, or the
-              LodgePay platform team. Platform team invites are owner-only.
+              Add an owner to one church, every church in a network, or the
+              ChurchPay platform team. Platform team invites are owner-only.
             </p>
           </div>
         </div>
 
         <form onSubmit={submit} className="mt-5 space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
-            {(["lodge", "province", "platform"] as const).map((value) => (
+            {(["church", "network", "platform"] as const).map((value) => (
               <button
                 key={value}
                 type="button"
@@ -191,10 +191,10 @@ export function PlatformConsoleManager({
                     : "border-dash-border bg-dash-surface text-dash-muted"
                 } disabled:cursor-not-allowed disabled:opacity-50`}
               >
-                {value === "lodge"
-                  ? "Lodge"
-                  : value === "province"
-                    ? "Province"
+                {value === "church"
+                  ? "Church"
+                  : value === "network"
+                    ? "Network"
                     : "Platform team"}
               </button>
             ))}
@@ -224,32 +224,32 @@ export function PlatformConsoleManager({
             </div>
           </div>
 
-          {scopeType === "lodge" ? (
+          {scopeType === "church" ? (
             <SelectField
-              id="platform-admin-lodge"
-              label="Tenant lodge"
-              value={form.lodge_id}
-              onChange={(value) => setField("lodge_id", value)}
+              id="platform-admin-church"
+              label="Tenant church"
+              value={form.church_id}
+              onChange={(value) => setField("church_id", value)}
             >
-              {lodges.map((lodge) => (
-                <option key={lodge.id} value={lodge.id}>
-                  {lodge.name}
-                  {lodge.lodge_number ? ` No ${lodge.lodge_number}` : ""}
+              {churches.map((church) => (
+                <option key={church.id} value={church.id}>
+                  {church.name}
+                  {church.church_number ? ` No ${church.church_number}` : ""}
                 </option>
               ))}
             </SelectField>
           ) : null}
 
-          {scopeType === "province" ? (
+          {scopeType === "network" ? (
             <SelectField
-              id="platform-admin-province"
-              label="Province"
-              value={form.province_id}
-              onChange={(value) => setField("province_id", value)}
+              id="platform-admin-network"
+              label="Network"
+              value={form.network_id}
+              onChange={(value) => setField("network_id", value)}
             >
-              {provinces.map((province) => (
-                <option key={province.id} value={province.id}>
-                  {province.name}
+              {networks.map((network) => (
+                <option key={network.id} value={network.id}>
+                  {network.name}
                 </option>
               ))}
             </SelectField>
@@ -310,7 +310,7 @@ export function PlatformConsoleManager({
           </div>
           <p className="mt-1 text-sm text-dash-muted">
             Platform team members can manage tenants. Tenant owners are scoped
-            to their lodge memberships.
+            to their church memberships.
           </p>
         </div>
         <div className="max-h-[32rem] overflow-auto p-5">
@@ -324,7 +324,7 @@ export function PlatformConsoleManager({
           <AdminList
             title="Tenant admins"
             rows={tenantAdmins}
-            getScope={(admin) => lodgeById.get(admin.lodge_id ?? "")?.name ?? "Unknown lodge"}
+            getScope={(admin) => churchById.get(admin.church_id ?? "")?.name ?? "Unknown church"}
             onResetPassword={sendPasswordReset}
             busy={busy}
           />

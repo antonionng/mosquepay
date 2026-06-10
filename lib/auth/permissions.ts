@@ -9,7 +9,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { ADMIN_LODGE_COOKIE } from "@/lib/tenant";
+import { ADMIN_CHURCH_COOKIE } from "@/lib/tenant";
 
 async function getStaffAdminCookieEmail(): Promise<string | null> {
   try {
@@ -25,14 +25,14 @@ export type AdminPermission =
   | "admin:all"
   | "members:read"
   | "members:write"
-  | "meetings:write"
-  | "summons:write"
+  | "services:write"
+  | "notice:write"
   | "payments:write"
   | "charity:write"
   | "website:write"
   | "audit:read"
-  | "welfare:read"
-  | "welfare:write";
+  | "pastoral:read"
+  | "pastoral:write";
 
 export type AdminRole =
   | "super_admin"
@@ -41,28 +41,28 @@ export type AdminRole =
   | "treasurer"
   | "charity_steward"
   | "membership_officer"
-  | "almoner"
+  | "pastoral_care"
   | "master";
 
 const ROLE_PERMISSIONS: Record<AdminRole, AdminPermission[]> = {
   super_admin: ["admin:all"],
   operator: ["admin:all"],
-  // Secretary is the de facto owner of a lodge: the person who provisions
-  // the LodgePay account and is accountable for everything that happens
-  // under it (members, meetings, payments, charity, welfare, settings).
-  // Tenant isolation is still enforced by admin_users.lodge_id, so this
-  // "admin:all" is scoped to the secretary's own lodge -- not platform-wide.
+  // Secretary is the de facto owner of a church: the person who provisions
+  // the ChurchPay account and is accountable for everything that happens
+  // under it (members, services, payments, charity, pastoral, settings).
+  // Tenant isolation is still enforced by admin_users.church_id, so this
+  // "admin:all" is scoped to the secretary's own church -- not platform-wide.
   // Platform-wide god mode lives on super_admin / operator rows with
-  // lodge_id == null (see getCurrentAdminScope).
+  // church_id == null (see getCurrentAdminScope).
   secretary: ["admin:all"],
   treasurer: ["payments:write", "audit:read"],
   charity_steward: ["charity:write", "audit:read"],
   membership_officer: ["members:read", "members:write", "audit:read"],
-  almoner: ["members:read", "welfare:read", "welfare:write", "audit:read"],
+  pastoral_care: ["members:read", "pastoral:read", "pastoral:write", "audit:read"],
   master: [
     "members:read",
-    "meetings:write",
-    "summons:write",
+    "services:write",
+    "notice:write",
     "website:write",
     "audit:read",
   ],
@@ -72,7 +72,7 @@ const ROLE_PERMISSIONS: Record<AdminRole, AdminPermission[]> = {
  * Returns the canonical permission set for a role. The default fallback
  * matches what roleHasPermission used to do implicitly -- unknown role
  * strings get treated as secretary so a misconfigured admin_users row
- * doesn't accidentally lock a real lodge owner out of their own lodge.
+ * doesn't accidentally lock a real church owner out of their own church.
  */
 export function getRolePermissions(role: string | null | undefined): AdminPermission[] {
   const normalized = (role ?? "secretary") as AdminRole;
@@ -105,14 +105,14 @@ export function roleHasPermission(
   return permissions.includes("admin:all") || permissions.includes(permission);
 }
 
-export async function getCurrentAdminContext(lodgeId?: string | null) {
+export async function getCurrentAdminContext(churchId?: string | null) {
   const hasSession = await hasDummySession();
   if (!hasSession) return null;
 
-  const email = process.env.ADMIN_EMAIL ?? "admin@covenantlodge.org.uk";
+  const email = process.env.ADMIN_EMAIL ?? "admin@covenantchurch.org.uk";
   const fallbackRole = (process.env.ADMIN_ROLE ?? "super_admin") as AdminRole;
   try {
-    const admin = await db.getAdminUserByEmail(email, lodgeId);
+    const admin = await db.getAdminUserByEmail(email, churchId);
     return {
       email,
       role: admin?.role ?? fallbackRole,
@@ -123,7 +123,7 @@ export async function getCurrentAdminContext(lodgeId?: string | null) {
   }
 }
 
-export async function getCurrentStaffAdminContext(lodgeId?: string | null) {
+export async function getCurrentStaffAdminContext(churchId?: string | null) {
   // Prefer the signed staff session cookie as the authoritative identity:
   // it is issued by /api/auth/login only after a successful Supabase auth
   // and matched admin_users row, so its email is trustworthy. Using it as
@@ -149,7 +149,7 @@ export async function getCurrentStaffAdminContext(lodgeId?: string | null) {
 
   if (cookieEmail && isSupabaseConfigured()) {
     try {
-      const admin = await db.getAdminUserByEmail(cookieEmail, lodgeId);
+      const admin = await db.getAdminUserByEmail(cookieEmail, churchId);
       if (admin) {
         return {
           email: admin.email,
@@ -164,34 +164,34 @@ export async function getCurrentStaffAdminContext(lodgeId?: string | null) {
       // isn't locked out by a transient cookie-path failure.
       console.error(
         "[permissions] getAdminUserByEmail failed for staff cookie",
-        { email: cookieEmail, lodgeId, error }
+        { email: cookieEmail, churchId, error }
       );
     }
 
     // Fallback: ask the DB for every active admin_users row matching this
     // email and pick the one that proves access for the requested scope.
     // listAdminUsersByEmail uses the simpler email + active query without
-    // the ordered-by-lodge_id-desc-limit-1 shape that getAdminUserByEmail
+    // the ordered-by-church_id-desc-limit-1 shape that getAdminUserByEmail
     // uses, so it's the safer source of truth for "does this email have
     // admin access here?".
     //
-    // Tenant safety: when a lodgeId is supplied we ONLY accept a membership
-    // that either matches that lodge or is a platform-wide row. We never
-    // silently swap in a different-lodge membership -- doing so would let a
-    // lodge-scoped admin pass a permission check against a lodge they don't
+    // Tenant safety: when a churchId is supplied we ONLY accept a membership
+    // that either matches that church or is a platform-wide row. We never
+    // silently swap in a different-church membership -- doing so would let a
+    // church-scoped admin pass a permission check against a church they don't
     // administer, even though downstream queries would still target the
-    // mismatched lodge. When no lodgeId is supplied we just need to confirm
+    // mismatched church. When no churchId is supplied we just need to confirm
     // they're an admin somewhere (callers like requireAdminApiAuth use this
     // for the "is the user an admin at all?" question).
     try {
       const memberships = await db.listAdminUsersByEmail(cookieEmail);
       if (memberships.length > 0) {
-        const preferred = lodgeId
-          ? memberships.find((m) => m.lodge_id === lodgeId) ??
+        const preferred = churchId
+          ? memberships.find((m) => m.church_id === churchId) ??
             memberships.find(
-              (m) => m.lodge_id == null && isPlatformRole(m.role)
+              (m) => m.church_id == null && isPlatformRole(m.role)
             )
-          : memberships.find((m) => m.lodge_id == null) ?? memberships[0];
+          : memberships.find((m) => m.church_id == null) ?? memberships[0];
         if (preferred) {
           return {
             email: preferred.email,
@@ -203,7 +203,7 @@ export async function getCurrentStaffAdminContext(lodgeId?: string | null) {
     } catch (error) {
       console.error(
         "[permissions] listAdminUsersByEmail fallback failed",
-        { email: cookieEmail, lodgeId, error }
+        { email: cookieEmail, churchId, error }
       );
     }
   }
@@ -226,7 +226,7 @@ export async function getCurrentStaffAdminContext(lodgeId?: string | null) {
         // pair after a member-side logout.
         console.warn(
           "[permissions] staff cookie present but unresolvable to an admin",
-          { email: cookieEmail, lodgeId, supabaseError: error?.message }
+          { email: cookieEmail, churchId, supabaseError: error?.message }
         );
       }
       return null;
@@ -240,7 +240,7 @@ export async function getCurrentStaffAdminContext(lodgeId?: string | null) {
       };
     }
 
-    const admin = await db.getAdminUserByEmail(user.email, lodgeId);
+    const admin = await db.getAdminUserByEmail(user.email, churchId);
     if (admin) {
       return {
         email: admin.email,
@@ -250,16 +250,16 @@ export async function getCurrentStaffAdminContext(lodgeId?: string | null) {
     }
 
     // Same list-based fallback for the Supabase-session path. Tenant
-    // safety mirrors the staff-cookie path above: with a lodgeId we only
-    // accept a row that matches that lodge or is a platform-wide row.
+    // safety mirrors the staff-cookie path above: with a churchId we only
+    // accept a row that matches that church or is a platform-wide row.
     const memberships = await db.listAdminUsersByEmail(user.email);
     if (memberships.length === 0) return null;
-    const preferred = lodgeId
-      ? memberships.find((m) => m.lodge_id === lodgeId) ??
+    const preferred = churchId
+      ? memberships.find((m) => m.church_id === churchId) ??
         memberships.find(
-          (m) => m.lodge_id == null && isPlatformRole(m.role)
+          (m) => m.church_id == null && isPlatformRole(m.role)
         )
-      : memberships.find((m) => m.lodge_id == null) ?? memberships[0];
+      : memberships.find((m) => m.church_id == null) ?? memberships[0];
     if (!preferred) return null;
     return {
       email: preferred.email,
@@ -269,31 +269,31 @@ export async function getCurrentStaffAdminContext(lodgeId?: string | null) {
   } catch (error) {
     console.error(
       "[permissions] supabase-session admin lookup failed",
-      { lodgeId, error }
+      { churchId, error }
     );
     return null;
   }
 }
 
-export async function getCurrentAdminContextAny(lodgeId?: string | null) {
+export async function getCurrentAdminContextAny(churchId?: string | null) {
   return (
-    (await getCurrentAdminContext(lodgeId)) ??
-    (await getCurrentStaffAdminContext(lodgeId))
+    (await getCurrentAdminContext(churchId)) ??
+    (await getCurrentStaffAdminContext(churchId))
   );
 }
 
 /**
- * Authorize an admin API action against (optionally) a specific lodge.
+ * Authorize an admin API action against (optionally) a specific church.
  *
  * Authority model:
  *   1. Identity comes from getCurrentAdminScope() -- the same resolver the
  *      page side uses. As long as a user can render /admin/* the API agrees
  *      they are an admin. This closes the class of bugs where the page
  *      rendered but the API returned 401 because a single-row admin lookup
- *      (getAdminUserByEmail) couldn't reconcile the requested lodgeId.
- *   2. Tenant isolation is enforced against scope.lodgeIds. A lodge-scoped
- *      admin can never act on a lodge they don't administer, no matter what
- *      lodgeId the request resolved to.
+ *      (getAdminUserByEmail) couldn't reconcile the requested churchId.
+ *   2. Tenant isolation is enforced against scope.churchIds. A church-scoped
+ *      admin can never act on a church they don't administer, no matter what
+ *      churchId the request resolved to.
  *   3. Permission is checked against the role first, then against per-row
  *      admin_users.permissions overrides loaded best-effort.
  *
@@ -303,7 +303,7 @@ export async function getCurrentAdminContextAny(lodgeId?: string | null) {
  */
 export async function requireAdminPermission(
   permission: AdminPermission,
-  lodgeId?: string | null
+  churchId?: string | null
 ) {
   const scope = await getCurrentAdminScope();
 
@@ -311,40 +311,40 @@ export async function requireAdminPermission(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (scope.kind === "lodge" && lodgeId != null && !scope.lodgeIds.includes(lodgeId)) {
-    // The request resolved a lodgeId the admin doesn't administer. This is
-    // almost always caused by a stale ADMIN_LODGE_COOKIE -- the page-side
+  if (scope.kind === "church" && churchId != null && !scope.churchIds.includes(churchId)) {
+    // The request resolved a churchId the admin doesn't administer. This is
+    // almost always caused by a stale ADMIN_CHURCH_COOKIE -- the page-side
     // scope resolver ignores stale cookies and uses the admin's actual
-    // lodge, but the API side resolves the lodge via getLodgeSlugFromRequest
+    // church, but the API side resolves the church via getChurchSlugFromRequest
     // which reads the cookie verbatim. Self-heal the cookie on the way out
     // and tell the client to retry; their next attempt will resolve to the
-    // correct lodge.
+    // correct church.
     console.warn(
-      "[permissions] healing stale lodge cookie on out-of-scope request",
+      "[permissions] healing stale church cookie on out-of-scope request",
       {
         email: scope.email,
         role: scope.role,
         permission,
-        requestedLodgeId: lodgeId,
-        scopeLodgeId: scope.lodgeId,
-        scopeLodgeIds: scope.lodgeIds,
+        requestedChurchId: churchId,
+        scopeChurchId: scope.churchId,
+        scopeChurchIds: scope.churchIds,
       }
     );
 
     const response = NextResponse.json(
       {
         error:
-          "Your lodge selection was out of date. We've refreshed it -- please retry.",
-        code: "lodge_cookie_healed",
+          "Your church selection was out of date. We've refreshed it -- please retry.",
+        code: "church_cookie_healed",
         retry: true,
       },
       { status: 409 }
     );
 
     try {
-      const adminLodge = await db.getLodgeById(scope.lodgeId);
-      if (adminLodge?.slug) {
-        response.cookies.set(ADMIN_LODGE_COOKIE, adminLodge.slug, {
+      const adminChurch = await db.getChurchById(scope.churchId);
+      if (adminChurch?.slug) {
+        response.cookies.set(ADMIN_CHURCH_COOKIE, adminChurch.slug, {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
           sameSite: "lax",
@@ -354,8 +354,8 @@ export async function requireAdminPermission(
       }
     } catch (error) {
       console.error(
-        "[permissions] failed to heal ADMIN_LODGE_COOKIE on out-of-scope request",
-        { email: scope.email, scopeLodgeId: scope.lodgeId, error }
+        "[permissions] failed to heal ADMIN_CHURCH_COOKIE on out-of-scope request",
+        { email: scope.email, scopeChurchId: scope.churchId, error }
       );
     }
 
@@ -370,7 +370,7 @@ export async function requireAdminPermission(
   // per-row overrides in the permissions[] column. Honor those before
   // returning 403.
   try {
-    const overrides = await db.getAdminUserByEmail(scope.email, lodgeId);
+    const overrides = await db.getAdminUserByEmail(scope.email, churchId);
     if (overrides?.permissions?.includes(permission)) {
       return null;
     }
@@ -380,7 +380,7 @@ export async function requireAdminPermission(
     // per-row overrides couldn't be loaded.
     console.error(
       "[permissions] per-row permission override lookup failed",
-      { email: scope.email, lodgeId, permission, error }
+      { email: scope.email, churchId, permission, error }
     );
   }
 
@@ -392,11 +392,11 @@ export type AdminScope =
   | { kind: "dummy"; email: string; role: AdminRole }
   | { kind: "platform"; email: string; role: AdminRole }
   | {
-      kind: "lodge";
+      kind: "church";
       email: string;
       role: AdminRole;
-      lodgeId: string;
-      lodgeIds: string[];
+      churchId: string;
+      churchIds: string[];
     };
 
 function isPlatformRole(role: string | null | undefined): role is AdminRole {
@@ -405,13 +405,13 @@ function isPlatformRole(role: string | null | undefined): role is AdminRole {
 
 /**
  * Resolves the current admin actor into a scope describing whether they are
- * the dev dummy admin, a platform-wide admin (lodge_id null with a platform
- * role), or a lodge-scoped admin. Used to gate cross-lodge actions like the
- * lodge switcher.
+ * the dev dummy admin, a platform-wide admin (church_id null with a platform
+ * role), or a church-scoped admin. Used to gate cross-church actions like the
+ * church switcher.
  */
 export async function getCurrentAdminScope(): Promise<AdminScope> {
   if (await hasDummySession()) {
-    const email = process.env.ADMIN_EMAIL ?? "admin@covenantlodge.org.uk";
+    const email = process.env.ADMIN_EMAIL ?? "admin@covenantchurch.org.uk";
     const role = (process.env.ADMIN_ROLE ?? "super_admin") as AdminRole;
     return { kind: "dummy", email, role };
   }
@@ -461,7 +461,7 @@ export async function getCurrentAdminScope(): Promise<AdminScope> {
     if (memberships.length === 0) return { kind: "none" };
 
     const platformAdmin = memberships.find(
-      (admin) => admin.lodge_id == null && isPlatformRole(admin.role)
+      (admin) => admin.church_id == null && isPlatformRole(admin.role)
     );
 
     if (platformAdmin) {
@@ -472,16 +472,16 @@ export async function getCurrentAdminScope(): Promise<AdminScope> {
       };
     }
 
-    const lodgeMemberships = memberships.filter((admin) => admin.lodge_id);
-    const primary = lodgeMemberships[0];
-    if (primary?.lodge_id) {
+    const churchMemberships = memberships.filter((admin) => admin.church_id);
+    const primary = churchMemberships[0];
+    if (primary?.church_id) {
       return {
-        kind: "lodge",
+        kind: "church",
         email: primary.email,
         role: primary.role as AdminRole,
-        lodgeId: primary.lodge_id,
-        lodgeIds: Array.from(
-          new Set(lodgeMemberships.flatMap((admin) => admin.lodge_id ?? []))
+        churchId: primary.church_id,
+        churchIds: Array.from(
+          new Set(churchMemberships.flatMap((admin) => admin.church_id ?? []))
         ),
       };
     }

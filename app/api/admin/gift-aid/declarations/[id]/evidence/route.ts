@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as db from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -37,15 +37,15 @@ export async function GET(
     );
   }
   const { id } = await params;
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("charity:write", lodgeId);
+  const forbidden = await requireAdminApiPermission("charity:write", churchId);
   if (forbidden) return forbidden;
 
-  const declaration = await db.getGiftAidDeclarationById(id, lodgeId);
+  const declaration = await db.getGiftAidDeclarationById(id, churchId);
   if (!declaration) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
@@ -76,13 +76,13 @@ export async function GET(
 
   let actorEmail: string | null = null;
   try {
-    const admin = await getCurrentAdminContextAny(lodgeId);
+    const admin = await getCurrentAdminContextAny(churchId);
     actorEmail = admin?.email ?? null;
   } catch {
     /* non-fatal */
   }
   try {
-    await db.insertGiftAidDeclarationEvent(lodgeId, {
+    await db.insertGiftAidDeclarationEvent(churchId, {
       declaration_id: id,
       event_type: "evidence_downloaded",
       actor_kind: "admin",

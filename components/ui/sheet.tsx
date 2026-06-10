@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 //   slide in from the right depending on `side`.
 //
 // Migration target: every "fixed inset-0 z-50 flex justify-end" drawer
-// across the admin (members add, meetings wizard, sequences editor,
+// across the admin (members add, services wizard, sequences editor,
 // templates marketplace, etc.). Centralising the chrome lets us evolve
 // keyboard handling, focus traps, drag-to-dismiss, etc. once.
 

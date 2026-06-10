@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getLodgeSlugFromRequest } from "@/lib/tenant";
+import { getChurchSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -14,12 +14,12 @@ const SAMPLE_MEMBERS: Array<{
   rank: string;
   office_title: string | null;
 }> = [
-  { full_name: "Sample · James Carter", email: "sample-james@example.com", rank: "Master", office_title: "Worshipful Master" },
+  { full_name: "Sample · James Carter", email: "sample-james@example.com", rank: "Master", office_title: "Lead Pastor" },
   { full_name: "Sample · Robert Hughes", email: "sample-robert@example.com", rank: "MM", office_title: "Senior Warden" },
   { full_name: "Sample · Edward Fielding", email: "sample-edward@example.com", rank: "MM", office_title: "Junior Warden" },
   { full_name: "Sample · Thomas Whitaker", email: "sample-thomas@example.com", rank: "PM", office_title: "Treasurer" },
   { full_name: "Sample · Michael Anderson", email: "sample-michael@example.com", rank: "PM", office_title: "Secretary" },
-  { full_name: "Sample · Daniel Reyes", email: "sample-daniel@example.com", rank: "MM", office_title: "Almoner" },
+  { full_name: "Sample · Daniel Reyes", email: "sample-daniel@example.com", rank: "MM", office_title: "PastoralCare" },
   { full_name: "Sample · William Pearce", email: "sample-william@example.com", rank: "MM", office_title: "Charity Steward" },
   { full_name: "Sample · George Holmes", email: "sample-george@example.com", rank: "FC", office_title: null },
 ];
@@ -30,9 +30,9 @@ const SAMPLE_LEADS: Array<{
   email: string;
   stage: string;
 }> = [
-  { first_name: "Sample", last_name: "Aaron Webb", email: "sample-lead-aaron@example.com", stage: "new" },
-  { first_name: "Sample", last_name: "Henry Patel", email: "sample-lead-henry@example.com", stage: "interview_scheduled" },
-  { first_name: "Sample", last_name: "Oliver King", email: "sample-lead-oliver@example.com", stage: "ballot_pending" },
+  { first_name: "Sample", last_name: "Aaron Webb", email: "sample-newcomer-aaron@example.com", stage: "new" },
+  { first_name: "Sample", last_name: "Henry Patel", email: "sample-newcomer-henry@example.com", stage: "interview_scheduled" },
+  { first_name: "Sample", last_name: "Oliver King", email: "sample-newcomer-oliver@example.com", stage: "membership decision_pending" },
 ];
 
 function isSampleEmail(email: string | null | undefined): boolean {
@@ -49,22 +49,22 @@ export async function POST(request: NextRequest) {
       { status: 503 }
     );
   }
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("admin:all", lodgeId);
+  const forbidden = await requireAdminApiPermission("admin:all", churchId);
   if (forbidden) return forbidden;
 
-  const created = { members: 0, leads: 0, events: 0, dues: 0, donations: 0 };
+  const created = { members: 0, newcomers: 0, events: 0, giving: 0, donations: 0 };
 
-  const existingMembers = await db.getMembers(lodgeId, {});
+  const existingMembers = await db.getMembers(churchId, {});
   const existingEmails = new Set(existingMembers.map((m) => m.email?.toLowerCase()));
   for (const m of SAMPLE_MEMBERS) {
     if (existingEmails.has(m.email)) continue;
     try {
-      await db.createMember(lodgeId, {
+      await db.createMember(churchId, {
         full_name: m.full_name,
         email: m.email,
         phone: null,
@@ -83,9 +83,9 @@ export async function POST(request: NextRequest) {
         country_list: false,
         honorary: false,
         dietary_requirements: null,
-        date_of_initiation: null,
+        date_of_membership: null,
         auth_user_id: null,
-        initiation_email_sent: false,
+        membership_email_sent: false,
         stripe_customer_id: null,
       });
       created.members++;
@@ -94,12 +94,12 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const existingLeads = await db.getLeads(lodgeId, {});
-  const existingLeadEmails = new Set(existingLeads.map((l) => l.email?.toLowerCase()));
+  const existingNewcomers = await db.getNewcomers(churchId, {});
+  const existingNewcomerEmails = new Set(existingNewcomers.map((l) => l.email?.toLowerCase()));
   for (const l of SAMPLE_LEADS) {
-    if (existingLeadEmails.has(l.email)) continue;
+    if (existingNewcomerEmails.has(l.email)) continue;
     try {
-      await db.addLead(lodgeId, {
+      await db.addNewcomer(churchId, {
         first_name: l.first_name,
         last_name: l.last_name,
         email: l.email,
@@ -117,11 +117,11 @@ export async function POST(request: NextRequest) {
         next_step: null,
         next_step_due_date: null,
         proposal_date: null,
-        ballot_date: null,
+        membership_decision_date: null,
         interview_completed_at: null,
         consent_given_at: null,
-      } as Parameters<typeof db.addLead>[1]);
-      created.leads++;
+      } as Parameters<typeof db.addNewcomer>[1]);
+      created.newcomers++;
     } catch {
       // ignore
     }
@@ -131,18 +131,18 @@ export async function POST(request: NextRequest) {
   const upcoming = new Date(today);
   upcoming.setDate(upcoming.getDate() + 21);
   const slug = `sample-regular-${upcoming.toISOString().slice(0, 10)}`;
-  const existingEvents = await db.getEvents(lodgeId, {});
+  const existingEvents = await db.getEvents(churchId, {});
   const existingSlugs = new Set(existingEvents.map((e) => e.slug));
   if (!existingSlugs.has(slug)) {
     try {
-      await db.addEvent(lodgeId, {
-        title: "Sample · Regular meeting",
+      await db.addEvent(churchId, {
+        title: "Sample · Regular service",
         slug,
-        description: "Demo meeting created by the sample data starter kit.",
-        event_type: "lodge_meeting",
+        description: "Demo service created by the sample data starter kit.",
+        event_type: "church_service",
         event_date: upcoming.toISOString(),
         event_time: "18:30",
-        location: "Mark Masons' Hall",
+        location: "Mark members' Hall",
         temple_room: null,
         dress_code: "Morning dress",
         enable_rsvp: true,
@@ -151,19 +151,19 @@ export async function POST(request: NextRequest) {
         enable_payments: false,
         enable_dining_rsvp: true,
         dining_price: 35,
-        dining_description: "Festive board after the meeting",
+        dining_description: "Festive board after the service",
         enable_charity_donation: true,
-        charity_name: "Lodge Benevolent Fund",
-        charity_description: "Supporting brethren and their families.",
+        charity_name: "Church Benevolent Fund",
+        charity_description: "Supporting members and their families.",
         charity_suggested_amounts: [10, 20, 50, 100],
         charity_allow_custom: true,
         enable_raffle_donation: false,
         raffle_description: "Help fund evening raffle prizes",
         raffle_suggested_amounts: [5, 10, 20, 50],
         raffle_allow_custom: true,
-        enable_meeting_fee: false,
-        meeting_fee_amount: null,
-        meeting_fee_description: null,
+        enable_service_fee: false,
+        service_fee_amount: null,
+        service_fee_description: null,
         enable_guest_tickets: false,
         guest_ticket_price: null,
         guest_ticket_description: null,
@@ -180,11 +180,11 @@ export async function POST(request: NextRequest) {
   const thisYear = today.getFullYear();
   for (const m of SAMPLE_MEMBERS) {
     try {
-      await db.createMemberDues(lodgeId, {
+      await db.createMemberGiving(churchId, {
         member_email: m.email,
         member_name: m.full_name,
         member_id: null,
-        dues_id: null,
+        giving_id: null,
         amount: 200,
         currency: "gbp",
         period_start: `${thisYear}-09-01`,
@@ -195,17 +195,17 @@ export async function POST(request: NextRequest) {
         stripe_subscription_id: null,
         paid_at: null,
       });
-      created.dues++;
+      created.giving++;
     } catch {
       // ignore (e.g. duplicate)
     }
   }
 
   await writeAuditLog({
-    lodgeId,
+    churchId,
     action: "sample_data_seeded",
-    entityType: "lodge",
-    entityId: lodgeId,
+    entityType: "church",
+    entityId: churchId,
     summary: "Sample data starter kit applied",
     metadata: created,
   });
@@ -222,21 +222,21 @@ export async function DELETE(request: NextRequest) {
       { status: 503 }
     );
   }
-  const lodgeSlug = getLodgeSlugFromRequest(request);
-  const lodgeId = await db.resolveLodgeId(lodgeSlug);
-  if (!lodgeId) {
-    return NextResponse.json({ error: "Lodge not found." }, { status: 404 });
+  const churchSlug = getChurchSlugFromRequest(request);
+  const churchId = await db.resolveChurchId(churchSlug);
+  if (!churchId) {
+    return NextResponse.json({ error: "Church not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("admin:all", lodgeId);
+  const forbidden = await requireAdminApiPermission("admin:all", churchId);
   if (forbidden) return forbidden;
 
-  const removed = { members: 0, leads: 0, events: 0 };
+  const removed = { members: 0, newcomers: 0, events: 0 };
 
-  const members = await db.getMembers(lodgeId, {});
+  const members = await db.getMembers(churchId, {});
   for (const m of members) {
     if (isSampleEmail(m.email)) {
       try {
-        await db.archiveMember(m.id, lodgeId, "Sample data cleanup");
+        await db.archiveMember(m.id, churchId, "Sample data cleanup");
         removed.members++;
       } catch {
         // ignore
@@ -244,23 +244,23 @@ export async function DELETE(request: NextRequest) {
     }
   }
 
-  const leads = await db.getLeads(lodgeId, {});
-  for (const l of leads) {
+  const newcomers = await db.getNewcomers(churchId, {});
+  for (const l of newcomers) {
     if (isSampleEmail(l.email)) {
       try {
-        await db.updateLead(l.id, lodgeId, { stage: "declined" });
-        removed.leads++;
+        await db.updateNewcomer(l.id, churchId, { stage: "declined" });
+        removed.newcomers++;
       } catch {
         // ignore
       }
     }
   }
 
-  const events = await db.getEvents(lodgeId, {});
+  const events = await db.getEvents(churchId, {});
   for (const e of events) {
     if (e.slug.startsWith("sample-regular-")) {
       try {
-        await db.updateEvent(e.id, lodgeId, { published: false });
+        await db.updateEvent(e.id, churchId, { published: false });
         removed.events++;
       } catch {
         // ignore
@@ -269,10 +269,10 @@ export async function DELETE(request: NextRequest) {
   }
 
   await writeAuditLog({
-    lodgeId,
+    churchId,
     action: "sample_data_cleared",
-    entityType: "lodge",
-    entityId: lodgeId,
+    entityType: "church",
+    entityId: churchId,
     summary: "Sample data starter kit cleared",
     metadata: removed,
   });

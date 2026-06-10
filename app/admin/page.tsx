@@ -30,7 +30,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const CLOSED_STAGES = new Set(["initiated", "declined"]);
+const CLOSED_STAGES = new Set(["welcomed", "declined"]);
 
 type KpiAccent = "brand" | "brandLight" | "emerald" | "amber";
 
@@ -47,39 +47,39 @@ const kpiAccentIcon: Record<
 export default async function AdminDashboardPage() {
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
-  const lodgeId = ctx.mode === "database" ? ctx.lodgeId : null;
+  const churchId = ctx.mode === "database" ? ctx.churchId : null;
 
-  const leads = useMock
-    ? mockDb.getLeads()
-    : lodgeId
-      ? await db.getLeads(lodgeId)
+  const newcomers = useMock
+    ? mockDb.getNewcomers()
+    : churchId
+      ? await db.getNewcomers(churchId)
       : [];
   const allEvents = useMock
     ? mockDb.getEvents({ published: true })
-    : lodgeId
-      ? await db.getEvents(lodgeId, { published: true })
+    : churchId
+      ? await db.getEvents(churchId, { published: true })
       : [];
   const upcomingEvents = useMock
     ? mockDb.getEvents({ published: true, upcoming: true })
-    : lodgeId
-      ? await db.getEvents(lodgeId, { published: true, upcoming: true })
+    : churchId
+      ? await db.getEvents(churchId, { published: true, upcoming: true })
       : [];
   const payments = useMock
     ? mockDb.getPayments()
-    : lodgeId
-      ? await db.getPayments(lodgeId)
+    : churchId
+      ? await db.getPayments(churchId)
       : [];
   const succeededPayments = payments.filter((p) => p.status === "succeeded");
   const blogPosts = useMock
     ? mockDb.getBlogPosts()
-    : lodgeId
-      ? await db.getBlogPosts(lodgeId)
+    : churchId
+      ? await db.getBlogPosts(churchId)
       : [];
   const publishedPosts = blogPosts.filter((p) => p.published);
   const campaigns = useMock
     ? mockDb.getCharityCampaigns()
-    : lodgeId
-      ? await db.getCharityCampaigns(lodgeId)
+    : churchId
+      ? await db.getCharityCampaigns(churchId)
       : [];
   const activeCampaigns = campaigns.filter((c) => c.status === "active");
 
@@ -87,8 +87,8 @@ export default async function AdminDashboardPage() {
   for (const event of upcomingEvents) {
     const rsvps = useMock
       ? mockDb.getRsvpsByEventId(event.id)
-      : lodgeId
-        ? await db.getRsvpsByEventId(event.id, lodgeId)
+      : churchId
+        ? await db.getRsvpsByEventId(event.id, churchId)
         : [];
     rsvpData[event.id] = rsvps.map((r) => ({
       payment_completed: r.payment_completed,
@@ -106,13 +106,13 @@ export default async function AdminDashboardPage() {
     return dl && new Date(dl) < now;
   }).length;
 
-  const newEnquiries = leads.filter(
+  const newEnquiries = newcomers.filter(
     (l) => l.stage === "expression_of_interest" || l.stage === "new_enquiry"
   ).length;
-  const assignedLeads = leads.filter((l) => Boolean(l.assigned_to)).length;
-  const closedOutcomes = leads.filter((l) => CLOSED_STAGES.has(l.stage)).length;
-  const initiatedCount = leads.filter((l) => l.stage === "initiated").length;
-  const declinedCount = leads.filter((l) => l.stage === "declined").length;
+  const assignedNewcomers = newcomers.filter((l) => Boolean(l.assigned_to)).length;
+  const closedOutcomes = newcomers.filter((l) => CLOSED_STAGES.has(l.stage)).length;
+  const welcomedCount = newcomers.filter((l) => l.stage === "welcomed").length;
+  const declinedCount = newcomers.filter((l) => l.stage === "declined").length;
 
   const totalRevenue = succeededPayments.reduce((s, p) => s + p.total_amount, 0);
   const chartYear = now.getFullYear();
@@ -132,7 +132,7 @@ export default async function AdminDashboardPage() {
 
   type AssigneeStats = { total: number; pipeline: number; closed: number };
   const byAssignee = new Map<string, AssigneeStats>();
-  for (const l of leads) {
+  for (const l of newcomers) {
     const key = l.assigned_to?.trim() || "Unassigned";
     const cur = byAssignee.get(key) ?? { total: 0, pipeline: 0, closed: 0 };
     cur.total += 1;
@@ -144,7 +144,7 @@ export default async function AdminDashboardPage() {
     .map(([name, s]) => ({ name, ...s }))
     .sort((a, b) => b.total - a.total);
 
-  const leaderboard = teamRows.slice(0, 6);
+  const newcomererboard = teamRows.slice(0, 6);
 
   const pendingActions = [
     ...(unpaidRsvps > 0
@@ -153,11 +153,11 @@ export default async function AdminDashboardPage() {
     ...(expiredDeadlines > 0
       ? [{ label: `${expiredDeadlines} expired RSVP deadline${expiredDeadlines > 1 ? "s" : ""}`, href: "/admin/events" as const }]
       : []),
-    ...(leads.filter((l) => l.stage === "expression_of_interest").length > 0
+    ...(newcomers.filter((l) => l.stage === "expression_of_interest").length > 0
       ? [
           {
-            label: `${leads.filter((l) => l.stage === "expression_of_interest").length} new enquiries to follow up`,
-            href: "/admin/leads" as const,
+            label: `${newcomers.filter((l) => l.stage === "expression_of_interest").length} new enquiries to follow up`,
+            href: "/admin/newcomers" as const,
           },
         ]
       : []),
@@ -172,26 +172,26 @@ export default async function AdminDashboardPage() {
     accent: KpiAccent;
   }> = [
     {
-      label: "Total leads",
-      value: String(leads.length),
+      label: "Total newcomers",
+      value: String(newcomers.length),
       hint: `${newEnquiries} new / open enquiries`,
-      href: "/admin/leads",
+      href: "/admin/newcomers",
       icon: Users,
       accent: "brand",
     },
     {
-      label: "Assigned leads",
-      value: String(assignedLeads),
-      hint: `${Math.max(0, leads.length - assignedLeads)} unassigned`,
-      href: "/admin/leads",
+      label: "Assigned newcomers",
+      value: String(assignedNewcomers),
+      hint: `${Math.max(0, newcomers.length - assignedNewcomers)} unassigned`,
+      href: "/admin/newcomers",
       icon: UserCheck,
       accent: "brandLight",
     },
     {
       label: "Closed outcomes",
       value: String(closedOutcomes),
-      hint: `${initiatedCount} initiated · ${declinedCount} declined`,
-      href: "/admin/leads",
+      hint: `${welcomedCount} welcomed · ${declinedCount} declined`,
+      href: "/admin/newcomers",
       icon: CheckCircle2,
       accent: "emerald",
     },
@@ -211,7 +211,7 @@ export default async function AdminDashboardPage() {
         <div>
           <h1 className="admin-page-title">Dashboard</h1>
           <p className="admin-page-copy">
-            Lodge pipeline, events, and payments in one place. Same data as your CRM and checkout.
+            Church pipeline, events, and payments in one place. Same data as your CRM and checkout.
           </p>
         </div>
       </div>
@@ -287,7 +287,7 @@ export default async function AdminDashboardPage() {
         </Link>
       </div>
 
-      {/* Main chart + leaderboard */}
+      {/* Main chart + newcomererboard */}
       <div className="grid gap-4 sm:gap-6 xl:grid-cols-3">
         <Card variant="panel" className="xl:col-span-2 overflow-hidden p-0">
           <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
@@ -332,21 +332,21 @@ export default async function AdminDashboardPage() {
         <Card variant="panel" className="overflow-hidden p-0">
           <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
             <div>
-              <h2 className="dash-panel-header-title">Assignee leaderboard</h2>
-              <p className="dash-panel-header-description">Leads by owner. Pipeline vs closed.</p>
+              <h2 className="dash-panel-header-title">Assignee newcomererboard</h2>
+              <p className="dash-panel-header-description">Newcomers by owner. Pipeline vs closed.</p>
             </div>
             <Link
-              href="/admin/leads"
+              href="/admin/newcomers"
               className="text-xs font-medium text-dash-ring hover:underline"
             >
               CRM
             </Link>
           </div>
           <CardContent className="space-y-1 p-3">
-            {leaderboard.length === 0 ? (
+            {newcomererboard.length === 0 ? (
               <p className="px-3 py-6 text-center text-sm text-dash-muted">No assignee data yet.</p>
             ) : (
-              leaderboard.map((row, idx) => (
+              newcomererboard.map((row, idx) => (
                 <div
                   key={row.name}
                   className={cn(
@@ -379,14 +379,14 @@ export default async function AdminDashboardPage() {
           <div>
             <h2 className="dash-panel-header-title">Team performance</h2>
             <p className="dash-panel-header-description">
-              Coverage across assignees; closed includes initiated and declined outcomes.
+              Coverage across assignees; closed includes welcomed and declined outcomes.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary">{leads.length} total leads</Badge>
+            <Badge variant="secondary">{newcomers.length} total newcomers</Badge>
             <Badge variant="outline" className="border-dash-border bg-dash-surface">
               <CheckCircle2 className="mr-1 h-3 w-3 text-emerald-600" />
-              {initiatedCount} initiated
+              {welcomedCount} welcomed
             </Badge>
             <Badge variant="outline" className="border-dash-border bg-dash-surface">
               <XCircle className="mr-1 h-3 w-3 text-red-600" />
@@ -396,13 +396,13 @@ export default async function AdminDashboardPage() {
         </div>
         <div className="border-t border-dash-border bg-dash-surface p-0">
           {teamRows.length === 0 ? (
-            <p className="p-8 text-center text-sm text-slate-500">No leads to show.</p>
+            <p className="p-8 text-center text-sm text-slate-500">No newcomers to show.</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead>Assignee</TableHead>
-                  <TableHead className="text-right">Total leads</TableHead>
+                  <TableHead className="text-right">Total newcomers</TableHead>
                   <TableHead className="text-right">In pipeline</TableHead>
                   <TableHead className="text-right">Closed</TableHead>
                   <TableHead className="w-[100px] text-right">Share</TableHead>
@@ -410,7 +410,7 @@ export default async function AdminDashboardPage() {
               </TableHeader>
               <TableBody>
                 {teamRows.map((row) => {
-                  const share = leads.length > 0 ? Math.round((row.total / leads.length) * 100) : 0;
+                  const share = newcomers.length > 0 ? Math.round((row.total / newcomers.length) * 100) : 0;
                   return (
                     <TableRow key={row.name}>
                       <TableCell className="font-medium">{row.name}</TableCell>
@@ -452,7 +452,7 @@ export default async function AdminDashboardPage() {
             Payments
           </Link>
           <Link
-            href="/admin/leads/kanban"
+            href="/admin/newcomers/kanban"
             className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-dash-muted hover:text-dash-text"
           >
             Pipeline board <ArrowRight className="h-3 w-3" />
