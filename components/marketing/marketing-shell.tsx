@@ -8,6 +8,7 @@ import { Menu, X, ArrowRight } from "lucide-react";
 
 const NAV_LINKS = [
   { href: "/features", label: "Features" },
+  { href: "/networks", label: "Networks" },
   { href: "/pricing", label: "Pricing" },
   { href: "/faq", label: "FAQ" },
   { href: "/about", label: "About" },
@@ -19,6 +20,7 @@ const FOOTER_COLUMNS = [
     title: "Product",
     links: [
       { href: "/features", label: "Features" },
+      { href: "/networks", label: "For networks & dioceses" },
       { href: "/pricing", label: "Pricing" },
       { href: "/book-demo", label: "Book a demo" },
       { href: "/news", label: "Product news" },

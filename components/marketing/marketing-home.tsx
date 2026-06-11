@@ -10,7 +10,9 @@ import {
   HandHeart,
   HeartHandshake,
   PoundSterling,
+  QrCode,
   Sparkles,
+  Target,
   Users,
 } from "lucide-react";
 import { PLAN_DEFINITIONS } from "@/lib/billing/plans";
@@ -26,12 +28,6 @@ import {
   GivingClaimMock,
   NewcomerPipelineMock,
 } from "@/components/marketing/feature-mini-mocks";
-
-const HERO_STATS = [
-  { value: "25%", label: "Gift Aid on every eligible gift" },
-  { value: "1", label: "shared record for the whole team" },
-  { value: "0", label: "spreadsheets at month-end" },
-];
 
 const PILLARS = [
   {
@@ -66,11 +62,34 @@ const PILLARS = [
   },
 ];
 
+const CHARITY_POINTS = [
+  {
+    Icon: Target,
+    title: "Campaigns with targets",
+    body: "Run a building fund appeal, a mission appeal, or a Christmas collection as a named campaign with its own target and progress. Every gift is recorded against the right appeal.",
+  },
+  {
+    Icon: QrCode,
+    title: "A giving link for every appeal",
+    body: "Each campaign gets its own QR code and giving page. Put it on the screen, the notice sheet, or the pew card and gifts arrive already labelled.",
+  },
+  {
+    Icon: HandHeart,
+    title: "Gift Aid on charity gifts too",
+    body: "Declarations are captured at the moment of giving, and GASDS evidence is logged for cash collections, so charitable appeals claim the same 25% as regular giving.",
+  },
+  {
+    Icon: BarChart3,
+    title: "Reporting your PCC will trust",
+    body: "Donations report by campaign, so your treasurer can show exactly what came in for each appeal and what it was given for. No more untangling a single giving total.",
+  },
+];
+
 const HOW_IT_WORKS = [
   {
     step: "1",
-    title: "We set up your church",
-    body: "Bring your member list and giving records. We help you import everything, brand your site, and connect payments.",
+    title: "Get set up in days",
+    body: "A guided setup wizard walks you through importing members and giving records, branding your site, and connecting payments. Our team is on hand whenever you want help.",
   },
   {
     step: "2",
@@ -153,15 +172,6 @@ export function MarketingHome() {
                 Explore features
               </Link>
             </div>
-            <dl className="mt-12 grid max-w-lg grid-cols-3 gap-6">
-              {HERO_STATS.map((stat) => (
-                <div key={stat.label}>
-                  <dt className="sr-only">{stat.label}</dt>
-                  <dd className="font-heading text-3xl font-bold text-brand">{stat.value}</dd>
-                  <dd className="mt-1 text-xs leading-5 text-slate-500">{stat.label}</dd>
-                </div>
-              ))}
-            </dl>
           </div>
           <div className="relative">
             <div
@@ -268,6 +278,48 @@ export function MarketingHome() {
 
       {/* In-person giving terminal */}
       <TerminalShowcase />
+
+      {/* Charity & designated giving */}
+      <MarketingSection>
+        <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-16">
+          <div>
+            <MarketingKicker>Charity &amp; designated giving</MarketingKicker>
+            <h2 className="mt-4 font-heading text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+              Building fund, mission appeal, Christmas collection. Each gift lands where it was
+              meant to.
+            </h2>
+            <p className="mt-5 text-base leading-7 text-slate-600">
+              Most churches run more than one pot: the general fund, a building appeal, a
+              mission partner, a seasonal collection. ChurchPay lets you run each one as a
+              named campaign with its own giving link, so designated gifts stay designated
+              from the moment of giving through to the treasurer&apos;s report.
+            </p>
+            <Link
+              href="/charity"
+              className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-brand transition-colors hover:text-brand-dark"
+            >
+              See how charity giving works
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="grid gap-5 sm:grid-cols-2">
+            {CHARITY_POINTS.map(({ Icon, title, body }) => (
+              <article
+                key={title}
+                className="rounded-3xl border border-[#e9e2d4] bg-white p-7 shadow-sm"
+              >
+                <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-brand/8 text-brand">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <h3 className="mt-4 font-heading text-base font-semibold text-slate-900">
+                  {title}
+                </h3>
+                <p className="mt-2.5 text-sm leading-6 text-slate-600">{body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </MarketingSection>
 
       {/* How it works */}
       <MarketingSection tinted>
@@ -398,6 +450,30 @@ export function MarketingHome() {
               </Link>
             </div>
           ))}
+        </div>
+      </MarketingSection>
+
+      {/* Networks teaser */}
+      <MarketingSection>
+        <div className="flex flex-col items-start justify-between gap-6 rounded-[2rem] border border-[#e9e2d4] bg-white p-8 shadow-sm lg:flex-row lg:items-center lg:p-12">
+          <div className="max-w-2xl">
+            <MarketingKicker>For networks &amp; denominations</MarketingKicker>
+            <h2 className="mt-3 font-heading text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+              Overseeing a diocese, circuit, association, or network of churches?
+            </h2>
+            <p className="mt-3 text-base leading-7 text-slate-600">
+              Roll ChurchPay out across every church in your care, with central oversight,
+              cross-church reporting, one invoice, and each church keeping its own identity
+              and bank account.
+            </p>
+          </div>
+          <Link
+            href="/networks"
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-brand px-7 py-3.5 text-sm font-semibold text-white shadow-[0_12px_28px_-8px_rgba(11,67,184,0.5)] transition-colors hover:bg-brand-dark"
+          >
+            ChurchPay for networks
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
       </MarketingSection>
 

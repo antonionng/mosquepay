@@ -24,13 +24,11 @@ import {
   BarChart3,
   CalendarDays,
   Check,
-  CreditCard,
   HandHeart,
   LayoutDashboard,
   Shield,
   TrendingUp,
   UserCheck,
-  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -91,11 +89,6 @@ export function HeroDashboard() {
         <Shield className="h-3.5 w-3.5 text-emerald-600" />
         Gift Aid ready
       </FloatingChip>
-      <FloatingChip className="-right-2 bottom-10 sm:-right-7" delay={1.6} reducedMotion={!!reducedMotion}>
-        <TrendingUp className="h-3.5 w-3.5 text-brand" />
-        £48,240 YTD
-      </FloatingChip>
-
       {/* App frame */}
       <div className="overflow-hidden rounded-[1.5rem] border border-[#e3dccb] bg-white text-[hsl(var(--dash-text))] shadow-[0_24px_60px_-20px_rgba(30,41,59,0.25)]">
         <div className="flex">
@@ -232,42 +225,14 @@ export function HeroDashboard() {
 // ---- Scenes ----
 
 function DashboardScene({ reducedMotion }: { reducedMotion: boolean }) {
-  const kpis = [
-    { label: "Newcomers", value: "48", icon: Users, wrap: "bg-[hsl(var(--dash-ring)/0.10)]", iconClass: "text-[hsl(var(--dash-ring))]" },
-    { label: "Members", value: "312", icon: UserCheck, wrap: "bg-[hsl(var(--dash-ring-soft)/0.12)]", iconClass: "text-[hsl(var(--dash-ring-soft))]" },
-    { label: "Events", value: "6", icon: CalendarDays, wrap: "bg-amber-500/10", iconClass: "text-amber-700" },
-    { label: "Payments", value: "186", icon: CreditCard, wrap: "bg-emerald-500/10", iconClass: "text-emerald-600" },
-  ];
   const bars = [49, 72, 58, 84, 76, 100];
 
   return (
     <div className="flex h-full flex-col gap-2">
-      <div className="grid grid-cols-4 gap-1.5">
-        {kpis.map((kpi, index) => {
-          const Icon = kpi.icon;
-          return (
-            <Stagger key={kpi.label} index={index} reducedMotion={reducedMotion}>
-              <div className="rounded-lg border border-dash-border bg-dash-surface p-2 shadow-[var(--dash-shadow)]">
-                <div className={cn("mb-1.5 flex h-6 w-6 items-center justify-center rounded-md", kpi.wrap)}>
-                  <Icon className={cn("h-3 w-3", kpi.iconClass)} aria-hidden />
-                </div>
-                <p className="truncate text-[7px] font-medium uppercase tracking-wide text-dash-muted">
-                  {kpi.label}
-                </p>
-                <p className="text-base font-semibold leading-tight">{kpi.value}</p>
-              </div>
-            </Stagger>
-          );
-        })}
-      </div>
-
       <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-dash-border bg-dash-surface shadow-[var(--dash-shadow)]">
         <div className="flex items-center justify-between border-b border-dash-border bg-dash-surface-subtle px-2.5 py-1.5">
           <span className="text-[10px] font-semibold">Payment volume</span>
-          <span className="text-xs font-semibold tabular-nums text-emerald-700">
-            <CountUp to={48240} prefix="£" reducedMotion={reducedMotion} />
-            <span className="ml-1 text-[8px] font-normal text-dash-muted">YTD</span>
-          </span>
+          <span className="text-[8px] font-medium text-dash-muted">By month</span>
         </div>
         <div className="flex min-h-0 flex-1 items-end gap-1.5 px-2.5 pb-2 pt-2" aria-hidden>
           {bars.map((pct, index) => (

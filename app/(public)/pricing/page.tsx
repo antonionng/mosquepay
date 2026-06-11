@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Check } from "lucide-react";
+import { Banknote, Check, Landmark, ShieldCheck } from "lucide-react";
 import { PLAN_CODES, PLAN_DEFINITIONS } from "@/lib/billing/plans";
 import {
   MarketingShell,
@@ -22,6 +22,24 @@ export const metadata = marketingMetadata({
   ],
 });
 
+const FEE_POINTS = [
+  {
+    Icon: Banknote,
+    title: "Provider rates only",
+    body: "You pay only your payment provider's standard card processing rates per transaction — the same as taking a card payment anywhere else. Nothing extra for using ChurchPay.",
+  },
+  {
+    Icon: Landmark,
+    title: "Settled to your account",
+    body: "Gifts and payments settle directly to your church's own bank account. Your money never sits in ours.",
+  },
+  {
+    Icon: ShieldCheck,
+    title: "No hidden charges",
+    body: "No per-gift fee, no percentage cut, no surprise line items. Our only revenue is your subscription, so we have no reason to skim your giving.",
+  },
+];
+
 const PRICING_FAQS = [
   {
     q: "Are there setup or onboarding fees?",
@@ -29,7 +47,7 @@ const PRICING_FAQS = [
   },
   {
     q: "What about payment processing fees?",
-    a: "Card processing fees are charged by the payment provider per transaction, as with any platform. ChurchPay does not add a markup on top.",
+    a: "See the transaction fees section above. Short version: you pay only your payment provider's standard card rates, and ChurchPay adds no markup.",
   },
   {
     q: "Can we change plans later?",
@@ -53,6 +71,10 @@ export default function PricingPage() {
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-slate-600">
             Every plan includes giving, Gift Aid, your church website, member records, and
             support from a team that knows UK church administration.
+          </p>
+          <p className="mx-auto mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800">
+            <Check className="h-4 w-4 text-emerald-600" />
+            No transaction markup on any plan
           </p>
         </div>
       </section>
@@ -116,6 +138,32 @@ export default function PricingPage() {
       </MarketingSection>
 
       <MarketingSection tinted>
+        <div className="mx-auto max-w-2xl text-center">
+          <MarketingKicker>Transaction fees</MarketingKicker>
+          <h2 className="mt-4 font-heading text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+            ChurchPay adds no markup on transactions.
+          </h2>
+          <p className="mt-4 text-base leading-7 text-slate-600">
+            The first question every treasurer asks, answered up front. Your subscription is
+            the whole price — we don&apos;t take a cut of your congregation&apos;s giving.
+          </p>
+        </div>
+        <div className="mx-auto mt-12 grid max-w-5xl gap-5 md:grid-cols-3">
+          {FEE_POINTS.map((point) => (
+            <article key={point.title} className="rounded-3xl border border-[#e9e2d4] bg-white p-7">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand/10">
+                <point.Icon className="h-5 w-5 text-brand" />
+              </span>
+              <h3 className="mt-4 font-heading text-base font-semibold text-slate-900">
+                {point.title}
+              </h3>
+              <p className="mt-2.5 text-sm leading-6 text-slate-600">{point.body}</p>
+            </article>
+          ))}
+        </div>
+      </MarketingSection>
+
+      <MarketingSection>
         <div className="mx-auto max-w-2xl text-center">
           <MarketingKicker>Pricing questions</MarketingKicker>
           <h2 className="mt-4 font-heading text-3xl font-bold tracking-tight text-slate-900">

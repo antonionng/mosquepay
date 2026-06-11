@@ -32,8 +32,8 @@ const ONBOARDING_STEPS = [
     body: "We learn how your church runs today, covering giving, records, services, and who does what, and agree the right plan.",
   },
   {
-    title: "Import and setup",
-    body: "We help import members, giving history, and Gift Aid declarations, connect payments, and brand your church site.",
+    title: "Guided import and setup",
+    body: "A step-by-step setup wizard imports your members, giving history, and Gift Aid declarations, connects payments, and brands your church site. We help wherever you want it.",
   },
   {
     title: "Team training",
