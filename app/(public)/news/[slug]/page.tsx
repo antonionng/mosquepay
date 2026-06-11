@@ -7,7 +7,7 @@ import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { ArrowLeft, User, Calendar } from "lucide-react";
 import { getDefaultChurchSlug, resolveChurchSlug } from "@/lib/tenant";
-import { SOCIAL_SHARE_IMAGE, SITE_ORIGIN } from "@/lib/seo";
+import { socialShareImageUrl, SITE_ORIGIN } from "@/lib/seo";
 
 async function loadPost(slug: string, churchSlug: string) {
   if (isSupabaseConfigured()) {
@@ -39,7 +39,7 @@ export async function generateMetadata({
   const description =
     post.excerpt ||
     `Read ${post.title} and other updates from ChurchPay and church websites.`;
-  const imageUrl = post.featured_image_url || SOCIAL_SHARE_IMAGE.url;
+  const imageUrl = post.featured_image_url || socialShareImageUrl();
 
   return {
     title: post.title,

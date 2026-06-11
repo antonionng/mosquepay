@@ -7,7 +7,6 @@ import { PageViewTracker } from "@/components/telemetry/page-view-tracker";
 import {
   churchPayStructuredData,
   marketingMetadata,
-  SOCIAL_SHARE_IMAGE,
   SITE_ORIGIN,
 } from "@/lib/seo";
 
@@ -71,11 +70,6 @@ export const metadata: Metadata = {
     url: false,
   },
   other: {
-    "og:image:secure_url": SOCIAL_SHARE_IMAGE.url,
-    "og:image:alt": SOCIAL_SHARE_IMAGE.alt,
-    "og:image:type": SOCIAL_SHARE_IMAGE.type,
-    "og:image:width": String(SOCIAL_SHARE_IMAGE.width),
-    "og:image:height": String(SOCIAL_SHARE_IMAGE.height),
     "article:publisher": SITE_ORIGIN,
     // Hint to Chromium PWAs that landscape is also acceptable on tablets.
     "mobile-web-app-capable": "yes",

@@ -8,7 +8,7 @@ import * as mockDb from "@/lib/mock-db";
 import { EventRsvpForm } from "@/components/forms/event-rsvp-form";
 import { ArrowLeft, Calendar, MapPin, Clock, Users } from "lucide-react";
 import { getDefaultChurchSlug, resolveChurchSlug } from "@/lib/tenant";
-import { SOCIAL_SHARE_IMAGE, SITE_ORIGIN } from "@/lib/seo";
+import { socialShareImageUrl, SITE_ORIGIN } from "@/lib/seo";
 import { churchScopedEventPath, churchScopedEventsPath } from "@/lib/public-links";
 import { isPubliclyVisible } from "@/lib/events/public-visibility";
 
@@ -48,7 +48,7 @@ export async function generateMetadata({
   const canonical = `${siteUrl()}/events/${slug}${
     churchSlug !== getDefaultChurchSlug() ? `?church=${encodeURIComponent(churchSlug)}` : ""
   }`;
-  const imageUrl = event.featured_image_url || SOCIAL_SHARE_IMAGE.url;
+  const imageUrl = event.featured_image_url || socialShareImageUrl(siteUrl());
   return {
     title: event.title,
     description,

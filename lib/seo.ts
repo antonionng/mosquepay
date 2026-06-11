@@ -3,12 +3,16 @@ import type { Metadata } from "next";
 export const SITE_ORIGIN = "https://www.churchpay.co.uk";
 
 export const SOCIAL_SHARE_IMAGE = {
-  url: `${SITE_ORIGIN}/social-share.png`,
-  width: 1024,
-  height: 547,
+  url: "/social-share.png",
+  width: 1200,
+  height: 630,
   alt: "ChurchPay - Faith. Community. Together. All-in-one membership, giving, events, and management platform for churches.",
   type: "image/png",
 };
+
+export function socialShareImageUrl(origin: string = SITE_ORIGIN): string {
+  return `${origin.replace(/\/$/, "")}${SOCIAL_SHARE_IMAGE.url}`;
+}
 
 export const CHURCHPAY_KEYWORDS = [
   "church management software",
@@ -99,7 +103,7 @@ export const churchPayStructuredData = {
         "@type": "ImageObject",
         url: `${SITE_ORIGIN}/brand/churchpay-logo.png`,
       },
-      image: SOCIAL_SHARE_IMAGE.url,
+      image: socialShareImageUrl(),
       description:
         "ChurchPay is an all-in-one membership, payments, and management platform for UK churches, charities, and church networks. It brings together church websites, online giving, Gift Aid and GASDS claims, member and newcomer CRM, services and events, pastoral care, and treasurer reporting.",
       areaServed: {
@@ -137,8 +141,8 @@ export const churchPayStructuredData = {
       applicationSubCategory: "Church Management Software",
       operatingSystem: "Web",
       url: SITE_ORIGIN,
-      image: SOCIAL_SHARE_IMAGE.url,
-      screenshot: SOCIAL_SHARE_IMAGE.url,
+      image: socialShareImageUrl(),
+      screenshot: socialShareImageUrl(),
       softwareHelp: `${SITE_ORIGIN}/features`,
       keywords: CHURCHPAY_KEYWORDS.join(", "),
       audience: {
