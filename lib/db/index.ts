@@ -1,7 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import type {
-  Church,
-  ChurchSitePage,
+  Mosque,
+  MosqueSitePage,
   AdminUser,
   AuditLog,
   Newcomer,
@@ -12,12 +12,12 @@ import type {
   Donation,
   GiftAidDeclaration,
   GiftAidDeclarationEvent,
-  ChurchSubscription,
+  MosqueSubscription,
   BlogPost,
   CharityCampaign,
-  ChurchGiving,
-  ChurchFeeDefaults,
-  ChurchGivingYear,
+  MosqueGiving,
+  MosqueFeeDefaults,
+  MosqueGivingYear,
   MemberGiving,
   MemberGivingInstalment,
   GivingSchedule,
@@ -55,9 +55,9 @@ import type {
   NoticeStatus,
   Network,
   MemberRank,
-  ChurchVisit,
+  MosqueVisit,
   NetworkOfficerDirectoryEntry,
-  ChurchAnnualReturn,
+  MosqueAnnualReturn,
   MemberConsent,
   DataRetentionSettings,
   SubjectAccessRequest,
@@ -65,114 +65,114 @@ import type {
   JobStatus,
   IntegrationCredentials,
   IntegrationProvider,
-  ChurchFeatureFlag,
+  MosqueFeatureFlag,
   EmailLog,
-  ChurchNotificationSetting,
+  MosqueNotificationSetting,
 } from "./types";
 
 export * from "./types";
-export { resolveChurchId, getDefaultChurchId } from "./helpers";
+export { resolveMosqueId, getDefaultMosqueId } from "./helpers";
 
 function db() {
   return createServiceClient();
 }
 
 // ---------------------------------------------------------------------------
-// Churches
+// Mosques
 // ---------------------------------------------------------------------------
 
-export async function listChurches(): Promise<Church[]> {
+export async function listMosques(): Promise<Mosque[]> {
   const { data, error } = await db()
-    .from("churches")
+    .from("mosques")
     .select("*")
     .order("name");
   if (error) throw error;
-  return data as Church[];
+  return data as Mosque[];
 }
 
-export async function getChurchBySlug(slug: string): Promise<Church | null> {
+export async function getMosqueBySlug(slug: string): Promise<Mosque | null> {
   const { data, error } = await db()
-    .from("churches")
+    .from("mosques")
     .select("*")
     .eq("slug", slug.trim().toLowerCase())
     .eq("is_active", true)
     .maybeSingle();
   if (error) throw error;
-  return data as Church | null;
+  return data as Mosque | null;
 }
 
-export async function getChurchByCustomDomain(
+export async function getMosqueByCustomDomain(
   domain: string
-): Promise<Church | null> {
+): Promise<Mosque | null> {
   const { data, error } = await db()
-    .from("churches")
+    .from("mosques")
     .select("*")
     .eq("custom_domain", domain.trim().toLowerCase())
     .eq("is_active", true)
     .maybeSingle();
   if (error) throw error;
-  return data as Church | null;
+  return data as Mosque | null;
 }
 
-export async function updateChurch(
+export async function updateMosque(
   id: string,
-  updates: Partial<Omit<Church, "id" | "created_at" | "updated_at">>
-): Promise<Church | null> {
+  updates: Partial<Omit<Mosque, "id" | "created_at" | "updated_at">>
+): Promise<Mosque | null> {
   const { data, error } = await db()
-    .from("churches")
+    .from("mosques")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
     .select("*")
     .maybeSingle();
   if (error) throw error;
-  return data as Church | null;
+  return data as Mosque | null;
 }
 
-export async function createChurch(
+export async function createMosque(
   data: {
     slug: string;
     name: string;
     network_id?: string | null;
-  } & Partial<Omit<Church, "id" | "created_at" | "updated_at" | "slug" | "name">>
-): Promise<Church> {
+  } & Partial<Omit<Mosque, "id" | "created_at" | "updated_at" | "slug" | "name">>
+): Promise<Mosque> {
   const insert = {
     is_active: true,
     ...data,
     slug: data.slug.trim().toLowerCase(),
   };
   const { data: row, error } = await db()
-    .from("churches")
+    .from("mosques")
     .insert(insert)
     .select("*")
     .single();
   if (error) throw error;
-  return row as Church;
+  return row as Mosque;
 }
 
-export async function getChurchById(id: string): Promise<Church | null> {
+export async function getMosqueById(id: string): Promise<Mosque | null> {
   const { data, error } = await db()
-    .from("churches")
+    .from("mosques")
     .select("*")
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
-  return data as Church | null;
+  return data as Mosque | null;
 }
 
 export async function getAdminUserByEmail(
   email: string,
-  churchId?: string | null
+  mosqueId?: string | null
 ): Promise<AdminUser | null> {
   let query = db()
     .from("admin_users")
     .select("*")
     .eq("email", email.trim().toLowerCase())
     .eq("active", true);
-  if (churchId) {
-    query = query.or(`church_id.eq.${churchId},church_id.is.null`);
+  if (mosqueId) {
+    query = query.or(`mosque_id.eq.${mosqueId},mosque_id.is.null`);
   }
   const { data, error } = await query
-    .order("church_id", { ascending: false })
+    .order("mosque_id", { ascending: false })
     .limit(1);
   if (error) throw error;
   return (data?.[0] as AdminUser | undefined) ?? null;
@@ -184,7 +184,7 @@ export async function listAdminUsersByEmail(email: string): Promise<AdminUser[]>
     .select("*")
     .eq("email", email.trim().toLowerCase())
     .eq("active", true)
-    .order("church_id", { ascending: true })
+    .order("mosque_id", { ascending: true })
     .order("role");
   if (error) throw error;
   return data as AdminUser[];
@@ -192,16 +192,16 @@ export async function listAdminUsersByEmail(email: string): Promise<AdminUser[]>
 
 export async function getAdminUserForScope(
   email: string,
-  churchId: string | null
+  mosqueId: string | null
 ): Promise<AdminUser | null> {
   let query = db()
     .from("admin_users")
     .select("*")
     .eq("email", email.trim().toLowerCase());
   query =
-    churchId === null
-      ? query.is("church_id", null)
-      : query.eq("church_id", churchId);
+    mosqueId === null
+      ? query.is("mosque_id", null)
+      : query.eq("mosque_id", mosqueId);
   const { data, error } = await query.maybeSingle();
   if (error) throw error;
   return data as AdminUser | null;
@@ -211,7 +211,7 @@ export async function listPlatformAdminUsers(): Promise<AdminUser[]> {
   const { data, error } = await db()
     .from("admin_users")
     .select("*")
-    .is("church_id", null)
+    .is("mosque_id", null)
     .order("role")
     .order("full_name");
   if (error) throw error;
@@ -222,21 +222,21 @@ export async function listTenantAdminUsers(): Promise<AdminUser[]> {
   const { data, error } = await db()
     .from("admin_users")
     .select("*")
-    .not("church_id", "is", null)
-    .order("church_id")
+    .not("mosque_id", "is", null)
+    .order("mosque_id")
     .order("role")
     .order("full_name");
   if (error) throw error;
   return data as AdminUser[];
 }
 
-export async function listAdminUsersForChurch(
-  churchId: string
+export async function listAdminUsersForMosque(
+  mosqueId: string
 ): Promise<AdminUser[]> {
   const { data, error } = await db()
     .from("admin_users")
     .select("*")
-    .or(`church_id.eq.${churchId},church_id.is.null`)
+    .or(`mosque_id.eq.${mosqueId},mosque_id.is.null`)
     .order("role")
     .order("full_name");
   if (error) throw error;
@@ -245,7 +245,7 @@ export async function listAdminUsersForChurch(
 
 export async function createAdminUser(
   data: Pick<AdminUser, "email" | "full_name" | "role" | "active"> & {
-    church_id: string | null;
+    mosque_id: string | null;
     permissions?: string[];
   }
 ): Promise<AdminUser> {
@@ -266,7 +266,7 @@ export async function updateAdminUser(
   id: string,
   data: Partial<
     Pick<AdminUser, "auth_user_id" | "full_name" | "role" | "active" | "permissions"> & {
-      church_id: string | null;
+      mosque_id: string | null;
     }
   >
 ): Promise<AdminUser | null> {
@@ -281,13 +281,13 @@ export async function updateAdminUser(
 }
 
 export async function listAuditLogs(
-  churchId: string,
+  mosqueId: string,
   limit = 100
 ): Promise<AuditLog[]> {
   const { data, error } = await db()
     .from("audit_logs")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
@@ -340,12 +340,12 @@ export async function recordEmailLog(
 }
 
 /**
- * Returns true when a row already exists for (church_id, email_type,
+ * Returns true when a row already exists for (mosque_id, email_type,
  * dedupe_key). Used by webhook senders as a pre-check so we don't
  * even render the email when Mooov redelivers an event.
  */
 export async function emailAlreadySent(
-  churchId: string | null,
+  mosqueId: string | null,
   emailType: string,
   dedupeKey: string,
 ): Promise<boolean> {
@@ -354,7 +354,7 @@ export async function emailAlreadySent(
     .select("id", { count: "exact", head: true })
     .eq("email_type", emailType)
     .eq("dedupe_key", dedupeKey);
-  query = churchId ? query.eq("church_id", churchId) : query.is("church_id", null);
+  query = mosqueId ? query.eq("mosque_id", mosqueId) : query.is("mosque_id", null);
   const { count, error } = await query;
   if (error) {
     // Conservative: failing open lets the email try; the unique index
@@ -370,14 +370,14 @@ export async function emailAlreadySent(
  * panel on /admin/members/[id].
  */
 export async function listEmailLogForMember(
-  churchId: string,
+  mosqueId: string,
   memberEmail: string,
   limit = 10,
 ): Promise<EmailLog[]> {
   const { data, error } = await db()
     .from("email_log")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("to_email", memberEmail.trim().toLowerCase())
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -386,42 +386,42 @@ export async function listEmailLogForMember(
 }
 
 // ---------------------------------------------------------------------------
-// church_notification_settings
+// mosque_notification_settings
 // ---------------------------------------------------------------------------
 
 /**
- * Returns true when this (church, role, event_type) is allowed to
+ * Returns true when this (mosque, role, event_type) is allowed to
  * send. Default is "send" — only an explicit row with enabled=false
- * suppresses. Also honours the church-wide kill-switch row stored
+ * suppresses. Also honours the mosque-wide kill-switch row stored
  * with role='__all__'.
  */
 export async function notificationEnabled(
-  churchId: string,
+  mosqueId: string,
   role: string,
   eventType: string,
 ): Promise<boolean> {
   const { data, error } = await db()
-    .from("church_notification_settings")
+    .from("mosque_notification_settings")
     .select("role, enabled")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .in("role", [role, "__all__"])
     .eq("event_type", eventType);
   if (error) {
     console.error("notificationEnabled: query failed", error);
     return true;
   }
-  for (const row of (data ?? []) as Array<Pick<ChurchNotificationSetting, "role" | "enabled">>) {
+  for (const row of (data ?? []) as Array<Pick<MosqueNotificationSetting, "role" | "enabled">>) {
     if (row.enabled === false) return false;
   }
   return true;
 }
 
-export async function upsertChurch(
-  input: Partial<Omit<Church, "id" | "created_at" | "updated_at">> &
-    Pick<Church, "slug" | "name">
-): Promise<Church> {
+export async function upsertMosque(
+  input: Partial<Omit<Mosque, "id" | "created_at" | "updated_at">> &
+    Pick<Mosque, "slug" | "name">
+): Promise<Mosque> {
   const { data, error } = await db()
-    .from("churches")
+    .from("mosques")
     .upsert(
       { ...input, slug: input.slug.trim().toLowerCase() },
       { onConflict: "slug" }
@@ -429,31 +429,31 @@ export async function upsertChurch(
     .select("*")
     .single();
   if (error) throw error;
-  return data as Church;
+  return data as Mosque;
 }
 
 // ---------------------------------------------------------------------------
-// Church Sites
+// Mosque Sites
 // ---------------------------------------------------------------------------
 
-export async function getChurchSite(
-  churchId: string
-): Promise<ChurchSitePage | null> {
+export async function getMosqueSite(
+  mosqueId: string
+): Promise<MosqueSitePage | null> {
   const { data, error } = await db()
-    .from("church_site_pages")
+    .from("mosque_site_pages")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("page_key", "home")
     .maybeSingle();
   if (error) throw error;
-  return data as ChurchSitePage | null;
+  return data as MosqueSitePage | null;
 }
 
-export async function updateChurchSite(
-  churchId: string,
+export async function updateMosqueSite(
+  mosqueId: string,
   updates: Partial<
     Pick<
-      ChurchSitePage,
+      MosqueSitePage,
       | "page_title"
       | "page_description"
       | "sections"
@@ -463,17 +463,17 @@ export async function updateChurchSite(
       | "published"
     >
   >
-): Promise<ChurchSitePage> {
+): Promise<MosqueSitePage> {
   const { data, error } = await db()
-    .from("church_site_pages")
+    .from("mosque_site_pages")
     .upsert(
-      { church_id: churchId, page_key: "home", ...updates },
-      { onConflict: "church_id,page_key" }
+      { mosque_id: mosqueId, page_key: "home", ...updates },
+      { onConflict: "mosque_id,page_key" }
     )
     .select("*")
     .single();
   if (error) throw error;
-  return data as ChurchSitePage;
+  return data as MosqueSitePage;
 }
 
 // ---------------------------------------------------------------------------
@@ -481,13 +481,13 @@ export async function updateChurchSite(
 // ---------------------------------------------------------------------------
 
 export async function getNewcomers(
-  churchId: string,
+  mosqueId: string,
   opts?: { stage?: string }
 ): Promise<Newcomer[]> {
   let query = db()
     .from("newcomers")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false });
 
   if (opts?.stage) {
@@ -501,25 +501,25 @@ export async function getNewcomers(
 
 export async function getNewcomerById(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<Newcomer | null> {
   const { data, error } = await db()
     .from("newcomers")
     .select("*")
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .maybeSingle();
   if (error) throw error;
   return data as Newcomer | null;
 }
 
 export async function addNewcomer(
-  churchId: string,
-  data: Omit<Newcomer, "id" | "church_id" | "created_at" | "updated_at" | "stage_changed_at">
+  mosqueId: string,
+  data: Omit<Newcomer, "id" | "mosque_id" | "created_at" | "updated_at" | "stage_changed_at">
 ): Promise<Newcomer> {
   const { data: row, error } = await db()
     .from("newcomers")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -528,7 +528,7 @@ export async function addNewcomer(
 
 export async function updateNewcomer(
   id: string,
-  churchId: string,
+  mosqueId: string,
   updates: Partial<
     Pick<
       Newcomer,
@@ -566,7 +566,7 @@ export async function updateNewcomer(
     .from("newcomers")
     .update(patch)
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -575,13 +575,13 @@ export async function updateNewcomer(
 
 export async function deleteNewcomer(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<{ deleted: boolean }> {
   const { error, count } = await db()
     .from("newcomers")
     .delete({ count: "exact" })
     .eq("id", id)
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
   return { deleted: (count ?? 0) > 0 };
 }
@@ -592,25 +592,25 @@ export async function deleteNewcomer(
 
 export async function getNewcomerActivities(
   newcomerId: string,
-  churchId: string
+  mosqueId: string
 ): Promise<NewcomerActivity[]> {
   const { data, error } = await db()
     .from("newcomer_activities")
     .select("*")
     .eq("newcomer_id", newcomerId)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as NewcomerActivity[];
 }
 
 export async function addNewcomerActivity(
-  churchId: string,
-  data: Omit<NewcomerActivity, "id" | "church_id" | "created_at">
+  mosqueId: string,
+  data: Omit<NewcomerActivity, "id" | "mosque_id" | "created_at">
 ): Promise<NewcomerActivity> {
   const { data: row, error } = await db()
     .from("newcomer_activities")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -619,7 +619,7 @@ export async function addNewcomerActivity(
 
 export async function updateNewcomerActivity(
   id: string,
-  churchId: string,
+  mosqueId: string,
   updates: Partial<
     Pick<
       NewcomerActivity,
@@ -636,7 +636,7 @@ export async function updateNewcomerActivity(
     .from("newcomer_activities")
     .update(updates)
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -645,13 +645,13 @@ export async function updateNewcomerActivity(
 
 export async function getLatestNewcomerActivity(
   newcomerId: string,
-  churchId: string
+  mosqueId: string
 ): Promise<NewcomerActivity | null> {
   const { data, error } = await db()
     .from("newcomer_activities")
     .select("*")
     .eq("newcomer_id", newcomerId)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false })
     .limit(1);
   if (error) throw error;
@@ -663,13 +663,13 @@ export async function getLatestNewcomerActivity(
 // ---------------------------------------------------------------------------
 
 export async function getEvents(
-  churchId: string,
+  mosqueId: string,
   opts?: { published?: boolean; upcoming?: boolean }
 ): Promise<Event[]> {
   let query = db()
     .from("events")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("event_date", { ascending: true });
 
   if (opts?.published !== undefined) {
@@ -686,13 +686,13 @@ export async function getEvents(
 
 export async function getEventById(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<Event | null> {
   const { data, error } = await db()
     .from("events")
     .select("*")
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .maybeSingle();
   if (error) throw error;
   return data as Event | null;
@@ -700,13 +700,13 @@ export async function getEventById(
 
 export async function getEventBySlug(
   slug: string,
-  churchId: string
+  mosqueId: string
 ): Promise<Event | null> {
   const { data, error } = await db()
     .from("events")
     .select("*")
     .eq("slug", slug)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("published", true)
     .maybeSingle();
   if (error) throw error;
@@ -730,13 +730,13 @@ type AddEventOptional =
   | "service_close_notes";
 
 export async function addEvent(
-  churchId: string,
-  data: Omit<Event, "id" | "church_id" | "created_at" | "updated_at" | AddEventOptional> &
+  mosqueId: string,
+  data: Omit<Event, "id" | "mosque_id" | "created_at" | "updated_at" | AddEventOptional> &
     Partial<Pick<Event, AddEventOptional>>
 ): Promise<Event> {
   const { data: row, error } = await db()
     .from("events")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -745,14 +745,14 @@ export async function addEvent(
 
 export async function updateEvent(
   id: string,
-  churchId: string,
-  updates: Partial<Omit<Event, "id" | "church_id" | "created_at">>
+  mosqueId: string,
+  updates: Partial<Omit<Event, "id" | "mosque_id" | "created_at">>
 ): Promise<Event | null> {
   const { data, error } = await db()
     .from("events")
     .update(updates)
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -767,23 +767,23 @@ export async function updateEvent(
  */
 export async function deleteEvent(
   id: string,
-  churchId: string,
+  mosqueId: string,
 ): Promise<{ title: string } | null> {
-  const event = await getEventById(id, churchId);
+  const event = await getEventById(id, mosqueId);
   if (!event) return null;
 
   const { error: detachError } = await db()
     .from("payments")
     .update({ event_id: null })
     .eq("event_id", id)
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (detachError) throw detachError;
 
   const { error } = await db()
     .from("events")
     .delete()
     .eq("id", id)
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
 
   return { title: event.title };
@@ -795,26 +795,26 @@ export async function deleteEvent(
 
 export async function getRsvpsByEventId(
   eventId: string,
-  churchId: string
+  mosqueId: string
 ): Promise<Rsvp[]> {
   const { data, error } = await db()
     .from("rsvps")
     .select("*")
     .eq("event_id", eventId)
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
   return data as Rsvp[];
 }
 
 export async function getRsvpById(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<Rsvp | null> {
   const { data, error } = await db()
     .from("rsvps")
     .select("*")
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .maybeSingle();
   if (error) throw error;
   return data as Rsvp | null;
@@ -826,13 +826,13 @@ type RsvpWineFields =
   | "raffle_wine_note";
 
 export async function addRsvp(
-  churchId: string,
-  data: Omit<Rsvp, "id" | "church_id" | "created_at" | "updated_at" | RsvpWineFields> &
+  mosqueId: string,
+  data: Omit<Rsvp, "id" | "mosque_id" | "created_at" | "updated_at" | RsvpWineFields> &
     Partial<Pick<Rsvp, RsvpWineFields>>
 ): Promise<Rsvp> {
   const { data: row, error } = await db()
     .from("rsvps")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -841,7 +841,7 @@ export async function addRsvp(
 
 export async function updateRsvp(
   id: string,
-  churchId: string,
+  mosqueId: string,
   updates: Partial<
     Pick<
       Rsvp,
@@ -863,7 +863,7 @@ export async function updateRsvp(
     .from("rsvps")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -873,14 +873,14 @@ export async function updateRsvp(
 export async function getRsvpByEventAndEmail(
   eventId: string,
   email: string,
-  churchId: string
+  mosqueId: string
 ): Promise<Rsvp | null> {
   const { data, error } = await db()
     .from("rsvps")
     .select("*")
     .eq("event_id", eventId)
     .eq("user_email", email.trim().toLowerCase())
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false })
     .limit(1);
   if (error) throw error;
@@ -891,11 +891,11 @@ export async function getRsvpByEventAndEmail(
 // Payments
 // ---------------------------------------------------------------------------
 
-export async function getPayments(churchId: string): Promise<Payment[]> {
+export async function getPayments(mosqueId: string): Promise<Payment[]> {
   const { data, error } = await db()
     .from("payments")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as Payment[];
@@ -909,12 +909,12 @@ export async function getPayments(churchId: string): Promise<Payment[]> {
  */
 export async function getPaymentsByEventId(
   eventId: string,
-  churchId: string,
+  mosqueId: string,
 ): Promise<Payment[]> {
   const { data, error } = await db()
     .from("payments")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("event_id", eventId)
     .order("created_at", { ascending: false });
   if (error) throw error;
@@ -933,7 +933,7 @@ export async function getPaymentByStripeId(
   return data as Payment | null;
 }
 
-// Lookup by Mooov-side payment id (e.g. don_<church>_<rand>). The Mooov webhook
+// Lookup by Mooov-side payment id (e.g. don_<mosque>_<rand>). The Mooov webhook
 // handler uses this for idempotency when projecting payment.succeeded /
 // payment.captured into public.payments, the same way getPaymentByStripeId
 // is used in the legacy Stripe webhook path.
@@ -951,13 +951,13 @@ export async function getPaymentByMooovId(
 
 export async function getPaymentById(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<Payment | null> {
   const { data, error } = await db()
     .from("payments")
     .select("*")
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .maybeSingle();
   if (error) throw error;
   return data as Payment | null;
@@ -965,25 +965,25 @@ export async function getPaymentById(
 
 export async function getDonationById(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<Donation | null> {
   const { data, error } = await db()
     .from("donations")
     .select("*")
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .maybeSingle();
   if (error) throw error;
   return data as Donation | null;
 }
 
 export async function addPayment(
-  churchId: string,
-  data: Omit<Payment, "id" | "church_id" | "created_at" | "updated_at">
+  mosqueId: string,
+  data: Omit<Payment, "id" | "mosque_id" | "created_at" | "updated_at">
 ): Promise<Payment> {
   const { data: row, error } = await db()
     .from("payments")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -992,16 +992,16 @@ export async function addPayment(
 
 export async function updatePayment(
   id: string,
-  churchId: string,
+  mosqueId: string,
   updates: Partial<
-    Omit<Payment, "id" | "church_id" | "created_at">
+    Omit<Payment, "id" | "mosque_id" | "created_at">
   >
 ): Promise<Payment | null> {
   const { data, error } = await db()
     .from("payments")
     .update(updates)
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -1012,22 +1012,22 @@ export async function updatePayment(
 // Donations
 // ---------------------------------------------------------------------------
 
-export async function getDonations(churchId: string): Promise<Donation[]> {
+export async function getDonations(mosqueId: string): Promise<Donation[]> {
   const { data, error } = await db()
     .from("donations")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as Donation[];
 }
 
 export async function addDonation(
-  churchId: string,
+  mosqueId: string,
   data: Omit<
     Donation,
     | "id"
-    | "church_id"
+    | "mosque_id"
     | "created_at"
     | "campaign_id"
     | "gift_aid_status"
@@ -1054,7 +1054,7 @@ export async function addDonation(
 ): Promise<Donation> {
   const { data: row, error } = await db()
     .from("donations")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -1063,7 +1063,7 @@ export async function addDonation(
 
 export async function updateDonation(
   id: string,
-  churchId: string,
+  mosqueId: string,
   updates: Partial<
     Pick<
       Donation,
@@ -1086,7 +1086,7 @@ export async function updateDonation(
     .from("donations")
     .update(updates)
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -1095,12 +1095,12 @@ export async function updateDonation(
 
 export async function getDonationsByPaymentId(
   paymentId: string,
-  churchId: string
+  mosqueId: string
 ): Promise<Donation[]> {
   const { data, error } = await db()
     .from("donations")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("payment_id", paymentId)
     .order("created_at", { ascending: true });
   if (error) throw error;
@@ -1109,34 +1109,34 @@ export async function getDonationsByPaymentId(
 
 export async function deleteDonation(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<void> {
   const { error } = await db()
     .from("donations")
     .delete()
     .eq("id", id)
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
 }
 
 export async function getGiftAidClaimBatches(
-  churchId: string
+  mosqueId: string
 ): Promise<GiftAidClaimBatch[]> {
   const { data, error } = await db()
     .from("gift_aid_claim_batches")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as GiftAidClaimBatch[];
 }
 
 export async function createGiftAidClaimBatch(
-  churchId: string,
+  mosqueId: string,
   data: Omit<
     GiftAidClaimBatch,
     | "id"
-    | "church_id"
+    | "mosque_id"
     | "created_at"
     | "updated_at"
     | "declarations_count"
@@ -1152,7 +1152,7 @@ export async function createGiftAidClaimBatch(
 ): Promise<GiftAidClaimBatch> {
   const { data: row, error } = await db()
     .from("gift_aid_claim_batches")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -1161,7 +1161,7 @@ export async function createGiftAidClaimBatch(
 
 export async function setClaimBatchDeclarationsCount(
   id: string,
-  churchId: string,
+  mosqueId: string,
   count: number
 ): Promise<void> {
   const { error } = await db()
@@ -1171,13 +1171,13 @@ export async function setClaimBatchDeclarationsCount(
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
 }
 
 export async function markClaimBatchPackGenerated(
   id: string,
-  churchId: string,
+  mosqueId: string,
   actorEmail: string | null
 ): Promise<void> {
   const { error } = await db()
@@ -1188,13 +1188,13 @@ export async function markClaimBatchPackGenerated(
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
 }
 
 export async function updateGiftAidClaimBatch(
   id: string,
-  churchId: string,
+  mosqueId: string,
   updates: Partial<
     Pick<
       GiftAidClaimBatch,
@@ -1206,7 +1206,7 @@ export async function updateGiftAidClaimBatch(
     .from("gift_aid_claim_batches")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -1214,13 +1214,13 @@ export async function updateGiftAidClaimBatch(
 }
 
 export async function getGiftAidClaimItems(
-  churchId: string,
+  mosqueId: string,
   claimBatchId: string
 ): Promise<GiftAidClaimItem[]> {
   const { data, error } = await db()
     .from("gift_aid_claim_items")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("claim_batch_id", claimBatchId)
     .order("donation_date", { ascending: true });
   if (error) throw error;
@@ -1228,15 +1228,15 @@ export async function getGiftAidClaimItems(
 }
 
 export async function createGiftAidClaimItems(
-  churchId: string,
+  mosqueId: string,
   rows: Array<
-    Omit<GiftAidClaimItem, "id" | "church_id" | "created_at">
+    Omit<GiftAidClaimItem, "id" | "mosque_id" | "created_at">
   >
 ): Promise<GiftAidClaimItem[]> {
   if (rows.length === 0) return [];
   const { data, error } = await db()
     .from("gift_aid_claim_items")
-    .insert(rows.map((row) => ({ ...row, church_id: churchId })))
+    .insert(rows.map((row) => ({ ...row, mosque_id: mosqueId })))
     .select("*");
   if (error) throw error;
   return data as GiftAidClaimItem[];
@@ -1247,18 +1247,18 @@ export async function createGiftAidClaimItems(
 // ---------------------------------------------------------------------------
 
 /**
- * Find the previously-created claim batch for this church. Used by the
+ * Find the previously-created claim batch for this mosque. Used by the
  * close flow to compute "what declarations are new since the last pack".
- * Returns null if this is the church's first batch.
+ * Returns null if this is the mosque's first batch.
  */
 export async function getMostRecentClaimBatchBefore(
-  churchId: string,
+  mosqueId: string,
   beforeIso: string
 ): Promise<GiftAidClaimBatch | null> {
   const { data, error } = await db()
     .from("gift_aid_claim_batches")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .lt("created_at", beforeIso)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -1273,14 +1273,14 @@ export async function getMostRecentClaimBatchBefore(
  * the window, UGLE still wants to know it existed.
  */
 export async function getDeclarationsCreatedBetween(
-  churchId: string,
+  mosqueId: string,
   startIso: string,
   endIso: string
 ): Promise<GiftAidDeclaration[]> {
   const { data, error } = await db()
     .from("gift_aid_declarations")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .gt("created_at", startIso)
     .lte("created_at", endIso)
     .order("created_at", { ascending: true });
@@ -1289,21 +1289,21 @@ export async function getDeclarationsCreatedBetween(
 }
 
 export async function getGiftAidDeclarationsByIds(
-  churchId: string,
+  mosqueId: string,
   ids: string[]
 ): Promise<GiftAidDeclaration[]> {
   if (ids.length === 0) return [];
   const { data, error } = await db()
     .from("gift_aid_declarations")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .in("id", ids);
   if (error) throw error;
   return data as GiftAidDeclaration[];
 }
 
 export async function linkDeclarationsToClaimBatch(
-  churchId: string,
+  mosqueId: string,
   claimBatchId: string,
   links: Array<{
     gift_aid_declaration_id: string;
@@ -1313,7 +1313,7 @@ export async function linkDeclarationsToClaimBatch(
   if (links.length === 0) return [];
   const payload = links.map((row) => ({
     ...row,
-    church_id: churchId,
+    mosque_id: mosqueId,
     claim_batch_id: claimBatchId,
   }));
   // Best-effort insert. The unique index on
@@ -1332,13 +1332,13 @@ export async function linkDeclarationsToClaimBatch(
 }
 
 export async function listClaimBatchDeclarations(
-  churchId: string,
+  mosqueId: string,
   claimBatchId: string
 ): Promise<GiftAidClaimDeclaration[]> {
   const { data, error } = await db()
     .from("gift_aid_claim_declarations")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("claim_batch_id", claimBatchId)
     .order("created_at", { ascending: true });
   if (error) throw error;
@@ -1350,12 +1350,12 @@ export async function listClaimBatchDeclarations(
 // ---------------------------------------------------------------------------
 
 export async function getGiftAidDeclarations(
-  churchId: string
+  mosqueId: string
 ): Promise<GiftAidDeclaration[]> {
   const { data, error } = await db()
     .from("gift_aid_declarations")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as GiftAidDeclaration[];
@@ -1363,26 +1363,26 @@ export async function getGiftAidDeclarations(
 
 export async function getGiftAidDeclarationById(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<GiftAidDeclaration | null> {
   const { data, error } = await db()
     .from("gift_aid_declarations")
     .select("*")
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .maybeSingle();
   if (error) throw error;
   return data as GiftAidDeclaration | null;
 }
 
 export async function getActiveGiftAidDeclarationByEmail(
-  churchId: string,
+  mosqueId: string,
   email: string
 ): Promise<GiftAidDeclaration | null> {
   const { data, error } = await db()
     .from("gift_aid_declarations")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .ilike("donor_email", email)
     .is("revoked_at", null)
     .eq("declaration_confirmed", true)
@@ -1396,16 +1396,16 @@ export async function getActiveGiftAidDeclarationByEmail(
 
 export async function updateGiftAidDeclaration(
   id: string,
-  churchId: string,
+  mosqueId: string,
   updates: Partial<
-    Omit<GiftAidDeclaration, "id" | "church_id" | "created_at">
+    Omit<GiftAidDeclaration, "id" | "mosque_id" | "created_at">
   >
 ): Promise<GiftAidDeclaration | null> {
   const { data, error } = await db()
     .from("gift_aid_declarations")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -1414,14 +1414,14 @@ export async function updateGiftAidDeclaration(
 
 export async function getDonationsByGiftAidDeclaration(
   declarationId: string,
-  churchId: string
+  mosqueId: string
 ): Promise<Donation[]> {
   // Donations linked to this declaration explicitly.
   const { data: linked, error } = await db()
     .from("donations")
     .select("*")
     .eq("gift_aid_declaration_id", declarationId)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false });
   if (error) throw error;
 
@@ -1435,7 +1435,7 @@ export async function getDonationsByGiftAidDeclaration(
     .from("gift_aid_declarations")
     .select("donor_email")
     .eq("id", declarationId)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .maybeSingle<{ donor_email: string | null }>();
   const email = decl?.donor_email?.trim().toLowerCase() ?? null;
   if (!email) return linked as Donation[];
@@ -1443,7 +1443,7 @@ export async function getDonationsByGiftAidDeclaration(
   const { data: unlinked, error: unlinkedError } = await db()
     .from("donations")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .is("gift_aid_declaration_id", null)
     .order("created_at", { ascending: false });
   if (unlinkedError) throw unlinkedError;
@@ -1455,14 +1455,14 @@ export async function getDonationsByGiftAidDeclaration(
 }
 
 export async function listAuditLogsByEntity(
-  churchId: string,
+  mosqueId: string,
   entityType: string,
   entityId: string
 ): Promise<AuditLog[]> {
   const { data, error } = await db()
     .from("audit_logs")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("entity_type", entityType)
     .eq("entity_id", entityId)
     .order("created_at", { ascending: false })
@@ -1506,12 +1506,12 @@ export type AddGiftAidDeclarationInput = {
 };
 
 export async function addGiftAidDeclaration(
-  churchId: string,
+  mosqueId: string,
   data: AddGiftAidDeclarationInput
 ): Promise<GiftAidDeclaration> {
   const { data: row, error } = await db()
     .from("gift_aid_declarations")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -1526,7 +1526,7 @@ export async function addGiftAidDeclaration(
  */
 export async function updateGiftAidDeclarationEvidence(
   id: string,
-  churchId: string,
+  mosqueId: string,
   evidence: {
     evidence_source: GiftAidDeclaration["evidence_source"];
     evidence_storage_bucket: string;
@@ -1542,7 +1542,7 @@ export async function updateGiftAidDeclarationEvidence(
     .from("gift_aid_declarations")
     .update({ ...evidence, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -1551,7 +1551,7 @@ export async function updateGiftAidDeclarationEvidence(
 
 export async function revokeGiftAidDeclaration(
   id: string,
-  churchId: string,
+  mosqueId: string,
   opts?: { reason?: string | null }
 ): Promise<GiftAidDeclaration | null> {
   const { data, error } = await db()
@@ -1561,7 +1561,7 @@ export async function revokeGiftAidDeclaration(
       revoked_reason: opts?.reason ?? null,
     })
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -1574,13 +1574,13 @@ export async function revokeGiftAidDeclaration(
  * recorded before the link existed.
  */
 export async function getActiveGiftAidDeclarationByMember(
-  churchId: string,
+  mosqueId: string,
   member: { id: string; email: string }
 ): Promise<GiftAidDeclaration | null> {
   const { data: linked, error: linkedError } = await db()
     .from("gift_aid_declarations")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("member_id", member.id)
     .is("revoked_at", null)
     .eq("declaration_confirmed", true)
@@ -1590,7 +1590,7 @@ export async function getActiveGiftAidDeclarationByMember(
     .maybeSingle();
   if (linkedError) throw linkedError;
   if (linked) return linked as GiftAidDeclaration;
-  return getActiveGiftAidDeclarationByEmail(churchId, member.email);
+  return getActiveGiftAidDeclarationByEmail(mosqueId, member.email);
 }
 
 // ---------------------------------------------------------------------------
@@ -1599,18 +1599,18 @@ export async function getActiveGiftAidDeclarationByMember(
 
 export type InsertGiftAidDeclarationEventInput = Omit<
   GiftAidDeclarationEvent,
-  "id" | "church_id" | "declaration_id" | "created_at"
+  "id" | "mosque_id" | "declaration_id" | "created_at"
 > & {
   declaration_id: string;
 };
 
 export async function insertGiftAidDeclarationEvent(
-  churchId: string,
+  mosqueId: string,
   input: InsertGiftAidDeclarationEventInput
 ): Promise<GiftAidDeclarationEvent> {
   const { data, error } = await db()
     .from("gift_aid_declaration_events")
-    .insert({ ...input, church_id: churchId })
+    .insert({ ...input, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -1618,13 +1618,13 @@ export async function insertGiftAidDeclarationEvent(
 }
 
 export async function listGiftAidDeclarationEvents(
-  churchId: string,
+  mosqueId: string,
   declarationId: string
 ): Promise<GiftAidDeclarationEvent[]> {
   const { data, error } = await db()
     .from("gift_aid_declaration_events")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("declaration_id", declarationId)
     .order("created_at", { ascending: true });
   if (error) throw error;
@@ -1637,7 +1637,7 @@ export async function listGiftAidDeclarationEvents(
 
 export async function updateMemberGiftAidPosture(
   memberId: string,
-  churchId: string,
+  mosqueId: string,
   patch: {
     gift_aid_consent_status?: "unknown" | "declared" | "declined";
     gift_aid_prompted_at?: string | null;
@@ -1647,7 +1647,7 @@ export async function updateMemberGiftAidPosture(
     .from("members")
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq("id", memberId)
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
 }
 
@@ -1657,7 +1657,7 @@ export async function updateMemberGiftAidPosture(
 
 export async function markEventServiceClosed(
   eventId: string,
-  churchId: string,
+  mosqueId: string,
   patch: {
     service_closed_at: string;
     service_closed_by_email: string | null;
@@ -1668,13 +1668,13 @@ export async function markEventServiceClosed(
     .from("events")
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq("id", eventId)
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
 }
 
 export async function attachClaimBatchToServiceCollection(
   collectionId: string,
-  churchId: string,
+  mosqueId: string,
   patch: {
     gift_aid_claim_batch_id: string;
     gift_aid_pack_delivered_at?: string | null;
@@ -1685,7 +1685,7 @@ export async function attachClaimBatchToServiceCollection(
     .from("service_collections")
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq("id", collectionId)
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
 }
 
@@ -1693,7 +1693,7 @@ export async function attachClaimBatchToServiceCollection(
 // for an event. Used by the service close panel so the treasurer can record
 // that the Gift Aid pack has actually been forwarded to UGLE.
 export async function markReliefChestDeliveredForEvent(
-  churchId: string,
+  mosqueId: string,
   eventId: string,
   opts: { deliveredAt?: string | null; deliveredTo?: string | null }
 ): Promise<void> {
@@ -1707,56 +1707,56 @@ export async function markReliefChestDeliveredForEvent(
       gift_aid_pack_delivered_to: opts.deliveredTo ?? null,
       updated_at: new Date().toISOString(),
     })
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("event_id", eventId);
   if (error) throw error;
 }
 
 // ---------------------------------------------------------------------------
-// Church Subscriptions
+// Mosque Subscriptions
 // ---------------------------------------------------------------------------
 
-export async function getChurchSubscription(
-  churchId: string
-): Promise<ChurchSubscription | null> {
+export async function getMosqueSubscription(
+  mosqueId: string
+): Promise<MosqueSubscription | null> {
   const { data, error } = await db()
-    .from("church_subscriptions")
+    .from("mosque_subscriptions")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .maybeSingle();
   if (error) throw error;
-  return data as ChurchSubscription | null;
+  return data as MosqueSubscription | null;
 }
 
-export async function upsertChurchSubscription(
-  churchId: string,
+export async function upsertMosqueSubscription(
+  mosqueId: string,
   data: Omit<
-    ChurchSubscription,
+    MosqueSubscription,
     | "id"
-    | "church_id"
+    | "mosque_id"
     | "created_at"
     | "updated_at"
     | "requested_plan_code"
     | "last_upgrade_requested_at"
-    | "church_limit"
+    | "mosque_limit"
   > &
     Partial<
       Pick<
-        ChurchSubscription,
-        "requested_plan_code" | "last_upgrade_requested_at" | "church_limit"
+        MosqueSubscription,
+        "requested_plan_code" | "last_upgrade_requested_at" | "mosque_limit"
       >
     >
-): Promise<ChurchSubscription> {
+): Promise<MosqueSubscription> {
   const { data: row, error } = await db()
-    .from("church_subscriptions")
+    .from("mosque_subscriptions")
     .upsert(
-      { ...data, church_id: churchId },
-      { onConflict: "church_id" }
+      { ...data, mosque_id: mosqueId },
+      { onConflict: "mosque_id" }
     )
     .select("*")
     .single();
   if (error) throw error;
-  return row as ChurchSubscription;
+  return row as MosqueSubscription;
 }
 
 // ---------------------------------------------------------------------------
@@ -1764,13 +1764,13 @@ export async function upsertChurchSubscription(
 // ---------------------------------------------------------------------------
 
 export async function getBlogPosts(
-  churchId: string,
+  mosqueId: string,
   opts?: { published?: boolean }
 ): Promise<BlogPost[]> {
   let query = db()
     .from("blog_posts")
     .select("*")
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
 
   if (opts?.published !== undefined) {
     query = query
@@ -1790,13 +1790,13 @@ export async function getBlogPosts(
 
 export async function getBlogPostById(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<BlogPost | null> {
   const { data, error } = await db()
     .from("blog_posts")
     .select("*")
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .maybeSingle();
   if (error) throw error;
   return data as BlogPost | null;
@@ -1804,13 +1804,13 @@ export async function getBlogPostById(
 
 export async function getBlogPostBySlug(
   slug: string,
-  churchId: string
+  mosqueId: string
 ): Promise<BlogPost | null> {
   const { data, error } = await db()
     .from("blog_posts")
     .select("*")
     .eq("slug", slug)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("published", true)
     .maybeSingle();
   if (error) throw error;
@@ -1818,12 +1818,12 @@ export async function getBlogPostBySlug(
 }
 
 export async function addBlogPost(
-  churchId: string,
-  data: Omit<BlogPost, "id" | "church_id" | "created_at" | "updated_at">
+  mosqueId: string,
+  data: Omit<BlogPost, "id" | "mosque_id" | "created_at" | "updated_at">
 ): Promise<BlogPost> {
   const { data: row, error } = await db()
     .from("blog_posts")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -1832,14 +1832,14 @@ export async function addBlogPost(
 
 export async function updateBlogPost(
   id: string,
-  churchId: string,
-  updates: Partial<Omit<BlogPost, "id" | "church_id" | "created_at">>
+  mosqueId: string,
+  updates: Partial<Omit<BlogPost, "id" | "mosque_id" | "created_at">>
 ): Promise<BlogPost | null> {
   const { data, error } = await db()
     .from("blog_posts")
     .update(updates)
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -1851,12 +1851,12 @@ export async function updateBlogPost(
 // ---------------------------------------------------------------------------
 
 export async function getCharityCampaigns(
-  churchId: string
+  mosqueId: string
 ): Promise<CharityCampaign[]> {
   const { data, error } = await db()
     .from("charity_campaigns")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as CharityCampaign[];
@@ -1864,25 +1864,25 @@ export async function getCharityCampaigns(
 
 export async function getCharityCampaignById(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<CharityCampaign | null> {
   const { data, error } = await db()
     .from("charity_campaigns")
     .select("*")
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .maybeSingle();
   if (error) throw error;
   return data as CharityCampaign | null;
 }
 
 export async function addCharityCampaign(
-  churchId: string,
-  data: Omit<CharityCampaign, "id" | "church_id" | "created_at" | "updated_at">
+  mosqueId: string,
+  data: Omit<CharityCampaign, "id" | "mosque_id" | "created_at" | "updated_at">
 ): Promise<CharityCampaign> {
   const { data: row, error } = await db()
     .from("charity_campaigns")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -1891,7 +1891,7 @@ export async function addCharityCampaign(
 
 export async function updateCharityCampaign(
   id: string,
-  churchId: string,
+  mosqueId: string,
   updates: Partial<
     Pick<CharityCampaign, "name" | "description" | "target_amount" | "raised_amount" | "status" | "end_date">
   >
@@ -1900,7 +1900,7 @@ export async function updateCharityCampaign(
     .from("charity_campaigns")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -1909,13 +1909,13 @@ export async function updateCharityCampaign(
 
 export async function getDonationsByCampaign(
   campaignId: string,
-  churchId: string
+  mosqueId: string
 ): Promise<Donation[]> {
   const { data, error } = await db()
     .from("donations")
     .select("*")
     .eq("campaign_id", campaignId)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as Donation[];
@@ -1923,41 +1923,41 @@ export async function getDonationsByCampaign(
 
 export async function getDonationsByEvent(
   eventId: string,
-  churchId: string
+  mosqueId: string
 ): Promise<Donation[]> {
   const { data, error } = await db()
     .from("donations")
     .select("*")
     .eq("event_id", eventId)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as Donation[];
 }
 
 // ---------------------------------------------------------------------------
-// Church Giving
+// Mosque Giving
 // ---------------------------------------------------------------------------
 
-export async function getChurchGiving(churchId: string): Promise<ChurchGiving[]> {
+export async function getMosqueGiving(mosqueId: string): Promise<MosqueGiving[]> {
   const { data, error } = await db()
-    .from("church_giving")
+    .from("mosque_giving")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("active", true)
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return data as ChurchGiving[];
+  return data as MosqueGiving[];
 }
 
 export async function getMemberGiving(
-  churchId: string,
+  mosqueId: string,
   opts?: { memberEmail?: string; status?: string }
 ): Promise<MemberGiving[]> {
   let query = db()
     .from("member_giving")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("period_start", { ascending: false });
 
   if (opts?.memberEmail) {
@@ -1973,11 +1973,11 @@ export async function getMemberGiving(
 }
 
 export async function createMemberGiving(
-  churchId: string,
+  mosqueId: string,
   data: Omit<
     MemberGiving,
     | "id"
-    | "church_id"
+    | "mosque_id"
     | "created_at"
     | "updated_at"
     | "reminder_sent_at"
@@ -2021,7 +2021,7 @@ export async function createMemberGiving(
 ): Promise<MemberGiving> {
   const { data: row, error } = await db()
     .from("member_giving")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -2030,7 +2030,7 @@ export async function createMemberGiving(
 
 export async function updateMemberGivingStatus(
   id: string,
-  churchId: string,
+  mosqueId: string,
   updates: Partial<
     Pick<
       MemberGiving,
@@ -2056,7 +2056,7 @@ export async function updateMemberGivingStatus(
     .from("member_giving")
     .update(updates)
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -2092,7 +2092,7 @@ export type SetGivingPaymentMethodInput =
  */
 export async function setMemberGivingPaymentMethod(
   memberGivingId: string,
-  churchId: string,
+  mosqueId: string,
   input: SetGivingPaymentMethodInput,
 ): Promise<MemberGiving | null> {
   const now = new Date().toISOString();
@@ -2107,7 +2107,7 @@ export async function setMemberGivingPaymentMethod(
     updates.giving_payment_method = null;
     updates.bacs_monthly_amount = null;
     updates.bacs_reference = null;
-    return updateMemberGivingStatus(memberGivingId, churchId, updates);
+    return updateMemberGivingStatus(memberGivingId, mosqueId, updates);
   }
 
   updates.giving_payment_method = input.method;
@@ -2129,19 +2129,19 @@ export async function setMemberGivingPaymentMethod(
     updates.paid_at = null;
   }
 
-  return updateMemberGivingStatus(memberGivingId, churchId, updates);
+  return updateMemberGivingStatus(memberGivingId, mosqueId, updates);
 }
 
 /**
- * Church-wide breakdown of giving payment methods for the dashboard tile.
- * Counts ALL non-advance member_giving rows for the church by method,
+ * Mosque-wide breakdown of giving payment methods for the dashboard tile.
+ * Counts ALL non-advance member_giving rows for the mosque by method,
  * including a synthetic "unset" bucket for NULL.
  *
  * Optional yearId narrows to a specific giving year when the caller
  * has resolved one (treasurer dashboard scopes to current year).
  */
 export async function countMemberGivingByPaymentMethod(
-  churchId: string,
+  mosqueId: string,
   opts: { yearStart?: string; yearEnd?: string } = {},
 ): Promise<{
   online_subscription: number;
@@ -2154,7 +2154,7 @@ export async function countMemberGivingByPaymentMethod(
   let query = db()
     .from("member_giving")
     .select("giving_payment_method, bacs_monthly_amount, period_start, period_end, is_advance")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("is_advance", false);
 
   if (opts.yearStart) query = query.gte("period_end", opts.yearStart);
@@ -2190,17 +2190,17 @@ export async function countMemberGivingByPaymentMethod(
 // ---------------------------------------------------------------------------
 
 export async function createMemberGivingInstalments(
-  churchId: string,
+  mosqueId: string,
   rows: Array<
     Omit<
       MemberGivingInstalment,
-      "id" | "church_id" | "created_at" | "updated_at" | "mooov_payment_id" | "schedule_id"
+      "id" | "mosque_id" | "created_at" | "updated_at" | "mooov_payment_id" | "schedule_id"
     > &
       Partial<Pick<MemberGivingInstalment, "mooov_payment_id" | "schedule_id">>
   >
 ): Promise<MemberGivingInstalment[]> {
   if (rows.length === 0) return [];
-  const payload = rows.map((row) => ({ ...row, church_id: churchId }));
+  const payload = rows.map((row) => ({ ...row, mosque_id: mosqueId }));
   const { data, error } = await db()
     .from("member_giving_instalments")
     .insert(payload)
@@ -2211,26 +2211,26 @@ export async function createMemberGivingInstalments(
 
 export async function getInstalmentsForGiving(
   memberGivingId: string,
-  churchId: string
+  mosqueId: string
 ): Promise<MemberGivingInstalment[]> {
   const { data, error } = await db()
     .from("member_giving_instalments")
     .select("*")
     .eq("member_giving_id", memberGivingId)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("sequence", { ascending: true });
   if (error) throw error;
   return data as MemberGivingInstalment[];
 }
 
 export async function getOutstandingInstalments(
-  churchId: string,
+  mosqueId: string,
   opts?: { onOrBefore?: string }
 ): Promise<MemberGivingInstalment[]> {
   let query = db()
     .from("member_giving_instalments")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .in("status", ["outstanding", "overdue"])
     .order("due_date", { ascending: true });
   if (opts?.onOrBefore) {
@@ -2243,7 +2243,7 @@ export async function getOutstandingInstalments(
 
 export async function updateInstalment(
   id: string,
-  churchId: string,
+  mosqueId: string,
   updates: Partial<
     Pick<
       MemberGivingInstalment,
@@ -2255,7 +2255,7 @@ export async function updateInstalment(
     .from("member_giving_instalments")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -2272,13 +2272,13 @@ export async function updateInstalment(
  */
 export async function deleteInstalmentsForSchedule(
   scheduleId: string,
-  churchId: string
+  mosqueId: string
 ): Promise<number> {
   const { error, count } = await db()
     .from("member_giving_instalments")
     .delete({ count: "exact" })
     .eq("schedule_id", scheduleId)
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
   return count ?? 0;
 }
@@ -2308,13 +2308,13 @@ export type CreateGivingScheduleInput = {
 };
 
 export async function createGivingSchedule(
-  churchId: string,
+  mosqueId: string,
   input: CreateGivingScheduleInput
 ): Promise<GivingSchedule> {
   const { data, error } = await db()
     .from("giving_schedules")
     .insert({
-      church_id: churchId,
+      mosque_id: mosqueId,
       member_id: input.member_id,
       member_giving_id: input.member_giving_id,
       member_email: input.member_email,
@@ -2353,26 +2353,26 @@ export async function getGivingScheduleByMooovSubscriptionId(
 
 export async function getGivingSchedule(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<GivingSchedule | null> {
   const { data, error } = await db()
     .from("giving_schedules")
     .select("*")
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .maybeSingle();
   if (error) throw error;
   return (data as GivingSchedule | null) ?? null;
 }
 
 export async function getGivingSchedulesForMember(
-  churchId: string,
+  mosqueId: string,
   memberEmail: string
 ): Promise<GivingSchedule[]> {
   const { data, error } = await db()
     .from("giving_schedules")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("member_email", memberEmail)
     .order("created_at", { ascending: false });
   if (error) throw error;
@@ -2398,7 +2398,7 @@ export async function getGivingSchedulesDue(
 }
 
 export async function listGivingSchedules(
-  churchId: string,
+  mosqueId: string,
   opts?: {
     status?: GivingScheduleStatus | GivingScheduleStatus[];
     memberEmail?: string;
@@ -2408,7 +2408,7 @@ export async function listGivingSchedules(
   let query = db()
     .from("giving_schedules")
     .select("*")
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
 
   if (opts?.status) {
     if (Array.isArray(opts.status)) {
@@ -2432,12 +2432,12 @@ export async function listGivingSchedules(
 // as a record keyed on GivingScheduleStatus with 0-fill for missing
 // statuses so callers can index without checks.
 export async function countGivingSchedulesByStatus(
-  churchId: string
+  mosqueId: string
 ): Promise<Record<GivingScheduleStatus, number>> {
   const { data, error } = await db()
     .from("giving_schedules")
     .select("status, cancelled_at")
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
 
   const counts: Record<GivingScheduleStatus, number> = {
@@ -2469,7 +2469,7 @@ export async function countGivingSchedulesByStatus(
 
 export async function updateGivingSchedule(
   id: string,
-  churchId: string,
+  mosqueId: string,
   updates: Partial<
     Pick<
       GivingSchedule,
@@ -2497,7 +2497,7 @@ export async function updateGivingSchedule(
     .from("giving_schedules")
     .update(updates)
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -2506,13 +2506,13 @@ export async function updateGivingSchedule(
 
 export async function getMemberGivingById(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<MemberGiving | null> {
   const { data, error } = await db()
     .from("member_giving")
     .select("*")
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .maybeSingle();
   if (error) throw error;
   return (data as MemberGiving | null) ?? null;
@@ -2523,13 +2523,13 @@ export async function getMemberGivingById(
 // ---------------------------------------------------------------------------
 
 export async function getServiceCollections(
-  churchId: string,
+  mosqueId: string,
   opts?: { eventId?: string; taxYear?: string }
 ): Promise<ServiceCollection[]> {
   let query = db()
     .from("service_collections")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("collection_date", { ascending: false });
 
   if (opts?.eventId) query = query.eq("event_id", opts.eventId);
@@ -2541,11 +2541,11 @@ export async function getServiceCollections(
 }
 
 export async function createServiceCollection(
-  churchId: string,
+  mosqueId: string,
   data: Omit<
     ServiceCollection,
     | "id"
-    | "church_id"
+    | "mosque_id"
     | "created_at"
     | "updated_at"
     | "gift_aid_claim_batch_id"
@@ -2563,30 +2563,30 @@ export async function createServiceCollection(
 ): Promise<ServiceCollection> {
   const { data: row, error } = await db()
     .from("service_collections")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
   return row as ServiceCollection;
 }
 
-export async function getGasdsClaims(churchId: string): Promise<GasdsClaim[]> {
+export async function getGasdsClaims(mosqueId: string): Promise<GasdsClaim[]> {
   const { data, error } = await db()
     .from("gasds_claims")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("tax_year", { ascending: false });
   if (error) throw error;
   return data as GasdsClaim[];
 }
 
 export async function upsertGasdsClaim(
-  churchId: string,
-  data: Omit<GasdsClaim, "id" | "church_id" | "created_at" | "updated_at">
+  mosqueId: string,
+  data: Omit<GasdsClaim, "id" | "mosque_id" | "created_at" | "updated_at">
 ): Promise<GasdsClaim> {
   const { data: row, error } = await db()
     .from("gasds_claims")
-    .upsert({ ...data, church_id: churchId }, { onConflict: "church_id,tax_year" })
+    .upsert({ ...data, mosque_id: mosqueId }, { onConflict: "mosque_id,tax_year" })
     .select("*")
     .single();
   if (error) throw error;
@@ -2598,7 +2598,7 @@ export async function upsertGasdsClaim(
 // ---------------------------------------------------------------------------
 
 export async function getTreasurerLedger(
-  churchId: string,
+  mosqueId: string,
   opts?: {
     from?: string;
     to?: string;
@@ -2609,7 +2609,7 @@ export async function getTreasurerLedger(
   let query = db()
     .from("treasurer_ledger")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("occurred_at", { ascending: false });
   if (opts?.from) query = query.gte("occurred_at", opts.from);
   if (opts?.to) query = query.lte("occurred_at", opts.to);
@@ -2629,11 +2629,11 @@ export async function getTreasurerLedger(
 // ---------------------------------------------------------------------------
 
 export async function addEventGuests(
-  churchId: string,
-  guests: Omit<EventGuest, "id" | "church_id" | "created_at">[]
+  mosqueId: string,
+  guests: Omit<EventGuest, "id" | "mosque_id" | "created_at">[]
 ): Promise<EventGuest[]> {
   if (guests.length === 0) return [];
-  const rows = guests.map((g) => ({ ...g, church_id: churchId }));
+  const rows = guests.map((g) => ({ ...g, mosque_id: mosqueId }));
   const { data, error } = await db()
     .from("event_guests")
     .insert(rows)
@@ -2644,13 +2644,13 @@ export async function addEventGuests(
 
 export async function getGuestsByRsvp(
   rsvpId: string,
-  churchId: string
+  mosqueId: string
 ): Promise<EventGuest[]> {
   const { data, error } = await db()
     .from("event_guests")
     .select("*")
     .eq("rsvp_id", rsvpId)
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
   return data as EventGuest[];
 }
@@ -2663,25 +2663,25 @@ export async function getGuestsByRsvp(
  */
 export async function deleteEventGuestsByRsvp(
   rsvpId: string,
-  churchId: string
+  mosqueId: string
 ): Promise<void> {
   const { error } = await db()
     .from("event_guests")
     .delete()
     .eq("rsvp_id", rsvpId)
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
 }
 
 export async function getGuestsByEvent(
   eventId: string,
-  churchId: string
+  mosqueId: string
 ): Promise<EventGuest[]> {
   const { data, error } = await db()
     .from("event_guests")
     .select("*")
     .eq("event_id", eventId)
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
   return data as EventGuest[];
 }
@@ -2691,13 +2691,13 @@ export async function getGuestsByEvent(
 // ---------------------------------------------------------------------------
 
 export async function getMembers(
-  churchId: string,
+  mosqueId: string,
   opts?: { status?: string; search?: string }
 ): Promise<Member[]> {
   let query = db()
     .from("members")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("full_name");
 
   if (opts?.status) {
@@ -2716,13 +2716,13 @@ export async function getMembers(
 
 export async function getMemberById(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<Member | null> {
   const { data, error } = await db()
     .from("members")
     .select("*")
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .maybeSingle();
   if (error) throw error;
   return data as Member | null;
@@ -2730,13 +2730,13 @@ export async function getMemberById(
 
 export async function getMemberByEmail(
   email: string,
-  churchId: string
+  mosqueId: string
 ): Promise<Member | null> {
   const { data, error } = await db()
     .from("members")
     .select("*")
     .eq("email", email.trim().toLowerCase())
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .maybeSingle();
   if (error) throw error;
   return data as Member | null;
@@ -2755,7 +2755,7 @@ export async function getMemberByAuthUserId(
   return (data?.[0] as Member | undefined) ?? null;
 }
 
-export async function getMemberByEmailAcrossChurches(
+export async function getMemberByEmailAcrossMosques(
   email: string
 ): Promise<Member | null> {
   const { data, error } = await db()
@@ -2782,11 +2782,11 @@ export async function getMemberByPortalToken(
 }
 
 export async function createMember(
-  churchId: string,
+  mosqueId: string,
   data: Omit<
     Member,
     | "id"
-    | "church_id"
+    | "mosque_id"
     | "created_at"
     | "updated_at"
     | "portal_token"
@@ -2838,7 +2838,7 @@ export async function createMember(
 ): Promise<Member> {
   const { data: row, error } = await db()
     .from("members")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -2847,14 +2847,14 @@ export async function createMember(
 
 export async function updateMember(
   id: string,
-  churchId: string,
-  updates: Partial<Omit<Member, "id" | "church_id" | "created_at">>
+  mosqueId: string,
+  updates: Partial<Omit<Member, "id" | "mosque_id" | "created_at">>
 ): Promise<Member | null> {
   const { data, error } = await db()
     .from("members")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -2872,7 +2872,7 @@ export async function updateMember(
  */
 export async function changeMemberEmail(
   id: string,
-  churchId: string,
+  mosqueId: string,
   newEmail: string
 ): Promise<{
   member: Member | null;
@@ -2884,7 +2884,7 @@ export async function changeMemberEmail(
   const supabase = db();
   const normalised = newEmail.trim().toLowerCase();
 
-  const existing = await getMemberById(id, churchId);
+  const existing = await getMemberById(id, mosqueId);
   if (!existing) {
     return {
       member: null,
@@ -2910,7 +2910,7 @@ export async function changeMemberEmail(
     .from("members")
     .update({ email: normalised, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (memberError) throw memberError;
@@ -2918,7 +2918,7 @@ export async function changeMemberEmail(
   const { data: paymentsRows, error: paymentsError } = await supabase
     .from("payments")
     .update({ user_email: normalised, updated_at: new Date().toISOString() })
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("user_email", oldEmail)
     .select("id");
   if (paymentsError) throw paymentsError;
@@ -2926,7 +2926,7 @@ export async function changeMemberEmail(
   const { data: rsvpRows, error: rsvpError } = await supabase
     .from("rsvps")
     .update({ user_email: normalised, updated_at: new Date().toISOString() })
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("user_email", oldEmail)
     .select("id");
   if (rsvpError) throw rsvpError;
@@ -2934,7 +2934,7 @@ export async function changeMemberEmail(
   const { data: givingRows, error: givingError } = await supabase
     .from("member_giving")
     .update({ member_email: normalised, updated_at: new Date().toISOString() })
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("member_email", oldEmail)
     .select("id");
   if (givingError) throw givingError;
@@ -2954,25 +2954,25 @@ export async function changeMemberEmail(
 
 export async function getServiceNotice(
   eventId: string,
-  churchId: string
+  mosqueId: string
 ): Promise<ServiceNotice | null> {
   const { data, error } = await db()
     .from("service_notices")
     .select("*")
     .eq("event_id", eventId)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .maybeSingle();
   if (error) throw error;
   return data as ServiceNotice | null;
 }
 
 export async function upsertServiceNotice(
-  churchId: string,
+  mosqueId: string,
   eventId: string,
   data: Partial<
     Omit<
       ServiceNotice,
-      "id" | "church_id" | "event_id" | "created_at" | "updated_at"
+      "id" | "mosque_id" | "event_id" | "created_at" | "updated_at"
     >
   >
 ): Promise<ServiceNotice> {
@@ -2981,11 +2981,11 @@ export async function upsertServiceNotice(
     .upsert(
       {
         ...data,
-        church_id: churchId,
+        mosque_id: mosqueId,
         event_id: eventId,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "church_id,event_id" }
+      { onConflict: "mosque_id,event_id" }
     )
     .select("*")
     .single();
@@ -2994,14 +2994,14 @@ export async function upsertServiceNotice(
 }
 
 export async function listServiceNoticeSends(
-  churchId: string,
+  mosqueId: string,
   eventId: string,
   limit = 5
 ): Promise<ServiceNoticeSend[]> {
   const { data, error } = await db()
     .from("service_notice_sends")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("event_id", eventId)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -3010,12 +3010,12 @@ export async function listServiceNoticeSends(
 }
 
 export async function createServiceNoticeSend(
-  churchId: string,
-  data: Omit<ServiceNoticeSend, "id" | "church_id" | "created_at">
+  mosqueId: string,
+  data: Omit<ServiceNoticeSend, "id" | "mosque_id" | "created_at">
 ): Promise<ServiceNoticeSend> {
   const { data: row, error } = await db()
     .from("service_notice_sends")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -3023,12 +3023,12 @@ export async function createServiceNoticeSend(
 }
 
 export async function createServiceNoticeAccessLink(
-  churchId: string,
-  data: Omit<ServiceNoticeAccessLink, "id" | "church_id" | "created_at" | "accessed_at" | "access_count">
+  mosqueId: string,
+  data: Omit<ServiceNoticeAccessLink, "id" | "mosque_id" | "created_at" | "accessed_at" | "access_count">
 ): Promise<ServiceNoticeAccessLink> {
   const { data: row, error } = await db()
     .from("service_notice_access_links")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -3052,12 +3052,12 @@ export async function getServiceNoticeAccessLinkByTokenHash(
 // ---------------------------------------------------------------------------
 
 export async function listServiceSequences(
-  churchId: string
+  mosqueId: string
 ): Promise<ServiceSequence[]> {
   const { data, error } = await db()
     .from("service_sequences")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as ServiceSequence[];
@@ -3065,19 +3065,19 @@ export async function listServiceSequences(
 
 export async function getServiceSequenceById(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<ServiceSequence | null> {
   const { data, error } = await db()
     .from("service_sequences")
     .select("*")
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .maybeSingle();
   if (error) throw error;
   return data as ServiceSequence | null;
 }
 
-export async function listActiveServiceSequencesForAllChurches(): Promise<
+export async function listActiveServiceSequencesForAllMosques(): Promise<
   ServiceSequence[]
 > {
   const { data, error } = await db()
@@ -3090,12 +3090,12 @@ export async function listActiveServiceSequencesForAllChurches(): Promise<
 }
 
 export async function createServiceSequence(
-  churchId: string,
-  data: Omit<ServiceSequence, "id" | "church_id" | "created_at" | "updated_at">
+  mosqueId: string,
+  data: Omit<ServiceSequence, "id" | "mosque_id" | "created_at" | "updated_at">
 ): Promise<ServiceSequence> {
   const { data: row, error } = await db()
     .from("service_sequences")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -3104,16 +3104,16 @@ export async function createServiceSequence(
 
 export async function updateServiceSequence(
   id: string,
-  churchId: string,
+  mosqueId: string,
   updates: Partial<
-    Omit<ServiceSequence, "id" | "church_id" | "created_at" | "updated_at">
+    Omit<ServiceSequence, "id" | "mosque_id" | "created_at" | "updated_at">
   >
 ): Promise<ServiceSequence | null> {
   const { data, error } = await db()
     .from("service_sequences")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -3122,40 +3122,40 @@ export async function updateServiceSequence(
 
 export async function deleteServiceSequence(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<boolean> {
   const { error } = await db()
     .from("service_sequences")
     .delete()
     .eq("id", id)
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
   return true;
 }
 
 export async function getEventsBySequenceId(
   sequenceId: string,
-  churchId: string
+  mosqueId: string
 ): Promise<Event[]> {
   const { data, error } = await db()
     .from("events")
     .select("*")
     .eq("sequence_id", sequenceId)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("event_date", { ascending: true });
   if (error) throw error;
   return (data ?? []) as Event[];
 }
 
 export async function getEventsAwaitingNoticeDraft(
-  churchId: string,
+  mosqueId: string,
   windowEndIso: string
 ): Promise<Event[]> {
   const nowIso = new Date().toISOString();
   const { data, error } = await db()
     .from("events")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("notice_status", "none")
     .gte("event_date", nowIso)
     .lte("event_date", windowEndIso)
@@ -3166,7 +3166,7 @@ export async function getEventsAwaitingNoticeDraft(
 
 export async function setServiceNoticeStatus(
   eventId: string,
-  churchId: string,
+  mosqueId: string,
   status: NoticeStatus,
   extra?: Partial<
     Pick<
@@ -3182,7 +3182,7 @@ export async function setServiceNoticeStatus(
     .from("events")
     .update({ notice_status: status, ...(extra ?? {}) })
     .eq("id", eventId)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -3199,23 +3199,23 @@ export async function setServiceNoticeStatus(
 // ---------------------------------------------------------------------------
 
 export async function listEventFeeOverrides(
-  churchId: string,
+  mosqueId: string,
   eventId: string
 ): Promise<EventFeeOverride[]> {
   const { data, error } = await db()
     .from("event_fee_overrides")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("event_id", eventId);
   if (error) throw error;
   return (data ?? []) as EventFeeOverride[];
 }
 
 export async function upsertEventFeeOverride(
-  churchId: string,
+  mosqueId: string,
   data: Omit<
     EventFeeOverride,
-    "id" | "church_id" | "created_at" | "updated_at"
+    "id" | "mosque_id" | "created_at" | "updated_at"
   >
 ): Promise<EventFeeOverride> {
   const { data: row, error } = await db()
@@ -3223,7 +3223,7 @@ export async function upsertEventFeeOverride(
     .upsert(
       {
         ...data,
-        church_id: churchId,
+        mosque_id: mosqueId,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "event_id,subject_type,subject_id" }
@@ -3235,7 +3235,7 @@ export async function upsertEventFeeOverride(
 }
 
 export async function deleteEventFeeOverride(
-  churchId: string,
+  mosqueId: string,
   eventId: string,
   subjectType: "member" | "guest",
   subjectId: string
@@ -3243,7 +3243,7 @@ export async function deleteEventFeeOverride(
   const { error } = await db()
     .from("event_fee_overrides")
     .delete()
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("event_id", eventId)
     .eq("subject_type", subjectType)
     .eq("subject_id", subjectId);
@@ -3269,13 +3269,13 @@ export async function recordServiceNoticeAccess(
 
 export async function getRsvpDietaryByEmail(
   email: string,
-  churchId: string
+  mosqueId: string
 ): Promise<Array<{ event_id: string; dietary_requirements: string | null; created_at: string }>> {
   const { data, error } = await db()
     .from("rsvps")
     .select("event_id, dietary_requirements, created_at")
     .eq("user_email", email)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .not("dietary_requirements", "is", null)
     .order("created_at", { ascending: false });
   if (error) throw error;
@@ -3284,13 +3284,13 @@ export async function getRsvpDietaryByEmail(
 
 export async function getRsvpsByEmail(
   email: string,
-  churchId: string
+  mosqueId: string
 ): Promise<Rsvp[]> {
   const { data, error } = await db()
     .from("rsvps")
     .select("*")
     .eq("user_email", email)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as Rsvp[];
@@ -3298,13 +3298,13 @@ export async function getRsvpsByEmail(
 
 export async function getNoticeAccessLinksByEmail(
   email: string,
-  churchId: string
+  mosqueId: string
 ): Promise<ServiceNoticeAccessLink[]> {
   const { data, error } = await db()
     .from("service_notice_access_links")
     .select("*")
     .eq("recipient_email", email)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as ServiceNoticeAccessLink[];
@@ -3312,13 +3312,13 @@ export async function getNoticeAccessLinksByEmail(
 
 export async function getPaymentsByEmail(
   email: string,
-  churchId: string
+  mosqueId: string
 ): Promise<Payment[]> {
   const { data, error } = await db()
     .from("payments")
     .select("*")
     .eq("user_email", email)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as Payment[];
@@ -3326,24 +3326,24 @@ export async function getPaymentsByEmail(
 
 export async function getDonationsByEmail(
   email: string,
-  churchId: string
+  mosqueId: string
 ): Promise<Donation[]> {
   const { data, error } = await db()
     .from("donations")
     .select("*")
     .eq("donor_email", email)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as Donation[];
 }
 
-export async function upsertChurchGiving(
-  churchId: string,
+export async function upsertMosqueGiving(
+  mosqueId: string,
   data: Omit<
-    ChurchGiving,
+    MosqueGiving,
     | "id"
-    | "church_id"
+    | "mosque_id"
     | "created_at"
     | "updated_at"
     | "enable_strategy_catch_up_lump"
@@ -3356,7 +3356,7 @@ export async function upsertChurchGiving(
   > &
     Partial<
       Pick<
-        ChurchGiving,
+        MosqueGiving,
         | "enable_strategy_catch_up_lump"
         | "enable_strategy_balloon"
         | "enable_strategy_reslice"
@@ -3366,43 +3366,43 @@ export async function upsertChurchGiving(
         | "advance_discount_percent"
       >
     >
-): Promise<ChurchGiving> {
-  const existing = await getChurchGiving(churchId);
+): Promise<MosqueGiving> {
+  const existing = await getMosqueGiving(mosqueId);
   if (existing.length > 0) {
     const { data: row, error } = await db()
-      .from("church_giving")
+      .from("mosque_giving")
       .update({ ...data, updated_at: new Date().toISOString() })
       .eq("id", existing[0].id)
-      .eq("church_id", churchId)
+      .eq("mosque_id", mosqueId)
       .select("*")
       .single();
     if (error) throw error;
-    return row as ChurchGiving;
+    return row as MosqueGiving;
   }
   const { data: row, error } = await db()
-    .from("church_giving")
-    .insert({ ...data, church_id: churchId })
+    .from("mosque_giving")
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
-  return row as ChurchGiving;
+  return row as MosqueGiving;
 }
 
 export async function getMembersForInitiation(
   today: string
-): Promise<Array<Member & { church_slug: string }>> {
+): Promise<Array<Member & { mosque_slug: string }>> {
   const { data, error } = await db()
     .from("members")
-    .select("*, churches!inner(slug)")
+    .select("*, mosques!inner(slug)")
     .eq("date_of_membership", today)
     .eq("membership_email_sent", false);
   if (error) throw error;
   return (data ?? []).map((row: Record<string, unknown>) => {
-    const churches = row.churches as { slug: string } | undefined;
+    const mosques = row.mosques as { slug: string } | undefined;
     return {
       ...row,
-      church_slug: churches?.slug ?? "",
-    } as Member & { church_slug: string };
+      mosque_slug: mosques?.slug ?? "",
+    } as Member & { mosque_slug: string };
   });
 }
 
@@ -3411,10 +3411,10 @@ export async function getMembersForInitiation(
 // ---------------------------------------------------------------------------
 
 export async function createBankImport(
-  churchId: string,
+  mosqueId: string,
   data: Omit<
     BankStatementImport,
-    "id" | "church_id" | "created_at" | "matched_rows" | "total_rows"
+    "id" | "mosque_id" | "created_at" | "matched_rows" | "total_rows"
   > &
     Partial<Pick<BankStatementImport, "matched_rows" | "total_rows">>
 ): Promise<BankStatementImport> {
@@ -3422,7 +3422,7 @@ export async function createBankImport(
     .from("bank_statement_imports")
     .insert({
       ...data,
-      church_id: churchId,
+      mosque_id: mosqueId,
       total_rows: data.total_rows ?? 0,
       matched_rows: data.matched_rows ?? 0,
     })
@@ -3434,7 +3434,7 @@ export async function createBankImport(
 
 export async function updateBankImport(
   id: string,
-  churchId: string,
+  mosqueId: string,
   updates: Partial<
     Pick<BankStatementImport, "total_rows" | "matched_rows" | "notes" | "account_label">
   >
@@ -3443,7 +3443,7 @@ export async function updateBankImport(
     .from("bank_statement_imports")
     .update(updates)
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -3451,23 +3451,23 @@ export async function updateBankImport(
 }
 
 export async function listBankImports(
-  churchId: string
+  mosqueId: string
 ): Promise<BankStatementImport[]> {
   const { data, error } = await db()
     .from("bank_statement_imports")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as BankStatementImport[];
 }
 
 export async function insertBankTransactions(
-  churchId: string,
+  mosqueId: string,
   rows: Array<
     Omit<
       BankTransaction,
-      "id" | "church_id" | "created_at" | "updated_at" | "matched_at" | "matched_by_admin_user_id" | "matched_confidence" | "matched_source_id" | "matched_source_type" | "status" | "notes"
+      "id" | "mosque_id" | "created_at" | "updated_at" | "matched_at" | "matched_by_admin_user_id" | "matched_confidence" | "matched_source_id" | "matched_source_type" | "status" | "notes"
     > &
       Partial<
         Pick<
@@ -3484,7 +3484,7 @@ export async function insertBankTransactions(
   >
 ): Promise<BankTransaction[]> {
   if (rows.length === 0) return [];
-  const payload = rows.map((row) => ({ ...row, church_id: churchId }));
+  const payload = rows.map((row) => ({ ...row, mosque_id: mosqueId }));
   const { data, error } = await db()
     .from("bank_transactions")
     .insert(payload)
@@ -3494,13 +3494,13 @@ export async function insertBankTransactions(
 }
 
 export async function listBankTransactions(
-  churchId: string,
+  mosqueId: string,
   opts?: { importId?: string; status?: BankTransaction["status"] }
 ): Promise<BankTransaction[]> {
   let query = db()
     .from("bank_transactions")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("posted_date", { ascending: false });
   if (opts?.importId) query = query.eq("import_id", opts.importId);
   if (opts?.status) query = query.eq("status", opts.status);
@@ -3511,7 +3511,7 @@ export async function listBankTransactions(
 
 export async function updateBankTransaction(
   id: string,
-  churchId: string,
+  mosqueId: string,
   updates: Partial<
     Pick<
       BankTransaction,
@@ -3529,7 +3529,7 @@ export async function updateBankTransaction(
     .from("bank_transactions")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -3541,13 +3541,13 @@ export async function updateBankTransaction(
 // ---------------------------------------------------------------------------
 
 export async function listPastoralCareCases(
-  churchId: string,
+  mosqueId: string,
   opts?: { status?: PastoralCareCase["status"] }
 ): Promise<PastoralCareCase[]> {
   let query = db()
     .from("pastoral_cases")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("opened_at", { ascending: false });
   if (opts?.status) query = query.eq("status", opts.status);
   const { data, error } = await query;
@@ -3557,26 +3557,26 @@ export async function listPastoralCareCases(
 
 export async function getPastoralCareCaseById(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<PastoralCareCase | null> {
   const { data, error } = await db()
     .from("pastoral_cases")
     .select("*")
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .maybeSingle();
   if (error) throw error;
   return data as PastoralCareCase | null;
 }
 
 export async function createPastoralCareCase(
-  churchId: string,
-  data: Omit<PastoralCareCase, "id" | "church_id" | "created_at" | "updated_at" | "opened_at" | "closed_at"> &
+  mosqueId: string,
+  data: Omit<PastoralCareCase, "id" | "mosque_id" | "created_at" | "updated_at" | "opened_at" | "closed_at"> &
     Partial<Pick<PastoralCareCase, "opened_at" | "closed_at">>
 ): Promise<PastoralCareCase> {
   const { data: row, error } = await db()
     .from("pastoral_cases")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -3585,7 +3585,7 @@ export async function createPastoralCareCase(
 
 export async function updatePastoralCareCase(
   id: string,
-  churchId: string,
+  mosqueId: string,
   updates: Partial<
     Pick<
       PastoralCareCase,
@@ -3605,7 +3605,7 @@ export async function updatePastoralCareCase(
     .from("pastoral_cases")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -3614,25 +3614,25 @@ export async function updatePastoralCareCase(
 
 export async function listPastoralCareVisits(
   caseId: string,
-  churchId: string
+  mosqueId: string
 ): Promise<PastoralCareVisit[]> {
   const { data, error } = await db()
     .from("pastoral_visits")
     .select("*")
     .eq("case_id", caseId)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("visited_at", { ascending: false });
   if (error) throw error;
   return data as PastoralCareVisit[];
 }
 
 export async function createPastoralCareVisit(
-  churchId: string,
-  data: Omit<PastoralCareVisit, "id" | "church_id" | "created_at">
+  mosqueId: string,
+  data: Omit<PastoralCareVisit, "id" | "mosque_id" | "created_at">
 ): Promise<PastoralCareVisit> {
   const { data: row, error } = await db()
     .from("pastoral_visits")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -3640,13 +3640,13 @@ export async function createPastoralCareVisit(
 }
 
 export async function listPastoralCareRegister(
-  churchId: string,
+  mosqueId: string,
   registerType?: PastoralCareRegisterEntry["register_type"]
 ): Promise<PastoralCareRegisterEntry[]> {
   let query = db()
     .from("pastoral_register_entries")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("date_of_event", { ascending: false });
   if (registerType) query = query.eq("register_type", registerType);
   const { data, error } = await query;
@@ -3655,12 +3655,12 @@ export async function listPastoralCareRegister(
 }
 
 export async function createPastoralCareRegister(
-  churchId: string,
-  data: Omit<PastoralCareRegisterEntry, "id" | "church_id" | "created_at" | "updated_at">
+  mosqueId: string,
+  data: Omit<PastoralCareRegisterEntry, "id" | "mosque_id" | "created_at" | "updated_at">
 ): Promise<PastoralCareRegisterEntry> {
   const { data: row, error } = await db()
     .from("pastoral_register_entries")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -3669,7 +3669,7 @@ export async function createPastoralCareRegister(
 
 export async function updatePastoralCareRegister(
   id: string,
-  churchId: string,
+  mosqueId: string,
   updates: Partial<
     Pick<
       PastoralCareRegisterEntry,
@@ -3687,7 +3687,7 @@ export async function updatePastoralCareRegister(
     .from("pastoral_register_entries")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -3695,13 +3695,13 @@ export async function updatePastoralCareRegister(
 }
 
 export async function listPastoralCareAlerts(
-  churchId: string,
+  mosqueId: string,
   opts?: { status?: PastoralCareAlert["status"] }
 ): Promise<PastoralCareAlert[]> {
   let query = db()
     .from("pastoral_alerts")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false });
   if (opts?.status) query = query.eq("status", opts.status);
   const { data, error } = await query;
@@ -3710,15 +3710,15 @@ export async function listPastoralCareAlerts(
 }
 
 export async function upsertPastoralCareAlert(
-  churchId: string,
-  data: Omit<PastoralCareAlert, "id" | "church_id" | "created_at" | "updated_at"> &
+  mosqueId: string,
+  data: Omit<PastoralCareAlert, "id" | "mosque_id" | "created_at" | "updated_at"> &
     Partial<Pick<PastoralCareAlert, "id">>
 ): Promise<PastoralCareAlert> {
   const { data: row, error } = await db()
     .from("pastoral_alerts")
     .upsert(
-      { ...data, church_id: churchId, updated_at: new Date().toISOString() },
-      { onConflict: "church_id,member_id,alert_type" }
+      { ...data, mosque_id: mosqueId, updated_at: new Date().toISOString() },
+      { onConflict: "mosque_id,member_id,alert_type" }
     )
     .select("*")
     .single();
@@ -3728,7 +3728,7 @@ export async function upsertPastoralCareAlert(
 
 export async function updatePastoralCareAlert(
   id: string,
-  churchId: string,
+  mosqueId: string,
   updates: Partial<
     Pick<
       PastoralCareAlert,
@@ -3740,7 +3740,7 @@ export async function updatePastoralCareAlert(
     .from("pastoral_alerts")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -3752,12 +3752,12 @@ export async function updatePastoralCareAlert(
 // ---------------------------------------------------------------------------
 
 export async function listMessageTemplates(
-  churchId: string
+  mosqueId: string
 ): Promise<MessageTemplate[]> {
   const { data, error } = await db()
     .from("message_templates")
     .select("*")
-    .or(`church_id.eq.${churchId},church_id.is.null`)
+    .or(`mosque_id.eq.${mosqueId},mosque_id.is.null`)
     .order("is_system", { ascending: false })
     .order("name", { ascending: true });
   if (error) throw error;
@@ -3765,29 +3765,29 @@ export async function listMessageTemplates(
 }
 
 export async function getMessageTemplateByKey(
-  churchId: string,
+  mosqueId: string,
   templateKey: string
 ): Promise<MessageTemplate | null> {
   const { data, error } = await db()
     .from("message_templates")
     .select("*")
     .eq("template_key", templateKey)
-    .or(`church_id.eq.${churchId},church_id.is.null`)
-    .order("church_id", { ascending: true, nullsFirst: false })
+    .or(`mosque_id.eq.${mosqueId},mosque_id.is.null`)
+    .order("mosque_id", { ascending: true, nullsFirst: false })
     .limit(1);
   if (error) throw error;
   return (data?.[0] as MessageTemplate | undefined) ?? null;
 }
 
 export async function upsertMessageTemplate(
-  churchId: string | null,
-  data: Omit<MessageTemplate, "id" | "church_id" | "created_at" | "updated_at">
+  mosqueId: string | null,
+  data: Omit<MessageTemplate, "id" | "mosque_id" | "created_at" | "updated_at">
 ): Promise<MessageTemplate> {
   const { data: row, error } = await db()
     .from("message_templates")
     .upsert(
-      { ...data, church_id: churchId, updated_at: new Date().toISOString() },
-      { onConflict: "church_id,template_key" }
+      { ...data, mosque_id: mosqueId, updated_at: new Date().toISOString() },
+      { onConflict: "mosque_id,template_key" }
     )
     .select("*")
     .single();
@@ -3796,27 +3796,27 @@ export async function upsertMessageTemplate(
 }
 
 export async function deleteMessageTemplate(
-  churchId: string,
+  mosqueId: string,
   id: string
 ): Promise<{ deleted: boolean }> {
   const { error, count } = await db()
     .from("message_templates")
     .delete({ count: "exact" })
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("is_system", false);
   if (error) throw error;
   return { deleted: (count ?? 0) > 0 };
 }
 
 export async function listMessages(
-  churchId: string,
+  mosqueId: string,
   opts?: { memberId?: string; newcomerId?: string; templateKey?: string; limit?: number }
 ): Promise<Message[]> {
   let query = db()
     .from("messages")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false });
   if (opts?.memberId) query = query.eq("recipient_member_id", opts.memberId);
   if (opts?.newcomerId) query = query.eq("recipient_newcomer_id", opts.newcomerId);
@@ -3828,14 +3828,14 @@ export async function listMessages(
 }
 
 export async function logMessages(
-  churchId: string,
+  mosqueId: string,
   rows: Array<
-    Omit<Message, "id" | "church_id" | "created_at"> &
+    Omit<Message, "id" | "mosque_id" | "created_at"> &
       Partial<Pick<Message, "metadata" | "status">>
   >
 ): Promise<Message[]> {
   if (rows.length === 0) return [];
-  const payload = rows.map((row) => ({ ...row, church_id: churchId }));
+  const payload = rows.map((row) => ({ ...row, mosque_id: mosqueId }));
   const { data, error } = await db()
     .from("messages")
     .insert(payload)
@@ -3845,18 +3845,18 @@ export async function logMessages(
 }
 
 export async function listAutomationSettings(
-  churchId: string
+  mosqueId: string
 ): Promise<AutomationSetting[]> {
   const { data, error } = await db()
     .from("automation_settings")
     .select("*")
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
   return data as AutomationSetting[];
 }
 
 export async function upsertAutomationSetting(
-  churchId: string,
+  mosqueId: string,
   automationKey: string,
   enabled: boolean,
   config?: Record<string, unknown>
@@ -3865,13 +3865,13 @@ export async function upsertAutomationSetting(
     .from("automation_settings")
     .upsert(
       {
-        church_id: churchId,
+        mosque_id: mosqueId,
         automation_key: automationKey,
         enabled,
         config: config ?? {},
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "church_id,automation_key" }
+      { onConflict: "mosque_id,automation_key" }
     )
     .select("*")
     .single();
@@ -3884,12 +3884,12 @@ export async function upsertAutomationSetting(
 // ---------------------------------------------------------------------------
 
 export async function recordProgressionSignoff(
-  churchId: string,
-  data: Omit<ProgressionSignoff, "id" | "church_id" | "created_at">
+  mosqueId: string,
+  data: Omit<ProgressionSignoff, "id" | "mosque_id" | "created_at">
 ): Promise<ProgressionSignoff> {
   const { data: row, error } = await db()
     .from("discipleship_signoffs")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -3897,13 +3897,13 @@ export async function recordProgressionSignoff(
 }
 
 export async function listProgressionSignoffs(
-  churchId: string,
+  mosqueId: string,
   memberId: string
 ): Promise<ProgressionSignoff[]> {
   const { data, error } = await db()
     .from("discipleship_signoffs")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("member_id", memberId)
     .order("created_at", { ascending: false });
   if (error) throw error;
@@ -3911,13 +3911,13 @@ export async function listProgressionSignoffs(
 }
 
 export async function listMentorAssignments(
-  churchId: string,
+  mosqueId: string,
   opts?: { active?: boolean }
 ): Promise<MentorAssignment[]> {
   let query = db()
     .from("mentor_assignments")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("started_at", { ascending: false });
   if (opts?.active) {
     query = query.is("ended_at", null);
@@ -3928,12 +3928,12 @@ export async function listMentorAssignments(
 }
 
 export async function createMentorAssignment(
-  churchId: string,
-  data: Omit<MentorAssignment, "id" | "church_id" | "created_at" | "updated_at">
+  mosqueId: string,
+  data: Omit<MentorAssignment, "id" | "mosque_id" | "created_at" | "updated_at">
 ): Promise<MentorAssignment> {
   const { data: row, error } = await db()
     .from("mentor_assignments")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -3942,14 +3942,14 @@ export async function createMentorAssignment(
 
 export async function updateMentorAssignment(
   id: string,
-  churchId: string,
+  mosqueId: string,
   updates: Partial<Pick<MentorAssignment, "ended_at" | "notes">>
 ): Promise<MentorAssignment | null> {
   const { data, error } = await db()
     .from("mentor_assignments")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -3957,13 +3957,13 @@ export async function updateMentorAssignment(
 }
 
 export async function listMentorContacts(
-  churchId: string,
+  mosqueId: string,
   opts?: { assignmentId?: string }
 ): Promise<MentorContact[]> {
   let query = db()
     .from("mentor_contact_log")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("contacted_at", { ascending: false });
   if (opts?.assignmentId) {
     query = query.eq("assignment_id", opts.assignmentId);
@@ -3974,12 +3974,12 @@ export async function listMentorContacts(
 }
 
 export async function createMentorContact(
-  churchId: string,
-  data: Omit<MentorContact, "id" | "church_id" | "created_at">
+  mosqueId: string,
+  data: Omit<MentorContact, "id" | "mosque_id" | "created_at">
 ): Promise<MentorContact> {
   const { data: row, error } = await db()
     .from("mentor_contact_log")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -3988,28 +3988,28 @@ export async function createMentorContact(
 
 export async function listEventRitualRoles(
   eventId: string,
-  churchId: string
+  mosqueId: string
 ): Promise<EventRitualRole[]> {
   const { data, error } = await db()
     .from("event_ritual_roles")
     .select("*")
     .eq("event_id", eventId)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("sort_order", { ascending: true });
   if (error) throw error;
   return data as EventRitualRole[];
 }
 
 export async function upsertEventRitualRoles(
-  churchId: string,
+  mosqueId: string,
   rows: Array<
-    Omit<EventRitualRole, "id" | "church_id" | "created_at" | "updated_at">
+    Omit<EventRitualRole, "id" | "mosque_id" | "created_at" | "updated_at">
   >
 ): Promise<EventRitualRole[]> {
   if (rows.length === 0) return [];
   const payload = rows.map((row) => ({
     ...row,
-    church_id: churchId,
+    mosque_id: mosqueId,
     updated_at: new Date().toISOString(),
   }));
   const { data, error } = await db()
@@ -4021,26 +4021,26 @@ export async function upsertEventRitualRoles(
 }
 
 export async function listOfficerLadder(
-  churchId: string
+  mosqueId: string
 ): Promise<OfficerLadderRung[]> {
   const { data, error } = await db()
     .from("officer_ladder")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("sort_order", { ascending: true });
   if (error) throw error;
   return data as OfficerLadderRung[];
 }
 
 export async function upsertOfficerLadderRung(
-  churchId: string,
-  data: Omit<OfficerLadderRung, "id" | "church_id" | "created_at" | "updated_at">
+  mosqueId: string,
+  data: Omit<OfficerLadderRung, "id" | "mosque_id" | "created_at" | "updated_at">
 ): Promise<OfficerLadderRung> {
   const { data: row, error } = await db()
     .from("officer_ladder")
     .upsert(
-      { ...data, church_id: churchId, updated_at: new Date().toISOString() },
-      { onConflict: "church_id,rung_label" }
+      { ...data, mosque_id: mosqueId, updated_at: new Date().toISOString() },
+      { onConflict: "mosque_id,rung_label" }
     )
     .select("*")
     .single();
@@ -4050,7 +4050,7 @@ export async function upsertOfficerLadderRung(
 
 export async function patchOfficerLadderRung(
   id: string,
-  churchId: string,
+  mosqueId: string,
   patch: Partial<Pick<OfficerLadderRung,
     "current_member_id" | "successor_member_id" | "notes" | "rung_label" | "sort_order"
   >>
@@ -4059,7 +4059,7 @@ export async function patchOfficerLadderRung(
     .from("officer_ladder")
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .single();
   if (error) throw error;
@@ -4068,13 +4068,13 @@ export async function patchOfficerLadderRung(
 
 export async function deleteOfficerLadderRung(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<void> {
   const { error } = await db()
     .from("officer_ladder")
     .delete()
     .eq("id", id)
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
 }
 
@@ -4099,7 +4099,7 @@ export type PublicOfficer = {
 };
 
 export async function listPublicOfficers(
-  churchId: string
+  mosqueId: string
 ): Promise<PublicOfficer[]> {
   const { data, error } = await db()
     .from("officer_ladder")
@@ -4107,7 +4107,7 @@ export async function listPublicOfficers(
       `id, rung_label, sort_order, current_member_id,
        members:current_member_id(id, full_name, rank, public_bio, show_on_website, membership_status)`
     )
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .not("current_member_id", "is", null)
     .order("sort_order", { ascending: true });
   if (error) throw error;
@@ -4213,35 +4213,35 @@ export async function updateNetwork(
   return data as Network | null;
 }
 
-export async function listChurchesByNetwork(networkId: string): Promise<Church[]> {
+export async function listMosquesByNetwork(networkId: string): Promise<Mosque[]> {
   const { data, error } = await db()
-    .from("churches")
+    .from("mosques")
     .select("*")
     .eq("network_id", networkId)
     .order("name", { ascending: true });
   if (error) throw error;
-  return data as Church[];
+  return data as Mosque[];
 }
 
-export async function setChurchNetwork(
-  churchId: string,
+export async function setMosqueNetwork(
+  mosqueId: string,
   networkId: string | null
 ): Promise<void> {
   const { error } = await db()
-    .from("churches")
+    .from("mosques")
     .update({ network_id: networkId })
-    .eq("id", churchId);
+    .eq("id", mosqueId);
   if (error) throw error;
 }
 
 export async function listMemberRanks(
-  churchId: string,
+  mosqueId: string,
   opts?: { memberId?: string; scope?: MemberRank["scope"] }
 ): Promise<MemberRank[]> {
   let query = db()
     .from("member_ranks")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("conferred_on", { ascending: false, nullsFirst: false });
   if (opts?.memberId) query = query.eq("member_id", opts.memberId);
   if (opts?.scope) query = query.eq("scope", opts.scope);
@@ -4251,60 +4251,60 @@ export async function listMemberRanks(
 }
 
 export async function createMemberRank(
-  churchId: string,
-  data: Omit<MemberRank, "id" | "church_id" | "created_at" | "updated_at">
+  mosqueId: string,
+  data: Omit<MemberRank, "id" | "mosque_id" | "created_at" | "updated_at">
 ): Promise<MemberRank> {
   const { data: row, error } = await db()
     .from("member_ranks")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
   return row as MemberRank;
 }
 
-export async function deleteMemberRank(id: string, churchId: string): Promise<void> {
+export async function deleteMemberRank(id: string, mosqueId: string): Promise<void> {
   const { error } = await db()
     .from("member_ranks")
     .delete()
     .eq("id", id)
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
 }
 
-export async function listChurchVisits(
-  newcomerChurchId: string,
+export async function listMosqueVisits(
+  newcomerMosqueId: string,
   opts?: { limit?: number }
-): Promise<ChurchVisit[]> {
+): Promise<MosqueVisit[]> {
   let query = db()
-    .from("church_visits")
+    .from("mosque_visits")
     .select("*")
-    .eq("newcomer_church_id", newcomerChurchId)
+    .eq("newcomer_mosque_id", newcomerMosqueId)
     .order("visit_date", { ascending: false });
   if (opts?.limit) query = query.limit(opts.limit);
   const { data, error } = await query;
   if (error) throw error;
-  return data as ChurchVisit[];
+  return data as MosqueVisit[];
 }
 
-export async function createChurchVisit(
-  data: Omit<ChurchVisit, "id" | "created_at">
-): Promise<ChurchVisit> {
+export async function createMosqueVisit(
+  data: Omit<MosqueVisit, "id" | "created_at">
+): Promise<MosqueVisit> {
   const { data: row, error } = await db()
-    .from("church_visits")
+    .from("mosque_visits")
     .insert(data)
     .select("*")
     .single();
   if (error) throw error;
-  return row as ChurchVisit;
+  return row as MosqueVisit;
 }
 
-export async function deleteChurchVisit(id: string, churchId: string): Promise<void> {
+export async function deleteMosqueVisit(id: string, mosqueId: string): Promise<void> {
   const { error } = await db()
-    .from("church_visits")
+    .from("mosque_visits")
     .delete()
     .eq("id", id)
-    .eq("newcomer_church_id", churchId);
+    .eq("newcomer_mosque_id", mosqueId);
   if (error) throw error;
 }
 
@@ -4320,17 +4320,17 @@ export async function listNetworkOfficers(
   return data as NetworkOfficerDirectoryEntry[];
 }
 
-export async function listChurchAnnualReturns(
+export async function listMosqueAnnualReturns(
   networkId?: string
-): Promise<ChurchAnnualReturn[]> {
+): Promise<MosqueAnnualReturn[]> {
   let query = db()
-    .from("church_annual_returns")
+    .from("mosque_annual_returns")
     .select("*")
-    .order("church_name", { ascending: true });
+    .order("mosque_name", { ascending: true });
   if (networkId) query = query.eq("network_id", networkId);
   const { data, error } = await query;
   if (error) throw error;
-  return data as ChurchAnnualReturn[];
+  return data as MosqueAnnualReturn[];
 }
 
 // ---------------------------------------------------------------------------
@@ -4338,13 +4338,13 @@ export async function listChurchAnnualReturns(
 // ---------------------------------------------------------------------------
 
 export async function listMemberConsents(
-  churchId: string,
+  mosqueId: string,
   memberId?: string
 ): Promise<MemberConsent[]> {
   let query = db()
     .from("member_consents")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("granted_at", { ascending: false });
   if (memberId) query = query.eq("member_id", memberId);
   const { data, error } = await query;
@@ -4353,20 +4353,20 @@ export async function listMemberConsents(
 }
 
 export async function recordMemberConsent(
-  churchId: string,
-  data: Omit<MemberConsent, "id" | "church_id" | "created_at" | "updated_at">
+  mosqueId: string,
+  data: Omit<MemberConsent, "id" | "mosque_id" | "created_at" | "updated_at">
 ): Promise<MemberConsent> {
   // Revoke any active consent of the same key for this member first.
   await db()
     .from("member_consents")
     .update({ revoked_at: new Date().toISOString() })
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("member_id", data.member_id)
     .eq("consent_key", data.consent_key)
     .is("revoked_at", null);
   const { data: row, error } = await db()
     .from("member_consents")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -4375,43 +4375,43 @@ export async function recordMemberConsent(
 
 export async function revokeMemberConsent(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<void> {
   const { error } = await db()
     .from("member_consents")
     .update({ revoked_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
 }
 
 export async function getDataRetentionSettings(
-  churchId: string
+  mosqueId: string
 ): Promise<DataRetentionSettings | null> {
   const { data, error } = await db()
     .from("data_retention_settings")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .maybeSingle();
   if (error) throw error;
   return data as DataRetentionSettings | null;
 }
 
 export async function upsertDataRetentionSettings(
-  churchId: string,
+  mosqueId: string,
   data: Partial<
-    Omit<DataRetentionSettings, "id" | "church_id" | "created_at" | "updated_at">
+    Omit<DataRetentionSettings, "id" | "mosque_id" | "created_at" | "updated_at">
   >
 ): Promise<DataRetentionSettings> {
   const { data: row, error } = await db()
     .from("data_retention_settings")
     .upsert(
       {
-        church_id: churchId,
+        mosque_id: mosqueId,
         ...data,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "church_id" }
+      { onConflict: "mosque_id" }
     )
     .select("*")
     .single();
@@ -4420,27 +4420,27 @@ export async function upsertDataRetentionSettings(
 }
 
 export async function listSubjectAccessRequests(
-  churchId: string
+  mosqueId: string
 ): Promise<SubjectAccessRequest[]> {
   const { data, error } = await db()
     .from("subject_access_requests")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as SubjectAccessRequest[];
 }
 
 export async function createSubjectAccessRequest(
-  churchId: string,
+  mosqueId: string,
   data: Omit<
     SubjectAccessRequest,
-    "id" | "church_id" | "created_at" | "updated_at"
+    "id" | "mosque_id" | "created_at" | "updated_at"
   >
 ): Promise<SubjectAccessRequest> {
   const { data: row, error } = await db()
     .from("subject_access_requests")
-    .insert({ ...data, church_id: churchId })
+    .insert({ ...data, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -4449,16 +4449,16 @@ export async function createSubjectAccessRequest(
 
 export async function updateSubjectAccessRequest(
   id: string,
-  churchId: string,
+  mosqueId: string,
   updates: Partial<
-    Omit<SubjectAccessRequest, "id" | "church_id" | "created_at" | "updated_at">
+    Omit<SubjectAccessRequest, "id" | "mosque_id" | "created_at" | "updated_at">
   >
 ): Promise<SubjectAccessRequest | null> {
   const { data, error } = await db()
     .from("subject_access_requests")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -4467,7 +4467,7 @@ export async function updateSubjectAccessRequest(
 
 export async function archiveMember(
   memberId: string,
-  churchId: string,
+  mosqueId: string,
   reason: string
 ): Promise<Member | null> {
   const { data, error } = await db()
@@ -4478,7 +4478,7 @@ export async function archiveMember(
       updated_at: new Date().toISOString(),
     })
     .eq("id", memberId)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .maybeSingle();
   if (error) throw error;
@@ -4520,7 +4520,7 @@ export async function updateAdminUserMfa(
  */
 export async function buildSubjectAccessExport(
   memberId: string,
-  churchId: string
+  mosqueId: string
 ): Promise<Record<string, unknown>> {
   const supabase = db();
   const tables = [
@@ -4542,7 +4542,7 @@ export async function buildSubjectAccessExport(
   ];
   const result: Record<string, unknown> = {
     generated_at: new Date().toISOString(),
-    church_id: churchId,
+    mosque_id: mosqueId,
     member_id: memberId,
   };
   for (const table of tables) {
@@ -4554,7 +4554,7 @@ export async function buildSubjectAccessExport(
           : table === "mentor_assignments" || table === "mentor_contact_log"
             ? "mentor_member_id"
             : "member_id";
-    let query = supabase.from(table).select("*").eq("church_id", churchId);
+    let query = supabase.from(table).select("*").eq("mosque_id", mosqueId);
     if (filterField === "user_email") {
       const { data: m } = await supabase
         .from("members")
@@ -4612,16 +4612,16 @@ export async function enqueueJob(
 }
 
 export async function listJobs(
-  opts?: { churchId?: string | null; status?: JobStatus; limit?: number }
+  opts?: { mosqueId?: string | null; status?: JobStatus; limit?: number }
 ): Promise<Job[]> {
   let query = db()
     .from("jobs")
     .select("*")
     .order("created_at", { ascending: false });
-  if (opts && opts.churchId === null) {
-    query = query.is("church_id", null);
-  } else if (opts?.churchId) {
-    query = query.eq("church_id", opts.churchId);
+  if (opts && opts.mosqueId === null) {
+    query = query.is("mosque_id", null);
+  } else if (opts?.mosqueId) {
+    query = query.eq("mosque_id", opts.mosqueId);
   }
   if (opts?.status) query = query.eq("status", opts.status);
   if (opts?.limit) query = query.limit(opts.limit);
@@ -4700,23 +4700,23 @@ export async function completeJob(
 // ---------------------------------------------------------------------------
 
 export async function listIntegrationCredentials(
-  churchId: string
+  mosqueId: string
 ): Promise<IntegrationCredentials[]> {
   const { data, error } = await db()
     .from("integration_credentials")
     .select("*")
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
   return data as IntegrationCredentials[];
 }
 
 export async function upsertIntegrationCredentials(
-  churchId: string,
+  mosqueId: string,
   provider: IntegrationProvider,
   data: Partial<
     Omit<
       IntegrationCredentials,
-      "id" | "church_id" | "provider" | "created_at" | "updated_at"
+      "id" | "mosque_id" | "provider" | "created_at" | "updated_at"
     >
   >
 ): Promise<IntegrationCredentials> {
@@ -4724,12 +4724,12 @@ export async function upsertIntegrationCredentials(
     .from("integration_credentials")
     .upsert(
       {
-        church_id: churchId,
+        mosque_id: mosqueId,
         provider,
         ...data,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "church_id,provider" }
+      { onConflict: "mosque_id,provider" }
     )
     .select("*")
     .single();
@@ -4738,13 +4738,13 @@ export async function upsertIntegrationCredentials(
 }
 
 export async function deleteIntegrationCredentials(
-  churchId: string,
+  mosqueId: string,
   provider: IntegrationProvider
 ): Promise<void> {
   const { error } = await db()
     .from("integration_credentials")
     .delete()
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("provider", provider);
   if (error) throw error;
 }
@@ -4753,10 +4753,10 @@ export async function deleteIntegrationCredentials(
 // Platform-wide aggregates (operator console)
 // ---------------------------------------------------------------------------
 
-export type PlatformChurchStats = {
-  church_id: string;
-  church_slug: string;
-  church_name: string;
+export type PlatformMosqueStats = {
+  mosque_id: string;
+  mosque_slug: string;
+  mosque_name: string;
   network_id: string | null;
   members: number;
   active_members: number;
@@ -4768,54 +4768,54 @@ export type PlatformChurchStats = {
 };
 
 // ---------------------------------------------------------------------------
-// Church feature flags
+// Mosque feature flags
 // ---------------------------------------------------------------------------
 
-export async function listChurchFeatureFlags(
-  churchId: string
-): Promise<ChurchFeatureFlag[]> {
+export async function listMosqueFeatureFlags(
+  mosqueId: string
+): Promise<MosqueFeatureFlag[]> {
   const { data, error } = await db()
-    .from("church_feature_flags")
+    .from("mosque_feature_flags")
     .select("*")
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
-  return (data ?? []) as ChurchFeatureFlag[];
+  return (data ?? []) as MosqueFeatureFlag[];
 }
 
-export async function setChurchFeatureFlag(
-  churchId: string,
+export async function setMosqueFeatureFlag(
+  mosqueId: string,
   flagKey: string,
   enabled: boolean,
   opts?: { notes?: string | null; updated_by_email?: string | null }
-): Promise<ChurchFeatureFlag> {
+): Promise<MosqueFeatureFlag> {
   const { data, error } = await db()
-    .from("church_feature_flags")
+    .from("mosque_feature_flags")
     .upsert(
       {
-        church_id: churchId,
+        mosque_id: mosqueId,
         flag_key: flagKey,
         enabled,
         notes: opts?.notes ?? null,
         updated_by_email: opts?.updated_by_email ?? null,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "church_id,flag_key" }
+      { onConflict: "mosque_id,flag_key" }
     )
     .select("*")
     .single();
   if (error) throw error;
-  return data as ChurchFeatureFlag;
+  return data as MosqueFeatureFlag;
 }
 
-export async function getPlatformChurchStats(): Promise<PlatformChurchStats[]> {
-  const churches = await listChurches();
-  const stats: PlatformChurchStats[] = [];
-  for (const church of churches) {
+export async function getPlatformMosqueStats(): Promise<PlatformMosqueStats[]> {
+  const mosques = await listMosques();
+  const stats: PlatformMosqueStats[] = [];
+  for (const mosque of mosques) {
     const [members, events, giving, donations] = await Promise.all([
-      getMembers(church.id, {}),
-      getEvents(church.id, {}),
-      getMemberGiving(church.id, {}),
-      getDonations(church.id),
+      getMembers(mosque.id, {}),
+      getEvents(mosque.id, {}),
+      getMemberGiving(mosque.id, {}),
+      getDonations(mosque.id),
     ]);
     const now = new Date();
     const upcoming = events.filter((e) => new Date(e.event_date) >= now);
@@ -4824,10 +4824,10 @@ export async function getPlatformChurchStats(): Promise<PlatformChurchStats[]> {
       .sort((a, b) => +new Date(b.event_date) - +new Date(a.event_date));
 
     stats.push({
-      church_id: church.id,
-      church_slug: church.slug,
-      church_name: church.name,
-      network_id: church.network_id,
+      mosque_id: mosque.id,
+      mosque_slug: mosque.slug,
+      mosque_name: mosque.name,
+      network_id: mosque.network_id,
       members: members.length,
       active_members: members.filter((m) => m.membership_status === "active").length,
       upcoming_events: upcoming.length,
@@ -4847,7 +4847,7 @@ export async function getPlatformChurchStats(): Promise<PlatformChurchStats[]> {
 // ---------------------------------------------------------------------------
 
 export async function listGuests(
-  churchId: string,
+  mosqueId: string,
   opts?: {
     search?: string;
     includeArchived?: boolean;
@@ -4857,7 +4857,7 @@ export async function listGuests(
   let query = db()
     .from("guests")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("last_seen_event_id", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
   if (!opts?.includeArchived) {
@@ -4869,7 +4869,7 @@ export async function listGuests(
   if (opts?.search) {
     const term = `%${opts.search}%`;
     query = query.or(
-      `full_name.ilike.${term},email.ilike.${term},mother_church_name.ilike.${term}`
+      `full_name.ilike.${term},email.ilike.${term},mother_mosque_name.ilike.${term}`
     );
   }
   const { data, error } = await query;
@@ -4879,47 +4879,47 @@ export async function listGuests(
 
 export async function getGuestById(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<Guest | null> {
   const { data, error } = await db()
     .from("guests")
     .select("*")
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .maybeSingle();
   if (error) throw error;
   return (data as Guest | null) ?? null;
 }
 
 export async function findGuestByEmail(
-  churchId: string,
+  mosqueId: string,
   email: string
 ): Promise<Guest | null> {
   const { data, error } = await db()
     .from("guests")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .ilike("email", email)
     .maybeSingle();
   if (error) throw error;
   return (data as Guest | null) ?? null;
 }
 
-export async function findGuestByNameAndChurch(
-  churchId: string,
+export async function findGuestByNameAndMosque(
+  mosqueId: string,
   fullName: string,
-  motherChurchName: string | null
+  motherMosqueName: string | null
 ): Promise<Guest | null> {
   let query = db()
     .from("guests")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .ilike("full_name", fullName)
     .limit(1);
-  if (motherChurchName) {
-    query = query.ilike("mother_church_name", motherChurchName);
+  if (motherMosqueName) {
+    query = query.ilike("mother_mosque_name", motherMosqueName);
   } else {
-    query = query.is("mother_church_name", null);
+    query = query.is("mother_mosque_name", null);
   }
   const { data, error } = await query.maybeSingle();
   if (error) throw error;
@@ -4927,14 +4927,14 @@ export async function findGuestByNameAndChurch(
 }
 
 export async function createGuest(
-  churchId: string,
-  guest: Partial<Omit<Guest, "id" | "church_id" | "created_at" | "updated_at">> & {
+  mosqueId: string,
+  guest: Partial<Omit<Guest, "id" | "mosque_id" | "created_at" | "updated_at">> & {
     full_name: string;
   }
 ): Promise<Guest> {
   const { data, error } = await db()
     .from("guests")
-    .insert({ ...guest, church_id: churchId })
+    .insert({ ...guest, mosque_id: mosqueId })
     .select("*")
     .single();
   if (error) throw error;
@@ -4943,14 +4943,14 @@ export async function createGuest(
 
 export async function updateGuest(
   id: string,
-  churchId: string,
-  patch: Partial<Omit<Guest, "id" | "church_id" | "created_at">>
+  mosqueId: string,
+  patch: Partial<Omit<Guest, "id" | "mosque_id" | "created_at">>
 ): Promise<Guest> {
   const { data, error } = await db()
     .from("guests")
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .select("*")
     .single();
   if (error) throw error;
@@ -4959,42 +4959,42 @@ export async function updateGuest(
 
 export async function archiveGuest(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<Guest> {
-  return updateGuest(id, churchId, {
+  return updateGuest(id, mosqueId, {
     archived_at: new Date().toISOString(),
   });
 }
 
 export async function restoreGuest(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<Guest> {
-  return updateGuest(id, churchId, { archived_at: null });
+  return updateGuest(id, mosqueId, { archived_at: null });
 }
 
 export async function hardDeleteGuestIfUnused(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<{ deleted: boolean }> {
-  const guest = await getGuestById(id, churchId);
+  const guest = await getGuestById(id, mosqueId);
   if (!guest) return { deleted: false };
   if ((guest.visit_count ?? 0) > 0) return { deleted: false };
   const { error } = await db()
     .from("guests")
     .delete()
     .eq("id", id)
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
   return { deleted: true };
 }
 
 export async function setGuestNewcomerTokenHash(
   id: string,
-  churchId: string,
+  mosqueId: string,
   tokenHash: string
 ): Promise<Guest> {
-  return updateGuest(id, churchId, { newcomer_token_hash: tokenHash });
+  return updateGuest(id, mosqueId, { newcomer_token_hash: tokenHash });
 }
 
 export async function getGuestByNewcomerTokenHash(
@@ -5010,13 +5010,13 @@ export async function getGuestByNewcomerTokenHash(
 }
 
 export async function upsertGuest(
-  churchId: string,
+  mosqueId: string,
   input: {
     full_name: string;
     email?: string | null;
     phone?: string | null;
-    mother_church_name?: string | null;
-    mother_church_number?: string | null;
+    mother_mosque_name?: string | null;
+    mother_mosque_number?: string | null;
     constitution?: string | null;
     rank?: string | null;
     dietary_requirements?: string | null;
@@ -5033,21 +5033,21 @@ export async function upsertGuest(
 ): Promise<Guest> {
   const email = input.email?.trim() || null;
   const fullName = input.full_name.trim();
-  const motherChurchName = input.mother_church_name?.trim() || null;
+  const motherMosqueName = input.mother_mosque_name?.trim() || null;
   const recordVisit = input.recordVisit !== false;
 
   const existing = email
-    ? await findGuestByEmail(churchId, email)
-    : await findGuestByNameAndChurch(churchId, fullName, motherChurchName);
+    ? await findGuestByEmail(mosqueId, email)
+    : await findGuestByNameAndMosque(mosqueId, fullName, motherMosqueName);
 
   if (existing) {
-    return updateGuest(existing.id, churchId, {
+    return updateGuest(existing.id, mosqueId, {
       full_name: fullName || existing.full_name,
       email: email ?? existing.email,
       phone: input.phone?.trim() ?? existing.phone,
-      mother_church_name: motherChurchName ?? existing.mother_church_name,
-      mother_church_number:
-        input.mother_church_number?.trim() ?? existing.mother_church_number,
+      mother_mosque_name: motherMosqueName ?? existing.mother_mosque_name,
+      mother_mosque_number:
+        input.mother_mosque_number?.trim() ?? existing.mother_mosque_number,
       constitution: input.constitution?.trim() ?? existing.constitution,
       rank: input.rank?.trim() ?? existing.rank,
       dietary_requirements:
@@ -5062,12 +5062,12 @@ export async function upsertGuest(
     });
   }
 
-  return createGuest(churchId, {
+  return createGuest(mosqueId, {
     full_name: fullName,
     email,
     phone: input.phone?.trim() || null,
-    mother_church_name: motherChurchName,
-    mother_church_number: input.mother_church_number?.trim() || null,
+    mother_mosque_name: motherMosqueName,
+    mother_mosque_number: input.mother_mosque_number?.trim() || null,
     constitution: input.constitution?.trim() || null,
     rank: input.rank?.trim() || null,
     dietary_requirements: input.dietary_requirements?.trim() || null,
@@ -5082,11 +5082,11 @@ export async function upsertGuest(
 }
 
 export async function createGuestInvitation(
-  churchId: string,
+  mosqueId: string,
   data: Omit<
     GuestInvitation,
     | "id"
-    | "church_id"
+    | "mosque_id"
     | "uses"
     | "created_at"
     | "last_used_at"
@@ -5096,7 +5096,7 @@ export async function createGuestInvitation(
 ): Promise<GuestInvitation> {
   const { data: row, error } = await db()
     .from("guest_invitations")
-    .insert({ ...data, church_id: churchId, uses: data.uses ?? 0 })
+    .insert({ ...data, mosque_id: mosqueId, uses: data.uses ?? 0 })
     .select("*")
     .single();
   if (error) throw error;
@@ -5117,13 +5117,13 @@ export async function getGuestInvitationByTokenHash(
 
 export async function getGuestInvitationById(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<GuestInvitation | null> {
   const { data, error } = await db()
     .from("guest_invitations")
     .select("*")
     .eq("id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .maybeSingle();
   if (error) throw error;
   return (data as GuestInvitation | null) ?? null;
@@ -5131,13 +5131,13 @@ export async function getGuestInvitationById(
 
 export async function listGuestInvitationsForGuest(
   guestId: string,
-  churchId: string
+  mosqueId: string
 ): Promise<GuestInvitation[]> {
   const { data, error } = await db()
     .from("guest_invitations")
     .select("*")
     .eq("guest_id", guestId)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as GuestInvitation[];
@@ -5145,13 +5145,13 @@ export async function listGuestInvitationsForGuest(
 
 export async function listGuestInvitationsForEvent(
   eventId: string,
-  churchId: string
+  mosqueId: string
 ): Promise<GuestInvitation[]> {
   const { data, error } = await db()
     .from("guest_invitations")
     .select("*")
     .eq("event_id", eventId)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as GuestInvitation[];
@@ -5159,13 +5159,13 @@ export async function listGuestInvitationsForEvent(
 
 export async function listGuestInvitationsForMember(
   memberId: string,
-  churchId: string
+  mosqueId: string
 ): Promise<GuestInvitation[]> {
   const { data, error } = await db()
     .from("guest_invitations")
     .select("*")
     .eq("inviter_member_id", memberId)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as GuestInvitation[];
@@ -5190,24 +5190,24 @@ export async function recordGuestInvitationUse(
 
 export async function revokeGuestInvitation(
   id: string,
-  churchId: string
+  mosqueId: string
 ): Promise<void> {
   const { error } = await db()
     .from("guest_invitations")
     .update({ revoked_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
 }
 
-export async function listEventGuestsForChurch(
-  churchId: string,
+export async function listEventGuestsForMosque(
+  mosqueId: string,
   opts?: { eventId?: string; guestId?: string }
 ): Promise<EventGuest[]> {
   let query = db()
     .from("event_guests")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("created_at", { ascending: false });
   if (opts?.eventId) query = query.eq("event_id", opts.eventId);
   if (opts?.guestId) query = query.eq("guest_id", opts.guestId);
@@ -5218,94 +5218,94 @@ export async function listEventGuestsForChurch(
 
 export async function markEventGuestWelcomeSent(
   ids: string[],
-  churchId: string
+  mosqueId: string
 ): Promise<void> {
   if (ids.length === 0) return;
   const { error } = await db()
     .from("event_guests")
     .update({ welcome_email_sent_at: new Date().toISOString() })
     .in("id", ids)
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) throw error;
 }
 
 // ---------------------------------------------------------------------------
-// Church fee defaults & giving year
+// Mosque fee defaults & giving year
 // ---------------------------------------------------------------------------
 
-export async function getChurchFeeDefaults(
-  churchId: string
-): Promise<ChurchFeeDefaults | null> {
+export async function getMosqueFeeDefaults(
+  mosqueId: string
+): Promise<MosqueFeeDefaults | null> {
   const { data, error } = await db()
-    .from("church_fee_defaults")
+    .from("mosque_fee_defaults")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .maybeSingle();
   if (error) throw error;
-  return (data as ChurchFeeDefaults | null) ?? null;
+  return (data as MosqueFeeDefaults | null) ?? null;
 }
 
-export async function upsertChurchFeeDefaults(
-  churchId: string,
-  input: Omit<ChurchFeeDefaults, "church_id" | "updated_at">
-): Promise<ChurchFeeDefaults> {
+export async function upsertMosqueFeeDefaults(
+  mosqueId: string,
+  input: Omit<MosqueFeeDefaults, "mosque_id" | "updated_at">
+): Promise<MosqueFeeDefaults> {
   const { data, error } = await db()
-    .from("church_fee_defaults")
+    .from("mosque_fee_defaults")
     .upsert(
       {
-        church_id: churchId,
+        mosque_id: mosqueId,
         ...input,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "church_id" }
+      { onConflict: "mosque_id" }
     )
     .select("*")
     .single();
   if (error) throw error;
-  return data as ChurchFeeDefaults;
+  return data as MosqueFeeDefaults;
 }
 
-export async function listChurchGivingYears(
-  churchId: string
-): Promise<ChurchGivingYear[]> {
+export async function listMosqueGivingYears(
+  mosqueId: string
+): Promise<MosqueGivingYear[]> {
   const { data, error } = await db()
-    .from("church_giving_years")
+    .from("mosque_giving_years")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .order("start_date", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as ChurchGivingYear[];
+  return (data ?? []) as MosqueGivingYear[];
 }
 
-export async function getCurrentChurchYear(
-  churchId: string
-): Promise<ChurchGivingYear | null> {
+export async function getCurrentMosqueYear(
+  mosqueId: string
+): Promise<MosqueGivingYear | null> {
   const { data, error } = await db()
-    .from("church_giving_years")
+    .from("mosque_giving_years")
     .select("*")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("is_current", true)
     .maybeSingle();
   if (error) throw error;
-  return (data as ChurchGivingYear | null) ?? null;
+  return (data as MosqueGivingYear | null) ?? null;
 }
 
-export async function upsertChurchGivingYear(
-  churchId: string,
-  input: Omit<ChurchGivingYear, "id" | "church_id" | "created_at" | "updated_at"> & {
+export async function upsertMosqueGivingYear(
+  mosqueId: string,
+  input: Omit<MosqueGivingYear, "id" | "mosque_id" | "created_at" | "updated_at"> & {
     id?: string;
   }
-): Promise<ChurchGivingYear> {
+): Promise<MosqueGivingYear> {
   if (input.is_current) {
     await db()
-      .from("church_giving_years")
+      .from("mosque_giving_years")
       .update({ is_current: false, updated_at: new Date().toISOString() })
-      .eq("church_id", churchId)
+      .eq("mosque_id", mosqueId)
       .eq("is_current", true);
   }
 
   const payload = {
-    church_id: churchId,
+    mosque_id: mosqueId,
     label: input.label,
     start_date: input.start_date,
     end_date: input.end_date,
@@ -5316,25 +5316,25 @@ export async function upsertChurchGivingYear(
 
   if (input.id) {
     const { data, error } = await db()
-      .from("church_giving_years")
+      .from("mosque_giving_years")
       .update(payload)
       .eq("id", input.id)
-      .eq("church_id", churchId)
+      .eq("mosque_id", mosqueId)
       .select("*")
       .single();
     if (error) throw error;
-    return data as ChurchGivingYear;
+    return data as MosqueGivingYear;
   }
 
   const { data, error } = await db()
-    .from("church_giving_years")
+    .from("mosque_giving_years")
     .insert(payload)
     .select("*")
     .single();
   if (error) throw error;
-  return data as ChurchGivingYear;
+  return data as MosqueGivingYear;
 }
 
-export async function listHonoraryGuests(churchId: string): Promise<Guest[]> {
-  return listGuests(churchId, { guestCategory: "honorary_guest" });
+export async function listHonoraryGuests(mosqueId: string): Promise<Guest[]> {
+  return listGuests(mosqueId, { guestCategory: "honorary_guest" });
 }

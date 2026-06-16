@@ -4,7 +4,7 @@ import type {
   Guest,
   Member,
 } from "@/lib/db/types";
-import type { ChurchFeeDefaults } from "@/lib/fees/resolve";
+import type { MosqueFeeDefaults } from "@/lib/fees/resolve";
 import {
   resolveGuestDining,
   resolveMemberDining,
@@ -48,7 +48,7 @@ export function buildRecipientsPreview(args: {
   members: Member[];
   honoraryGuests: Guest[];
   event: Event;
-  defaults: ChurchFeeDefaults | null;
+  defaults: MosqueFeeDefaults | null;
   includeMembers: boolean;
   includeHonoraryGuests: boolean;
   overrides?: EventFeeOverride[];
@@ -151,7 +151,7 @@ export function buildRecipientsPreview(args: {
   };
 }
 
-export function serviceFormFromChurchDefaults(fees: {
+export function serviceFormFromMosqueDefaults(fees: {
   default_member_levy_amount?: number | null;
   default_member_dining_amount?: number | null;
   default_guest_dining_amount?: number | null;

@@ -228,7 +228,7 @@ export function GiftAidBanner({
             Boost your donations by 25 percent with Gift Aid
           </p>
           <p className="mt-0.5 text-emerald-800">
-            One short form. Then every donation you make to the church is
+            One short form. Then every donation you make to the mosque is
             Gift Aided automatically.
           </p>
         </div>
@@ -331,7 +331,7 @@ export function GiftAidDeclarationDialog({
           </div>
           <DialogTitle>Set up Gift Aid</DialogTitle>
           <DialogDescription>
-            If you are a UK taxpayer, the church can reclaim 25p for every £1
+            If you are a UK taxpayer, the mosque can reclaim 25p for every £1
             you give. This declaration covers past, present, and future
             donations until you choose to revoke it.
           </DialogDescription>

@@ -29,7 +29,7 @@ export function NewcomerNextActionPanel({
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(`/api/newcomers/church/${newcomerId}`, {
+      const res = await fetch(`/api/newcomers/mosque/${newcomerId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

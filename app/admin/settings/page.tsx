@@ -9,7 +9,7 @@ export default function AdminSettingsPage() {
         <div>
           <h1 className="admin-page-title">Settings</h1>
           <p className="admin-page-copy">
-            Manage the church profile, church team, and your personal admin profile.
+            Manage the mosque profile, mosque team, and your personal admin profile.
           </p>
         </div>
       </div>

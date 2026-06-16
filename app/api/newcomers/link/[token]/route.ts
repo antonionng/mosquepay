@@ -59,7 +59,7 @@ export async function PATCH(
         { status: 410 }
       );
     }
-    const updated = await db.updateGuest(guest.id, guest.church_id, patch);
+    const updated = await db.updateGuest(guest.id, guest.mosque_id, patch);
     return NextResponse.json({
       guest: {
         id: updated.id,
@@ -86,7 +86,7 @@ export async function PATCH(
     );
   }
   const updated = mockDb.updateGuestRecord(guest.id, patch, {
-    church_slug: guest.church_slug,
+    mosque_slug: guest.mosque_slug,
   });
   return NextResponse.json({
     guest: updated

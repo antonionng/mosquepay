@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -20,19 +20,19 @@ export async function POST(
     );
   }
   const { id: assignmentId } = await params;
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("members:write", churchId);
+  const forbidden = await requireAdminApiPermission("members:write", mosqueId);
   if (forbidden) return forbidden;
   const body = await request.json();
 
-  const assignments = await db.listMentorAssignments(churchId);
+  const assignments = await db.listMentorAssignments(mosqueId);
   const assignment = assignments.find((a) => a.id === assignmentId);
 
-  const contact = await db.createMentorContact(churchId, {
+  const contact = await db.createMentorContact(mosqueId, {
     assignment_id: assignmentId,
     mentor_member_id: assignment?.mentor_member_id ?? null,
     mentee_member_id: assignment?.mentee_member_id ?? null,

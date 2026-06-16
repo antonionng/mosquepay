@@ -3,7 +3,7 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import { requireAdminApiAuth } from "@/lib/auth/api";
 import { getCurrentAdminContextAny } from "@/lib/auth/permissions";
 
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     const unauthorized = await requireAdminApiAuth();
     if (unauthorized) return unauthorized;
 
-    const churchSlug = getChurchSlugFromRequest(request);
+    const mosqueSlug = getMosqueSlugFromRequest(request);
     const body = await request.json();
     const newcomer_id = body.newcomer_id;
     const activity_type = body.activity_type;
@@ -57,11 +57,11 @@ export async function POST(request: NextRequest) {
     const createdBy = ctx?.email ?? null;
 
     if (isSupabaseConfigured()) {
-      const churchId = await db.resolveChurchId(churchSlug);
-      if (!churchId) {
-        return NextResponse.json({ error: "Church not found." }, { status: 404 });
+      const mosqueId = await db.resolveMosqueId(mosqueSlug);
+      if (!mosqueId) {
+        return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
       }
-      const activity = await db.addNewcomerActivity(churchId, {
+      const activity = await db.addNewcomerActivity(mosqueId, {
         newcomer_id,
         activity_type,
         title,
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     }
 
     const activity = mockDb.addNewcomerActivity({
-      church_slug: churchSlug,
+      mosque_slug: mosqueSlug,
       newcomer_id,
       activity_type,
       title,

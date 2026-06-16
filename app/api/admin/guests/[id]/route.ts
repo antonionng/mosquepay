@@ -6,7 +6,7 @@ import {
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -18,8 +18,8 @@ const EDITABLE_KEYS = [
   "full_name",
   "email",
   "phone",
-  "mother_church_name",
-  "mother_church_number",
+  "mother_mosque_name",
+  "mother_mosque_number",
   "constitution",
   "rank",
   "dietary_requirements",
@@ -73,11 +73,11 @@ function pickPatch(body: Record<string, unknown>) {
   return patch;
 }
 
-async function ensureFlag(churchId: string | null) {
-  const enabled = await isFeatureEnabled(churchId, "guest_links");
+async function ensureFlag(mosqueId: string | null) {
+  const enabled = await isFeatureEnabled(mosqueId, "guest_links");
   if (enabled) return null;
   return NextResponse.json(
-    { error: "Guest links are disabled for this church." },
+    { error: "Guest links are disabled for this mosque." },
     { status: 403 }
   );
 }
@@ -90,18 +90,18 @@ export async function GET(
   if (unauthorized) return unauthorized;
 
   const { id } = await params;
-  const churchSlug = getChurchSlugFromRequest(request);
+  const mosqueSlug = getMosqueSlugFromRequest(request);
 
   if (isSupabaseConfigured()) {
-    const churchId = await db.resolveChurchId(churchSlug);
-    if (!churchId) {
-      return NextResponse.json({ error: "Church not found." }, { status: 404 });
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("members:read", churchId);
+    const forbidden = await requireAdminApiPermission("members:read", mosqueId);
     if (forbidden) return forbidden;
-    const flagBlocked = await ensureFlag(churchId);
+    const flagBlocked = await ensureFlag(mosqueId);
     if (flagBlocked) return flagBlocked;
-    const guest = await db.getGuestById(id, churchId);
+    const guest = await db.getGuestById(id, mosqueId);
     if (!guest) {
       return NextResponse.json({ error: "Guest not found." }, { status: 404 });
     }
@@ -111,7 +111,7 @@ export async function GET(
   if (!shouldUseInMemoryMock()) {
     return NextResponse.json({ error: "Guest not found." }, { status: 404 });
   }
-  const guest = mockDb.getGuestById(id, { church_slug: churchSlug });
+  const guest = mockDb.getGuestById(id, { mosque_slug: mosqueSlug });
   if (!guest) {
     return NextResponse.json({ error: "Guest not found." }, { status: 404 });
   }
@@ -129,7 +129,7 @@ export async function PATCH(
   if (unauthorized) return unauthorized;
 
   const { id } = await params;
-  const churchSlug = getChurchSlugFromRequest(request);
+  const mosqueSlug = getMosqueSlugFromRequest(request);
   let body: Record<string, unknown> = {};
   try {
     body = await request.json();
@@ -139,22 +139,22 @@ export async function PATCH(
   const patch = pickPatch(body);
 
   if (isSupabaseConfigured()) {
-    const churchId = await db.resolveChurchId(churchSlug);
-    if (!churchId) {
-      return NextResponse.json({ error: "Church not found." }, { status: 404 });
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("members:write", churchId);
+    const forbidden = await requireAdminApiPermission("members:write", mosqueId);
     if (forbidden) return forbidden;
-    const flagBlocked = await ensureFlag(churchId);
+    const flagBlocked = await ensureFlag(mosqueId);
     if (flagBlocked) return flagBlocked;
 
-    const existing = await db.getGuestById(id, churchId);
+    const existing = await db.getGuestById(id, mosqueId);
     if (!existing) {
       return NextResponse.json({ error: "Guest not found." }, { status: 404 });
     }
-    const guest = await db.updateGuest(id, churchId, patch);
+    const guest = await db.updateGuest(id, mosqueId, patch);
     await writeAuditLog({
-      churchId,
+      mosqueId,
       action: "updated",
       entityType: "guest",
       entityId: guest.id,
@@ -164,7 +164,7 @@ export async function PATCH(
     return NextResponse.json({ guest });
   }
 
-  const guest = mockDb.updateGuestRecord(id, patch, { church_slug: churchSlug });
+  const guest = mockDb.updateGuestRecord(id, patch, { mosque_slug: mosqueSlug });
   if (!guest) {
     return NextResponse.json({ error: "Guest not found." }, { status: 404 });
   }
@@ -182,27 +182,27 @@ export async function DELETE(
   if (unauthorized) return unauthorized;
 
   const { id } = await params;
-  const churchSlug = getChurchSlugFromRequest(request);
+  const mosqueSlug = getMosqueSlugFromRequest(request);
   const url = new URL(request.url);
   const action = url.searchParams.get("action") ?? "archive";
 
   if (isSupabaseConfigured()) {
-    const churchId = await db.resolveChurchId(churchSlug);
-    if (!churchId) {
-      return NextResponse.json({ error: "Church not found." }, { status: 404 });
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("members:write", churchId);
+    const forbidden = await requireAdminApiPermission("members:write", mosqueId);
     if (forbidden) return forbidden;
-    const flagBlocked = await ensureFlag(churchId);
+    const flagBlocked = await ensureFlag(mosqueId);
     if (flagBlocked) return flagBlocked;
 
-    const existing = await db.getGuestById(id, churchId);
+    const existing = await db.getGuestById(id, mosqueId);
     if (!existing) {
       return NextResponse.json({ error: "Guest not found." }, { status: 404 });
     }
 
     if (action === "purge") {
-      const result = await db.hardDeleteGuestIfUnused(id, churchId);
+      const result = await db.hardDeleteGuestIfUnused(id, mosqueId);
       if (!result.deleted) {
         return NextResponse.json(
           {
@@ -213,7 +213,7 @@ export async function DELETE(
         );
       }
       await writeAuditLog({
-        churchId,
+        mosqueId,
         action: "deleted",
         entityType: "guest",
         entityId: id,
@@ -223,9 +223,9 @@ export async function DELETE(
     }
 
     if (action === "restore") {
-      const guest = await db.restoreGuest(id, churchId);
+      const guest = await db.restoreGuest(id, mosqueId);
       await writeAuditLog({
-        churchId,
+        mosqueId,
         action: "restored",
         entityType: "guest",
         entityId: id,
@@ -234,9 +234,9 @@ export async function DELETE(
       return NextResponse.json({ guest, mode: "restore" });
     }
 
-    const guest = await db.archiveGuest(id, churchId);
+    const guest = await db.archiveGuest(id, mosqueId);
     await writeAuditLog({
-      churchId,
+      mosqueId,
       action: "archived",
       entityType: "guest",
       entityId: id,
@@ -247,7 +247,7 @@ export async function DELETE(
 
   if (action === "purge") {
     const ok = mockDb.hardDeleteGuestRecordIfUnused(id, {
-      church_slug: churchSlug,
+      mosque_slug: mosqueSlug,
     });
     if (!ok) {
       return NextResponse.json(
@@ -261,9 +261,9 @@ export async function DELETE(
     return NextResponse.json({ success: true, mode: "purge" });
   }
   if (action === "restore") {
-    const guest = mockDb.restoreGuestRecord(id, { church_slug: churchSlug });
+    const guest = mockDb.restoreGuestRecord(id, { mosque_slug: mosqueSlug });
     return NextResponse.json({ guest, mode: "restore" });
   }
-  const guest = mockDb.archiveGuestRecord(id, { church_slug: churchSlug });
+  const guest = mockDb.archiveGuestRecord(id, { mosque_slug: mosqueSlug });
   return NextResponse.json({ guest, mode: "archive" });
 }

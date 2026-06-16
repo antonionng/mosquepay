@@ -4,7 +4,7 @@ import * as mockDb from "@/lib/mock-db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
 import { computeNextGivingForMember } from "@/lib/giving/next-due";
 import { sweepAbandonedPendingSchedules } from "@/lib/giving/abandoned-pending-sweep";
-import { getDefaultChurchSlug } from "@/lib/tenant";
+import { getDefaultMosqueSlug } from "@/lib/tenant";
 import type {
   GivingSchedule,
   GiftAidDeclaration,
@@ -43,7 +43,7 @@ export default async function AdminMemberDetailPage({
   const { id } = await params;
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
-  const churchId = ctx.mode === "database" ? ctx.churchId : null;
+  const mosqueId = ctx.mode === "database" ? ctx.mosqueId : null;
 
   if (useMock) {
     const member = mockDb.getMemberById(id);
@@ -66,14 +66,14 @@ export default async function AdminMemberDetailPage({
     );
   }
 
-  if (!churchId) notFound();
+  if (!mosqueId) notFound();
 
-  const member = await db.getMemberById(id, churchId);
+  const member = await db.getMemberById(id, mosqueId);
   if (!member) notFound();
 
   // Self-heal stale pending schedules from abandoned Mooov checkouts
   // before we read this member's subscription history.
-  await sweepAbandonedPendingSchedules(churchId).catch(() => 0);
+  await sweepAbandonedPendingSchedules(mosqueId).catch(() => 0);
 
   const [
     dietaryHistory,
@@ -81,36 +81,36 @@ export default async function AdminMemberDetailPage({
     givingRecords,
     offices,
     currentYear,
-    churchGiving,
+    mosqueGiving,
     schedules,
     giftAidDeclaration,
     recentEmails,
   ] = await Promise.all([
-    db.getRsvpDietaryByEmail(member.email, churchId),
-    db.getPaymentsByEmail(member.email, churchId),
-    db.getMemberGiving(churchId, { memberEmail: member.email }),
-    db.listOfficerLadder(churchId),
-    db.getCurrentChurchYear(churchId),
-    db.getChurchGiving(churchId),
-    db.getGivingSchedulesForMember(churchId, member.email),
+    db.getRsvpDietaryByEmail(member.email, mosqueId),
+    db.getPaymentsByEmail(member.email, mosqueId),
+    db.getMemberGiving(mosqueId, { memberEmail: member.email }),
+    db.listOfficerLadder(mosqueId),
+    db.getCurrentMosqueYear(mosqueId),
+    db.getMosqueGiving(mosqueId),
+    db.getGivingSchedulesForMember(mosqueId, member.email),
     // Seed the Gift Aid panel with the active declaration. The panel
     // re-fetches on mount so an upload from another tab will update; the
     // server seed just avoids the empty-flash on first paint.
-    db.getActiveGiftAidDeclarationByMember(churchId, {
+    db.getActiveGiftAidDeclarationByMember(mosqueId, {
       id: member.id,
       email: member.email,
     }),
     // The "Recent emails" panel reads append-only sends from
     // public.email_log (migration 064). Empty list = no sends yet,
     // not an error.
-    db.listEmailLogForMember(churchId, member.email, 10).catch(() => []),
+    db.listEmailLogForMember(mosqueId, member.email, 10).catch(() => []),
   ]);
 
   const nextGiving = computeNextGivingForMember({
     currentYear,
     memberGiving: givingRecords,
     defaultAnnualAmount:
-      currentYear?.annual_giving_amount ?? churchGiving[0]?.amount ?? null,
+      currentYear?.annual_giving_amount ?? mosqueGiving[0]?.amount ?? null,
     annualGivingWaived: member.annual_giving_waived === true,
     annualGivingWaiverReason: member.annual_giving_waiver_reason ?? null,
   });
@@ -159,7 +159,7 @@ export default async function AdminMemberDetailPage({
   if (activeSchedule && hasLiveSchedule) {
     const instalments = await db.getInstalmentsForGiving(
       activeSchedule.member_giving_id,
-      churchId
+      mosqueId
     );
     subscription = { schedule: activeSchedule, instalments };
   }
@@ -175,16 +175,16 @@ export default async function AdminMemberDetailPage({
 
   // Build the public subscription/pay link the admin can copy or
   // mailto. Same shape as the membership cron template:
-  // ${siteUrl}/giving/[givingId]?email=...&church=...
+  // ${siteUrl}/giving/[givingId]?email=...&mosque=...
   let subscriptionLink: string | null = null;
   if (givingRowForMethod) {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
-    const churchSlug = ctx.mode === "database" ? ctx.churchSlug : null;
+    const mosqueSlug = ctx.mode === "database" ? ctx.mosqueSlug : null;
     if (siteUrl) {
       const u = new URL(`/giving/${givingRowForMethod.id}`, siteUrl);
       u.searchParams.set("email", member.email);
-      if (churchSlug && churchSlug !== getDefaultChurchSlug()) {
-        u.searchParams.set("church", churchSlug);
+      if (mosqueSlug && mosqueSlug !== getDefaultMosqueSlug()) {
+        u.searchParams.set("mosque", mosqueSlug);
       }
       subscriptionLink = u.toString();
     }

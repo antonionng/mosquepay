@@ -41,7 +41,7 @@ export function PersonPickerSheet({
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Guest mode state. The list is async because the guests directory can be
-  // huge on busy churches and we don't want to ship the whole thing to every
+  // huge on busy mosques and we don't want to ship the whole thing to every
   // mobile client at page load.
   const [guests, setGuests] = useState<GuestOption[]>([]);
   const [guestsLoading, setGuestsLoading] = useState(false);
@@ -52,8 +52,8 @@ export function PersonPickerSheet({
     full_name: "",
     email: null,
     phone: null,
-    mother_church_name: null,
-    mother_church_number: null,
+    mother_mosque_name: null,
+    mother_mosque_number: null,
   });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -69,8 +69,8 @@ export function PersonPickerSheet({
         full_name: "",
         email: null,
         phone: null,
-        mother_church_name: null,
-        mother_church_number: null,
+        mother_mosque_name: null,
+        mother_mosque_number: null,
       });
       setCreateError(null);
     }
@@ -164,8 +164,8 @@ export function PersonPickerSheet({
           full_name: fullName,
           email: draft.email ?? undefined,
           phone: draft.phone ?? undefined,
-          mother_church_name: draft.mother_church_name ?? undefined,
-          mother_church_number: draft.mother_church_number ?? undefined,
+          mother_mosque_name: draft.mother_mosque_name ?? undefined,
+          mother_mosque_number: draft.mother_mosque_number ?? undefined,
         }),
       });
       const json = (await res.json()) as
@@ -283,7 +283,7 @@ export function PersonPickerSheet({
                     <div className="min-w-0">
                       <p className="text-sm font-semibold">Add new guest</p>
                       <p className="text-xs text-emerald-700/80">
-                        Capture name, email, and mother church for the receipt.
+                        Capture name, email, and mother mosque for the receipt.
                       </p>
                     </div>
                   </button>
@@ -328,8 +328,8 @@ export function PersonPickerSheet({
                           <p className="truncate text-xs text-slate-500">
                             {g.email
                               ? g.email
-                              : g.mother_church_name
-                                ? g.mother_church_name
+                              : g.mother_mosque_name
+                                ? g.mother_mosque_name
                                 : "Guest"}
                           </p>
                         </div>
@@ -345,7 +345,7 @@ export function PersonPickerSheet({
                     <li className="px-4 py-10 text-center text-sm text-slate-500">
                       {query.trim()
                         ? `No members match "${query}".`
-                        : "No active members in this church yet."}
+                        : "No active members in this mosque yet."}
                     </li>
                   )
                   : filteredMembers.map((m) => (
@@ -406,24 +406,24 @@ export function PersonPickerSheet({
                 placeholder="Optional"
               />
               <Field
-                label="Mother church"
-                value={draft.mother_church_name ?? ""}
+                label="Mother mosque"
+                value={draft.mother_mosque_name ?? ""}
                 onChange={(v) =>
                   setDraft({
                     ...draft,
-                    mother_church_name: v.trim() ? v : null,
+                    mother_mosque_name: v.trim() ? v : null,
                   })
                 }
                 placeholder="Optional"
                 autoCapitalize="words"
               />
               <Field
-                label="Church number"
-                value={draft.mother_church_number ?? ""}
+                label="Mosque number"
+                value={draft.mother_mosque_number ?? ""}
                 onChange={(v) =>
                   setDraft({
                     ...draft,
-                    mother_church_number: v.trim() ? v : null,
+                    mother_mosque_number: v.trim() ? v : null,
                   })
                 }
                 placeholder="Optional"

@@ -1,5 +1,5 @@
 {
-  "name": "churchpay",
+  "name": "mosquepay",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint .",
     "bootstrap:platform-owner": "node scripts/bootstrap-platform-owner.mjs",
+    "seed:platform-demo": "node --experimental-strip-types scripts/seed-platform-demo.mjs",
     "seed:gift-aid-demo": "node scripts/seed-gift-aid-demo.mjs",
     "audit:crud": "node scripts/audit-crud.mjs",
     "audit:crud:strict": "node scripts/audit-crud.mjs --strict"

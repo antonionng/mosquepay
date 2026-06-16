@@ -37,16 +37,16 @@ export async function GET(
     );
   }
 
-  // Anchor to the admin's scoped church (same logic as the page) so an
-  // unset ADMIN_CHURCH_COOKIE doesn't silently swap us onto the platform
-  // default church and 401 a polling tablet mid-payment.
+  // Anchor to the admin's scoped mosque (same logic as the page) so an
+  // unset ADMIN_MOSQUE_COOKIE doesn't silently swap us onto the platform
+  // default mosque and 401 a polling tablet mid-payment.
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
-    return NextResponse.json({ error: "Church not selected." }, { status: 404 });
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
+    return NextResponse.json({ error: "Mosque not selected." }, { status: 404 });
   }
-  const churchId = ctx.churchId;
+  const mosqueId = ctx.mosqueId;
 
-  const forbidden = await requireAdminApiPermission("payments:write", churchId);
+  const forbidden = await requireAdminApiPermission("payments:write", mosqueId);
   if (forbidden) return forbidden;
 
   const supa = createServiceClient();
@@ -54,16 +54,16 @@ export async function GET(
   const { data: attempt, error: attemptError } = await supa
     .schema("mooov")
     .from("payment_attempts")
-    .select("payment_id, status, amount, currency, failure_reason, church_id")
+    .select("payment_id, status, amount, currency, failure_reason, mosque_id")
     .eq("payment_id", paymentId)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .maybeSingle<{
       payment_id: string;
       status: string;
       amount: number;
       currency: string;
       failure_reason: string | null;
-      church_id: string;
+      mosque_id: string;
     }>();
   if (attemptError) {
     console.error("Take payment status GET: attempt lookup failed", {
@@ -112,7 +112,7 @@ export async function GET(
       .from("donations")
       .select("id, gift_aid_declaration_id")
       .eq("payment_id", projected.id)
-      .eq("church_id", churchId)
+      .eq("mosque_id", mosqueId)
       .maybeSingle<{
         id: string;
         gift_aid_declaration_id: string | null;

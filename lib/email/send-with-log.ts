@@ -17,12 +17,12 @@
 
 import { Resend } from "resend";
 import * as db from "@/lib/db";
-import { churchPayFromEmail } from "@/lib/email/templates";
+import { mosquePayFromEmail } from "@/lib/email/templates";
 import { memberWantsEmail } from "@/lib/email/preferences";
 
 export type SendWithLogArgs = {
-  /** Church owning this send (NULL for platform-wide messages). */
-  churchId: string | null;
+  /** Mosque owning this send (NULL for platform-wide messages). */
+  mosqueId: string | null;
   toEmail: string;
   toName?: string | null;
 
@@ -53,7 +53,7 @@ export type SendWithLogArgs = {
   /** Anything you'd like searchable on the email_log row. */
   metadata?: Record<string, unknown>;
 
-  /** Optional reply-to (e.g. church.email when present). */
+  /** Optional reply-to (e.g. mosque.email when present). */
   replyTo?: string | null;
 
   /** Extra BCC addresses on top of the platform debug BCC. */
@@ -68,18 +68,18 @@ export type SendWithLogResult =
 const FROM_ENV =
   process.env.RESEND_FROM_EMAIL ??
   process.env.EMAIL_FROM ??
-  "ChurchPay <noreply@churchpay.co.uk>";
+  "MosquePay <noreply@mosque-pay.com>";
 
 /**
  * Comma-separated list of BCC addresses applied to every send.
- * Defaults to the ChurchPay QA inbox so we always have an audit
+ * Defaults to the MosquePay QA inbox so we always have an audit
  * mirror; set EMAIL_DEBUG_BCC="" in env to disable.
  */
 const DEBUG_BCC =
   process.env.EMAIL_DEBUG_BCC ?? "ag@experrt.com";
 
 function buildFrom() {
-  return churchPayFromEmail(FROM_ENV);
+  return mosquePayFromEmail(FROM_ENV);
 }
 
 function buildBcc(extraBcc: string | string[] | null | undefined): string[] {
@@ -110,7 +110,7 @@ export async function sendWithLog(args: SendWithLogArgs): Promise<SendWithLogRes
     // didn't send" rather than silently dropping.
     await db
       .recordEmailLog({
-        church_id: args.churchId,
+        mosque_id: args.mosqueId,
         to_email: args.toEmail,
         member_id: args.memberId ?? null,
         admin_user_id: args.adminUserId ?? null,
@@ -132,7 +132,7 @@ export async function sendWithLog(args: SendWithLogArgs): Promise<SendWithLogRes
   // the call to Resend altogether when a redeliver hits.
   if (args.dedupeKey) {
     const already = await db
-      .emailAlreadySent(args.churchId, args.emailType, args.dedupeKey)
+      .emailAlreadySent(args.mosqueId, args.emailType, args.dedupeKey)
       .catch(() => false);
     if (already) {
       console.log("sendWithLog: dedupe hit, skipping", {
@@ -153,7 +153,7 @@ export async function sendWithLog(args: SendWithLogArgs): Promise<SendWithLogRes
       // would have sent and consciously didn't.
       await db
         .recordEmailLog({
-          church_id: args.churchId,
+          mosque_id: args.mosqueId,
           to_email: args.toEmail,
           member_id: args.memberId,
           admin_user_id: args.adminUserId ?? null,
@@ -199,7 +199,7 @@ export async function sendWithLog(args: SendWithLogArgs): Promise<SendWithLogRes
   // surface the failure to the treasurer.
   const persisted = await db
     .recordEmailLog({
-      church_id: args.churchId,
+      mosque_id: args.mosqueId,
       to_email: args.toEmail,
       member_id: args.memberId ?? null,
       admin_user_id: args.adminUserId ?? null,

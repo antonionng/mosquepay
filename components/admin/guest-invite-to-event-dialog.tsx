@@ -210,7 +210,7 @@ export function GuestInviteToEventDialog({
                     checked={payer === "guest"}
                     onChange={() => setPayer("guest")}
                   />
-                  The guest pays through their church-branded guest link
+                  The guest pays through their mosque-branded guest link
                   (default)
                 </label>
                 <label className="flex items-center gap-2">
@@ -220,7 +220,7 @@ export function GuestInviteToEventDialog({
                     checked={payer === "inviter"}
                     onChange={() => setPayer("inviter")}
                   />
-                  The church will cover the fees (no payment screen)
+                  The mosque will cover the fees (no payment screen)
                 </label>
               </div>
             </fieldset>

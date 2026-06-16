@@ -3,7 +3,7 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import { requireAdminApiAuth } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
 
@@ -13,7 +13,7 @@ const VALID_STAGES = [
   "new_enquiry",
   "initial_contact",
   "service_scheduled",
-  "proposal_church",
+  "proposal_mosque",
   "approved",
   "welcomed",
   "declined",
@@ -58,7 +58,7 @@ export async function PATCH(
     const unauthorized = await requireAdminApiAuth();
     if (unauthorized) return unauthorized;
 
-    const churchSlug = getChurchSlugFromRequest(request);
+    const mosqueSlug = getMosqueSlugFromRequest(request);
     const body = await request.json();
     const updates: Record<string, unknown> = {};
 
@@ -87,17 +87,17 @@ export async function PATCH(
     }
 
     if (isSupabaseConfigured()) {
-      const churchId = await db.resolveChurchId(churchSlug);
-      if (!churchId) {
-        return NextResponse.json({ error: "Church not found." }, { status: 404 });
+      const mosqueId = await db.resolveMosqueId(mosqueSlug);
+      if (!mosqueId) {
+        return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
       }
-      const updated = await db.updateNewcomer(id, churchId, updates);
+      const updated = await db.updateNewcomer(id, mosqueId, updates);
       if (!updated) {
         return NextResponse.json({ error: "Newcomer not found." }, { status: 404 });
       }
       if (updates.stage) {
         await writeAuditLog({
-          churchId,
+          mosqueId,
           action: "stage_changed",
           entityType: "newcomer",
           entityId: updated.id,
@@ -107,7 +107,7 @@ export async function PATCH(
       return NextResponse.json({ success: true, newcomer: updated });
     }
 
-    const updated = mockDb.updateNewcomer(id, updates, { church_slug: churchSlug });
+    const updated = mockDb.updateNewcomer(id, updates, { mosque_slug: mosqueSlug });
     if (!updated) {
       return NextResponse.json({ error: "Newcomer not found." }, { status: 404 });
     }
@@ -134,23 +134,23 @@ export async function DELETE(
     const unauthorized = await requireAdminApiAuth();
     if (unauthorized) return unauthorized;
 
-    const churchSlug = getChurchSlugFromRequest(request);
+    const mosqueSlug = getMosqueSlugFromRequest(request);
 
     if (isSupabaseConfigured()) {
-      const churchId = await db.resolveChurchId(churchSlug);
-      if (!churchId) {
-        return NextResponse.json({ error: "Church not found." }, { status: 404 });
+      const mosqueId = await db.resolveMosqueId(mosqueSlug);
+      if (!mosqueId) {
+        return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
       }
-      const existing = await db.getNewcomerById(id, churchId);
+      const existing = await db.getNewcomerById(id, mosqueId);
       if (!existing) {
         return NextResponse.json({ error: "Newcomer not found." }, { status: 404 });
       }
-      const { deleted } = await db.deleteNewcomer(id, churchId);
+      const { deleted } = await db.deleteNewcomer(id, mosqueId);
       if (!deleted) {
         return NextResponse.json({ error: "Newcomer not found." }, { status: 404 });
       }
       await writeAuditLog({
-        churchId,
+        mosqueId,
         action: "deleted",
         entityType: "newcomer",
         entityId: id,
@@ -160,7 +160,7 @@ export async function DELETE(
       return NextResponse.json({ success: true });
     }
 
-    const { deleted } = mockDb.deleteNewcomer(id, { church_slug: churchSlug });
+    const { deleted } = mockDb.deleteNewcomer(id, { mosque_slug: mosqueSlug });
     if (!deleted) {
       return NextResponse.json({ error: "Newcomer not found." }, { status: 404 });
     }

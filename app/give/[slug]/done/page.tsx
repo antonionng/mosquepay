@@ -2,7 +2,7 @@
 //
 // Landed here after Mooov captures the standing-QR payment. We don't try to
 // gate on the webhook (it might race the redirect by a second or two); we
-// just show a "Thanks, the church will receive your gift" page. The Treasurer
+// just show a "Thanks, the mosque will receive your gift" page. The Treasurer
 // gets the official audit trail via the Mooov webhook and the projection
 // into public.payments.
 
@@ -27,7 +27,7 @@ export default async function GiveDonePage({
         </h1>
         <p className="mt-2 text-sm text-slate-600">
           Your gift has been received. You&apos;ll get a receipt by email
-          shortly. The church thanks you for your support.
+          shortly. The mosque thanks you for your support.
         </p>
         <p className="mt-6 text-xs text-slate-400">{slug}</p>
       </div>

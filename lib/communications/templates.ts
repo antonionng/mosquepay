@@ -1,4 +1,4 @@
-// Seed library of system message templates. Church-specific copies override
+// Seed library of system message templates. Mosque-specific copies override
 // the system version (matched on template_key).
 
 export type TemplateCategory =
@@ -25,20 +25,20 @@ export const SYSTEM_TEMPLATES: readonly SystemTemplate[] = [
     name: "Blank newsletter",
     category: "newsletter",
     description: "A clean starting point for any monthly update.",
-    subject: "Church update",
+    subject: "Mosque update",
     html_body:
       "<p>Hello {{first_name}},</p>\n<p>Write your newsletter content here. You can include <strong>bold text</strong> and links.</p>\n<p>Yours sincerely,<br/>The Secretary</p>",
-    merge_tags: ["first_name", "last_name", "church_name"],
+    merge_tags: ["first_name", "last_name", "mosque_name"],
   },
   {
     template_key: "system.newsletter.monthly",
     name: "Monthly newsletter",
     category: "newsletter",
     description: "Recap of the last service plus a look ahead.",
-    subject: "{{church_name}} - this month at the church",
+    subject: "{{mosque_name}} - this month at the mosque",
     html_body:
-      "<p>Dear {{first_name}},</p>\n<p>Here is your monthly catch-up from {{church_name}}.</p>\n<h3>Last service</h3>\n<p>Thank you to everyone who joined us at our last regular service. A short summary of the proceedings and the life shared as a church is below.</p>\n<h3>Looking ahead</h3>\n<p>Our next service is on {{event_date}}. Full details are in the notice that follows.</p>\n<h3>Charity</h3>\n<p>Our current campaign continues. If you would like to contribute, you can do so through the member portal.</p>\n<p>With every blessing,<br/>The Secretary</p>",
-    merge_tags: ["first_name", "church_name", "event_date"],
+      "<p>Dear {{first_name}},</p>\n<p>Here is your monthly catch-up from {{mosque_name}}.</p>\n<h3>Last service</h3>\n<p>Thank you to everyone who joined us at our last regular service. A short summary of the proceedings and the life shared as a mosque is below.</p>\n<h3>Looking ahead</h3>\n<p>Our next service is on {{event_date}}. Full details are in the notice that follows.</p>\n<h3>Charity</h3>\n<p>Our current campaign continues. If you would like to contribute, you can do so through the member portal.</p>\n<p>With every blessing,<br/>The Secretary</p>",
+    merge_tags: ["first_name", "mosque_name", "event_date"],
   },
   {
     template_key: "system.notice.regular",
@@ -47,8 +47,8 @@ export const SYSTEM_TEMPLATES: readonly SystemTemplate[] = [
     description: "Standard notice for a regular service with dining details.",
     subject: "Notice - {{event_title}} on {{event_date}}",
     html_body:
-      "<p>Dear {{first_name}},</p>\n<p>You are invited to attend a regular service of {{church_name}}.</p>\n<p><strong>Date:</strong> {{event_date}}<br/><strong>Time:</strong> {{event_time}}<br/><strong>Location:</strong> {{event_location}}<br/><strong>Dress:</strong> {{event_dress_code}}</p>\n<h3>Agenda</h3>\n<ol><li>Opening of the church</li><li>Reading of minutes</li><li>Treasurer's report</li><li>Secretary's correspondence</li><li>Charity steward's report</li><li>Any other business</li><li>Closing of the church</li></ol>\n<p>Please RSVP from your member portal so the fellowship meal can be catered.</p>\n<p>With every blessing,<br/>The Secretary</p>",
-    merge_tags: ["first_name", "church_name", "event_title", "event_date", "event_time", "event_location", "event_dress_code"],
+      "<p>Dear {{first_name}},</p>\n<p>You are invited to attend a regular service of {{mosque_name}}.</p>\n<p><strong>Date:</strong> {{event_date}}<br/><strong>Time:</strong> {{event_time}}<br/><strong>Location:</strong> {{event_location}}<br/><strong>Dress:</strong> {{event_dress_code}}</p>\n<h3>Agenda</h3>\n<ol><li>Opening of the mosque</li><li>Reading of minutes</li><li>Treasurer's report</li><li>Secretary's correspondence</li><li>Charity steward's report</li><li>Any other business</li><li>Closing of the mosque</li></ol>\n<p>Please RSVP from your member portal so the community meal can be catered.</p>\n<p>With every blessing,<br/>The Secretary</p>",
+    merge_tags: ["first_name", "mosque_name", "event_title", "event_date", "event_time", "event_location", "event_dress_code"],
   },
   {
     template_key: "system.notice.special_service",
@@ -57,18 +57,18 @@ export const SYSTEM_TEMPLATES: readonly SystemTemplate[] = [
     description: "Formal notice for an special_service service.",
     subject: "Special service notice - {{event_date}}",
     html_body:
-      "<p>Dear {{first_name}},</p>\n<p>You are most warmly invited to attend the special_service of the Lead Pastor Elect of {{church_name}}.</p>\n<p><strong>Date:</strong> {{event_date}}<br/><strong>Time:</strong> {{event_time}}<br/><strong>Location:</strong> {{event_location}}<br/><strong>Dress:</strong> Smart dress</p>\n<p>A fellowship meal will follow. Please RSVP from your member portal at your earliest convenience.</p>\n<p>With every blessing,<br/>The Secretary</p>",
-    merge_tags: ["first_name", "church_name", "event_date", "event_time", "event_location"],
+      "<p>Dear {{first_name}},</p>\n<p>You are most warmly invited to attend the special_service of the Lead Imam Elect of {{mosque_name}}.</p>\n<p><strong>Date:</strong> {{event_date}}<br/><strong>Time:</strong> {{event_time}}<br/><strong>Location:</strong> {{event_location}}<br/><strong>Dress:</strong> Smart dress</p>\n<p>A community meal will follow. Please RSVP from your member portal at your earliest convenience.</p>\n<p>With every blessing,<br/>The Secretary</p>",
+    merge_tags: ["first_name", "mosque_name", "event_date", "event_time", "event_location"],
   },
   {
     template_key: "system.giving.reminder",
     name: "Giving reminder",
     category: "giving",
     description: "Polite first reminder for outstanding giving.",
-    subject: "Reminder: church giving due {{due_date}}",
+    subject: "Reminder: mosque giving due {{due_date}}",
     html_body:
       "<p>Dear {{first_name}},</p>\n<p>This is a friendly reminder that your annual giving of {{amount}} are due on {{due_date}}.</p>\n<p>You can pay or set up instalments from the member portal.</p>",
-    merge_tags: ["first_name", "amount", "due_date", "church_name"],
+    merge_tags: ["first_name", "amount", "due_date", "mosque_name"],
   },
   {
     template_key: "system.giving.final-notice",
@@ -87,8 +87,8 @@ export const SYSTEM_TEMPLATES: readonly SystemTemplate[] = [
     description: "Thank members for attending; sets up the next service.",
     subject: "Thank you for attending {{event_title}}",
     html_body:
-      "<p>Dear {{first_name}},</p>\n<p>Thank you for joining us at {{event_title}} on {{event_date}}. Your fellowship made the evening memorable.</p>\n<p>We look forward to seeing you again at our next service.</p>",
-    merge_tags: ["first_name", "event_title", "event_date", "church_name"],
+      "<p>Dear {{first_name}},</p>\n<p>Thank you for joining us at {{event_title}} on {{event_date}}. Your community made the evening memorable.</p>\n<p>We look forward to seeing you again at our next service.</p>",
+    merge_tags: ["first_name", "event_title", "event_date", "mosque_name"],
   },
   {
     template_key: "system.event.rsvp-reminder",
@@ -105,10 +105,10 @@ export const SYSTEM_TEMPLATES: readonly SystemTemplate[] = [
     name: "Birthday greeting",
     category: "milestones",
     description: "Sent automatically on a member's birthday.",
-    subject: "Happy birthday from {{church_name}}",
+    subject: "Happy birthday from {{mosque_name}}",
     html_body:
-      "<p>Dear {{first_name}},</p>\n<p>The members of {{church_name}} send our warmest birthday wishes. We hope you have a wonderful day with family and friends.</p>",
-    merge_tags: ["first_name", "church_name"],
+      "<p>Dear {{first_name}},</p>\n<p>The members of {{mosque_name}} send our warmest birthday wishes. We hope you have a wonderful day with family and friends.</p>",
+    merge_tags: ["first_name", "mosque_name"],
   },
   {
     template_key: "system.membership.anniversary",
@@ -117,8 +117,8 @@ export const SYSTEM_TEMPLATES: readonly SystemTemplate[] = [
     description: "Sent on the anniversary of a member's membership.",
     subject: "{{years}} years a member",
     html_body:
-      "<p>Dear {{first_name}},</p>\n<p>Today marks {{years}} years since your membership into {{church_name}}. The members thank you for your continued service and fellowship.</p>",
-    merge_tags: ["first_name", "church_name", "years"],
+      "<p>Dear {{first_name}},</p>\n<p>Today marks {{years}} years since your membership into {{mosque_name}}. The members thank you for your continued service and community.</p>",
+    merge_tags: ["first_name", "mosque_name", "years"],
   },
   {
     template_key: "system.pastoral.checkin",
@@ -127,7 +127,7 @@ export const SYSTEM_TEMPLATES: readonly SystemTemplate[] = [
     description: "Personal note from the PastoralCare to a member who may be unwell.",
     subject: "Thinking of you",
     html_body:
-      "<p>Dear {{first_name}},</p>\n<p>The members have been thinking of you. Please know that you are in our thoughts. If there is anything practical the church can do, please reach out to me directly in confidence.</p>\n<p>With every blessing,<br/>The PastoralCare</p>",
+      "<p>Dear {{first_name}},</p>\n<p>The members have been thinking of you. Please know that you are in our thoughts. If there is anything practical the mosque can do, please reach out to me directly in confidence.</p>\n<p>With every blessing,<br/>The PastoralCare</p>",
     merge_tags: ["first_name"],
   },
   {
@@ -137,8 +137,8 @@ export const SYSTEM_TEMPLATES: readonly SystemTemplate[] = [
     description: "Sympathy note to a member or family during bereavement.",
     subject: "With our deepest sympathies",
     html_body:
-      "<p>Dear {{first_name}},</p>\n<p>The members of {{church_name}} are deeply saddened to learn of your loss. You and your family are in our thoughts and prayers at this difficult time.</p>\n<p>Please do not hesitate to reach out to the PastoralCare if there is anything we can do to support you.</p>\n<p>With every blessing,<br/>The Lead Pastor and Members</p>",
-    merge_tags: ["first_name", "church_name"],
+      "<p>Dear {{first_name}},</p>\n<p>The members of {{mosque_name}} are deeply saddened to learn of your loss. You and your family are in our thoughts and prayers at this difficult time.</p>\n<p>Please do not hesitate to reach out to the PastoralCare if there is anything we can do to support you.</p>\n<p>With every blessing,<br/>The Lead Imam and Members</p>",
+    merge_tags: ["first_name", "mosque_name"],
   },
 ];
 
@@ -147,7 +147,7 @@ export type MergeTagContext = {
   last_name: string;
   full_name: string;
   email: string;
-  church_name: string;
+  mosque_name: string;
   event_title?: string;
   event_date?: string;
   amount?: string;

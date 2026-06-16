@@ -8,7 +8,7 @@ import {
   MarketingSection,
   MarketingKicker,
 } from "@/components/marketing/marketing-shell";
-import { resolveChurchSlug } from "@/lib/tenant";
+import { resolveMosqueSlug } from "@/lib/tenant";
 import { marketingMetadata } from "@/lib/seo";
 
 const SAAS_CONTACT_INFO = [
@@ -26,34 +26,34 @@ const SAAS_CONTACT_INFO = [
   {
     Icon: MessageCircle,
     title: "What to include",
-    content: "Your church name, congregation size, and what you'd like to solve first",
+    content: "Your mosque name, congregation size, and what you'd like to solve first",
   },
 ];
 
 export async function generateMetadata({
   searchParams,
 }: {
-  searchParams: Promise<{ church?: string }>;
+  searchParams: Promise<{ mosque?: string }>;
 }) {
-  const { church } = await searchParams;
-  if (church) {
+  const { mosque } = await searchParams;
+  if (mosque) {
     return {
-      title: "Contact the Church",
+      title: "Contact the Mosque",
       description:
-        "Contact the church team about services, membership, giving, events, or general information.",
+        "Contact the mosque team about services, membership, giving, events, or general information.",
     };
   }
 
   return marketingMetadata({
-    title: "Contact ChurchPay | Sales and Support for Church Software",
+    title: "Contact MosquePay | Sales and Support for Mosque Software",
     description:
-      "Contact ChurchPay about giving, Gift Aid, church websites, member records, service notices, newcomer follow-up, pastoral care, and network rollouts for UK churches.",
+      "Contact MosquePay about giving, Gift Aid, mosque websites, member records, service notices, newcomer follow-up, welfare, and network rollouts for UK mosques.",
     path: "/contact",
     keywords: [
-      "contact ChurchPay",
-      "church software support",
-      "church software sales",
-      "church giving platform enquiry",
+      "contact MosquePay",
+      "mosque software support",
+      "mosque software sales",
+      "mosque giving platform enquiry",
     ],
   });
 }
@@ -61,11 +61,11 @@ export async function generateMetadata({
 export default async function ContactPage({
   searchParams,
 }: {
-  searchParams: Promise<{ church?: string }>;
+  searchParams: Promise<{ mosque?: string }>;
 }) {
-  const { church } = await searchParams;
-  const isTenantMode = Boolean(church);
-  const churchSlug = resolveChurchSlug(church);
+  const { mosque } = await searchParams;
+  const isTenantMode = Boolean(mosque);
+  const mosqueSlug = resolveMosqueSlug(mosque);
 
   if (!isTenantMode) {
     return (
@@ -75,11 +75,11 @@ export default async function ContactPage({
             <div className="max-w-3xl">
               <MarketingKicker>Contact</MarketingKicker>
               <h1 className="mt-4 font-heading text-4xl font-bold leading-tight tracking-tight text-slate-900 sm:text-5xl">
-                Talk to a human who knows church admin.
+                Talk to a human who knows mosque admin.
               </h1>
               <p className="mt-6 text-lg leading-8 text-slate-600">
                 Questions about giving, Gift Aid, migration, pricing, or anything else? Tell us
-                about your church and we&apos;ll point you in the right direction.
+                about your mosque and we&apos;ll point you in the right direction.
               </p>
             </div>
           </div>
@@ -132,7 +132,7 @@ export default async function ContactPage({
           <section className="public-hero">
             <div className="public-hero-shell">
               <div className="public-hero-copy">
-                <p className="public-kicker">Contact the church</p>
+                <p className="public-kicker">Contact the mosque</p>
                 <h1 className="public-hero-title">We&apos;d love to hear from you.</h1>
                 <p className="public-hero-body">
                   Questions about services, membership, giving, or anything else? Send us a
@@ -160,7 +160,7 @@ export default async function ContactPage({
                     Fill out the form below and we&apos;ll get back to you as soon as we can.
                   </p>
                   <Suspense>
-                    <ContactForm churchSlug={churchSlug} />
+                    <ContactForm mosqueSlug={mosqueSlug} />
                   </Suspense>
                 </div>
               </div>

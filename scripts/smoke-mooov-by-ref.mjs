@@ -25,7 +25,7 @@
 //   MOOOV_API_BASE=... \
 //   MOOOV_PLATFORM_API_KEY_ID=... \
 //   MOOOV_PLATFORM_API_KEY_SECRET=... \
-//   node scripts/smoke-mooov-by-ref.mjs merch_churchpaytest_3f3a5w mbr_test_smoke_001
+//   node scripts/smoke-mooov-by-ref.mjs merch_mosquepaytest_3f3a5w mbr_test_smoke_001
 //
 // Expected outcomes:
 //   200 + JSON body  -> the tuple was resolved (real or seeded)

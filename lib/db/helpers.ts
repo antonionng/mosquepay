@@ -1,9 +1,9 @@
 import { createServiceClient } from "@/lib/supabase/server";
 
-export async function resolveChurchId(slug: string): Promise<string | null> {
+export async function resolveMosqueId(slug: string): Promise<string | null> {
   const supabase = createServiceClient();
   const { data, error } = await supabase
-    .from("churches")
+    .from("mosques")
     .select("id")
     .eq("slug", slug.trim().toLowerCase())
     .maybeSingle();
@@ -12,6 +12,6 @@ export async function resolveChurchId(slug: string): Promise<string | null> {
   return data?.id ?? null;
 }
 
-export async function getDefaultChurchId(): Promise<string | null> {
-  return resolveChurchId("st-marys-demo");
+export async function getDefaultMosqueId(): Promise<string | null> {
+  return resolveMosqueId("central-jamia-demo");
 }

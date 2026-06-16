@@ -47,20 +47,20 @@ export default async function ServiceReportPage({
   const rafflePrice = stripRaw ? Number(stripRaw) || 5 : 5;
 
   const ctx = await getAdminReadContext();
-  const churchId = ctx.mode === "database" ? ctx.churchId : null;
-  if (!churchId) notFound();
+  const mosqueId = ctx.mode === "database" ? ctx.mosqueId : null;
+  if (!mosqueId) notFound();
 
-  const event = await db.getEventById(id, churchId);
+  const event = await db.getEventById(id, mosqueId);
   if (!event) notFound();
 
-  const [rsvps, guests, payments, donations, church, collections] =
+  const [rsvps, guests, payments, donations, mosque, collections] =
     await Promise.all([
-      db.getRsvpsByEventId(id, churchId).catch(() => []),
-      db.getGuestsByEvent(id, churchId).catch(() => []),
-      db.getPaymentsByEventId(id, churchId).catch(() => []),
-      db.getDonationsByEvent(id, churchId).catch(() => []),
-      db.getChurchById(churchId).catch(() => null),
-      db.getServiceCollections(churchId, { eventId: id }).catch(() => []),
+      db.getRsvpsByEventId(id, mosqueId).catch(() => []),
+      db.getGuestsByEvent(id, mosqueId).catch(() => []),
+      db.getPaymentsByEventId(id, mosqueId).catch(() => []),
+      db.getDonationsByEvent(id, mosqueId).catch(() => []),
+      db.getMosqueById(mosqueId).catch(() => null),
+      db.getServiceCollections(mosqueId, { eventId: id }).catch(() => []),
     ]);
 
   const collection = collections[0] ?? null;
@@ -93,7 +93,7 @@ export default async function ServiceReportPage({
     ? Number(collection.gasds_eligible_amount ?? 0)
     : 0;
 
-  const methodOrder: PaymentMethodGroup[] = ["cash", "churchpay", "other"];
+  const methodOrder: PaymentMethodGroup[] = ["cash", "mosquepay", "other"];
   const categoryOrder: CategoryKey[] = [
     "service_fee",
     "dining",
@@ -141,8 +141,8 @@ export default async function ServiceReportPage({
           <div className="flex items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold tracking-tight">
-                {church?.name ?? "Church"}
-                {church?.church_number ? ` No. ${church.church_number}` : ""}
+                {mosque?.name ?? "Mosque"}
+                {mosque?.mosque_number ? ` No. ${mosque.mosque_number}` : ""}
               </h1>
               <p className="mt-1 text-sm font-medium uppercase tracking-[0.18em] text-slate-500">
                 Service Treasurer&rsquo;s Report

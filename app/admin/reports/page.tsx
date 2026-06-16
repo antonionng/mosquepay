@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ReportsPage() {
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
     return (
       <div className="space-y-4">
         <h1 className="admin-page-title">Reports</h1>
@@ -27,7 +27,7 @@ export default async function ReportsPage() {
       </div>
     );
   }
-  const churchId = ctx.churchId;
+  const mosqueId = ctx.mosqueId;
 
   const [
     members,
@@ -40,15 +40,15 @@ export default async function ReportsPage() {
     campaigns,
     serviceCollections,
   ] = await Promise.all([
-    db.getMembers(churchId),
-    db.getNewcomers(churchId),
-    db.getEvents(churchId),
-    db.getPayments(churchId),
-    db.getMemberGiving(churchId),
-    db.getDonations(churchId),
-    db.getGiftAidDeclarations(churchId),
-    db.getCharityCampaigns(churchId),
-    db.getServiceCollections(churchId).catch(() => []),
+    db.getMembers(mosqueId),
+    db.getNewcomers(mosqueId),
+    db.getEvents(mosqueId),
+    db.getPayments(mosqueId),
+    db.getMemberGiving(mosqueId),
+    db.getDonations(mosqueId),
+    db.getGiftAidDeclarations(mosqueId),
+    db.getCharityCampaigns(mosqueId),
+    db.getServiceCollections(mosqueId).catch(() => []),
   ]);
 
   const rsvpsByEvent = new Map<string, Rsvp[]>();
@@ -57,9 +57,9 @@ export default async function ReportsPage() {
   await Promise.all(
     events.map(async (e) => {
       const [rsvps, notice, sends] = await Promise.all([
-        db.getRsvpsByEventId(e.id, churchId),
-        db.getServiceNotice(e.id, churchId),
-        db.listServiceNoticeSends(churchId, e.id, 200),
+        db.getRsvpsByEventId(e.id, mosqueId),
+        db.getServiceNotice(e.id, mosqueId),
+        db.listServiceNoticeSends(mosqueId, e.id, 200),
       ]);
       rsvpsByEvent.set(e.id, rsvps);
       noticeSendsByEvent.set(e.id, sends);
@@ -88,21 +88,21 @@ export default async function ReportsPage() {
   let operator: ReturnType<typeof buildOperatorReport> | null = null;
   if (isSupabaseConfigured()) {
     try {
-      const churches = await db.listChurches();
-      const membersByChurch = new Map<string, number>();
-      const upcomingByChurch = new Map<string, number>();
-      const paymentsLast30ByChurch = new Map<string, number>();
+      const mosques = await db.listMosques();
+      const membersByMosque = new Map<string, number>();
+      const upcomingByMosque = new Map<string, number>();
+      const paymentsLast30ByMosque = new Map<string, number>();
       const since = new Date().getTime() - 30 * 24 * 60 * 60 * 1000;
       await Promise.all(
-        churches.map(async (l) => {
+        mosques.map(async (l) => {
           const [m, e, p] = await Promise.all([
             db.getMembers(l.id),
             db.getEvents(l.id, { upcoming: true }),
             db.getPayments(l.id),
           ]);
-          membersByChurch.set(l.id, m.length);
-          upcomingByChurch.set(l.id, e.length);
-          paymentsLast30ByChurch.set(
+          membersByMosque.set(l.id, m.length);
+          upcomingByMosque.set(l.id, e.length);
+          paymentsLast30ByMosque.set(
             l.id,
             p
               .filter(
@@ -116,10 +116,10 @@ export default async function ReportsPage() {
         })
       );
       operator = buildOperatorReport({
-        churches,
-        membersByChurch,
-        upcomingByChurch,
-        paymentsLast30ByChurch,
+        mosques,
+        membersByMosque,
+        upcomingByMosque,
+        paymentsLast30ByMosque,
       });
     } catch (e) {
       console.error("Operator report failed", e);
@@ -128,7 +128,7 @@ export default async function ReportsPage() {
 
   return (
     <ReportsClient
-      churchName={ctx.churchSlug}
+      mosqueName={ctx.mosqueSlug}
       secretary={JSON.parse(JSON.stringify(secretary))}
       treasurer={JSON.parse(JSON.stringify(treasurer))}
       charity={JSON.parse(JSON.stringify(charity))}

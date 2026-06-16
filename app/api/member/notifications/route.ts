@@ -18,7 +18,7 @@ async function resolveMember() {
   if (!user || !user.email) return null;
   return (
     (await db.getMemberByAuthUserId(user.id)) ??
-    (await db.getMemberByEmailAcrossChurches(user.email))
+    (await db.getMemberByEmailAcrossMosques(user.email))
   );
 }
 

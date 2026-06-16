@@ -75,7 +75,7 @@ function Kpi({
 }
 
 export function ReportsClient({
-  churchName,
+  mosqueName,
   secretary,
   treasurer,
   charity,
@@ -83,7 +83,7 @@ export function ReportsClient({
   annualReturn,
   operator,
 }: {
-  churchName: string;
+  mosqueName: string;
   secretary: SecretaryReport;
   treasurer: TreasurerReport;
   charity: CharityReport;
@@ -99,7 +99,7 @@ export function ReportsClient({
         <div>
           <h1 className="admin-page-title">Reports</h1>
           <p className="admin-page-copy">
-            Role-focused operational reports for {churchName}.
+            Role-focused operational reports for {mosqueName}.
           </p>
         </div>
       </div>
@@ -818,7 +818,7 @@ function RecruitmentView({
                 {r.staleList.map((s) => (
                   <tr key={s.id} className="hover:bg-dash-surface-subtle/40">
                     <td className="px-4 py-3">
-                      <Link href={`/admin/newcomers/church/${s.id}`} className="hover:text-dash-ring">
+                      <Link href={`/admin/newcomers/mosque/${s.id}`} className="hover:text-dash-ring">
                         <p className="font-medium text-dash-text">{s.name}</p>
                         <p className="text-xs text-dash-muted">{s.email}</p>
                       </Link>
@@ -837,9 +837,9 @@ function RecruitmentView({
 }
 
 function OperatorView({ r }: { r: OperatorReport }) {
-  function exportChurches() {
+  function exportMosques() {
     downloadCsv(
-      "operator-churches.csv",
+      "operator-mosques.csv",
       [
         "Name",
         "Slug",
@@ -849,7 +849,7 @@ function OperatorView({ r }: { r: OperatorReport }) {
         "Payments (30d)",
         "Risk",
       ],
-      r.churchRows.map((l) => [
+      r.mosqueRows.map((l) => [
         l.name,
         l.slug,
         l.healthScore,
@@ -864,20 +864,20 @@ function OperatorView({ r }: { r: OperatorReport }) {
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="grid gap-4 sm:grid-cols-3">
-        <Kpi label="Churches" value={`${r.totalChurches}`} />
-        <Kpi label="Active" value={`${r.activeChurches}`} />
-        <Kpi label="Inactive" value={`${r.inactiveChurches}`} />
+        <Kpi label="Mosques" value={`${r.totalMosques}`} />
+        <Kpi label="Active" value={`${r.activeMosques}`} />
+        <Kpi label="Inactive" value={`${r.inactiveMosques}`} />
       </div>
 
       <Card variant="panel" className="overflow-hidden p-0">
         <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
           <div>
-            <h2 className="dash-panel-header-title">Church health</h2>
+            <h2 className="dash-panel-header-title">Mosque health</h2>
             <p className="dash-panel-header-description">
               Composite score from membership, upcoming services, and recent payments.
             </p>
           </div>
-          <Button variant="dashboard" size="sm" onClick={exportChurches}>
+          <Button variant="dashboard" size="sm" onClick={exportMosques}>
             <Download className="mr-1.5 h-4 w-4" /> CSV
           </Button>
         </div>
@@ -885,7 +885,7 @@ function OperatorView({ r }: { r: OperatorReport }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-dash-border bg-dash-surface-subtle text-left text-xs uppercase tracking-wider text-dash-muted">
-                <th className="px-4 py-3">Church</th>
+                <th className="px-4 py-3">Mosque</th>
                 <th className="px-4 py-3 text-right">Members</th>
                 <th className="px-4 py-3 text-right">Upcoming</th>
                 <th className="px-4 py-3 text-right">Payments (30d)</th>
@@ -894,10 +894,10 @@ function OperatorView({ r }: { r: OperatorReport }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-dash-border">
-              {r.churchRows.map((l) => (
+              {r.mosqueRows.map((l) => (
                 <tr key={l.id} className="hover:bg-dash-surface-subtle/40">
                   <td className="px-4 py-3">
-                    <Link href={`/operator/churches/${l.slug}`} className="hover:text-dash-ring">
+                    <Link href={`/operator/mosques/${l.slug}`} className="hover:text-dash-ring">
                       <p className="font-medium text-dash-text">{l.name}</p>
                       <p className="text-xs text-dash-muted">{l.slug}</p>
                     </Link>

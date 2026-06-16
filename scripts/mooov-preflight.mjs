@@ -87,9 +87,9 @@ async function main() {
     amount: amountMinor,
     currency: "GBP",
     flow: "redirect",
-    success_url: "https://www.churchpay.co.uk/admin/integrations?preflight=ok",
-    cancel_url: "https://www.churchpay.co.uk/admin/integrations?preflight=cancel",
-    description: "ChurchPay charge-capability preflight (not a real charge intent)",
+    success_url: "https://www.mosque-pay.com/admin/integrations?preflight=ok",
+    cancel_url: "https://www.mosque-pay.com/admin/integrations?preflight=cancel",
+    description: "MosquePay charge-capability preflight (not a real charge intent)",
   };
   const raw = JSON.stringify(body);
   const ts = mooovTimestamp();

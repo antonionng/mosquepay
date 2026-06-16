@@ -10,14 +10,14 @@ import {
 import { marketingMetadata } from "@/lib/seo";
 
 export const metadata = marketingMetadata({
-  title: "Pricing | ChurchPay Plans for Churches and Networks",
+  title: "Pricing | MosquePay Plans for Mosques and Networks",
   description:
-    "Simple ChurchPay pricing for UK churches: Essentials from £149/mo, Complete from £229/mo, Group from £349/mo, and Network rollouts. Giving, Gift Aid, websites, member records, and reporting included.",
+    "Simple MosquePay pricing for UK mosques: Essentials from £149/mo, Complete from £229/mo, Group from £349/mo, and Network rollouts. Giving, Gift Aid, websites, member records, and reporting included.",
   path: "/pricing",
   keywords: [
-    "church software pricing",
-    "church giving platform cost",
-    "church management software price",
+    "mosque software pricing",
+    "mosque giving platform cost",
+    "mosque management software price",
     "Gift Aid software pricing",
   ],
 });
@@ -26,12 +26,12 @@ const FEE_POINTS = [
   {
     Icon: Banknote,
     title: "Provider rates only",
-    body: "You pay only your payment provider's standard card processing rates per transaction — the same as taking a card payment anywhere else. Nothing extra for using ChurchPay.",
+    body: "You pay only your payment provider's standard card processing rates per transaction — the same as taking a card payment anywhere else. Nothing extra for using MosquePay.",
   },
   {
     Icon: Landmark,
     title: "Settled to your account",
-    body: "Gifts and payments settle directly to your church's own bank account. Your money never sits in ours.",
+    body: "Gifts and payments settle directly to your mosque's own bank account. Your money never sits in ours.",
   },
   {
     Icon: ShieldCheck,
@@ -47,15 +47,15 @@ const PRICING_FAQS = [
   },
   {
     q: "What about payment processing fees?",
-    a: "See the transaction fees section above. Short version: you pay only your payment provider's standard card rates, and ChurchPay adds no markup.",
+    a: "See the transaction fees section above. Short version: you pay only your payment provider's standard card rates, and MosquePay adds no markup.",
   },
   {
     q: "Can we change plans later?",
     a: "Yes. Upgrade or downgrade at any time; we pro-rate the difference on your next invoice.",
   },
   {
-    q: "Do you offer discounts for small churches or charities?",
-    a: "If your congregation is small or your budget is tight, talk to us. We would rather find a number that works than see a church stay on spreadsheets.",
+    q: "Do you offer discounts for small mosques or charities?",
+    a: "If your congregation is small or your budget is tight, talk to us. We would rather find a number that works than see a mosque stay on spreadsheets.",
   },
 ];
 
@@ -66,11 +66,11 @@ export default function PricingPage() {
         <div className="mx-auto max-w-7xl text-center">
           <MarketingKicker>Pricing</MarketingKicker>
           <h1 className="mx-auto mt-4 max-w-3xl font-heading text-4xl font-bold leading-tight tracking-tight text-slate-900 sm:text-5xl">
-            Simple plans for churches and networks.
+            Simple plans for mosques and networks.
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-slate-600">
-            Every plan includes giving, Gift Aid, your church website, member records, and
-            support from a team that knows UK church administration.
+            Every plan includes giving, Gift Aid, your mosque website, member records, and
+            support from a team that knows UK mosque administration.
           </p>
           <p className="mx-auto mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800">
             <Check className="h-4 w-4 text-emerald-600" />
@@ -141,7 +141,7 @@ export default function PricingPage() {
         <div className="mx-auto max-w-2xl text-center">
           <MarketingKicker>Transaction fees</MarketingKicker>
           <h2 className="mt-4 font-heading text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-            ChurchPay adds no markup on transactions.
+            MosquePay adds no markup on transactions.
           </h2>
           <p className="mt-4 text-base leading-7 text-slate-600">
             The first question every treasurer asks, answered up front. Your subscription is
@@ -182,7 +182,7 @@ export default function PricingPage() {
 
       <MarketingCtaBand
         title="Not sure which plan fits?"
-        body="Tell us about your church, your congregation size, giving setup, and how many sites, and we'll recommend the right starting point. No pressure, no lock-in."
+        body="Tell us about your mosque, your congregation size, giving setup, and how many sites, and we'll recommend the right starting point. No pressure, no lock-in."
         ctaLabel="Talk to us"
         ctaHref="/contact"
         secondaryLabel="Book a demo"

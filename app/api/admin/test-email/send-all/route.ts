@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   const from =
     process.env.RESEND_FROM_EMAIL ??
     process.env.EMAIL_FROM ??
-    "ChurchPay <noreply@churchpayment.com>";
+    "MosquePay <noreply@mosque-pay.com>";
 
   const results: Array<{ type: string; success: boolean; messageId?: string; error?: string }> = [];
 
@@ -41,22 +41,22 @@ export async function POST(req: NextRequest) {
   try {
     const html = renderSimpleMessageEmail({
       eyebrow: "Welcome",
-      title: "Welcome to ChurchPay",
-      preview: "Your church management platform is ready.",
+      title: "Welcome to MosquePay",
+      preview: "Your mosque management platform is ready.",
       greeting: "Hello there,",
       paragraphs: [
-        "Thank you for choosing ChurchPay for your church management needs.",
-        "With ChurchPay, you can manage member records, process donations, track giving, and communicate with your congregation all in one place.",
-        "We are committed to helping churches operate more efficiently while maintaining the highest standards of data security and privacy.",
+        "Thank you for choosing MosquePay for your mosque management needs.",
+        "With MosquePay, you can manage member records, process donations, track giving, and communicate with your congregation all in one place.",
+        "We are committed to helping mosques operate more efficiently while maintaining the highest standards of data security and privacy.",
       ],
-      cta: { label: "Get Started", href: "https://churchpayment.com" },
+      cta: { label: "Get Started", href: "https://mosque-pay.com" },
       note: "If you have any questions, our support team is here to help. Simply reply to this email or visit our help center.",
     });
 
     const { data, error } = await resend.emails.send({
       from,
       to,
-      subject: "Welcome to ChurchPay - Test Email",
+      subject: "Welcome to MosquePay - Test Email",
       html,
     });
 
@@ -79,8 +79,8 @@ export async function POST(req: NextRequest) {
     const html = renderNotificationEmail({
       eyebrow: "Donation Received",
       title: "New Donation Notification",
-      preview: "A new donation has been received for your church.",
-      intro: "A new donation has been processed through ChurchPay.",
+      preview: "A new donation has been received for your mosque.",
+      intro: "A new donation has been processed through MosquePay.",
       rows: [
         { label: "Donor", value: "John Smith" },
         { label: "Amount", value: "£50.00" },
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
         { label: "Date", value: new Date().toLocaleDateString("en-GB") },
         { label: "Reference", value: "DON-2026-001234" },
       ],
-      message: "Thank you for your generous contribution to our church community.",
+      message: "Thank you for your generous contribution to our mosque community.",
     });
 
     const { data, error } = await resend.emails.send({
@@ -117,8 +117,8 @@ export async function POST(req: NextRequest) {
     const html = renderStaffInviteEmail({
       name: "Sarah Johnson",
       roleLabel: "Treasurer",
-      churchName: "St. Mary's Church",
-      actionUrl: "https://churchpayment.com/admin/accept-invite",
+      mosqueName: "St. Mary's Mosque",
+      actionUrl: "https://mosque-pay.com/admin/accept-invite",
       actionLabel: "Accept Invitation",
     });
 
@@ -147,8 +147,8 @@ export async function POST(req: NextRequest) {
   try {
     const html = renderMemberInviteEmail({
       name: "Michael Brown",
-      churchName: "St. Mary's Church",
-      actionUrl: "https://churchpayment.com/member/accept-invite",
+      mosqueName: "St. Mary's Mosque",
+      actionUrl: "https://mosque-pay.com/member/accept-invite",
       actionLabel: "Access Member Portal",
     });
 
@@ -177,10 +177,10 @@ export async function POST(req: NextRequest) {
   try {
     const html = renderGivingReminderEmail({
       memberName: "David Wilson",
-      churchName: "St. Mary's Church",
+      mosqueName: "St. Mary's Mosque",
       amountDue: "£120.00",
       dueDate: "30th June 2026",
-      portalUrl: "https://churchpayment.com/member/giving",
+      portalUrl: "https://mosque-pay.com/member/giving",
       reminderNumber: 1,
     });
 

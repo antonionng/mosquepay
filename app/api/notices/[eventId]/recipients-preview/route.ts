@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import { buildRecipientsPreview } from "@/lib/fees/recipients-preview";
 
 type Params = { params: Promise<{ eventId: string }> };
@@ -17,12 +17,12 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   try {
     const { eventId } = await params;
-    const churchSlug = getChurchSlugFromRequest(request);
-    const churchId = await db.resolveChurchId(churchSlug);
-    if (!churchId) {
-      return NextResponse.json({ error: "Church not found." }, { status: 404 });
+    const mosqueSlug = getMosqueSlugFromRequest(request);
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("notice:write", churchId);
+    const forbidden = await requireAdminApiPermission("notice:write", mosqueId);
     if (forbidden) return forbidden;
 
     const url = new URL(request.url);
@@ -32,12 +32,12 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     const [event, members, honoraryGuests, defaults, notice, overrides] =
       await Promise.all([
-        db.getEventById(eventId, churchId),
-        db.getMembers(churchId, { status: "active" }),
-        db.listHonoraryGuests(churchId),
-        db.getChurchFeeDefaults(churchId),
-        db.getServiceNotice(eventId, churchId),
-        db.listEventFeeOverrides(churchId, eventId),
+        db.getEventById(eventId, mosqueId),
+        db.getMembers(mosqueId, { status: "active" }),
+        db.listHonoraryGuests(mosqueId),
+        db.getMosqueFeeDefaults(mosqueId),
+        db.getServiceNotice(eventId, mosqueId),
+        db.listEventFeeOverrides(mosqueId, eventId),
       ]);
 
     if (!event) {
@@ -87,21 +87,21 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   try {
     const { eventId } = await params;
-    const churchSlug = getChurchSlugFromRequest(request);
-    const churchId = await db.resolveChurchId(churchSlug);
-    if (!churchId) {
-      return NextResponse.json({ error: "Church not found." }, { status: 404 });
+    const mosqueSlug = getMosqueSlugFromRequest(request);
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("notice:write", churchId);
+    const forbidden = await requireAdminApiPermission("notice:write", mosqueId);
     if (forbidden) return forbidden;
 
     const body = await request.json().catch(() => ({}));
 
-    const existing = await db.getServiceNotice(eventId, churchId);
+    const existing = await db.getServiceNotice(eventId, mosqueId);
     let notice = existing ?? null;
     if (Object.prototype.hasOwnProperty.call(body, "include_honorary_guests")) {
       const includeHonoraryGuests = body.include_honorary_guests !== false;
-      notice = await db.upsertServiceNotice(churchId, eventId, {
+      notice = await db.upsertServiceNotice(mosqueId, eventId, {
         ...(existing ?? {}),
         include_honorary_guests: includeHonoraryGuests,
       });
@@ -112,7 +112,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       Object.prototype.hasOwnProperty.call(body, "dining_waived_for_all")
     ) {
       const flag = body.dining_waived_for_all === true;
-      event = await db.updateEvent(eventId, churchId, {
+      event = await db.updateEvent(eventId, mosqueId, {
         dining_waived_for_all: flag,
       });
     }

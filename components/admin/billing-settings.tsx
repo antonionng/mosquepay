@@ -43,9 +43,9 @@ type BillingErrorResponse = {
 };
 
 const FEATURE_LABELS: Record<string, string> = {
-  site_builder: "Public church website",
+  site_builder: "Public mosque website",
   member_portal: "Member portal and PWA",
-  digital_church_card: "Digital church card",
+  digital_mosque_card: "Digital mosque card",
   payments: "Mooov payments and reconciliation",
   giving: "Giving and reminders",
   gift_aid: "Gift Aid reporting",
@@ -63,8 +63,8 @@ const FEATURE_LABELS: Record<string, string> = {
   audit: "Audit trail",
   bulk_import: "Bulk member import",
   advanced_members: "Advanced member fields",
-  multi_church: "Multiple churches",
-  cross_church_reporting: "Cross-church reporting",
+  multi_mosque: "Multiple mosques",
+  cross_mosque_reporting: "Cross-mosque reporting",
   central_billing: "Central billing",
   network_dashboards: "Network dashboards",
   migration_planning: "Migration planning",

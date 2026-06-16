@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error:
-          "Monthly instalments are coming soon. Please pay in full or contact your church secretary.",
+          "Monthly instalments are coming soon. Please pay in full or contact your mosque secretary.",
         code: "subscription_not_enabled",
       },
       { status: 503 },
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Same row-derived tenant resolution we use on /api/giving/pay so the
-  // preview cannot disagree about the church.
+  // preview cannot disagree about the mosque.
   let supa: ReturnType<typeof createServiceClient>;
   try {
     supa = createServiceClient();
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
   }
 
   const planResult = await computeEnrolmentPlan({
-    churchId: givingRecord.church_id,
+    mosqueId: givingRecord.mosque_id,
     givingRecord,
     memberEmail,
     strategy: body.split_strategy,
@@ -163,9 +163,9 @@ export async function POST(request: NextRequest) {
       strategy: plan.strategy,
       strategyDescription: describeStrategy(plan.strategy, plan.yearPosition),
       autoRenew: plan.autoRenew,
-      yearLabel: plan.churchYear.label,
-      yearStartDate: plan.churchYear.start_date,
-      yearEndDate: plan.churchYear.end_date,
+      yearLabel: plan.mosqueYear.label,
+      yearStartDate: plan.mosqueYear.start_date,
+      yearEndDate: plan.mosqueYear.end_date,
       cycleCount: plan.schedule.cycleCount,
       firstCycleAmount: plan.schedule.firstCycleAmount,
       total: plan.schedule.total,

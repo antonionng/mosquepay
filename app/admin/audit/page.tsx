@@ -14,7 +14,7 @@ const ENTITY_PATHS: Record<string, (id: string) => string> = {
   pastoral_register: () => `/admin/pastoral_care`,
   pastoral_alert: () => `/admin/pastoral_care`,
   member: (id) => `/admin/members/${id}`,
-  newcomer: (id) => `/admin/newcomers/church/${id}`,
+  newcomer: (id) => `/admin/newcomers/mosque/${id}`,
   event: (id) => `/admin/events/${id}`,
   blog_post: (id) => `/admin/blog/${id}`,
   charity_campaign: (id) => `/admin/charity/${id}`,
@@ -31,7 +31,7 @@ function entityHref(entityType: string, entityId: string | null): string | null 
 export default async function AdminAuditPage() {
   const ctx = await getAdminReadContext();
   const logs =
-    ctx.mode === "database" && ctx.churchId ? await db.listAuditLogs(ctx.churchId, 150) : [];
+    ctx.mode === "database" && ctx.mosqueId ? await db.listAuditLogs(ctx.mosqueId, 150) : [];
 
   return (
     <div className="space-y-5 sm:space-y-8">

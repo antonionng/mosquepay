@@ -33,7 +33,7 @@ export function NewNewcomerClient() {
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Could not create newcomer.");
-      router.push(`/admin/newcomers/church/${body.id}`);
+      router.push(`/admin/newcomers/mosque/${body.id}`);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create newcomer.");

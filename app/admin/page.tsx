@@ -47,39 +47,39 @@ const kpiAccentIcon: Record<
 export default async function AdminDashboardPage() {
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
-  const churchId = ctx.mode === "database" ? ctx.churchId : null;
+  const mosqueId = ctx.mode === "database" ? ctx.mosqueId : null;
 
   const newcomers = useMock
     ? mockDb.getNewcomers()
-    : churchId
-      ? await db.getNewcomers(churchId)
+    : mosqueId
+      ? await db.getNewcomers(mosqueId)
       : [];
   const allEvents = useMock
     ? mockDb.getEvents({ published: true })
-    : churchId
-      ? await db.getEvents(churchId, { published: true })
+    : mosqueId
+      ? await db.getEvents(mosqueId, { published: true })
       : [];
   const upcomingEvents = useMock
     ? mockDb.getEvents({ published: true, upcoming: true })
-    : churchId
-      ? await db.getEvents(churchId, { published: true, upcoming: true })
+    : mosqueId
+      ? await db.getEvents(mosqueId, { published: true, upcoming: true })
       : [];
   const payments = useMock
     ? mockDb.getPayments()
-    : churchId
-      ? await db.getPayments(churchId)
+    : mosqueId
+      ? await db.getPayments(mosqueId)
       : [];
   const succeededPayments = payments.filter((p) => p.status === "succeeded");
   const blogPosts = useMock
     ? mockDb.getBlogPosts()
-    : churchId
-      ? await db.getBlogPosts(churchId)
+    : mosqueId
+      ? await db.getBlogPosts(mosqueId)
       : [];
   const publishedPosts = blogPosts.filter((p) => p.published);
   const campaigns = useMock
     ? mockDb.getCharityCampaigns()
-    : churchId
-      ? await db.getCharityCampaigns(churchId)
+    : mosqueId
+      ? await db.getCharityCampaigns(mosqueId)
       : [];
   const activeCampaigns = campaigns.filter((c) => c.status === "active");
 
@@ -87,8 +87,8 @@ export default async function AdminDashboardPage() {
   for (const event of upcomingEvents) {
     const rsvps = useMock
       ? mockDb.getRsvpsByEventId(event.id)
-      : churchId
-        ? await db.getRsvpsByEventId(event.id, churchId)
+      : mosqueId
+        ? await db.getRsvpsByEventId(event.id, mosqueId)
         : [];
     rsvpData[event.id] = rsvps.map((r) => ({
       payment_completed: r.payment_completed,
@@ -211,7 +211,7 @@ export default async function AdminDashboardPage() {
         <div>
           <h1 className="admin-page-title">Dashboard</h1>
           <p className="admin-page-copy">
-            Church pipeline, events, and payments in one place. Same data as your CRM and checkout.
+            Mosque pipeline, events, and payments in one place. Same data as your CRM and checkout.
           </p>
         </div>
       </div>

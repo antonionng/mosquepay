@@ -3,11 +3,11 @@
 // Used by both /api/admin/take-payment (QR) and /api/admin/take-payment/cash.
 // Handles three flavours of payer:
 //
-//   1. Member         — `member_id` set; resolves Churchpay member + GA decl.
+//   1. Member         — `member_id` set; resolves Mosquepay member + GA decl.
 //   2. Existing guest — `guest_id` set; resolves the guest directory row.
 //   3. Inline guest   — `guest_inline = { full_name, email?, phone?, … }`;
 //                       upserts into the guest directory (matches by email
-//                       first, then name + mother church) so repeated visits
+//                       first, then name + mother mosque) so repeated visits
 //                       attach to the same record.
 //   4. Anonymous      — none of the above; payer attribution is null.
 //
@@ -27,8 +27,8 @@ export type Attribution = {
   payerName: string | null;
   payerEmail: string | null;
   payerPhone: string | null;
-  motherChurchName: string | null;
-  motherChurchNumber: string | null;
+  motherMosqueName: string | null;
+  motherMosqueNumber: string | null;
   giftAidDeclarationId: string | null;
   giftAidEligible: boolean;
   giftAidRefused: boolean;
@@ -38,8 +38,8 @@ export type GuestInlineInput = {
   full_name: string;
   email?: string | null;
   phone?: string | null;
-  mother_church_name?: string | null;
-  mother_church_number?: string | null;
+  mother_mosque_name?: string | null;
+  mother_mosque_number?: string | null;
 };
 
 export type ResolveInput = {
@@ -55,15 +55,15 @@ const EMPTY: Attribution = {
   payerName: null,
   payerEmail: null,
   payerPhone: null,
-  motherChurchName: null,
-  motherChurchNumber: null,
+  motherMosqueName: null,
+  motherMosqueNumber: null,
   giftAidDeclarationId: null,
   giftAidEligible: false,
   giftAidRefused: false,
 };
 
 async function resolveGiftAid(
-  churchId: string,
+  mosqueId: string,
   email: string | null,
 ): Promise<{
   giftAidDeclarationId: string | null;
@@ -74,7 +74,7 @@ async function resolveGiftAid(
   }
   try {
     const declaration = await db.getActiveGiftAidDeclarationByEmail(
-      churchId,
+      mosqueId,
       email,
     );
     if (declaration) {
@@ -87,7 +87,7 @@ async function resolveGiftAid(
     console.warn(
       "take-payment attribution: gift aid declaration lookup failed",
       {
-        church_id: churchId,
+        mosque_id: mosqueId,
         email,
         message: err instanceof Error ? err.message : String(err),
       },
@@ -97,7 +97,7 @@ async function resolveGiftAid(
 }
 
 export async function resolveTakePaymentAttribution(
-  churchId: string,
+  mosqueId: string,
   input: ResolveInput | string | null | undefined,
 ): Promise<Attribution> {
   // Backwards-compatible signature: callers used to pass a raw memberId
@@ -110,12 +110,12 @@ export async function resolveTakePaymentAttribution(
   // 1. Member path.
   if (normalised.memberId) {
     try {
-      const member = await db.getMemberById(normalised.memberId, churchId);
+      const member = await db.getMemberById(normalised.memberId, mosqueId);
       if (member) {
         const giftAidRefused = member.gift_aid_consent_status === "declined";
         const ga = giftAidRefused
           ? { giftAidDeclarationId: null, giftAidEligible: false }
-          : await resolveGiftAid(churchId, member.email ?? null);
+          : await resolveGiftAid(mosqueId, member.email ?? null);
         return {
           kind: "member",
           memberId: normalised.memberId,
@@ -123,15 +123,15 @@ export async function resolveTakePaymentAttribution(
           payerName: member.full_name ?? null,
           payerEmail: member.email ?? null,
           payerPhone: null,
-          motherChurchName: null,
-          motherChurchNumber: null,
+          motherMosqueName: null,
+          motherMosqueNumber: null,
           giftAidRefused,
           ...ga,
         };
       }
     } catch (err) {
       console.warn("take-payment attribution: member lookup failed", {
-        church_id: churchId,
+        mosque_id: mosqueId,
         member_id: normalised.memberId,
         message: err instanceof Error ? err.message : String(err),
       });
@@ -142,12 +142,12 @@ export async function resolveTakePaymentAttribution(
   // 2. Existing guest path.
   if (normalised.guestId) {
     try {
-      const guest = await db.getGuestById(normalised.guestId, churchId);
+      const guest = await db.getGuestById(normalised.guestId, mosqueId);
       if (guest) {
         const giftAidRefused = guest.gift_aid_consent_status === "declined";
         const ga = giftAidRefused
           ? { giftAidDeclarationId: null, giftAidEligible: false }
-          : await resolveGiftAid(churchId, guest.email ?? null);
+          : await resolveGiftAid(mosqueId, guest.email ?? null);
         return {
           kind: "guest",
           memberId: null,
@@ -155,15 +155,15 @@ export async function resolveTakePaymentAttribution(
           payerName: guest.full_name,
           payerEmail: guest.email ?? null,
           payerPhone: guest.phone ?? null,
-          motherChurchName: guest.mother_church_name ?? null,
-          motherChurchNumber: guest.mother_church_number ?? null,
+          motherMosqueName: guest.mother_mosque_name ?? null,
+          motherMosqueNumber: guest.mother_mosque_number ?? null,
           giftAidRefused,
           ...ga,
         };
       }
     } catch (err) {
       console.warn("take-payment attribution: guest lookup failed", {
-        church_id: churchId,
+        mosque_id: mosqueId,
         guest_id: normalised.guestId,
         message: err instanceof Error ? err.message : String(err),
       });
@@ -173,29 +173,29 @@ export async function resolveTakePaymentAttribution(
 
   // 3. Inline guest — find-or-create, then attribute. Find-by-email first
   // because a single guest can change name styling but rarely changes email;
-  // fall back to name + mother church so a repeat in-person newcomer without
+  // fall back to name + mother mosque so a repeat in-person newcomer without
   // an email doesn't get duplicated each time.
   if (normalised.guestInline && normalised.guestInline.full_name) {
     const inline = normalised.guestInline;
     try {
       let guest = null;
       if (inline.email) {
-        guest = await db.findGuestByEmail(churchId, inline.email);
+        guest = await db.findGuestByEmail(mosqueId, inline.email);
       }
       if (!guest) {
-        guest = await db.findGuestByNameAndChurch(
-          churchId,
+        guest = await db.findGuestByNameAndMosque(
+          mosqueId,
           inline.full_name,
-          inline.mother_church_name ?? null,
+          inline.mother_mosque_name ?? null,
         );
       }
       if (!guest) {
-        guest = await db.createGuest(churchId, {
+        guest = await db.createGuest(mosqueId, {
           full_name: inline.full_name,
           email: inline.email ?? null,
           phone: inline.phone ?? null,
-          mother_church_name: inline.mother_church_name ?? null,
-          mother_church_number: inline.mother_church_number ?? null,
+          mother_mosque_name: inline.mother_mosque_name ?? null,
+          mother_mosque_number: inline.mother_mosque_number ?? null,
           is_member: true,
           source: "admin",
           guest_category: "guest",
@@ -205,7 +205,7 @@ export async function resolveTakePaymentAttribution(
         const giftAidRefused = guest.gift_aid_consent_status === "declined";
         const ga = giftAidRefused
           ? { giftAidDeclarationId: null, giftAidEligible: false }
-          : await resolveGiftAid(churchId, guest.email ?? null);
+          : await resolveGiftAid(mosqueId, guest.email ?? null);
         return {
           kind: "guest",
           memberId: null,
@@ -213,15 +213,15 @@ export async function resolveTakePaymentAttribution(
           payerName: guest.full_name,
           payerEmail: guest.email ?? null,
           payerPhone: guest.phone ?? null,
-          motherChurchName: guest.mother_church_name ?? null,
-          motherChurchNumber: guest.mother_church_number ?? null,
+          motherMosqueName: guest.mother_mosque_name ?? null,
+          motherMosqueNumber: guest.mother_mosque_number ?? null,
           giftAidRefused,
           ...ga,
         };
       }
     } catch (err) {
       console.warn("take-payment attribution: inline guest upsert failed", {
-        church_id: churchId,
+        mosque_id: mosqueId,
         full_name: inline.full_name,
         message: err instanceof Error ? err.message : String(err),
       });
@@ -233,8 +233,8 @@ export async function resolveTakePaymentAttribution(
       payerName: inline.full_name,
       payerEmail: inline.email ?? null,
       payerPhone: inline.phone ?? null,
-      motherChurchName: inline.mother_church_name ?? null,
-      motherChurchNumber: inline.mother_church_number ?? null,
+      motherMosqueName: inline.mother_mosque_name ?? null,
+      motherMosqueNumber: inline.mother_mosque_number ?? null,
     };
   }
 

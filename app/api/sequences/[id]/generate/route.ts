@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -59,15 +59,15 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   try {
     const { id } = await params;
-    const churchSlug = getChurchSlugFromRequest(request);
-    const churchId = await db.resolveChurchId(churchSlug);
-    if (!churchId) {
-      return NextResponse.json({ error: "Church not found." }, { status: 404 });
+    const mosqueSlug = getMosqueSlugFromRequest(request);
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("services:write", churchId);
+    const forbidden = await requireAdminApiPermission("services:write", mosqueId);
     if (forbidden) return forbidden;
 
-    const sequence = await db.getServiceSequenceById(id, churchId);
+    const sequence = await db.getServiceSequenceById(id, mosqueId);
     if (!sequence) {
       return NextResponse.json(
         { error: "Sequence not found." },
@@ -98,9 +98,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ created: [], skipped: [] });
     }
 
-    const existingEvents = await db.getEvents(churchId);
+    const existingEvents = await db.getEvents(mosqueId);
     const existingSlugs = new Set(existingEvents.map((event) => event.slug));
-    const existingForSequence = await db.getEventsBySequenceId(id, churchId);
+    const existingForSequence = await db.getEventsBySequenceId(id, mosqueId);
     const datesAlreadyTaken = new Set(
       existingForSequence.map((event) => event.event_date.slice(0, 10))
     );
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       );
       existingSlugs.add(slug);
 
-      const event = await db.addEvent(churchId, {
+      const event = await db.addEvent(mosqueId, {
         title: `${sequence.name} (${MONTH_SHORT[newcomer.month]?.toUpperCase() ?? newcomer.month} ${newcomer.year})`,
         slug,
         description: sequence.description,
@@ -180,7 +180,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     await writeAuditLog({
-      churchId,
+      mosqueId,
       action: "generated",
       entityType: "service_sequence",
       entityId: sequence.id,

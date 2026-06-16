@@ -3,7 +3,7 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import { requireAdminApiAuth } from "@/lib/auth/api";
 
 export async function PATCH(
@@ -18,7 +18,7 @@ export async function PATCH(
     if (unauthorized) return unauthorized;
 
     const { id } = await params;
-    const churchSlug = getChurchSlugFromRequest(request);
+    const mosqueSlug = getMosqueSlugFromRequest(request);
     const body = await request.json();
     const updates: Record<string, unknown> = {};
     if (typeof body.completed === "boolean") updates.completed = body.completed;
@@ -36,11 +36,11 @@ export async function PATCH(
     }
 
     if (isSupabaseConfigured()) {
-      const churchId = await db.resolveChurchId(churchSlug);
-      if (!churchId) {
-        return NextResponse.json({ error: "Church not found." }, { status: 404 });
+      const mosqueId = await db.resolveMosqueId(mosqueSlug);
+      if (!mosqueId) {
+        return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
       }
-      const activity = await db.updateNewcomerActivity(id, churchId, updates);
+      const activity = await db.updateNewcomerActivity(id, mosqueId, updates);
       if (!activity) {
         return NextResponse.json({ error: "Activity not found." }, { status: 404 });
       }
@@ -48,7 +48,7 @@ export async function PATCH(
     }
 
     const activity = mockDb.updateNewcomerActivity(id, updates, {
-      church_slug: churchSlug,
+      mosque_slug: mosqueSlug,
     });
     if (!activity) {
       return NextResponse.json({ error: "Activity not found." }, { status: 404 });

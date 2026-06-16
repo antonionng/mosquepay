@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { defaultChurchYearBounds } from "@/lib/giving/pro-rata";
+import { defaultMosqueYearBounds } from "@/lib/giving/pro-rata";
 
-type ChurchYear = {
+type MosqueYear = {
   id?: string;
   label: string;
   start_date: string;
@@ -17,9 +17,9 @@ type ChurchYear = {
   is_current: boolean;
 };
 
-export function ChurchYearSettings() {
-  const fallback = defaultChurchYearBounds();
-  const [year, setYear] = useState<ChurchYear>({
+export function MosqueYearSettings() {
+  const fallback = defaultMosqueYearBounds();
+  const [year, setYear] = useState<MosqueYear>({
     label: fallback.label,
     start_date: fallback.startDate,
     end_date: fallback.endDate,
@@ -109,7 +109,7 @@ export function ChurchYearSettings() {
               Giving year
             </h2>
             <p className="dash-panel-header-description">
-              Define the church year for annual giving and pro rata calculations when members join
+              Define the mosque year for annual giving and pro rata calculations when members join
               mid-year.
             </p>
           </div>

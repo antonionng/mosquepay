@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -19,16 +19,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("members:write", churchId);
+  const forbidden = await requireAdminApiPermission("members:write", mosqueId);
   if (forbidden) return forbidden;
 
   const body = await request.json();
-  const subject: string = body.subject ?? "Church update";
+  const subject: string = body.subject ?? "Mosque update";
   const html: string = body.html_body ?? "";
   const audience: "active_members" | "all_members" | "newcomers" =
     body.audience ?? "active_members";
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
   const recipientName =
     typeof body.recipient_name === "string" ? body.recipient_name.trim() : "";
 
-  const church = await db.getChurchById(churchId);
+  const mosque = await db.getMosqueById(mosqueId);
   let recipients: Awaited<ReturnType<typeof sendBatch>> | null = null;
 
   if (recipientEmail) {
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
           last_name: name.split(/\s+/).slice(1).join(" "),
           full_name: name,
           email: recipientEmail,
-          church_name: church?.name ?? "the church",
+          mosque_name: mosque?.name ?? "the mosque",
         },
       },
     ];
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       });
     }
     recipients = await sendBatch({
-      churchId,
+      mosqueId,
       templateKey,
       subject,
       htmlBody: html,
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     });
   } else if (audience === "newcomers") {
 
-    const newcomers = await db.getNewcomers(churchId);
+    const newcomers = await db.getNewcomers(mosqueId);
     const list = newcomers
       .filter((l) => l.email)
       .map((newcomer) => {
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
             last_name: newcomer.last_name ?? "",
             full_name: fullName,
             email: newcomer.email,
-            church_name: church?.name ?? "the church",
+            mosque_name: mosque?.name ?? "the mosque",
           },
         };
       });
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
       });
     }
     recipients = await sendBatch({
-      churchId,
+      mosqueId,
       templateKey,
       subject,
       htmlBody: html,
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
       audienceLabel: "newcomers",
     });
   } else {
-    const allMembers = await db.getMembers(churchId);
+    const allMembers = await db.getMembers(mosqueId);
     const filtered =
       audience === "active_members"
         ? allMembers.filter((m) => m.membership_status === "active")
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
       name: member.full_name,
       member_id: member.id,
       newcomer_id: null,
-      context: buildMemberContext(member, church),
+      context: buildMemberContext(member, mosque),
     }));
     if (dryRun) {
       return NextResponse.json({
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
       });
     }
     recipients = await sendBatch({
-      churchId,
+      mosqueId,
       templateKey,
       subject,
       htmlBody: html,
@@ -141,10 +141,10 @@ export async function POST(request: NextRequest) {
   }
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "newsletter_sent",
     entityType: "newsletter",
-    entityId: churchId,
+    entityId: mosqueId,
     summary: `Sent ${recipients.sent} newsletter emails`,
     metadata: {
       audience,

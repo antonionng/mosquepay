@@ -4,7 +4,7 @@
 // Mooov payment_intent for an arbitrary amount + description, returns the
 // hosted_url so the iPad client can render it as a QR for a guest to scan.
 //
-// Auth: admin with payments:write on the active church.
+// Auth: admin with payments:write on the active mosque.
 // Persistence: writes a preflight mooov.payment_attempts row with
 // intent='take_payment' so the Mooov webhook handler projects success into
 // public.payments the same way it does for any other channel.
@@ -47,8 +47,8 @@ function parseGuestInline(value: unknown): GuestInlineInput | null {
     full_name,
     email: trimOrNull(v.email),
     phone: trimOrNull(v.phone),
-    mother_church_name: trimOrNull(v.mother_church_name),
-    mother_church_number: trimOrNull(v.mother_church_number),
+    mother_mosque_name: trimOrNull(v.mother_mosque_name),
+    mother_mosque_number: trimOrNull(v.mother_mosque_number),
   };
 }
 
@@ -65,13 +65,13 @@ interface PaymentIntentResponse {
 
 async function loadMooovMerchant(
   supa: ReturnType<typeof createServiceClient>,
-  churchId: string,
+  mosqueId: string,
 ): Promise<string | null> {
   const { data, error } = await supa
     .schema("mooov")
-    .from("churches")
+    .from("mosques")
     .select("merchant_id, status")
-    .eq("id", churchId)
+    .eq("id", mosqueId)
     .maybeSingle<{ merchant_id: string; status: string }>();
   if (error) throw error;
   if (!data) return null;
@@ -151,38 +151,38 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Use the admin's scoped church (same logic as the page) so a church-scoped
-  // treasurer whose ADMIN_CHURCH_COOKIE has not been set never mints a QR
-  // against the wrong church -- they'd previously fall through to the
-  // platform default church here and 401 on the permission check.
+  // Use the admin's scoped mosque (same logic as the page) so a mosque-scoped
+  // treasurer whose ADMIN_MOSQUE_COOKIE has not been set never mints a QR
+  // against the wrong mosque -- they'd previously fall through to the
+  // platform default mosque here and 401 on the permission check.
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
-    return NextResponse.json({ error: "Church not selected." }, { status: 404 });
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
+    return NextResponse.json({ error: "Mosque not selected." }, { status: 404 });
   }
-  const churchId = ctx.churchId;
-  const churchSlug = ctx.churchSlug;
+  const mosqueId = ctx.mosqueId;
+  const mosqueSlug = ctx.mosqueSlug;
 
-  const forbidden = await requireAdminApiPermission("payments:write", churchId);
+  const forbidden = await requireAdminApiPermission("payments:write", mosqueId);
   if (forbidden) return forbidden;
 
-  // Validate any provided event_id is for this church. If the lookup throws
+  // Validate any provided event_id is for this mosque. If the lookup throws
   // we treat it as non-fatal and proceed without an event link rather than
   // failing the QR mint outright.
   let resolvedEventId: string | null = null;
   if (eventIdInput) {
     try {
-      const eventRow = await db.getEventById(eventIdInput, churchId);
+      const eventRow = await db.getEventById(eventIdInput, mosqueId);
       if (eventRow) {
         resolvedEventId = eventRow.id;
       } else {
         return NextResponse.json(
-          { error: "Selected service not found in this church." },
+          { error: "Selected service not found in this mosque." },
           { status: 400 },
         );
       }
     } catch (err) {
       console.warn("Take payment POST: event lookup failed (non-fatal)", {
-        church_id: churchId,
+        mosque_id: mosqueId,
         event_id: eventIdInput,
         message: err instanceof Error ? err.message : String(err),
       });
@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
   // takings to it so reconciliation rolls up cleanly without the treasurer
   // having to pick the event each time during a live service.
   if (!resolvedEventId) {
-    resolvedEventId = await resolveTodaysServiceId(churchId);
+    resolvedEventId = await resolveTodaysServiceId(mosqueId);
   }
 
   // Capture who is generating this QR so the history view can show
@@ -202,12 +202,12 @@ export async function POST(request: NextRequest) {
   let createdByEmail: string | null = null;
   let createdByRole: string | null = null;
   try {
-    const admin = await getCurrentAdminContextAny(churchId);
+    const admin = await getCurrentAdminContextAny(mosqueId);
     createdByEmail = admin?.email ?? null;
     createdByRole = admin?.role ?? null;
   } catch (err) {
     console.warn("Take payment POST: could not resolve admin identity", {
-      church_id: churchId,
+      mosque_id: mosqueId,
       message: err instanceof Error ? err.message : String(err),
     });
   }
@@ -227,14 +227,14 @@ export async function POST(request: NextRequest) {
 
   let merchantId: string | null;
   try {
-    merchantId = await loadMooovMerchant(supa, churchId);
+    merchantId = await loadMooovMerchant(supa, mosqueId);
   } catch (err) {
     console.error("Take payment POST: mooov merchant lookup failed", {
-      church_id: churchId,
+      mosque_id: mosqueId,
       message: err instanceof Error ? err.message : String(err),
     });
     return NextResponse.json(
-      { error: "Could not look up payment processor for this church." },
+      { error: "Could not look up payment processor for this mosque." },
       { status: 500 },
     );
   }
@@ -242,8 +242,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error:
-          "This church has not connected its payment processor yet. Visit Integrations to connect Mooov before taking in-person payments.",
-        code: "church_not_connected",
+          "This mosque has not connected its payment processor yet. Visit Integrations to connect Mooov before taking in-person payments.",
+        code: "mosque_not_connected",
       },
       { status: 503 },
     );
@@ -251,7 +251,7 @@ export async function POST(request: NextRequest) {
 
   const amountMinor = Math.round(amount * 100);
   const currency = "GBP";
-  const paymentId = `tip_${churchId}_${Date.now().toString(36)}_${Math.random()
+  const paymentId = `tip_${mosqueId}_${Date.now().toString(36)}_${Math.random()
     .toString(36)
     .slice(2, 10)}`;
   const idempotencyKey = `tip_${paymentId}`;
@@ -264,14 +264,14 @@ export async function POST(request: NextRequest) {
   // active-session card keeps polling the LP-side status independently.
   const successUrl = `${siteUrl}/take-payment/done?payment_id=${encodeURIComponent(paymentId)}`;
   const cancelUrl = `${siteUrl}/take-payment/cancelled?payment_id=${encodeURIComponent(paymentId)}`;
-  const intentDescription = description || `Payment to church (${reference || "in-person"})`;
+  const intentDescription = description || `Payment to mosque (${reference || "in-person"})`;
 
   // Payer attribution. Resolved up front so the downstream webhook projector
   // credits user_name / user_email correctly and we can auto-attach a Gift
-  // Aid declaration when the payer has an active one on this church. Shared
+  // Aid declaration when the payer has an active one on this mosque. Shared
   // with the cash endpoint; supports member, existing guest, and inline-new
   // guest (created via find-or-create on the guests directory).
-  const attribution = await resolveTakePaymentAttribution(churchId, {
+  const attribution = await resolveTakePaymentAttribution(mosqueId, {
     memberId,
     guestId,
     guestInline,
@@ -287,9 +287,9 @@ export async function POST(request: NextRequest) {
   } = attribution;
 
   const initialMetadata: Record<string, unknown> = {
-    source: "churchpay_take_payment",
-    church_slug: churchSlug,
-    church_id: churchId,
+    source: "mosquepay_take_payment",
+    mosque_slug: mosqueSlug,
+    mosque_id: mosqueId,
     intent: "take_payment",
     category,
     line_items: itemised ? lineItems : null,
@@ -317,7 +317,7 @@ export async function POST(request: NextRequest) {
     .from("payment_attempts")
     .insert({
       payment_id: paymentId,
-      church_id: churchId,
+      mosque_id: mosqueId,
       member_id: null,
       amount: amountMinor,
       currency,
@@ -327,7 +327,7 @@ export async function POST(request: NextRequest) {
       metadata: initialMetadata,
       guest_descriptor: {
         source: "in_person_take_payment",
-        church_slug: churchSlug,
+        mosque_slug: mosqueSlug,
         reference: reference || null,
         category,
         line_items: itemised ? lineItems : null,
@@ -343,7 +343,7 @@ export async function POST(request: NextRequest) {
     });
   if (insertError) {
     console.error("Take payment POST: preflight insert failed", {
-      church_id: churchId,
+      mosque_id: mosqueId,
       payment_id: paymentId,
       code: insertError.code,
       message: insertError.message,
@@ -371,8 +371,8 @@ export async function POST(request: NextRequest) {
           description: intentDescription,
           metadata: {
             intent: "take_payment",
-            church_id: churchId,
-            church_slug: churchSlug,
+            mosque_id: mosqueId,
+            mosque_slug: mosqueSlug,
             category,
             reference: reference || undefined,
             event_id: resolvedEventId ?? undefined,
@@ -450,8 +450,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             error:
-              "This church has not finished setting up online payments yet.",
-            code: "church_setup_incomplete",
+              "This mosque has not finished setting up online payments yet.",
+            code: "mosque_setup_incomplete",
             setup_url: err.setupHint.setupUrl,
           },
           { status: 503 },

@@ -40,7 +40,7 @@ const STEPS: Array<{ id: StepId; title: string; description: string }> = [
   {
     id: "intro",
     title: "Welcome",
-    description: "A 15 minute setup to get your church live.",
+    description: "A 15 minute setup to get your mosque live.",
   },
   {
     id: "members",
@@ -110,12 +110,12 @@ function Stepper({
 }
 
 export function OnboardingWizard({
-  churchSlug,
-  churchName,
+  mosqueSlug,
+  mosqueName,
   counts,
 }: {
-  churchSlug: string;
-  churchName: string;
+  mosqueSlug: string;
+  mosqueName: string;
   counts: Counts;
 }) {
   const router = useRouter();
@@ -154,7 +154,7 @@ export function OnboardingWizard({
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${churchSlug}-members-template.csv`;
+    link.download = `${mosqueSlug}-members-template.csv`;
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -164,10 +164,10 @@ export function OnboardingWizard({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-wider text-slate-500">
-            Church onboarding
+            Mosque onboarding
           </p>
           <h1 className="text-2xl font-bold text-slate-900">
-            Get {churchName} live in 15 minutes
+            Get {mosqueName} live in 15 minutes
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-500">
             We will guide you through importing members, generating giving,
@@ -240,7 +240,7 @@ export function OnboardingWizard({
             onSkip={() => setCurrent("done")}
           />
         )}
-        {current === "done" && <DoneStep churchName={churchName} />}
+        {current === "done" && <DoneStep mosqueName={mosqueName} />}
       </div>
 
       <div className="flex justify-between">
@@ -775,7 +775,7 @@ function NoticeStep({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
-          event_type: "church_service",
+          event_type: "mosque_service",
           enable_rsvp: true,
           published: true,
         }),
@@ -1021,14 +1021,14 @@ function StaffStep({
   );
 }
 
-function DoneStep({ churchName }: { churchName: string }) {
+function DoneStep({ mosqueName }: { mosqueName: string }) {
   return (
     <div className="space-y-3 text-center">
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100">
         <CheckCircle2 className="h-7 w-7 text-emerald-600" />
       </div>
       <h2 className="text-xl font-semibold text-slate-900">
-        {churchName} is live
+        {mosqueName} is live
       </h2>
       <p className="mx-auto max-w-md text-sm text-slate-500">
         Members are imported, giving are scheduled, your first notice is on the

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -103,13 +103,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ sequences: [] });
   }
 
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
     return NextResponse.json({ sequences: [] });
   }
 
-  const sequences = await db.listServiceSequences(churchId);
+  const sequences = await db.listServiceSequences(mosqueId);
   return NextResponse.json({ sequences });
 }
 
@@ -128,12 +128,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const churchSlug = getChurchSlugFromRequest(request);
-    const churchId = await db.resolveChurchId(churchSlug);
-    if (!churchId) {
-      return NextResponse.json({ error: "Church not found." }, { status: 404 });
+    const mosqueSlug = getMosqueSlugFromRequest(request);
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("services:write", churchId);
+    const forbidden = await requireAdminApiPermission("services:write", mosqueId);
     if (forbidden) return forbidden;
 
     const body = await request.json();
@@ -162,8 +162,8 @@ export async function POST(request: NextRequest) {
     }
     const month_overrides = parseMonthOverrides(body.month_overrides, months);
 
-    const admin = await getCurrentAdminContextAny(churchId);
-    const sequence = await db.createServiceSequence(churchId, {
+    const admin = await getCurrentAdminContextAny(mosqueId);
+    const sequence = await db.createServiceSequence(mosqueId, {
       name,
       description: nullableTrim(body.description),
       event_type: typeof body.event_type === "string" && body.event_type.trim()
@@ -198,7 +198,7 @@ export async function POST(request: NextRequest) {
     });
 
     await writeAuditLog({
-      churchId,
+      mosqueId,
       action: "created",
       entityType: "service_sequence",
       entityId: sequence.id,

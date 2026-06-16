@@ -10,8 +10,8 @@
 //      optional emails. Default is on; an explicit row with
 //      enabled=false is the only opt-out signal.
 //
-// Church-wide opt-outs for treasurers/secretaries live separately in
-// public.church_notification_settings and are consulted by
+// Mosque-wide opt-outs for treasurers/secretaries live separately in
+// public.mosque_notification_settings and are consulted by
 // lib/email/recipients.ts.
 
 import * as db from "@/lib/db";
@@ -28,7 +28,7 @@ export const CRITICAL_EVENT_TYPES = new Set<string>([
   "member_password_reset",
   "staff_invite",
   "staff_password_reset",
-  "notice_member", // legally important — suppress church-wide if at all
+  "notice_member", // legally important — suppress mosque-wide if at all
 ]);
 
 /**
@@ -107,7 +107,7 @@ export const OPTIONAL_PREFERENCES: Array<{
     ],
   },
   {
-    group: "Church updates",
+    group: "Mosque updates",
     items: [
       {
         eventType: "notice_acknowledgement_member",
@@ -210,7 +210,7 @@ export async function setMemberPreference(
 }
 
 // ---------------------------------------------------------------------------
-// Church-wide settings convenience (admin UI uses these too)
+// Mosque-wide settings convenience (admin UI uses these too)
 // ---------------------------------------------------------------------------
 
 export const ADMIN_NOTIFICATION_EVENTS: Array<{
@@ -259,8 +259,8 @@ export const ADMIN_NOTIFICATION_EVENTS: Array<{
 /**
  * Roles offered in the admin notifications settings UI. Mirrors
  * ADMIN_NOTIFY_ROLES in lib/email/recipients.ts. The 'platform_owner'
- * scope is intentionally excluded — that's the ChurchPay vendor and
- * we don't expose them as a per-church toggle.
+ * scope is intentionally excluded — that's the MosquePay vendor and
+ * we don't expose them as a per-mosque toggle.
  */
 export const ADMIN_NOTIFICATION_ROLES: Array<{
   role: string;
@@ -275,16 +275,16 @@ export const ADMIN_NOTIFICATION_ROLES: Array<{
   { role: "super_admin", label: "Super admin" },
 ];
 
-export async function listChurchNotificationSettings(
-  churchId: string,
+export async function listMosqueNotificationSettings(
+  mosqueId: string,
 ): Promise<Map<string, boolean>> {
   const supa = await getServiceClient();
   const { data, error } = await supa
-    .from("church_notification_settings")
+    .from("mosque_notification_settings")
     .select("role, event_type, enabled")
-    .eq("church_id", churchId);
+    .eq("mosque_id", mosqueId);
   if (error) {
-    console.error("listChurchNotificationSettings: query failed", error);
+    console.error("listMosqueNotificationSettings: query failed", error);
     return new Map();
   }
   const out = new Map<string, boolean>();
@@ -298,8 +298,8 @@ export async function listChurchNotificationSettings(
   return out;
 }
 
-export async function setChurchNotificationSetting(
-  churchId: string,
+export async function setMosqueNotificationSetting(
+  mosqueId: string,
   role: string,
   eventType: string,
   enabled: boolean,
@@ -308,25 +308,25 @@ export async function setChurchNotificationSetting(
   if (enabled) {
     // "Send" is the default; clearing the row is enough.
     const { error } = await supa
-      .from("church_notification_settings")
+      .from("mosque_notification_settings")
       .delete()
-      .eq("church_id", churchId)
+      .eq("mosque_id", mosqueId)
       .eq("role", role)
       .eq("event_type", eventType);
     if (error) throw error;
     return;
   }
   const { error } = await supa
-    .from("church_notification_settings")
+    .from("mosque_notification_settings")
     .upsert(
       {
-        church_id: churchId,
+        mosque_id: mosqueId,
         role,
         event_type: eventType,
         enabled: false,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "church_id,role,event_type" },
+      { onConflict: "mosque_id,role,event_type" },
     );
   if (error) throw error;
 }

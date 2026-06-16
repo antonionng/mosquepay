@@ -41,8 +41,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { MembershipFeesSettings } from "@/components/admin/membership-fees-settings";
-import { ChurchFeeDefaultsSettings } from "@/components/admin/church-fee-defaults-settings";
-import { ChurchYearSettings } from "@/components/admin/giving-year-settings";
+import { MosqueFeeDefaultsSettings } from "@/components/admin/mosque-fee-defaults-settings";
+import { MosqueYearSettings } from "@/components/admin/giving-year-settings";
 import { NextGivingPanel } from "@/components/admin/next-giving-panel";
 import { cn } from "@/lib/utils";
 
@@ -60,7 +60,7 @@ type LedgerEntry = {
   metadata: Record<string, unknown>;
 };
 
-type ChurchGiving = {
+type MosqueGiving = {
   id: string;
   name: string;
   amount: number;
@@ -143,7 +143,7 @@ type MethodBreakdown = {
 
 export function TreasurerClient({
   ledger,
-  churchGiving,
+  mosqueGiving,
   activeMembers,
   outstandingInstalments,
   scheduleCounts,
@@ -151,7 +151,7 @@ export function TreasurerClient({
   currentYearLabel,
 }: {
   ledger: LedgerEntry[];
-  churchGiving: ChurchGiving[];
+  mosqueGiving: MosqueGiving[];
   activeMembers: number;
   outstandingInstalments: Instalment[];
   scheduleCounts: ScheduleCounts;
@@ -168,13 +168,13 @@ export function TreasurerClient({
     const yearStart = new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10);
     const yearEnd = new Date(now.getFullYear(), 11, 31).toISOString().slice(0, 10);
     return {
-      giving_id: churchGiving[0]?.id ?? "",
+      giving_id: mosqueGiving[0]?.id ?? "",
       period_start: yearStart,
       period_end: yearEnd,
-      amount: churchGiving[0]?.amount ?? 0,
-      instalment_count: churchGiving[0]?.instalment_count ?? 1,
+      amount: mosqueGiving[0]?.amount ?? 0,
+      instalment_count: mosqueGiving[0]?.instalment_count ?? 1,
       instalment_frequency:
-        (churchGiving[0]?.instalment_frequency as
+        (mosqueGiving[0]?.instalment_frequency as
           | "monthly"
           | "quarterly"
           | "annually") ?? "monthly",
@@ -571,11 +571,11 @@ export function TreasurerClient({
         </TabsContent>
 
         <TabsContent value="service-fees" className="space-y-4">
-          <ChurchFeeDefaultsSettings />
+          <MosqueFeeDefaultsSettings />
         </TabsContent>
 
         <TabsContent value="giving-year" className="space-y-4">
-          <ChurchYearSettings />
+          <MosqueYearSettings />
         </TabsContent>
 
         <TabsContent value="giving-run" className="space-y-4">
@@ -598,7 +598,7 @@ export function TreasurerClient({
                   className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                 >
                   <option value="">No template (use amount below)</option>
-                  {churchGiving.map((d) => (
+                  {mosqueGiving.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.name} (£{Number(d.amount).toFixed(2)} {d.billing_period})
                     </option>
@@ -943,11 +943,11 @@ function Kpi({
 // ---------------------------------------------------------------------------
 // GivingPaymentMethodPanel
 // ---------------------------------------------------------------------------
-// Shows how the church is collecting this year's giving across the
+// Shows how the mosque is collecting this year's giving across the
 // member base: online subscriptions, BACS standing orders, members
 // who paid in full offline, fee-waived members, and members who
 // haven't been tagged yet ("unset"). Counts come from
-// db.countMemberGivingByPaymentMethod scoped to the current church
+// db.countMemberGivingByPaymentMethod scoped to the current mosque
 // year.
 //
 // Each tile clicks through to a filtered admin members list (?giving=...)
@@ -1030,7 +1030,7 @@ function GivingPaymentMethodPanel({
           label="Fee waived"
           count={breakdown.fee_waived}
           tone="slate"
-          hint="Church-approved waivers"
+          hint="Mosque-approved waivers"
         />
         <MethodTile
           icon={AlertTriangle}

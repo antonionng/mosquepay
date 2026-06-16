@@ -12,18 +12,18 @@ export default async function CampaignDetailPage({
 }) {
   const { id } = await params;
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
     notFound();
   }
-  const churchId = ctx.churchId;
-  const campaign = await db.getCharityCampaignById(id, churchId);
+  const mosqueId = ctx.mosqueId;
+  const campaign = await db.getCharityCampaignById(id, mosqueId);
   if (!campaign) notFound();
 
   const [donations, allDonations, events, giftAid] = await Promise.all([
-    db.getDonationsByCampaign(id, churchId),
-    db.getDonations(churchId),
-    db.getEvents(churchId),
-    db.getGiftAidDeclarations(churchId),
+    db.getDonationsByCampaign(id, mosqueId),
+    db.getDonations(mosqueId),
+    db.getEvents(mosqueId),
+    db.getGiftAidDeclarations(mosqueId),
   ]);
 
   const eventTitleMap = new Map(events.map((e) => [e.id, e.title] as const));

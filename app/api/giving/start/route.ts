@@ -1,7 +1,7 @@
 // POST /api/giving/start
 //
 // Starts a Mooov payment_intent for a single member due using Mooov Connect.
-// ChurchPay signs with its platform key and acts on behalf of the church merchant
+// MosquePay signs with its platform key and acts on behalf of the mosque merchant
 // via the Mooov-Merchant header.
 
 import { type NextRequest, NextResponse } from "next/server";
@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 interface StartGivingBody {
-  church_id: string;
+  mosque_id: string;
   member_id: string;
   amount: number; // minor units (e.g. pence)
   currency: string;
@@ -22,7 +22,7 @@ interface StartGivingBody {
   // Path C (Mooov's recommended path, per docs.mooov.money/connect-protocol §4.1):
   // hosted Stripe Checkout via Mooov. Set `flow:"redirect"` + the two URLs and
   // Mooov returns `provider.hosted_url` for the caller to window.location.assign.
-  // Keeps ChurchPay at PCI SAQ A; 3DS / SCA / Apple Pay / Google Pay / Klarna /
+  // Keeps MosquePay at PCI SAQ A; 3DS / SCA / Apple Pay / Google Pay / Klarna /
   // iDEAL / SEPA all handled by Stripe on the hosted page.
   flow?: "server" | "redirect";
   // Absolute https URLs (Mooov validates and 400s otherwise; localhost allowed
@@ -32,7 +32,7 @@ interface StartGivingBody {
   description?: string;
   customer_email?: string;
   // Giving-cycle identifier. When provided, makes the request idempotent on the
-  // (church_id, member_id, period) tuple: caller-side retries collapse to the
+  // (mosque_id, member_id, period) tuple: caller-side retries collapse to the
   // same payment_id and the same Mooov authorize. When omitted, falls back to
   // a monotonic-time key (smoke tests, ad-hoc charges that should NOT collapse).
   period?: string;
@@ -54,36 +54,36 @@ interface PaymentIntentResponse {
 
 async function loadMerchant(
   supa: ReturnType<typeof createServiceClient>,
-  churchId: string,
+  mosqueId: string,
 ): Promise<string | null> {
   const { data, error } = await supa
     .schema("mooov")
-    .from("churches")
+    .from("mosques")
     .select("merchant_id")
-    .eq("id", churchId)
+    .eq("id", mosqueId)
     .maybeSingle<{ merchant_id: string }>();
   if (error) {
-    throw new Error(`unknown church ${churchId}: ${error.message}`);
+    throw new Error(`unknown mosque ${mosqueId}: ${error.message}`);
   }
   return data?.merchant_id ?? null;
 }
 
-async function ensureDemoChurch(
+async function ensureDemoMosque(
   supa: ReturnType<typeof createServiceClient>,
-  churchId: string,
+  mosqueId: string,
 ): Promise<string | null> {
   const demoMerchant =
     process.env.MOOOV_DEMO_MERCHANT_ID ??
-    process.env.MOOOV_DEMO_CHURCH_ID ??
-    process.env.MOOOV_CHURCH_PILOT_MERCHANT_ID;
-  const demoChurchId = process.env.MOOOV_DEMO_CHURCH_ID ?? "merch_churchpay_demo";
-  if (!demoMerchant || churchId !== demoChurchId) return null;
+    process.env.MOOOV_DEMO_MOSQUE_ID ??
+    process.env.MOOOV_MOSQUE_PILOT_MERCHANT_ID;
+  const demoMosqueId = process.env.MOOOV_DEMO_MOSQUE_ID ?? "merch_mosquepay_demo";
+  if (!demoMerchant || mosqueId !== demoMosqueId) return null;
 
-  const { error } = await supa.schema("mooov").from("churches").upsert(
+  const { error } = await supa.schema("mooov").from("mosques").upsert(
     {
-      id: demoChurchId,
+      id: demoMosqueId,
       merchant_id: demoMerchant,
-      display_name: "ChurchPay demo merchant",
+      display_name: "MosquePay demo merchant",
       currency: "GBP",
       status: "active",
       metadata: { source: "mooov_connect_staging" },
@@ -156,7 +156,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid json" }, { status: 400 });
   }
   if (
-    !input.church_id ||
+    !input.mosque_id ||
     !input.member_id ||
     typeof input.amount !== "number" ||
     !input.currency
@@ -183,43 +183,43 @@ export async function POST(req: NextRequest) {
   let merchantId: string;
   try {
     merchantId =
-      (await loadMerchant(supa, input.church_id)) ??
-      (await ensureDemoChurch(supa, input.church_id)) ??
+      (await loadMerchant(supa, input.mosque_id)) ??
+      (await ensureDemoMosque(supa, input.mosque_id)) ??
       "";
   } catch (err) {
     console.error("mooov credentials lookup failed", {
-      church_id: input.church_id,
+      mosque_id: input.mosque_id,
       message: err instanceof Error ? err.message : String(err),
     });
     return NextResponse.json(
-      { error: "church credentials not found" },
+      { error: "mosque credentials not found" },
       { status: 404 },
     );
   }
   if (!merchantId) {
     return NextResponse.json(
-      { error: "church has not connected Mooov" },
+      { error: "mosque has not connected Mooov" },
       { status: 409 },
     );
   }
 
   // Idempotency key: deterministic when caller passes `period`, monotonic
   // (Date.now) otherwise. Deterministic mode lets retries collapse to the
-  // same Mooov payment via the unique(church_id, idempotency_key) constraint
+  // same Mooov payment via the unique(mosque_id, idempotency_key) constraint
   // -- preserves payment safety under client retries during a giving cycle.
   const paymentId = input.period
-    ? `pay_${input.church_id}_${input.member_id}_${input.period}`
-    : `pay_${input.church_id}_${input.member_id}_${Date.now()}`;
+    ? `pay_${input.mosque_id}_${input.member_id}_${input.period}`
+    : `pay_${input.mosque_id}_${input.member_id}_${Date.now()}`;
   const idempotencyKey = input.period
     ? `giving_${input.member_id}_${input.period}`
     : `giving_${input.member_id}_${paymentId}`;
   const initialMetadata: Record<string, unknown> = {
-    source: input.period ? "churchpay_giving_start" : "churchpay_dev_quickstart",
+    source: input.period ? "mosquepay_giving_start" : "mosquepay_dev_quickstart",
     ...(input.period ? { period: input.period } : {}),
   };
 
   // Replay short-circuit: in deterministic (period) mode, if this exact
-  // (church_id, idempotency_key) was already processed, return the persisted
+  // (mosque_id, idempotency_key) was already processed, return the persisted
   // state without re-calling Mooov. This is the user-facing contract of
   // idempotency: same input -> same payment.
   if (input.period) {
@@ -227,7 +227,7 @@ export async function POST(req: NextRequest) {
       .schema("mooov")
       .from("payment_attempts")
       .select("payment_id, status, provider_ref, metadata, failure_reason")
-      .eq("church_id", input.church_id)
+      .eq("mosque_id", input.mosque_id)
       .eq("idempotency_key", idempotencyKey)
       .maybeSingle<{
         payment_id: string;
@@ -238,7 +238,7 @@ export async function POST(req: NextRequest) {
       }>();
     if (lookupError) {
       console.error("giving_start idempotency lookup failed", {
-        church_id: input.church_id,
+        mosque_id: input.mosque_id,
         idempotency_key: idempotencyKey,
         code: lookupError.code,
         message: lookupError.message,
@@ -275,7 +275,7 @@ export async function POST(req: NextRequest) {
     .from("payment_attempts")
     .insert({
       payment_id: paymentId,
-      church_id: input.church_id,
+      mosque_id: input.mosque_id,
       member_id: input.member_id,
       amount: input.amount,
       currency: input.currency,
@@ -286,14 +286,14 @@ export async function POST(req: NextRequest) {
     });
   if (insertError) {
     // 23505 = Postgres unique_violation. Two requests with the same
-    // (church_id, idempotency_key) raced past the lookup above; the loser
+    // (mosque_id, idempotency_key) raced past the lookup above; the loser
     // should re-read and return the winner's row instead of erroring.
     if (insertError.code === "23505" && input.period) {
       const { data: raced } = await supa
         .schema("mooov")
         .from("payment_attempts")
         .select("payment_id, status, provider_ref, metadata, failure_reason")
-        .eq("church_id", input.church_id)
+        .eq("mosque_id", input.mosque_id)
         .eq("idempotency_key", idempotencyKey)
         .maybeSingle<{
           payment_id: string;
@@ -319,7 +319,7 @@ export async function POST(req: NextRequest) {
       }
     }
     console.error("giving_start preflight insert failed", {
-      church_id: input.church_id,
+      mosque_id: input.mosque_id,
       member_id: input.member_id,
       payment_id: paymentId,
       code: insertError.code,
@@ -344,8 +344,8 @@ export async function POST(req: NextRequest) {
       amount: input.amount,
       currency: input.currency,
       metadata: {
-        churchpay_member_id: input.member_id,
-        church_id: input.church_id,
+        mosquepay_member_id: input.member_id,
+        mosque_id: input.mosque_id,
       },
     };
     if (input.payment_method) mooovBody.payment_method = input.payment_method;
@@ -395,7 +395,7 @@ export async function POST(req: NextRequest) {
       .eq("payment_id", paymentId);
     if (updateError || (updateCount ?? 0) === 0) {
       console.error("giving_start post-authorize update failed", {
-        church_id: input.church_id,
+        mosque_id: input.mosque_id,
         payment_id: paymentId,
         mooov_state: result.state,
         provider_ref: result.provider?.provider_ref ?? null,
@@ -494,28 +494,28 @@ export async function POST(req: NextRequest) {
         });
       }
       if (err.status === 403 && err.body.includes("MERCHANT_GRANT_REVOKED")) {
-        const { data: churchConnection } = await supa
+        const { data: mosqueConnection } = await supa
           .schema("mooov")
-          .from("churches")
+          .from("mosques")
           .select("metadata")
-          .eq("id", input.church_id)
+          .eq("id", input.mosque_id)
           .maybeSingle<{ metadata: Record<string, unknown> | null }>();
         const { error: revokeUpdateError } = await supa
           .schema("mooov")
-          .from("churches")
+          .from("mosques")
           .update({
             status: "revoked",
             metadata: {
-              ...(churchConnection?.metadata ?? {}),
+              ...(mosqueConnection?.metadata ?? {}),
               revoked_at: new Date().toISOString(),
               revoked_source: "giving_start",
               revoked_error: "MERCHANT_GRANT_REVOKED",
             },
           })
-          .eq("id", input.church_id);
+          .eq("id", input.mosque_id);
         if (revokeUpdateError) {
           console.error("giving_start revoke-status update failed", {
-            church_id: input.church_id,
+            mosque_id: input.mosque_id,
             code: revokeUpdateError.code,
             message: revokeUpdateError.message,
           });
@@ -527,7 +527,7 @@ export async function POST(req: NextRequest) {
       );
     }
     console.error("giving_start unhandled error", {
-      church_id: input.church_id,
+      mosque_id: input.mosque_id,
       payment_id: paymentId,
       err_name: err instanceof Error ? err.name : typeof err,
       err_message: err instanceof Error ? err.message : String(err),

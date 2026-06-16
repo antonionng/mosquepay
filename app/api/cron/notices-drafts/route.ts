@@ -41,19 +41,19 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const sequences = await db.listActiveServiceSequencesForAllChurches();
+    const sequences = await db.listActiveServiceSequencesForAllMosques();
     if (sequences.length === 0) {
       return NextResponse.json({ message: "No active sequences.", drafted: 0 });
     }
 
     const now = Date.now();
-    const drafted: Array<{ event_id: string; church_id: string; title: string }> = [];
+    const drafted: Array<{ event_id: string; mosque_id: string; title: string }> = [];
 
     for (const sequence of sequences) {
       const windowMs = sequence.notice_newcomer_weeks * 7 * 86400000;
       const windowEndIso = new Date(now + windowMs).toISOString();
       const newcomers = await db.getEventsAwaitingNoticeDraft(
-        sequence.church_id,
+        sequence.mosque_id,
         windowEndIso
       );
       const events = newcomers.filter(
@@ -61,38 +61,38 @@ export async function GET(request: NextRequest) {
       );
       if (events.length === 0) continue;
 
-      const church = await db.getChurchById(sequence.church_id);
+      const mosque = await db.getMosqueById(sequence.mosque_id);
 
       for (const event of events) {
-        const existing = await db.getServiceNotice(event.id, sequence.church_id);
+        const existing = await db.getServiceNotice(event.id, sequence.mosque_id);
         if (existing) {
-          await db.setServiceNoticeStatus(event.id, sequence.church_id, "draft", {
+          await db.setServiceNoticeStatus(event.id, sequence.mosque_id, "draft", {
             notice_auto_drafted_at: new Date().toISOString(),
           });
           continue;
         }
 
-        await db.upsertServiceNotice(sequence.church_id, event.id, {
+        await db.upsertServiceNotice(sequence.mosque_id, event.id, {
           issue_date: new Date().toISOString().slice(0, 10),
-          opening_text: renderDefaultNoticeOpening(event, church),
+          opening_text: renderDefaultNoticeOpening(event, mosque),
           agenda_items: defaultAgendaItems(),
           menu_items: [],
           dining_time: event.event_time,
           notices: [
-            church?.service_schedule,
-            church?.data_protection_notice,
-            church?.newcomer_notice,
+            mosque?.service_schedule,
+            mosque?.data_protection_notice,
+            mosque?.newcomer_notice,
           ].filter((notice): notice is string => Boolean(notice)),
           include_member_directory: true,
         });
 
-        await db.setServiceNoticeStatus(event.id, sequence.church_id, "draft", {
+        await db.setServiceNoticeStatus(event.id, sequence.mosque_id, "draft", {
           notice_auto_drafted_at: new Date().toISOString(),
         });
 
         drafted.push({
           event_id: event.id,
-          church_id: sequence.church_id,
+          mosque_id: sequence.mosque_id,
           title: event.title,
         });
       }
@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
 
     for (const entry of drafted) {
       await writeAuditLog({
-        churchId: entry.church_id,
+        mosqueId: entry.mosque_id,
         action: "auto_drafted",
         entityType: "notice",
         entityId: entry.event_id,

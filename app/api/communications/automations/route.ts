@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -22,15 +22,15 @@ export async function GET(request: NextRequest) {
   if (unauthorized) return unauthorized;
   if (!isSupabaseConfigured()) return NextResponse.json({ settings: [] });
 
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("members:write", churchId);
+  const forbidden = await requireAdminApiPermission("members:write", mosqueId);
   if (forbidden) return forbidden;
 
-  const settings = await db.listAutomationSettings(churchId);
+  const settings = await db.listAutomationSettings(mosqueId);
   return NextResponse.json({ settings });
 }
 
@@ -43,12 +43,12 @@ export async function PATCH(request: NextRequest) {
       { status: 503 }
     );
   }
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("members:write", churchId);
+  const forbidden = await requireAdminApiPermission("members:write", mosqueId);
   if (forbidden) return forbidden;
 
   const body = await request.json();
@@ -59,16 +59,16 @@ export async function PATCH(request: NextRequest) {
     );
   }
   const setting = await db.upsertAutomationSetting(
-    churchId,
+    mosqueId,
     body.automation_key,
     Boolean(body.enabled),
     body.config ?? {}
   );
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "automation_toggled",
     entityType: "automation",
-    entityId: churchId,
+    entityId: mosqueId,
     summary: `Automation ${body.automation_key} ${setting.enabled ? "enabled" : "disabled"}`,
     metadata: { key: setting.automation_key, enabled: setting.enabled },
   });
@@ -84,20 +84,20 @@ export async function POST(request: NextRequest) {
       { status: 503 }
     );
   }
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("members:write", churchId);
+  const forbidden = await requireAdminApiPermission("members:write", mosqueId);
   if (forbidden) return forbidden;
 
-  const results = await runAllAutomations(churchId);
+  const results = await runAllAutomations(mosqueId);
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "automations_run",
     entityType: "automation",
-    entityId: churchId,
+    entityId: mosqueId,
     summary: `Ran ${results.filter((r) => r.attempted > 0).length} active automations`,
     metadata: { results },
   });

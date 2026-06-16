@@ -8,7 +8,7 @@ import {
   signStaffAdminCookie,
 } from "@/lib/auth/staff-cookie";
 import { isPlatformOwnerEmail } from "@/lib/auth/platform-owner";
-import { ADMIN_CHURCH_COOKIE } from "@/lib/tenant";
+import { ADMIN_MOSQUE_COOKIE } from "@/lib/tenant";
 
 export async function POST(request: NextRequest) {
   try {
@@ -81,18 +81,18 @@ export async function POST(request: NextRequest) {
       path: "/",
     });
 
-    // Anchor ADMIN_CHURCH_COOKIE to the admin's actual church so subsequent
-    // API calls that resolve the church via getChurchSlugFromRequest land on
-    // the right tenant. Without this, a church-scoped admin who never used
-    // the church switcher would fall back to DEFAULT_CHURCH_SLUG -- which is
+    // Anchor ADMIN_MOSQUE_COOKIE to the admin's actual mosque so subsequent
+    // API calls that resolve the mosque via getMosqueSlugFromRequest land on
+    // the right tenant. Without this, a mosque-scoped admin who never used
+    // the mosque switcher would fall back to DEFAULT_MOSQUE_SLUG -- which is
     // the source of the recurring "page renders but POST/PATCH 401s" class
     // of bugs. For platform owners we explicitly clear the cookie so they
-    // see the global view by default and can pick a church via the switcher.
-    if (admin?.church_id) {
+    // see the global view by default and can pick a mosque via the switcher.
+    if (admin?.mosque_id) {
       try {
-        const adminChurch = await db.getChurchById(admin.church_id);
-        if (adminChurch?.slug) {
-          response.cookies.set(ADMIN_CHURCH_COOKIE, adminChurch.slug, {
+        const adminMosque = await db.getMosqueById(admin.mosque_id);
+        if (adminMosque?.slug) {
+          response.cookies.set(ADMIN_MOSQUE_COOKIE, adminMosque.slug, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: "lax",
@@ -101,14 +101,14 @@ export async function POST(request: NextRequest) {
           });
         }
       } catch (error) {
-        console.error("[login] failed to anchor ADMIN_CHURCH_COOKIE", {
+        console.error("[login] failed to anchor ADMIN_MOSQUE_COOKIE", {
           email: cookieEmail,
-          churchId: admin.church_id,
+          mosqueId: admin.mosque_id,
           error,
         });
       }
-    } else if (isPlatformOwner || (admin && admin.church_id == null)) {
-      response.cookies.delete(ADMIN_CHURCH_COOKIE);
+    } else if (isPlatformOwner || (admin && admin.mosque_id == null)) {
+      response.cookies.delete(ADMIN_MOSQUE_COOKIE);
     }
 
     return response;

@@ -6,13 +6,13 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import { requireAdminApiPermission } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
 
 /**
  * Admin-only newcomer creation. Mirrors the public `/api/newcomers` POST but skips the
- * website consent gate and the newcomer auto-responder / church notification
+ * website consent gate and the newcomer auto-responder / mosque notification
  * emails: this path is for staff manually capturing a newcomer, not the
  * public intake form.
  */
@@ -30,13 +30,13 @@ export async function POST(request: NextRequest) {
   if (_rejectMock) return _rejectMock;
 
   try {
-    const churchSlug = getChurchSlugFromRequest(request);
-    const churchId = await db.resolveChurchId(churchSlug);
-    if (!churchId) {
-      return NextResponse.json({ error: "Church not found." }, { status: 404 });
+    const mosqueSlug = getMosqueSlugFromRequest(request);
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
     }
 
-    const forbidden = await requireAdminApiPermission("services:write", churchId);
+    const forbidden = await requireAdminApiPermission("services:write", mosqueId);
     if (forbidden) return forbidden;
 
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (isSupabaseConfigured()) {
-      const newcomer = await db.addNewcomer(churchId, {
+      const newcomer = await db.addNewcomer(mosqueId, {
         first_name,
         last_name,
         email,
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
       });
 
       await writeAuditLog({
-        churchId,
+        mosqueId,
         action: "created",
         entityType: "newcomer",
         entityId: newcomer.id,
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     }
 
     const newcomer = mockDb.addNewcomer({
-      church_slug: churchSlug,
+      mosque_slug: mosqueSlug,
       first_name,
       last_name,
       email,

@@ -7,15 +7,15 @@ export const dynamic = "force-dynamic";
 
 export default async function NewDonationPage() {
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
     redirect("/admin/donations");
   }
-  const churchId = ctx.churchId;
+  const mosqueId = ctx.mosqueId;
 
   const [campaigns, declarations, events] = await Promise.all([
-    db.getCharityCampaigns(churchId),
-    db.getGiftAidDeclarations(churchId),
-    db.getEvents(churchId),
+    db.getCharityCampaigns(mosqueId),
+    db.getGiftAidDeclarations(mosqueId),
+    db.getEvents(mosqueId),
   ]);
 
   return (

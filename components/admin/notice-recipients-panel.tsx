@@ -251,7 +251,7 @@ export function NoticeRecipientsPanel({ eventId }: Props) {
               Waive dining for everyone at this service
             </p>
             <p className="text-xs text-amber-800">
-              Useful when the church is covering dining (e.g. special_service). This
+              Useful when the mosque is covering dining (e.g. special_service). This
               overrides each member and guest&apos;s individual price. Per-row
               overrides below are ignored while this is on.
             </p>
@@ -625,7 +625,7 @@ function OverrideDialog({
             <Textarea
               id="override-note"
               rows={2}
-              placeholder="e.g. Secretary's guest, church covering dining."
+              placeholder="e.g. Secretary's guest, mosque covering dining."
               value={note}
               maxLength={500}
               onChange={(e) => setNote(e.target.value)}

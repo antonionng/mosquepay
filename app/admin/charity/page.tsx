@@ -8,36 +8,36 @@ export const dynamic = "force-dynamic";
 export default async function AdminCharityPage() {
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
-  const churchId = ctx.mode === "database" ? ctx.churchId : null;
-  const churchSlug = ctx.mode === "database" ? ctx.churchSlug : "default";
+  const mosqueId = ctx.mode === "database" ? ctx.mosqueId : null;
+  const mosqueSlug = ctx.mode === "database" ? ctx.mosqueSlug : "default";
 
   const campaigns = useMock
     ? mockDb.getCharityCampaigns()
-    : churchId
-      ? await db.getCharityCampaigns(churchId)
+    : mosqueId
+      ? await db.getCharityCampaigns(mosqueId)
       : [];
   const donations = useMock
     ? mockDb.getDonations()
-    : churchId
-      ? await db.getDonations(churchId)
+    : mosqueId
+      ? await db.getDonations(mosqueId)
       : [];
   const giftAidDeclarations = useMock
     ? mockDb.getGiftAidDeclarations()
-    : churchId
-      ? await db.getGiftAidDeclarations(churchId)
+    : mosqueId
+      ? await db.getGiftAidDeclarations(mosqueId)
       : [];
-  const serviceCollections = useMock || !churchId
+  const serviceCollections = useMock || !mosqueId
     ? []
-    : await db.getServiceCollections(churchId).catch(() => []);
-  const gasdsClaims = useMock || !churchId
+    : await db.getServiceCollections(mosqueId).catch(() => []);
+  const gasdsClaims = useMock || !mosqueId
     ? []
-    : await db.getGasdsClaims(churchId).catch(() => []);
-  const church = useMock
+    : await db.getGasdsClaims(mosqueId).catch(() => []);
+  const mosque = useMock
     ? null
-    : churchId
-      ? await db.getChurchBySlug(churchSlug).catch(() => null)
+    : mosqueId
+      ? await db.getMosqueBySlug(mosqueSlug).catch(() => null)
       : null;
-  const currentCampaignId = church?.current_charity_campaign_id ?? null;
+  const currentCampaignId = mosque?.current_charity_campaign_id ?? null;
 
   return (
     <AdminCharityClient
@@ -47,7 +47,7 @@ export default async function AdminCharityPage() {
       serviceCollections={JSON.parse(JSON.stringify(serviceCollections))}
       gasdsClaims={JSON.parse(JSON.stringify(gasdsClaims))}
       currentCharityCampaignId={currentCampaignId}
-      churchSlug={churchSlug}
+      mosqueSlug={mosqueSlug}
     />
   );
 }

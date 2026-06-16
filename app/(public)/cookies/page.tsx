@@ -10,11 +10,11 @@ import {
 } from "@/lib/legal";
 
 export const metadata: Metadata = marketingMetadata({
-  title: "Cookie Policy | ChurchPay",
+  title: "Cookie Policy | MosquePay",
   description:
-    "How ChurchPay uses strictly necessary cookies and optional analytics cookies, and how users can accept, decline, or change their choice.",
+    "How MosquePay uses strictly necessary cookies and optional analytics cookies, and how users can accept, decline, or change their choice.",
   path: "/cookies",
-  keywords: ["ChurchPay cookies", "cookie policy", "PECR analytics consent"],
+  keywords: ["MosquePay cookies", "cookie policy", "PECR analytics consent"],
 });
 
 const sections = [
@@ -36,7 +36,7 @@ const sections = [
     title: "Analytics cookies",
     body: [
       "If you choose Accept all, we may use analytics cookies and events to measure page views, understand which public pages are useful, and improve the product and website.",
-      "If you choose Decline, analytics cookies and page-view tracking are not enabled by ChurchPay. You can still use the website and platform.",
+      "If you choose Decline, analytics cookies and page-view tracking are not enabled by MosquePay. You can still use the website and platform.",
     ],
   },
   {
@@ -50,7 +50,7 @@ const sections = [
     title: "Data protection",
     body: [
       "Where cookie data identifies or can identify a person, it is handled under the UK GDPR and Data Protection Act 2018. Analytics is used only with consent and for service improvement.",
-      `${COMPANY_NAME} does not sell personal data and does not use church member records for unrelated advertising.`,
+      `${COMPANY_NAME} does not sell personal data and does not use mosque member records for unrelated advertising.`,
     ],
   },
 ];
@@ -59,7 +59,7 @@ export default function CookiesPage() {
   return (
     <LegalPage
       kicker="Cookies"
-      title="Cookie Policy for ChurchPay."
+      title="Cookie Policy for MosquePay."
       intro={`Last updated ${LEGAL_LAST_UPDATED}. This page explains how ${PRODUCT_NAME} uses cookies, how consent works, and how you can change your choice.`}
       sections={sections}
       footer={

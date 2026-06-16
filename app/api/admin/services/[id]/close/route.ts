@@ -1,6 +1,6 @@
 // Close a service and prepare its Gift Aid claim pack.
 //
-// The treasurer hits "Close service" after the fellowship meal. We:
+// The treasurer hits "Close service" after the community meal. We:
 //
 //   1. Aggregate the service's payments into a `service_collections` row
 //      (cash, card, donor-linked, anonymous, GASDS eligible).
@@ -22,7 +22,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as db from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -60,15 +60,15 @@ export async function POST(
     );
   }
   const { id: eventId } = await params;
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("charity:write", churchId);
+  const forbidden = await requireAdminApiPermission("charity:write", mosqueId);
   if (forbidden) return forbidden;
 
-  const event = await db.getEventById(eventId, churchId);
+  const event = await db.getEventById(eventId, mosqueId);
   if (!event) {
     return NextResponse.json({ error: "Service not found." }, { status: 404 });
   }
@@ -94,9 +94,9 @@ export async function POST(
       : null;
 
   const [eventPayments, eventDonations, declarations] = await Promise.all([
-    db.getPaymentsByEventId(eventId, churchId).catch(() => []),
-    db.getDonationsByEvent(eventId, churchId).catch(() => []),
-    db.getGiftAidDeclarations(churchId),
+    db.getPaymentsByEventId(eventId, mosqueId).catch(() => []),
+    db.getDonationsByEvent(eventId, mosqueId).catch(() => []),
+    db.getGiftAidDeclarations(mosqueId),
   ]);
 
   // Aggregate per-payment-method splits using the existing payment row
@@ -116,7 +116,7 @@ export async function POST(
     if (payment.user_email && charity > 0) donorLinkedAmount += charity;
   }
   // Anonymous cash = cash charity income with no payer email attached.
-  // GASDS lets the church reclaim the BR tax on small anonymous cash
+  // GASDS lets the mosque reclaim the BR tax on small anonymous cash
   // donations up to £8,000 a year. Treasurer can override the auto-figure
   // via the body if their on-the-day cash basket was bigger than the
   // logged take-payment entries.
@@ -131,7 +131,7 @@ export async function POST(
   const collectionDate = event.event_date;
   const taxYear = taxYearForDate(collectionDate);
   const existingCollections = await db
-    .getServiceCollections(churchId, { taxYear })
+    .getServiceCollections(mosqueId, { taxYear })
     .catch(() => []);
   const usedAllowance = existingCollections.reduce(
     (sum, collection) => sum + Number(collection.gasds_eligible_amount ?? 0),
@@ -146,7 +146,7 @@ export async function POST(
   const actorEmail =
     scope.kind === "dummy" ||
     scope.kind === "platform" ||
-    scope.kind === "church"
+    scope.kind === "mosque"
       ? scope.email
       : null;
 
@@ -166,7 +166,7 @@ export async function POST(
   // 1. Service collection row.
   let collection;
   try {
-    collection = await db.createServiceCollection(churchId, {
+    collection = await db.createServiceCollection(mosqueId, {
       event_id: eventId,
       campaign_id: null,
       collection_date: collectionDate,
@@ -205,7 +205,7 @@ export async function POST(
   // 2. Gift Aid claim batch. We create the batch even when there are no
   // eligible donations IF there are new declarations to ship to UGLE --
   // the Gift Aid pack wants copies of every signed declaration regardless
-  // of whether the church has anything to reclaim this service.
+  // of whether the mosque has anything to reclaim this service.
   let batch = null;
   let attachedDeclarationsCount = 0;
   // Probe what's new since the previous batch so we can decide whether to
@@ -215,7 +215,7 @@ export async function POST(
   // for the upper window bound.
   const probeNowIso = new Date().toISOString();
   const probe = await resolveDeclarationsForBatch({
-    churchId,
+    mosqueId,
     newBatch: { created_at: probeNowIso, id: "" },
     donorDeclarationIds: eligibleForBatch
       .map((row) => row.gift_aid_declaration_id)
@@ -231,7 +231,7 @@ export async function POST(
 
   if (eligibleForBatch.length > 0 || willShipDeclarations) {
     try {
-      batch = await db.createGiftAidClaimBatch(churchId, {
+      batch = await db.createGiftAidClaimBatch(mosqueId, {
         claim_reference: `MEET-${collectionDate}-${eventId.slice(0, 8)}`,
         period_start: collectionDate,
         period_end: collectionDate,
@@ -247,7 +247,7 @@ export async function POST(
       });
       if (eligibleForBatch.length > 0) {
         await db.createGiftAidClaimItems(
-          churchId,
+          mosqueId,
           eligibleForBatch.map((row) => ({
             claim_batch_id: batch!.id,
             donation_id: row.id,
@@ -262,7 +262,7 @@ export async function POST(
         );
         await Promise.all(
           eligibleForBatch.map((row) =>
-            db.updateDonation(row.id, churchId, {
+            db.updateDonation(row.id, mosqueId, {
               gift_aid_claim_batch_id: batch!.id,
             })
           )
@@ -273,7 +273,7 @@ export async function POST(
       // unbacked declaration storage failure doesn't break the close.
       try {
         const resolved = await resolveDeclarationsForBatch({
-          churchId,
+          mosqueId,
           newBatch: { created_at: batch.created_at, id: batch.id },
           donorDeclarationIds: eligibleForBatch
             .map((row) => row.gift_aid_declaration_id)
@@ -281,7 +281,7 @@ export async function POST(
         });
         if (resolved.links.length > 0) {
           await db.linkDeclarationsToClaimBatch(
-            churchId,
+            mosqueId,
             batch.id,
             resolved.links
           );
@@ -291,7 +291,7 @@ export async function POST(
           const newCount = resolved.links.filter(
             (link) => link.inclusion_reason === "new_in_window"
           ).length;
-          await db.setClaimBatchDeclarationsCount(batch.id, churchId, newCount);
+          await db.setClaimBatchDeclarationsCount(batch.id, mosqueId, newCount);
           attachedDeclarationsCount = newCount;
         }
       } catch (err) {
@@ -300,7 +300,7 @@ export async function POST(
           message: err instanceof Error ? err.message : String(err),
         });
       }
-      await db.attachClaimBatchToServiceCollection(collection.id, churchId, {
+      await db.attachClaimBatchToServiceCollection(collection.id, mosqueId, {
         gift_aid_claim_batch_id: batch.id,
       });
     } catch (err) {
@@ -318,7 +318,7 @@ export async function POST(
 
   // 3. Stamp the event closed.
   try {
-    await db.markEventServiceClosed(eventId, churchId, {
+    await db.markEventServiceClosed(eventId, mosqueId, {
       service_closed_at: new Date().toISOString(),
       service_closed_by_email: actorEmail,
       service_close_notes: closeNotes,
@@ -331,7 +331,7 @@ export async function POST(
   }
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "service_closed",
     entityType: "event",
     entityId: eventId,

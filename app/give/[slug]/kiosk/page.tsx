@@ -1,6 +1,6 @@
 // /give/<slug>/kiosk
 //
-// Public self-service giving kiosk. Churches open this URL full-screen on an
+// Public self-service giving kiosk. Mosques open this URL full-screen on an
 // iPad / tablet at the door; members walk up, choose an amount + purpose,
 // optionally add their details and a digital Gift Aid declaration, then scan
 // the generated QR with their own phone to pay via Apple Pay / Google Pay /
@@ -28,40 +28,40 @@ export default async function KioskPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const church = await loadChurch(slug);
+  const mosque = await loadMosque(slug);
 
-  if (!church) {
+  if (!mosque) {
     return (
       <KioskShellMessage
-        title="We couldn't find this church."
-        body="Please check the kiosk link, or ask the church team to re-open it from the admin dashboard."
+        title="We couldn't find this mosque."
+        body="Please check the kiosk link, or ask the mosque team to re-open it from the admin dashboard."
       />
     );
   }
 
-  const connected = await isMerchantConnected(church.id);
+  const connected = await isMerchantConnected(mosque.id);
   if (!connected) {
     return (
       <KioskShellMessage
-        title={`${church.name} isn't ready for kiosk giving yet.`}
-        body="The church has not connected its payment processor. An admin can finish setup under Integrations."
+        title={`${mosque.name} isn't ready for kiosk giving yet.`}
+        body="The mosque has not connected its payment processor. An admin can finish setup under Integrations."
       />
     );
   }
 
-  return <KioskClient slug={church.slug} churchName={church.name} />;
+  return <KioskClient slug={mosque.slug} mosqueName={mosque.name} />;
 }
 
-async function loadChurch(slug: string) {
+async function loadMosque(slug: string) {
   try {
     const { data, error } = await createServiceClient()
-      .from("churches")
+      .from("mosques")
       .select("id, slug, name")
       .eq("slug", slug.trim().toLowerCase())
       .eq("is_active", true)
       .maybeSingle<{ id: string; slug: string; name: string }>();
     if (error) {
-      console.error("kiosk page: church lookup failed", {
+      console.error("kiosk page: mosque lookup failed", {
         slug,
         message: error.message,
       });
@@ -69,7 +69,7 @@ async function loadChurch(slug: string) {
     }
     return data ?? null;
   } catch (err) {
-    console.error("kiosk page: church lookup threw", {
+    console.error("kiosk page: mosque lookup threw", {
       slug,
       message: err instanceof Error ? err.message : String(err),
     });
@@ -77,13 +77,13 @@ async function loadChurch(slug: string) {
   }
 }
 
-async function isMerchantConnected(churchId: string): Promise<boolean> {
+async function isMerchantConnected(mosqueId: string): Promise<boolean> {
   try {
     const { data, error } = await createServiceClient()
       .schema("mooov")
-      .from("churches")
+      .from("mosques")
       .select("merchant_id, status")
-      .eq("id", churchId)
+      .eq("id", mosqueId)
       .maybeSingle<{ merchant_id: string; status: string }>();
     if (error || !data) return false;
     if (data.status && data.status !== "active") return false;

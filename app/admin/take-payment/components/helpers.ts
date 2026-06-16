@@ -30,7 +30,7 @@ export function humanizeFailureReason(reason: string | null | undefined): string
     case "unexpected_error":
       return "Something went wrong when creating the payment session.";
     case "merchant_setup_required":
-      return "Church payment processor needs setup.";
+      return "Mosque payment processor needs setup.";
     default:
       return reason.replace(/_/g, " ");
   }

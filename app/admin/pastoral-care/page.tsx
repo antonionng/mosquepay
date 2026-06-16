@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function PastoralCarePage() {
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
     return (
       <div className="space-y-4 sm:space-y-6">
         <div className="admin-page-head">
@@ -22,18 +22,18 @@ export default async function PastoralCarePage() {
         <EmptyState
           icon={HeartHandshake}
           title="PastoralCare needs a database"
-          description="Connect Supabase and choose a church to manage pastoral cases, visits, and registers."
+          description="Connect Supabase and choose a mosque to manage pastoral cases, visits, and registers."
         />
       </div>
     );
   }
-  const churchId = ctx.churchId;
+  const mosqueId = ctx.mosqueId;
 
   const [cases, alerts, register, members] = await Promise.all([
-    db.listPastoralCareCases(churchId),
-    db.listPastoralCareAlerts(churchId, { status: "open" }),
-    db.listPastoralCareRegister(churchId),
-    db.getMembers(churchId, { status: "active" }),
+    db.listPastoralCareCases(mosqueId),
+    db.listPastoralCareAlerts(mosqueId, { status: "open" }),
+    db.listPastoralCareRegister(mosqueId),
+    db.getMembers(mosqueId, { status: "active" }),
   ]);
 
   return (

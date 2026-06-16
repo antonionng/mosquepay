@@ -10,7 +10,7 @@ import { Banknote } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-// Point this route at its own PWA manifest so admins can install "ChurchPay
+// Point this route at its own PWA manifest so admins can install "MosquePay
 // POS" as a standalone app from /admin/take-payment without it being
 // confused with the member portal manifest (which scopes to /member).
 export const metadata: Metadata = {
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "ChurchPay POS",
+    title: "MosquePay POS",
   },
 };
 
@@ -51,13 +51,13 @@ function buildReturnPath(params: SearchParams): string {
   return `${RETURN_PATH}?${search}`;
 }
 
-async function getMooovConnection(churchId: string) {
+async function getMooovConnection(mosqueId: string) {
   try {
     const { data } = await createServiceClient()
       .schema("mooov")
-      .from("churches")
+      .from("mosques")
       .select("merchant_id,status")
-      .eq("id", churchId)
+      .eq("id", mosqueId)
       .maybeSingle<{ merchant_id: string; status: string }>();
     return data;
   } catch {
@@ -65,13 +65,13 @@ async function getMooovConnection(churchId: string) {
   }
 }
 
-async function getChurchMembers(churchId: string) {
+async function getMosqueMembers(mosqueId: string) {
   // Light-weight list for the in-form picker. We deliberately fetch all
-  // active members in one go (churches are small — typically <100 members) so
+  // active members in one go (mosques are small — typically <100 members) so
   // the client can run the filter locally without a debounced API round-trip
   // mid-service on flaky venue Wi-Fi.
   try {
-    const members = await db.getMembers(churchId, { status: "active" });
+    const members = await db.getMembers(mosqueId, { status: "active" });
     return members.map((m) => ({
       id: m.id,
       full_name: m.full_name,
@@ -91,9 +91,9 @@ async function getChurchMembers(churchId: string) {
  * phone. Older services can still be attached retroactively from the
  * payment detail page.
  */
-async function getChurchEventsForPicker(churchId: string) {
+async function getMosqueEventsForPicker(mosqueId: string) {
   try {
-    const events = await db.getEvents(churchId);
+    const events = await db.getEvents(mosqueId);
     const now = Date.now();
     const horizonBackMs = 90 * 24 * 60 * 60 * 1000;
     return events
@@ -139,7 +139,7 @@ export default async function TakePaymentPage({
   }
 
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
     return (
       <div className="space-y-4 sm:space-y-6">
         <div className="admin-page-head">
@@ -153,17 +153,17 @@ export default async function TakePaymentPage({
         </div>
         <EmptyState
           icon={Banknote}
-          title="Take payment needs a live church"
-          description="Connect Supabase and choose a church to use the in-person QR flow. Demo mode does not mint live payment sessions."
+          title="Take payment needs a live mosque"
+          description="Connect Supabase and choose a mosque to use the in-person QR flow. Demo mode does not mint live payment sessions."
         />
       </div>
     );
   }
 
   const [connection, members, events] = await Promise.all([
-    getMooovConnection(ctx.churchId),
-    getChurchMembers(ctx.churchId),
-    getChurchEventsForPicker(ctx.churchId),
+    getMooovConnection(ctx.mosqueId),
+    getMosqueMembers(ctx.mosqueId),
+    getMosqueEventsForPicker(ctx.mosqueId),
   ]);
   const connected = !!connection && connection.status === "active";
 
@@ -173,7 +173,7 @@ export default async function TakePaymentPage({
       mooovStatus={connection?.status ?? null}
       members={members}
       events={events}
-      churchSlug={ctx.churchSlug ?? null}
+      mosqueSlug={ctx.mosqueSlug ?? null}
     />
   );
 }

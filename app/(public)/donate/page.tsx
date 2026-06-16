@@ -11,8 +11,8 @@ const PRESET_AMOUNTS = [10, 25, 50, 100];
 
 function DonatePageContent() {
   const searchParams = useSearchParams();
-  const church = searchParams.get("church") ?? "";
-  const churchQuery = church ? `?church=${encodeURIComponent(church)}` : "";
+  const mosque = searchParams.get("mosque") ?? "";
+  const mosqueQuery = mosque ? `?mosque=${encodeURIComponent(mosque)}` : "";
 
   // Optional URL pre-fill: the member portal links here from
   // /member/donations with the signed-in member's email/name and a
@@ -23,12 +23,12 @@ function DonatePageContent() {
   const initialName = searchParams.get("name") ?? "";
   const initialGiftAid = searchParams.get("gift_aid") === "1";
 
-  // Church name for the hero. Fetched client-side using the same public
-  // endpoint the PublicHeader uses so donors see "Donate to St Mary's Church
-  // No. 4344" (or whichever church the link routes to) instead of the
-  // platform-generic copy. We only render the church label once it's loaded
+  // Mosque name for the hero. Fetched client-side using the same public
+  // endpoint the PublicHeader uses so donors see "Donate to Central Jamia Masjid
+  // No. 4344" (or whichever mosque the link routes to) instead of the
+  // platform-generic copy. We only render the mosque label once it's loaded
   // so we don't flash the wrong name.
-  const [churchName, setChurchName] = useState<string | null>(null);
+  const [mosqueName, setMosqueName] = useState<string | null>(null);
 
   const [amount, setAmount] = useState<number>(0);
   const [customAmount, setCustomAmount] = useState("");
@@ -43,7 +43,7 @@ function DonatePageContent() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   // Whether this email already has an active Gift Aid declaration on file
-  // for this church. When true the donor doesn't need to re-enter the
+  // for this mosque. When true the donor doesn't need to re-enter the
   // address / re-tick the eligibility confirmation: the existing
   // enduring declaration covers this and all future donations from this
   // email until the donor revokes it.
@@ -55,35 +55,35 @@ function DonatePageContent() {
 
   const effectiveAmount = amount || Number(customAmount) || 0;
 
-  // Resolve the church label for the hero. We only attempt the lookup when
+  // Resolve the mosque label for the hero. We only attempt the lookup when
   // a slug is on the URL -- on the bare /donate path we keep the generic
-  // copy. The same endpoint powers the church-aware PublicHeader, so this
+  // copy. The same endpoint powers the mosque-aware PublicHeader, so this
   // adds no new public surface area.
   useEffect(() => {
-    if (!church) {
-      setChurchName(null);
+    if (!mosque) {
+      setMosqueName(null);
       return;
     }
     let active = true;
-    async function loadChurch() {
+    async function loadMosque() {
       try {
         const res = await fetch(
-          `/api/churches/${encodeURIComponent(church)}/site`,
+          `/api/mosques/${encodeURIComponent(mosque)}/site`,
           { cache: "no-store" }
         );
         if (!res.ok) return;
-        const data = (await res.json()) as { church?: { name?: string } };
+        const data = (await res.json()) as { mosque?: { name?: string } };
         if (!active) return;
-        if (data.church?.name) setChurchName(data.church.name);
+        if (data.mosque?.name) setMosqueName(data.mosque.name);
       } catch {
         // Keep generic copy on failure.
       }
     }
-    loadChurch();
+    loadMosque();
     return () => {
       active = false;
     };
-  }, [church]);
+  }, [mosque]);
 
   // Debounced lookup: whenever the donor's email looks valid, ask the API
   // whether we already have a Gift Aid declaration on file for it. If we do,
@@ -103,7 +103,7 @@ function DonatePageContent() {
       try {
         const res = await fetch(
           `/api/donations/gift-aid-status?email=${encodeURIComponent(email)}${
-            church ? `&church=${encodeURIComponent(church)}` : ""
+            mosque ? `&mosque=${encodeURIComponent(mosque)}` : ""
           }`,
           { cache: "no-store" }
         );
@@ -127,7 +127,7 @@ function DonatePageContent() {
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [donorEmail, church]);
+  }, [donorEmail, mosque]);
 
   function selectPreset(value: number) {
     setAmount(value);
@@ -164,7 +164,7 @@ function DonatePageContent() {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/donations${churchQuery}`, {
+      const res = await fetch(`/api/donations${mosqueQuery}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -204,14 +204,14 @@ function DonatePageContent() {
         <div className="public-hero-shell">
           <div className="public-hero-copy">
             <p className="public-kicker">
-              {churchName ? `Donate to ${churchName}` : "Make a donation"}
+              {mosqueName ? `Donate to ${mosqueName}` : "Make a donation"}
             </p>
             <h1 className="public-hero-title">
               Every contribution makes a difference.
             </h1>
             <p className="public-hero-body">
-              {churchName
-                ? `Support ${churchName}'s charitable work with a one-off donation. Your generosity helps fund community causes, education, and pastoral programmes.`
+              {mosqueName
+                ? `Support ${mosqueName}'s charitable work with a one-off donation. Your generosity helps fund community causes, education, and pastoral programmes.`
                 : "Support our charitable work with a one-off donation. Your generosity helps fund community causes, education, and pastoral programmes."}
             </p>
           </div>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -21,14 +21,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const churchSlug = getChurchSlugFromRequest(request);
-    const churchId = await db.resolveChurchId(churchSlug);
-    if (!churchId) {
-      return NextResponse.json({ error: "Church not found." }, { status: 404 });
+    const mosqueSlug = getMosqueSlugFromRequest(request);
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
     }
     const forbidden = await requireAdminApiPermission(
       "payments:write",
-      churchId
+      mosqueId
     );
     if (forbidden) return forbidden;
 
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       : undefined;
 
     const giving = (
-      await db.getMemberGiving(churchId, { status: "outstanding" })
+      await db.getMemberGiving(mosqueId, { status: "outstanding" })
     ).filter((d) => !onlyGivingIds || onlyGivingIds.includes(d.id));
 
     if (giving.length === 0) {
@@ -52,8 +52,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const church = await db.getChurchById(churchId);
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://churchpay.co.uk";
+    const mosque = await db.getMosqueById(mosqueId);
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://mosque-pay.com";
     const portalUrl = `${siteUrl}/member/giving`;
 
     const failures: Array<{ email: string; message: string }> = [];
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       const reminderNumber = (record.reminder_count ?? 0) + 1;
       const html = renderGivingReminderEmail({
         memberName: record.member_name ?? record.member_email,
-        churchName: church?.name ?? "Your Church",
+        mosqueName: mosque?.name ?? "Your Mosque",
         amountDue: `£${Number(record.amount).toFixed(2)}`,
         dueDate: new Date(record.period_end).toLocaleDateString("en-GB", {
           day: "numeric",
@@ -76,13 +76,13 @@ export async function POST(request: NextRequest) {
 
       const subject =
         reminderNumber >= 3
-          ? "Final reminder: church giving outstanding"
+          ? "Final reminder: mosque giving outstanding"
           : reminderNumber === 2
-            ? "Second reminder: church giving due"
-            : "Reminder: church giving due";
+            ? "Second reminder: mosque giving due"
+            : "Reminder: mosque giving due";
 
       const result = await sendWithLog({
-        churchId,
+        mosqueId,
         toEmail: record.member_email,
         toName: record.member_name,
         memberId: record.member_id ?? null,
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
       });
 
       if (result.ok) {
-        await db.updateMemberGivingStatus(record.id, churchId, {
+        await db.updateMemberGivingStatus(record.id, mosqueId, {
           reminder_sent_at: new Date().toISOString(),
           reminder_count: reminderNumber,
         });
@@ -115,10 +115,10 @@ export async function POST(request: NextRequest) {
     }
 
     await writeAuditLog({
-      churchId,
+      mosqueId,
       action: "giving_reminders_sent",
       entityType: "giving",
-      entityId: churchId,
+      entityId: mosqueId,
       summary: `Sent ${sent} giving reminder${sent === 1 ? "" : "s"}`,
       metadata: { sent, failures: failures.length },
     });

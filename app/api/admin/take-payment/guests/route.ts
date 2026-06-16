@@ -6,13 +6,13 @@
 // be used by treasurers who don't necessarily have the broader members:read
 // permission required by /api/admin/guests.
 //
-// GET  ?q=…       -> { guests: [...] }  (top matches for the active church)
-// POST { full_name, email?, phone?, mother_church_name?, mother_church_number? }
+// GET  ?q=…       -> { guests: [...] }  (top matches for the active mosque)
+// POST { full_name, email?, phone?, mother_mosque_name?, mother_mosque_number? }
 //      -> { guest: {...} }
 //
 // Bypasses the guest_links feature flag because the payments flow needs to
 // be able to log a payer regardless of whether the public guest portal is
-// enabled for the church.
+// enabled for the mosque.
 
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
@@ -43,41 +43,41 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const search = url.searchParams.get("q")?.trim() || undefined;
 
-  // Resolve the church from the admin's scope (same logic the page uses), not
-  // from the request host/cookie/default. Otherwise a church-scoped admin
-  // whose ADMIN_CHURCH_COOKIE has not been set yet (e.g. a single-church
-  // treasurer who never used the church switcher) lands on the DEFAULT church
+  // Resolve the mosque from the admin's scope (same logic the page uses), not
+  // from the request host/cookie/default. Otherwise a mosque-scoped admin
+  // whose ADMIN_MOSQUE_COOKIE has not been set yet (e.g. a single-mosque
+  // treasurer who never used the mosque switcher) lands on the DEFAULT mosque
   // here, fails the permission check, and gets a 401 even though the page
-  // rendered fine using their actual church.
+  // rendered fine using their actual mosque.
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
-    return NextResponse.json({ error: "Church not selected." }, { status: 404 });
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
+    return NextResponse.json({ error: "Mosque not selected." }, { status: 404 });
   }
-  const churchId = ctx.churchId;
+  const mosqueId = ctx.mosqueId;
 
-  const forbidden = await requireAdminApiPermission("payments:write", churchId);
+  const forbidden = await requireAdminApiPermission("payments:write", mosqueId);
   if (forbidden) return forbidden;
 
   try {
-    const guests = await db.listGuests(churchId, {
+    const guests = await db.listGuests(mosqueId, {
       search,
       includeArchived: false,
     });
     // Trim to a reasonable surface for the picker. The directory can have
-    // thousands of rows on busy churches — the picker only ever shows the top
+    // thousands of rows on busy mosques — the picker only ever shows the top
     // matches, so we cap server-side too.
     const top = guests.slice(0, 50).map((g) => ({
       id: g.id,
       full_name: g.full_name,
       email: g.email ?? null,
       phone: g.phone ?? null,
-      mother_church_name: g.mother_church_name ?? null,
-      mother_church_number: g.mother_church_number ?? null,
+      mother_mosque_name: g.mother_mosque_name ?? null,
+      mother_mosque_number: g.mother_mosque_number ?? null,
     }));
     return NextResponse.json({ guests: top });
   } catch (err) {
     console.error("Take-payment guests GET failed", {
-      church_id: churchId,
+      mosque_id: mosqueId,
       message: err instanceof Error ? err.message : String(err),
     });
     return NextResponse.json({ guests: [] });
@@ -111,39 +111,39 @@ export async function POST(request: NextRequest) {
   }
 
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
-    return NextResponse.json({ error: "Church not selected." }, { status: 404 });
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
+    return NextResponse.json({ error: "Mosque not selected." }, { status: 404 });
   }
-  const churchId = ctx.churchId;
+  const mosqueId = ctx.mosqueId;
 
-  const forbidden = await requireAdminApiPermission("payments:write", churchId);
+  const forbidden = await requireAdminApiPermission("payments:write", mosqueId);
   if (forbidden) return forbidden;
 
   const email = trimOrNull(body.email);
-  const motherChurchName = trimOrNull(body.mother_church_name);
+  const motherMosqueName = trimOrNull(body.mother_mosque_name);
 
   // Find-or-create: if a guest with the same email (or same name + mother
-  // church) already exists we attach to that record. Treasurers add walk-ins
+  // mosque) already exists we attach to that record. Treasurers add walk-ins
   // mid-service — a second visit shouldn't create a duplicate.
   try {
     let guest = null;
     if (email) {
-      guest = await db.findGuestByEmail(churchId, email);
+      guest = await db.findGuestByEmail(mosqueId, email);
     }
     if (!guest) {
-      guest = await db.findGuestByNameAndChurch(
-        churchId,
+      guest = await db.findGuestByNameAndMosque(
+        mosqueId,
         fullName,
-        motherChurchName,
+        motherMosqueName,
       );
     }
     if (!guest) {
-      guest = await db.createGuest(churchId, {
+      guest = await db.createGuest(mosqueId, {
         full_name: fullName,
         email,
         phone: trimOrNull(body.phone),
-        mother_church_name: motherChurchName,
-        mother_church_number: trimOrNull(body.mother_church_number),
+        mother_mosque_name: motherMosqueName,
+        mother_mosque_number: trimOrNull(body.mother_mosque_number),
         is_member: true,
         source: "admin",
         guest_category: "guest",
@@ -155,13 +155,13 @@ export async function POST(request: NextRequest) {
         full_name: guest.full_name,
         email: guest.email ?? null,
         phone: guest.phone ?? null,
-        mother_church_name: guest.mother_church_name ?? null,
-        mother_church_number: guest.mother_church_number ?? null,
+        mother_mosque_name: guest.mother_mosque_name ?? null,
+        mother_mosque_number: guest.mother_mosque_number ?? null,
       },
     });
   } catch (err) {
     console.error("Take-payment guests POST failed", {
-      church_id: churchId,
+      mosque_id: mosqueId,
       message: err instanceof Error ? err.message : String(err),
     });
     return NextResponse.json(

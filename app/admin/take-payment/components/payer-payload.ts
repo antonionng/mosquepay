@@ -13,8 +13,8 @@ export type PayerPayload = {
     full_name: string;
     email?: string | null;
     phone?: string | null;
-    mother_church_name?: string | null;
-    mother_church_number?: string | null;
+    mother_mosque_name?: string | null;
+    mother_mosque_number?: string | null;
   } | null;
 };
 
@@ -30,8 +30,8 @@ export function buildPayerPayload(payer: PayerSelection): PayerPayload {
           full_name: payer.draft.full_name,
           email: payer.draft.email,
           phone: payer.draft.phone,
-          mother_church_name: payer.draft.mother_church_name,
-          mother_church_number: payer.draft.mother_church_number,
+          mother_mosque_name: payer.draft.mother_mosque_name,
+          mother_mosque_number: payer.draft.mother_mosque_number,
         },
       };
     case "anonymous":

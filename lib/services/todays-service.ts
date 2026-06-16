@@ -6,11 +6,11 @@ import * as db from "@/lib/db";
 // silently pinned to the wrong (or an ambiguous) event. Returns null on any
 // ambiguity or error.
 export async function resolveTodaysServiceId(
-  churchId: string,
+  mosqueId: string,
 ): Promise<string | null> {
   try {
     const today = new Date().toISOString().slice(0, 10);
-    const events = await db.getEvents(churchId);
+    const events = await db.getEvents(mosqueId);
     const todays = events.filter(
       (e) =>
         typeof e.event_date === "string" &&

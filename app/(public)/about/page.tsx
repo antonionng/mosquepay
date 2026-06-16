@@ -8,15 +8,15 @@ import {
 import { marketingMetadata } from "@/lib/seo";
 
 export const metadata = marketingMetadata({
-  title: "About ChurchPay | Software Built for UK Church Teams",
+  title: "About MosquePay | Software Built for UK Mosque Teams",
   description:
-    "ChurchPay exists so church teams spend less time on spreadsheets and more time with people. Learn why we built one platform for giving, Gift Aid, congregation records, services, and pastoral care.",
+    "MosquePay exists so mosque teams spend less time on spreadsheets and more time with people. Learn why we built one platform for giving, Gift Aid, congregation records, services, and welfare.",
   path: "/about",
   keywords: [
-    "about ChurchPay",
-    "church software company",
-    "UK church technology",
-    "church administration platform",
+    "about MosquePay",
+    "mosque software company",
+    "UK mosque technology",
+    "mosque administration platform",
   ],
 });
 
@@ -31,13 +31,13 @@ const VALUES = [
     Icon: ShieldCheck,
     title: "Stewardship and trust",
     description:
-      "Churches handle money and sensitive pastoral information. We build with role-based access, audit trails, and UK data protection in mind from day one.",
+      "Mosques handle money and sensitive pastoral information. We build with role-based access, audit trails, and UK data protection in mind from day one.",
   },
   {
     Icon: HandHeart,
     title: "Generosity made easy",
     description:
-      "Giving should be simple for the giver and accountable for the church. Gift Aid and GASDS shouldn't require a specialist to claim correctly.",
+      "Giving should be simple for the giver and accountable for the mosque. Gift Aid and GASDS shouldn't require a specialist to claim correctly.",
   },
   {
     Icon: Sparkles,
@@ -50,15 +50,15 @@ const VALUES = [
 const STORY = [
   {
     title: "The problem we kept seeing",
-    body: "Church treasurers reconciling three spreadsheets at midnight. Welcome teams losing newcomers between Sundays. Gift Aid claims left unclaimed because the paperwork was scattered. Churches were running on goodwill and copy-paste.",
+    body: "Mosque treasurers reconciling three spreadsheets at midnight. Welcome teams losing newcomers between Sundays. Gift Aid claims left unclaimed because the paperwork was scattered. Mosques were running on goodwill and copy-paste.",
   },
   {
-    title: "Why we built ChurchPay",
-    body: "We believed UK churches deserved software designed around how they actually work: Sunday services, planned giving, Gift Aid and GASDS, pastoral confidentiality, and volunteers who change every year. Not a generic CRM with a cross on the logo.",
+    title: "Why we built MosquePay",
+    body: "We believed UK mosques deserved software designed around how they actually work: Friday Jumu'ah, planned giving, Gift Aid and GASDS, pastoral confidentiality, and volunteers who change every year. Not a generic CRM with a cross on the logo.",
   },
   {
     title: "Where we are today",
-    body: "ChurchPay covers giving, congregation records, services and notices, newcomer follow-up, pastoral care, church websites, and treasurer reporting. It works for single churches, multi-site groups, and whole networks.",
+    body: "MosquePay covers giving, congregation records, services and notices, newcomer follow-up, welfare, mosque websites, and treasurer reporting. It works for single mosques, multi-site groups, and whole networks.",
   },
 ];
 
@@ -68,13 +68,13 @@ export default function AboutPage() {
       <section className="px-5 pb-4 pt-16 lg:px-8 lg:pt-24">
         <div className="mx-auto max-w-7xl">
           <div className="max-w-3xl">
-            <MarketingKicker>About ChurchPay</MarketingKicker>
+            <MarketingKicker>About MosquePay</MarketingKicker>
             <h1 className="mt-4 font-heading text-4xl font-bold leading-tight tracking-tight text-slate-900 sm:text-5xl">
-              We build software so church teams can get back to people.
+              We build software so mosque teams can get back to people.
             </h1>
             <p className="mt-6 text-lg leading-8 text-slate-600">
-              ChurchPay started with a simple conviction: the administrative weight of running a
-              church, from giving records and Gift Aid claims to member lists, rotas, notices, and
+              MosquePay started with a simple conviction: the administrative weight of running a
+              mosque, from giving records and Gift Aid claims to member lists, rotas, notices, and
               follow-ups, should not fall on a handful of exhausted volunteers juggling
               spreadsheets.
             </p>
@@ -116,8 +116,8 @@ export default function AboutPage() {
       <MarketingSection>
         <div className="mx-auto grid max-w-5xl gap-8 rounded-[2rem] border border-[#e9e2d4] bg-white p-10 sm:grid-cols-3 lg:p-14">
           {[
-            { label: "Focus", value: "UK churches" },
-            { label: "Coverage", value: "Giving to pastoral care" },
+            { label: "Focus", value: "UK mosques" },
+            { label: "Coverage", value: "Giving to welfare" },
             { label: "Promise", value: "One shared record" },
           ].map((item) => (
             <div key={item.label} className="text-center">
@@ -131,8 +131,8 @@ export default function AboutPage() {
       </MarketingSection>
 
       <MarketingCtaBand
-        title="Get to know ChurchPay properly."
-        body="The best way to understand what we've built is to see it with your own church in mind. Book a walkthrough or just start a conversation."
+        title="Get to know MosquePay properly."
+        body="The best way to understand what we've built is to see it with your own mosque in mind. Book a walkthrough or just start a conversation."
         secondaryLabel="Contact us"
         secondaryHref="/contact"
       />

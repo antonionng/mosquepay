@@ -39,8 +39,8 @@ function isSameMonthDay(a: Date, iso: string | null): boolean {
   return a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-export async function runAllAutomations(churchId: string): Promise<AutomationRunResult[]> {
-  const settings = await db.listAutomationSettings(churchId);
+export async function runAllAutomations(mosqueId: string): Promise<AutomationRunResult[]> {
+  const settings = await db.listAutomationSettings(mosqueId);
   const enabledKeys = new Set(
     settings.filter((s) => s.enabled).map((s) => s.automation_key)
   );
@@ -54,7 +54,7 @@ export async function runAllAutomations(churchId: string): Promise<AutomationRun
       continue;
     }
     try {
-      const result = await runAutomation(churchId, key);
+      const result = await runAutomation(mosqueId, key);
       results.push(result);
     } catch (error) {
       console.warn(`Automation ${key} failed`, error);
@@ -65,12 +65,12 @@ export async function runAllAutomations(churchId: string): Promise<AutomationRun
 }
 
 export async function runAutomation(
-  churchId: string,
+  mosqueId: string,
   key: AutomationKey
 ): Promise<AutomationRunResult> {
-  const church = await db.getChurchById(churchId);
+  const mosque = await db.getMosqueById(mosqueId);
   const template = await db.getMessageTemplateByKey(
-    churchId,
+    mosqueId,
     AUTOMATION_TEMPLATE_KEYS[key]
   );
   if (!template) {
@@ -79,34 +79,34 @@ export async function runAutomation(
   const today = new Date();
 
   if (key === "birthday") {
-    const members = await db.getMembers(churchId, { status: "active" });
+    const members = await db.getMembers(mosqueId, { status: "active" });
     const recipients = members
       .filter((m) => isSameMonthDay(today, m.date_of_birth))
       .map((member) => ({
         email: member.email,
         name: member.full_name,
         member_id: member.id,
-        context: buildMemberContext(member, church),
+        context: buildMemberContext(member, mosque),
       }));
     if (recipients.length === 0) {
       return { key, enabled: true, attempted: 0, sent: 0, failed: 0, skipped: 0 };
     }
     const out = await sendBatch({
-      churchId,
+      mosqueId,
       templateKey: template.template_key,
       subject: template.subject,
       htmlBody: template.html_body,
       recipients,
       audienceLabel: "automation:birthday",
     });
-    await db.upsertAutomationSetting(churchId, key, true, {
+    await db.upsertAutomationSetting(mosqueId, key, true, {
       last_run_at: new Date().toISOString(),
     });
     return { key, enabled: true, attempted: recipients.length, ...out };
   }
 
   if (key === "membership_anniversary") {
-    const members = await db.getMembers(churchId, { status: "active" });
+    const members = await db.getMembers(mosqueId, { status: "active" });
     const recipients = members
       .filter((m) => isSameMonthDay(today, m.date_of_membership))
       .map((member) => {
@@ -118,7 +118,7 @@ export async function runAutomation(
           email: member.email,
           name: member.full_name,
           member_id: member.id,
-          context: buildMemberContext(member, church, { years: String(years) }),
+          context: buildMemberContext(member, mosque, { years: String(years) }),
         };
       })
       .filter((r) => Number(r.context.years) > 0);
@@ -126,7 +126,7 @@ export async function runAutomation(
       return { key, enabled: true, attempted: 0, sent: 0, failed: 0, skipped: 0 };
     }
     const out = await sendBatch({
-      churchId,
+      mosqueId,
       templateKey: template.template_key,
       subject: template.subject,
       htmlBody: template.html_body,
@@ -137,7 +137,7 @@ export async function runAutomation(
   }
 
   if (key === "post_service_thank_you") {
-    const events = await db.getEvents(churchId, { published: true });
+    const events = await db.getEvents(mosqueId, { published: true });
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayKey = yesterday.toISOString().slice(0, 10);
@@ -152,7 +152,7 @@ export async function runAutomation(
     let failed = 0;
     let skipped = 0;
     for (const event of recentEvents) {
-      const rsvps = await db.getRsvpsByEventId(event.id, churchId);
+      const rsvps = await db.getRsvpsByEventId(event.id, mosqueId);
       const attendees = rsvps.filter((r) => r.attending_ceremony && r.user_email);
       const recipients = attendees.map((rsvp) => ({
         email: rsvp.user_email!,
@@ -162,7 +162,7 @@ export async function runAutomation(
           first_name: rsvp.user_name.split(/\s+/)[0],
           full_name: rsvp.user_name,
           email: rsvp.user_email!,
-          church_name: church?.name ?? "the church",
+          mosque_name: mosque?.name ?? "the mosque",
           event_title: event.title,
           event_date: new Date(event.event_date).toLocaleDateString("en-GB", {
             day: "numeric",
@@ -174,7 +174,7 @@ export async function runAutomation(
       total += recipients.length;
       if (recipients.length === 0) continue;
       const out = await sendBatch({
-        churchId,
+        mosqueId,
         templateKey: template.template_key,
         subject: template.subject,
         htmlBody: template.html_body,

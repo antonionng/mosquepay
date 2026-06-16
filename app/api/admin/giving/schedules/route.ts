@@ -1,6 +1,6 @@
 // GET /api/admin/giving/schedules
 //
-// Treasurer-facing list of giving_schedules for the active church. Used by:
+// Treasurer-facing list of giving_schedules for the active mosque. Used by:
 //   * /admin/giving/schedules (full list view)
 //   * /admin/treasurer (count card)
 //
@@ -49,12 +49,12 @@ export async function GET(request: NextRequest) {
   }
 
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
     return NextResponse.json({ schedules: [], counts: null });
   }
-  const churchId = ctx.churchId;
+  const mosqueId = ctx.mosqueId;
 
-  const forbidden = await requireAdminApiPermission("payments:write", churchId);
+  const forbidden = await requireAdminApiPermission("payments:write", mosqueId);
   if (forbidden) return forbidden;
 
   const url = new URL(request.url);
@@ -89,13 +89,13 @@ export async function GET(request: NextRequest) {
   }
 
   const [schedules, counts] = await Promise.all([
-    db.listGivingSchedules(churchId, {
+    db.listGivingSchedules(mosqueId, {
       status: statusFilter,
       memberEmail: email,
       limit,
     }),
     includeCounts
-      ? db.countGivingSchedulesByStatus(churchId)
+      ? db.countGivingSchedulesByStatus(mosqueId)
       : Promise.resolve(null),
   ]);
 

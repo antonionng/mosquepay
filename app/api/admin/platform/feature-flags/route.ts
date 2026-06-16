@@ -22,12 +22,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const churchId = request.nextUrl.searchParams.get("church_id");
-  if (!churchId) {
-    return NextResponse.json({ error: "church_id is required." }, { status: 400 });
+  const mosqueId = request.nextUrl.searchParams.get("mosque_id");
+  if (!mosqueId) {
+    return NextResponse.json({ error: "mosque_id is required." }, { status: 400 });
   }
 
-  const flags = await db.listChurchFeatureFlags(churchId);
+  const flags = await db.listMosqueFeatureFlags(mosqueId);
   return NextResponse.json({
     flags: Object.fromEntries(
       Object.entries(FEATURE_FLAGS).map(([key, meta]) => {
@@ -48,23 +48,23 @@ export async function PATCH(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const churchId = typeof body.church_id === "string" ? body.church_id : "";
+  const mosqueId = typeof body.mosque_id === "string" ? body.mosque_id : "";
   const flagKey = typeof body.flag_key === "string" ? body.flag_key : "";
-  if (!churchId || !flagKey || !isValidKey(flagKey)) {
+  if (!mosqueId || !flagKey || !isValidKey(flagKey)) {
     return NextResponse.json(
-      { error: "church_id and a valid flag_key are required." },
+      { error: "mosque_id and a valid flag_key are required." },
       { status: 400 }
     );
   }
   const enabled = Boolean(body.enabled);
 
-  const updated = await db.setChurchFeatureFlag(churchId, flagKey, enabled, {
+  const updated = await db.setMosqueFeatureFlag(mosqueId, flagKey, enabled, {
     updated_by_email: scope.email,
   });
-  clearFeatureFlagCache(churchId);
+  clearFeatureFlagCache(mosqueId);
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: enabled ? "feature_flag_enabled" : "feature_flag_disabled",
     entityType: "feature_flag",
     entityId: updated.id,

@@ -1,25 +1,25 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { isSupabaseConfigured, shouldUseInMemoryMock } from "@/lib/db/with-fallback";
-import { getDefaultChurchId, resolveChurchId } from "@/lib/db/helpers";
-import { getChurchById } from "@/lib/db";
+import { getDefaultMosqueId, resolveMosqueId } from "@/lib/db/helpers";
+import { getMosqueById } from "@/lib/db";
 import { getCurrentAdminScope } from "@/lib/auth/permissions";
 import {
-  ADMIN_CHURCH_COOKIE,
-  getDefaultChurchSlug,
-  resolveChurchSlug,
+  ADMIN_MOSQUE_COOKIE,
+  getDefaultMosqueSlug,
+  resolveMosqueSlug,
 } from "@/lib/tenant";
 
-export { ADMIN_CHURCH_COOKIE };
+export { ADMIN_MOSQUE_COOKIE };
 
 /**
  * Admin server pages: use mock data only on the offline demo path (see shouldUseInMemoryMock).
- * When Supabase is configured, always scope reads with churchId; if the default church is
+ * When Supabase is configured, always scope reads with mosqueId; if the default mosque is
  * missing, use empty DB paths (never mock) to avoid cross-tenant leakage.
  */
 export type AdminReadContext =
   | { mode: "mock" }
-  | { mode: "database"; churchId: string | null; churchSlug: string };
+  | { mode: "database"; mosqueId: string | null; mosqueSlug: string };
 
 export async function getAdminReadContext(): Promise<AdminReadContext> {
   const scope = await getCurrentAdminScope();
@@ -41,41 +41,41 @@ export async function getAdminReadContext(): Promise<AdminReadContext> {
 
   const cookieStore = await cookies();
 
-  if (scope.kind === "church") {
-    const selectedCookieSlug = cookieStore.get(ADMIN_CHURCH_COOKIE)?.value;
+  if (scope.kind === "mosque") {
+    const selectedCookieSlug = cookieStore.get(ADMIN_MOSQUE_COOKIE)?.value;
     const selectedSlug = selectedCookieSlug
-      ? resolveChurchSlug(selectedCookieSlug)
+      ? resolveMosqueSlug(selectedCookieSlug)
       : null;
-    const selectedChurchId = selectedSlug ? await resolveChurchId(selectedSlug) : null;
-    const scopedChurchId =
-      selectedChurchId && scope.churchIds.includes(selectedChurchId)
-        ? selectedChurchId
-        : scope.churchId;
-    const church = await getChurchById(scopedChurchId);
+    const selectedMosqueId = selectedSlug ? await resolveMosqueId(selectedSlug) : null;
+    const scopedMosqueId =
+      selectedMosqueId && scope.mosqueIds.includes(selectedMosqueId)
+        ? selectedMosqueId
+        : scope.mosqueId;
+    const mosque = await getMosqueById(scopedMosqueId);
 
     return {
       mode: "database",
-      churchId: scopedChurchId,
-      churchSlug: church?.slug ?? getDefaultChurchSlug(),
+      mosqueId: scopedMosqueId,
+      mosqueSlug: mosque?.slug ?? getDefaultMosqueSlug(),
     };
   }
 
-  const selectedSlug = resolveChurchSlug(
-    cookieStore.get(ADMIN_CHURCH_COOKIE)?.value ?? getDefaultChurchSlug()
+  const selectedSlug = resolveMosqueSlug(
+    cookieStore.get(ADMIN_MOSQUE_COOKIE)?.value ?? getDefaultMosqueSlug()
   );
-  const selectedChurchId = await resolveChurchId(selectedSlug);
+  const selectedMosqueId = await resolveMosqueId(selectedSlug);
 
-  if (selectedChurchId) {
+  if (selectedMosqueId) {
     return {
       mode: "database",
-      churchId: selectedChurchId,
-      churchSlug: selectedSlug,
+      mosqueId: selectedMosqueId,
+      mosqueSlug: selectedSlug,
     };
   }
 
   return {
     mode: "database",
-    churchId: await getDefaultChurchId(),
-    churchSlug: getDefaultChurchSlug(),
+    mosqueId: await getDefaultMosqueId(),
+    mosqueSlug: getDefaultMosqueSlug(),
   };
 }

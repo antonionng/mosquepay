@@ -7,23 +7,23 @@ export const dynamic = "force-dynamic";
 
 export default async function OnboardingPage() {
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
     redirect("/admin");
   }
-  const churchId = ctx.churchId;
+  const mosqueId = ctx.mosqueId;
 
-  const [church, members, giving, events, staff] = await Promise.all([
-    db.getChurchBySlug(ctx.churchSlug),
-    db.getMembers(churchId, {}),
-    db.getMemberGiving(churchId, {}),
-    db.getEvents(churchId, { upcoming: true }),
-    db.listAdminUsersForChurch(churchId).catch(() => []),
+  const [mosque, members, giving, events, staff] = await Promise.all([
+    db.getMosqueBySlug(ctx.mosqueSlug),
+    db.getMembers(mosqueId, {}),
+    db.getMemberGiving(mosqueId, {}),
+    db.getEvents(mosqueId, { upcoming: true }),
+    db.listAdminUsersForMosque(mosqueId).catch(() => []),
   ]);
 
   return (
     <OnboardingWizard
-      churchSlug={ctx.churchSlug}
-      churchName={church?.name ?? "Your church"}
+      mosqueSlug={ctx.mosqueSlug}
+      mosqueName={mosque?.name ?? "Your mosque"}
       counts={{
         members: members.length,
         giving: giving.length,

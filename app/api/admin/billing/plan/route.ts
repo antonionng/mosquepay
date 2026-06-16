@@ -10,16 +10,16 @@ import {
 } from "@/lib/billing/plans";
 import * as db from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 
 export async function GET(request: NextRequest) {
   const unauthorized = await requireAdminApiAuth();
   if (unauthorized) return unauthorized;
 
-  const churchSlug = getChurchSlugFromRequest(request);
+  const mosqueSlug = getMosqueSlugFromRequest(request);
 
   if (!isSupabaseConfigured()) {
-    const plan = getPlanDefinition("church_essentials");
+    const plan = getPlanDefinition("mosque_essentials");
     const entitlements = entitlementsForPlan(plan.code);
     return NextResponse.json({
       plan,
@@ -30,19 +30,19 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
 
-  const forbidden = await requireAdminApiPermission("admin:all", churchId);
+  const forbidden = await requireAdminApiPermission("admin:all", mosqueId);
   if (forbidden) return forbidden;
 
-  const subscription = await db.getChurchSubscription(churchId);
+  const subscription = await db.getMosqueSubscription(mosqueId);
   const planCode = normalizePlanCode(subscription?.plan_code);
   const plan = getPlanDefinition(planCode);
   const entitlements = entitlementsForPlan(planCode);
-  const overrides = await db.listChurchFeatureFlags(churchId).catch(() => []);
+  const overrides = await db.listMosqueFeatureFlags(mosqueId).catch(() => []);
 
   for (const override of overrides) {
     entitlements[override.flag_key as keyof typeof entitlements] = override.enabled;

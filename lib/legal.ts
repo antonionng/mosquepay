@@ -1,4 +1,4 @@
-export const PRODUCT_NAME = "ChurchPay";
+export const PRODUCT_NAME = "MosquePay";
 
 export const COMPANY_NAME = "NEURAL NETWORK GROUP LIMITED";
 

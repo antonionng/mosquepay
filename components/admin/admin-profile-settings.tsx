@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 
 type ProfileMembership = {
   id: string;
-  church_id: string | null;
+  mosque_id: string | null;
   email: string;
   full_name: string;
   role: string;
@@ -103,7 +103,7 @@ export function AdminProfileSettings() {
             My profile
           </h2>
           <p className="dash-panel-header-description">
-            Manage your own admin identity. Church roles are controlled by the church team.
+            Manage your own admin identity. Mosque roles are controlled by the mosque team.
           </p>
         </div>
       </div>
@@ -159,15 +159,15 @@ export function AdminProfileSettings() {
             </form>
 
             <div className="rounded-2xl border border-dash-border bg-dash-surface-subtle p-4">
-              <h3 className="text-sm font-semibold text-dash-text">Your church access</h3>
+              <h3 className="text-sm font-semibold text-dash-text">Your mosque access</h3>
               <p className="mt-1 text-xs text-dash-muted">
-                If you help with multiple churches, each assigned church appears in the church switcher.
+                If you help with multiple mosques, each assigned mosque appears in the mosque switcher.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 {profile.memberships.map((membership) => (
                   <Badge key={membership.id} variant="secondary" className="border-dash-border">
                     {membership.role.replaceAll("_", " ")}
-                    {membership.church_id ? "" : " · platform"}
+                    {membership.mosque_id ? "" : " · platform"}
                   </Badge>
                 ))}
               </div>

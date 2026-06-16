@@ -30,56 +30,56 @@ function cleanRole(value: unknown) {
   return typeof value === "string" && ROLES.has(value) ? value : "secretary";
 }
 
-async function selectedChurchId(_request: NextRequest) {
-  // Resolve the church from the admin's scope (same logic the page uses), not
-  // from the request host/cookie/default. Otherwise a church-scoped admin
-  // whose ADMIN_CHURCH_COOKIE has not been set yet (e.g. a single-church
-  // secretary who never used the church switcher) lands on the DEFAULT church
+async function selectedMosqueId(_request: NextRequest) {
+  // Resolve the mosque from the admin's scope (same logic the page uses), not
+  // from the request host/cookie/default. Otherwise a mosque-scoped admin
+  // whose ADMIN_MOSQUE_COOKIE has not been set yet (e.g. a single-mosque
+  // secretary who never used the mosque switcher) lands on the DEFAULT mosque
   // here, fails the admin:all permission check, and gets a 401 even though
-  // the page rendered fine using their actual church.
+  // the page rendered fine using their actual mosque.
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
-    return { churchSlug: ctx.mode === "database" ? ctx.churchSlug : "", churchId: null };
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
+    return { mosqueSlug: ctx.mode === "database" ? ctx.mosqueSlug : "", mosqueId: null };
   }
-  return { churchSlug: ctx.churchSlug, churchId: ctx.churchId };
+  return { mosqueSlug: ctx.mosqueSlug, mosqueId: ctx.mosqueId };
 }
 
 async function sendStaffInvite({
   request,
   staff,
-  churchSlug,
+  mosqueSlug,
 }: {
   request: NextRequest;
   staff: db.AdminUser;
-  churchSlug: string;
+  mosqueSlug: string;
 }) {
-  return sendInvite({ request, staff, churchName: churchSlug });
+  return sendInvite({ request, staff, mosqueName: mosqueSlug });
 }
 
 export async function GET(request: NextRequest) {
-  const { churchId } = await selectedChurchId(request);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const { mosqueId } = await selectedMosqueId(request);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
 
-  const forbidden = await requireAdminApiPermission("admin:all", churchId);
+  const forbidden = await requireAdminApiPermission("admin:all", mosqueId);
   if (forbidden) return forbidden;
 
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ staff: [] });
   }
 
-  const staff = await db.listAdminUsersForChurch(churchId);
+  const staff = await db.listAdminUsersForMosque(mosqueId);
   return NextResponse.json({ staff });
 }
 
 export async function POST(request: NextRequest) {
-  const { churchSlug, churchId } = await selectedChurchId(request);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const { mosqueSlug, mosqueId } = await selectedMosqueId(request);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
 
-  const forbidden = await requireAdminApiPermission("admin:all", churchId);
+  const forbidden = await requireAdminApiPermission("admin:all", mosqueId);
   if (forbidden) return forbidden;
 
   if (!isSupabaseConfigured()) {
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
   }
 
   const staff = await db.createAdminUser({
-    church_id: churchId,
+    mosque_id: mosqueId,
     email,
     full_name: fullName,
     role,
@@ -110,12 +110,12 @@ export async function POST(request: NextRequest) {
   });
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "created",
     entityType: "admin_user",
     entityId: staff.id,
     summary: `Created staff user ${staff.email}`,
-    metadata: { role: staff.role, scoped_church_id: staff.church_id },
+    metadata: { role: staff.role, scoped_mosque_id: staff.mosque_id },
   });
 
   let invite: { sent: boolean; error: string | null } = {
@@ -123,10 +123,10 @@ export async function POST(request: NextRequest) {
     error: null,
   };
   if (sendInvite) {
-    invite = await sendStaffInvite({ request, staff, churchSlug });
+    invite = await sendStaffInvite({ request, staff, mosqueSlug });
     if (invite.sent) {
       await writeAuditLog({
-        churchId,
+        mosqueId,
         action: "invited",
         entityType: "admin_user",
         entityId: staff.id,
@@ -140,12 +140,12 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const { churchSlug, churchId } = await selectedChurchId(request);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const { mosqueSlug, mosqueId } = await selectedMosqueId(request);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
 
-  const forbidden = await requireAdminApiPermission("admin:all", churchId);
+  const forbidden = await requireAdminApiPermission("admin:all", mosqueId);
   if (forbidden) return forbidden;
 
   if (!isSupabaseConfigured()) {
@@ -159,13 +159,13 @@ export async function PATCH(request: NextRequest) {
   }
 
   if (body.action === "send_invite") {
-    const existing = (await db.listAdminUsersForChurch(churchId)).find(
+    const existing = (await db.listAdminUsersForMosque(mosqueId)).find(
       (member) => member.id === id
     );
     if (!existing) {
       return NextResponse.json({ error: "Staff user not found." }, { status: 404 });
     }
-    const invite = await sendStaffInvite({ request, staff: existing, churchSlug });
+    const invite = await sendStaffInvite({ request, staff: existing, mosqueSlug });
     if (!invite.sent) {
       return NextResponse.json(
         { error: invite.error ?? "Could not send invite." },
@@ -173,7 +173,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
     await writeAuditLog({
-      churchId,
+      mosqueId,
       action: "invited",
       entityType: "admin_user",
       entityId: existing.id,
@@ -184,17 +184,17 @@ export async function PATCH(request: NextRequest) {
   }
 
   if (body.action === "send_password_reset") {
-    const existing = (await db.listAdminUsersForChurch(churchId)).find(
+    const existing = (await db.listAdminUsersForMosque(mosqueId)).find(
       (member) => member.id === id
     );
     if (!existing) {
       return NextResponse.json({ error: "Staff user not found." }, { status: 404 });
     }
-    const church = await db.getChurchById(churchId).catch(() => null);
+    const mosque = await db.getMosqueById(mosqueId).catch(() => null);
     const reset = await sendStaffPasswordReset({
       request,
       staff: existing,
-      churchName: church?.name ?? churchSlug,
+      mosqueName: mosque?.name ?? mosqueSlug,
     });
     if (!reset.sent) {
       return NextResponse.json(
@@ -203,7 +203,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
     await writeAuditLog({
-      churchId,
+      mosqueId,
       action: "password_reset_sent",
       entityType: "admin_user",
       entityId: existing.id,
@@ -219,7 +219,7 @@ export async function PATCH(request: NextRequest) {
     full_name: fullName,
     role,
     active: body.active !== false,
-    church_id: churchId,
+    mosque_id: mosqueId,
     permissions: Array.isArray(body.permissions) ? body.permissions : [],
   };
 
@@ -233,12 +233,12 @@ export async function PATCH(request: NextRequest) {
   }
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "updated",
     entityType: "admin_user",
     entityId: staff.id,
     summary: `Updated staff user ${staff.email}`,
-    metadata: { role: staff.role, active: staff.active, scoped_church_id: staff.church_id },
+    metadata: { role: staff.role, active: staff.active, scoped_mosque_id: staff.mosque_id },
   });
 
   return NextResponse.json({ staff });

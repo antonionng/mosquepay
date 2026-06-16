@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
 
@@ -17,15 +17,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ giving: [] });
     }
 
-    const churchSlug = getChurchSlugFromRequest(request);
-    const churchId = await db.resolveChurchId(churchSlug);
-    if (!churchId) {
-      return NextResponse.json({ error: "Church not found." }, { status: 404 });
+    const mosqueSlug = getMosqueSlugFromRequest(request);
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
     }
 
     const status = request.nextUrl.searchParams.get("status") ?? undefined;
 
-    const giving = await db.getMemberGiving(churchId, { memberEmail, status });
+    const giving = await db.getMemberGiving(mosqueId, { memberEmail, status });
     return NextResponse.json({ giving });
   } catch (e) {
     console.error("Giving GET error:", e);
@@ -45,12 +45,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const churchSlug = getChurchSlugFromRequest(request);
-    const churchId = await db.resolveChurchId(churchSlug);
-    if (!churchId) {
-      return NextResponse.json({ error: "Church not found." }, { status: 404 });
+    const mosqueSlug = getMosqueSlugFromRequest(request);
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("payments:write", churchId);
+    const forbidden = await requireAdminApiPermission("payments:write", mosqueId);
     if (forbidden) return forbidden;
 
     const body = await request.json();
@@ -90,12 +90,12 @@ export async function POST(request: NextRequest) {
         updates.waiver_reason = null;
       }
 
-      const record = await db.updateMemberGivingStatus(givingId, churchId, updates);
+      const record = await db.updateMemberGivingStatus(givingId, mosqueId, updates);
       if (!record) {
         return NextResponse.json({ error: "Giving record not found." }, { status: 404 });
       }
       await writeAuditLog({
-        churchId,
+        mosqueId,
         action: body.action,
         entityType: "giving",
         entityId: record.id,
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
     let charitableAmount = Number(body.charitable_amount ?? 0);
     let giftAidEnabled = Boolean(body.gift_aid_enabled);
     if (giving_id) {
-      const templates = await db.getChurchGiving(churchId);
+      const templates = await db.getMosqueGiving(mosqueId);
       const template = templates.find((item) => item.id === giving_id);
       if (template) {
         charitableAmount = Math.min(template.charitable_amount ?? 0, Number(amount));
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const record = await db.createMemberGiving(churchId, {
+    const record = await db.createMemberGiving(mosqueId, {
       member_email,
       member_name: member_name ?? null,
       member_id: null,
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
     });
 
     await writeAuditLog({
-      churchId,
+      mosqueId,
       action: "created",
       entityType: "giving",
       entityId: record.id,

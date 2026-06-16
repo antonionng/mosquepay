@@ -19,7 +19,7 @@ export function defaultMaxUsesForPolicy(
 }
 
 /**
- * Per-guest token used for church-scoped newcomer links. Same shape as invitation tokens
+ * Per-guest token used for mosque-scoped newcomer links. Same shape as invitation tokens
  * (32 bytes, base64url, sha256-hashed at rest); a separate generator just so
  * the call site reads clearly.
  */

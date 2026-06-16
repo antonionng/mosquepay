@@ -152,7 +152,7 @@ export function TemplateMarketplaceClient({
             Communications template library
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-500">
-            Hand-crafted starting points for every email your church sends.
+            Hand-crafted starting points for every email your mosque sends.
             Install one or many; you can edit them freely afterwards under
             Communications &rsaquo; Templates.
           </p>

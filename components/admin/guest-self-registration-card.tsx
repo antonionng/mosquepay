@@ -5,15 +5,15 @@ import { useRouter } from "next/navigation";
 import { Check, Copy, Link as LinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { churchScopedVisitPath } from "@/lib/public-links";
+import { mosqueScopedVisitPath } from "@/lib/public-links";
 
 type Props = {
-  churchSlug: string;
+  mosqueSlug: string;
   initialEnabled: boolean;
 };
 
 export function GuestSelfRegistrationCard({
-  churchSlug,
+  mosqueSlug,
   initialEnabled,
 }: Props) {
   const router = useRouter();
@@ -24,8 +24,8 @@ export function GuestSelfRegistrationCard({
 
   const publicUrl =
     typeof window !== "undefined"
-      ? `${window.location.origin}${churchScopedVisitPath(churchSlug)}`
-      : churchScopedVisitPath(churchSlug);
+      ? `${window.location.origin}${mosqueScopedVisitPath(mosqueSlug)}`
+      : mosqueScopedVisitPath(mosqueSlug);
 
   async function toggle(next: boolean) {
     setError(null);

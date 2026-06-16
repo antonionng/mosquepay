@@ -13,21 +13,21 @@ const FLAGS = [
   { key: "site_builder", label: "Public site builder" },
 ] as const;
 
-type Church = { id: string; name: string };
+type Mosque = { id: string; name: string };
 
-export function FeatureFlagsClient({ churches }: { churches: Church[] }) {
+export function FeatureFlagsClient({ mosques }: { mosques: Mosque[] }) {
   const [open, setOpen] = useState(false);
-  const [churchId, setChurchId] = useState<string>(churches[0]?.id ?? "");
+  const [mosqueId, setMosqueId] = useState<string>(mosques[0]?.id ?? "");
   const [flags, setFlags] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open || !churchId) return;
+    if (!open || !mosqueId) return;
     let active = true;
     setLoading(true);
-    fetch(`/api/admin/platform/feature-flags?church_id=${churchId}`)
+    fetch(`/api/admin/platform/feature-flags?mosque_id=${mosqueId}`)
       .then((res) => res.json())
       .then((data) => {
         if (active) setFlags(data.flags ?? {});
@@ -39,17 +39,17 @@ export function FeatureFlagsClient({ churches }: { churches: Church[] }) {
     return () => {
       active = false;
     };
-  }, [open, churchId]);
+  }, [open, mosqueId]);
 
   async function toggle(flagKey: string) {
-    if (!churchId) return;
+    if (!mosqueId) return;
     setBusyKey(flagKey);
     try {
       const res = await fetch("/api/admin/platform/feature-flags", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          church_id: churchId,
+          mosque_id: mosqueId,
           flag_key: flagKey,
           enabled: !flags[flagKey],
         }),
@@ -79,7 +79,7 @@ export function FeatureFlagsClient({ churches }: { churches: Church[] }) {
         <div>
           <h2 className="text-base font-semibold text-slate-900">Feature flags</h2>
           <p className="text-xs text-slate-500">
-            Gate any module on or off per church. Disabling hides the navigation
+            Gate any module on or off per mosque. Disabling hides the navigation
             entry and short-circuits APIs that opt-in to checking.
           </p>
         </div>
@@ -89,16 +89,16 @@ export function FeatureFlagsClient({ churches }: { churches: Church[] }) {
       </div>
 
       <div className="mt-4 flex items-center gap-3">
-        <label htmlFor="ff-church" className="text-xs text-slate-500">
-          Church
+        <label htmlFor="ff-mosque" className="text-xs text-slate-500">
+          Mosque
         </label>
         <select
-          id="ff-church"
+          id="ff-mosque"
           className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-          value={churchId}
-          onChange={(e) => setChurchId(e.target.value)}
+          value={mosqueId}
+          onChange={(e) => setMosqueId(e.target.value)}
         >
-          {churches.map((l) => (
+          {mosques.map((l) => (
             <option key={l.id} value={l.id}>
               {l.name}
             </option>

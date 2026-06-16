@@ -12,33 +12,33 @@ import {
   MarketingSection,
   MarketingKicker,
 } from "@/components/marketing/marketing-shell";
-import { getDefaultChurchSlug, resolveChurchSlug } from "@/lib/tenant";
+import { getDefaultMosqueSlug, resolveMosqueSlug } from "@/lib/tenant";
 import { marketingMetadata } from "@/lib/seo";
 
 export const metadata = marketingMetadata({
-  title: "ChurchPay News | Product Updates for Church Software",
+  title: "MosquePay News | Product Updates for Mosque Software",
   description:
-    "Read ChurchPay product updates covering giving and Gift Aid tools, church websites, service notices, member portals, newcomer follow-up, reporting, and multi-church administration.",
+    "Read MosquePay product updates covering giving and Gift Aid tools, mosque websites, service notices, member portals, newcomer follow-up, reporting, and multi-mosque administration.",
   path: "/news",
   keywords: [
-    "ChurchPay news",
-    "church software updates",
-    "church platform updates",
-    "church technology news",
+    "MosquePay news",
+    "mosque software updates",
+    "mosque platform updates",
+    "mosque technology news",
   ],
 });
 
 const PRODUCT_UPDATES = [
   {
-    slug: "multi-church-rollout",
-    title: "Multi-church networks now fully supported",
+    slug: "multi-mosque-rollout",
+    title: "Multi-mosque networks now fully supported",
     excerpt:
-      "Per-church branding, records, and websites with central oversight, cross-church reporting, and one invoice for the whole network.",
+      "Per-mosque branding, records, and websites with central oversight, cross-mosque reporting, and one invoice for the whole network.",
     published_at: "2026-04-08T10:00:00.000Z",
   },
   {
     slug: "ai-site-builder",
-    title: "AI-assisted church website builder",
+    title: "AI-assisted mosque website builder",
     excerpt:
       "Generate page drafts, review changes side by side, and publish with guardrails. Built for volunteers, not developers.",
     published_at: "2026-04-07T10:00:00.000Z",
@@ -52,7 +52,7 @@ const PRODUCT_UPDATES = [
   },
   {
     slug: "pastoral-care",
-    title: "Pastoral care module with private access",
+    title: "Welfare module with private access",
     excerpt:
       "Confidential care cases, visit logs, and gentle follow-up signals, visible only to your pastoral team.",
     published_at: "2026-03-05T10:00:00.000Z",
@@ -62,14 +62,14 @@ const PRODUCT_UPDATES = [
 export default async function NewsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ church?: string }>;
+  searchParams: Promise<{ mosque?: string }>;
 }) {
-  const { church } = await searchParams;
-  const isTenantMode = Boolean(church);
-  const churchSlug = resolveChurchSlug(church);
-  const defaultSlug = getDefaultChurchSlug();
-  const withChurchQuery = (href: string) =>
-    churchSlug === defaultSlug ? href : `${href}?church=${encodeURIComponent(churchSlug)}`;
+  const { mosque } = await searchParams;
+  const isTenantMode = Boolean(mosque);
+  const mosqueSlug = resolveMosqueSlug(mosque);
+  const defaultSlug = getDefaultMosqueSlug();
+  const withMosqueQuery = (href: string) =>
+    mosqueSlug === defaultSlug ? href : `${href}?mosque=${encodeURIComponent(mosqueSlug)}`;
 
   if (!isTenantMode) {
     return (
@@ -79,7 +79,7 @@ export default async function NewsPage({
             <div className="max-w-3xl">
               <MarketingKicker>Product news</MarketingKicker>
               <h1 className="mt-4 font-heading text-4xl font-bold leading-tight tracking-tight text-slate-900 sm:text-5xl">
-                What&apos;s new in ChurchPay.
+                What&apos;s new in MosquePay.
               </h1>
               <p className="mt-6 text-lg leading-8 text-slate-600">
                 Updates and improvements across giving, websites, congregation tools, and
@@ -114,9 +114,9 @@ export default async function NewsPage({
   }>;
 
   if (useDb) {
-    const churchId = await db.resolveChurchId(churchSlug);
-    const raw = churchId
-      ? await db.getBlogPosts(churchId, { published: true })
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    const raw = mosqueId
+      ? await db.getBlogPosts(mosqueId, { published: true })
       : [];
     posts = raw.map((p) => ({
       slug: p.slug,
@@ -125,7 +125,7 @@ export default async function NewsPage({
       published_at: p.published_at,
     }));
   } else if (shouldUseInMemoryMock()) {
-    posts = mockDb.getBlogPosts({ published: true, church_slug: churchSlug }).map((p) => ({
+    posts = mockDb.getBlogPosts({ published: true, mosque_slug: mosqueSlug }).map((p) => ({
       slug: p.slug,
       title: p.title,
       excerpt: p.excerpt,
@@ -148,7 +148,7 @@ export default async function NewsPage({
                 <p className="public-kicker">News</p>
                 <h1 className="public-hero-title">Updates, announcements, and stories.</h1>
                 <p className="public-hero-body">
-                  Follow what&apos;s happening in the life of our church: announcements, event
+                  Follow what&apos;s happening in the life of our mosque: announcements, event
                   recaps, and news for members and newcomers.
                 </p>
               </div>
@@ -157,7 +157,7 @@ export default async function NewsPage({
                   Coverage
                 </p>
                 <div className="mt-6 space-y-3 text-sm text-slate-300">
-                  <p>Church announcements</p>
+                  <p>Mosque announcements</p>
                   <p>Event recaps</p>
                   <p>News for members and newcomers</p>
                 </div>
@@ -172,7 +172,7 @@ export default async function NewsPage({
                   {posts.map((p) => (
                     <Link
                       key={p.slug}
-                      href={withChurchQuery(`/news/${p.slug}`)}
+                      href={withMosqueQuery(`/news/${p.slug}`)}
                       className="group public-grid-card block h-full"
                     >
                       <div>
@@ -200,7 +200,7 @@ export default async function NewsPage({
                   </div>
                   <h3 className="mb-2 text-xl font-semibold text-slate-900">No news yet</h3>
                   <p className="mx-auto max-w-md text-slate-600">
-                    Check back soon for updates and announcements from the church.
+                    Check back soon for updates and announcements from the mosque.
                   </p>
                 </div>
               )}

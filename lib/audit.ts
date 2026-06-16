@@ -5,14 +5,14 @@ import {
 } from "@/lib/auth/permissions";
 
 export async function writeAuditLog({
-  churchId,
+  mosqueId,
   action,
   entityType,
   entityId,
   summary,
   metadata = {},
 }: {
-  churchId: string | null;
+  mosqueId: string | null;
   action: string;
   entityType: string;
   entityId?: string | null;
@@ -20,11 +20,11 @@ export async function writeAuditLog({
   metadata?: Record<string, unknown>;
 }) {
   try {
-    const admin = await getCurrentAdminContextAny(churchId);
+    const admin = await getCurrentAdminContextAny(mosqueId);
     const scope = await getCurrentAdminScope();
     const enriched: Record<string, unknown> = { ...metadata };
     if (
-      churchId &&
+      mosqueId &&
       (scope.kind === "platform" || scope.kind === "dummy")
     ) {
       enriched.impersonation = {
@@ -33,7 +33,7 @@ export async function writeAuditLog({
       };
     }
     await db.createAuditLog({
-      church_id: churchId,
+      mosque_id: mosqueId,
       actor_email: admin?.email ?? null,
       actor_role: admin?.role ?? null,
       action,

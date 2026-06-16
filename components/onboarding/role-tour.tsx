@@ -64,12 +64,12 @@ const TOURS: Record<Role, { greeting: string; steps: TourStep[] } | null> = {
     ],
   },
   operator: {
-    greeting: "Welcome. As an operator you have platform-wide access across churches.",
+    greeting: "Welcome. As an operator you have platform-wide access across mosques.",
     steps: [
       {
         icon: Sparkles,
         title: "Onboarding wizard",
-        description: "Walk a new church through the 15-minute setup.",
+        description: "Walk a new mosque through the 15-minute setup.",
         href: "/admin/onboarding",
         cta: "Open onboarding",
       },
@@ -88,7 +88,7 @@ const TOURS: Record<Role, { greeting: string; steps: TourStep[] } | null> = {
       {
         icon: Calendar,
         title: "Schedule services",
-        description: "Add the next regular service, fellowship meal, or special_service.",
+        description: "Add the next regular service, community meal, or special_service.",
         href: "/admin/services",
         cta: "Open services",
       },
@@ -194,7 +194,7 @@ const TOURS: Record<Role, { greeting: string; steps: TourStep[] } | null> = {
 };
 
 function storageKey(role: Role) {
-  return `church.tour.dismissed.${role}`;
+  return `mosque.tour.dismissed.${role}`;
 }
 
 export function RoleTour() {

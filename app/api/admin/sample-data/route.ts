@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -14,7 +14,7 @@ const SAMPLE_MEMBERS: Array<{
   rank: string;
   office_title: string | null;
 }> = [
-  { full_name: "Sample · James Carter", email: "sample-james@example.com", rank: "Master", office_title: "Lead Pastor" },
+  { full_name: "Sample · James Carter", email: "sample-james@example.com", rank: "Master", office_title: "Lead Imam" },
   { full_name: "Sample · Robert Hughes", email: "sample-robert@example.com", rank: "MM", office_title: "Senior Warden" },
   { full_name: "Sample · Edward Fielding", email: "sample-edward@example.com", rank: "MM", office_title: "Junior Warden" },
   { full_name: "Sample · Thomas Whitaker", email: "sample-thomas@example.com", rank: "PM", office_title: "Treasurer" },
@@ -49,22 +49,22 @@ export async function POST(request: NextRequest) {
       { status: 503 }
     );
   }
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("admin:all", churchId);
+  const forbidden = await requireAdminApiPermission("admin:all", mosqueId);
   if (forbidden) return forbidden;
 
   const created = { members: 0, newcomers: 0, events: 0, giving: 0, donations: 0 };
 
-  const existingMembers = await db.getMembers(churchId, {});
+  const existingMembers = await db.getMembers(mosqueId, {});
   const existingEmails = new Set(existingMembers.map((m) => m.email?.toLowerCase()));
   for (const m of SAMPLE_MEMBERS) {
     if (existingEmails.has(m.email)) continue;
     try {
-      await db.createMember(churchId, {
+      await db.createMember(mosqueId, {
         full_name: m.full_name,
         email: m.email,
         phone: null,
@@ -94,12 +94,12 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const existingNewcomers = await db.getNewcomers(churchId, {});
+  const existingNewcomers = await db.getNewcomers(mosqueId, {});
   const existingNewcomerEmails = new Set(existingNewcomers.map((l) => l.email?.toLowerCase()));
   for (const l of SAMPLE_LEADS) {
     if (existingNewcomerEmails.has(l.email)) continue;
     try {
-      await db.addNewcomer(churchId, {
+      await db.addNewcomer(mosqueId, {
         first_name: l.first_name,
         last_name: l.last_name,
         email: l.email,
@@ -131,15 +131,15 @@ export async function POST(request: NextRequest) {
   const upcoming = new Date(today);
   upcoming.setDate(upcoming.getDate() + 21);
   const slug = `sample-regular-${upcoming.toISOString().slice(0, 10)}`;
-  const existingEvents = await db.getEvents(churchId, {});
+  const existingEvents = await db.getEvents(mosqueId, {});
   const existingSlugs = new Set(existingEvents.map((e) => e.slug));
   if (!existingSlugs.has(slug)) {
     try {
-      await db.addEvent(churchId, {
+      await db.addEvent(mosqueId, {
         title: "Sample · Regular service",
         slug,
         description: "Demo service created by the sample data starter kit.",
-        event_type: "church_service",
+        event_type: "mosque_service",
         event_date: upcoming.toISOString(),
         event_time: "18:30",
         location: "Mark members' Hall",
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
         dining_price: 35,
         dining_description: "Festive board after the service",
         enable_charity_donation: true,
-        charity_name: "Church Benevolent Fund",
+        charity_name: "Mosque Benevolent Fund",
         charity_description: "Supporting members and their families.",
         charity_suggested_amounts: [10, 20, 50, 100],
         charity_allow_custom: true,
@@ -180,7 +180,7 @@ export async function POST(request: NextRequest) {
   const thisYear = today.getFullYear();
   for (const m of SAMPLE_MEMBERS) {
     try {
-      await db.createMemberGiving(churchId, {
+      await db.createMemberGiving(mosqueId, {
         member_email: m.email,
         member_name: m.full_name,
         member_id: null,
@@ -202,10 +202,10 @@ export async function POST(request: NextRequest) {
   }
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "sample_data_seeded",
-    entityType: "church",
-    entityId: churchId,
+    entityType: "mosque",
+    entityId: mosqueId,
     summary: "Sample data starter kit applied",
     metadata: created,
   });
@@ -222,21 +222,21 @@ export async function DELETE(request: NextRequest) {
       { status: 503 }
     );
   }
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("admin:all", churchId);
+  const forbidden = await requireAdminApiPermission("admin:all", mosqueId);
   if (forbidden) return forbidden;
 
   const removed = { members: 0, newcomers: 0, events: 0 };
 
-  const members = await db.getMembers(churchId, {});
+  const members = await db.getMembers(mosqueId, {});
   for (const m of members) {
     if (isSampleEmail(m.email)) {
       try {
-        await db.archiveMember(m.id, churchId, "Sample data cleanup");
+        await db.archiveMember(m.id, mosqueId, "Sample data cleanup");
         removed.members++;
       } catch {
         // ignore
@@ -244,11 +244,11 @@ export async function DELETE(request: NextRequest) {
     }
   }
 
-  const newcomers = await db.getNewcomers(churchId, {});
+  const newcomers = await db.getNewcomers(mosqueId, {});
   for (const l of newcomers) {
     if (isSampleEmail(l.email)) {
       try {
-        await db.updateNewcomer(l.id, churchId, { stage: "declined" });
+        await db.updateNewcomer(l.id, mosqueId, { stage: "declined" });
         removed.newcomers++;
       } catch {
         // ignore
@@ -256,11 +256,11 @@ export async function DELETE(request: NextRequest) {
     }
   }
 
-  const events = await db.getEvents(churchId, {});
+  const events = await db.getEvents(mosqueId, {});
   for (const e of events) {
     if (e.slug.startsWith("sample-regular-")) {
       try {
-        await db.updateEvent(e.id, churchId, { published: false });
+        await db.updateEvent(e.id, mosqueId, { published: false });
         removed.events++;
       } catch {
         // ignore
@@ -269,10 +269,10 @@ export async function DELETE(request: NextRequest) {
   }
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "sample_data_cleared",
-    entityType: "church",
-    entityId: churchId,
+    entityType: "mosque",
+    entityId: mosqueId,
     summary: "Sample data starter kit cleared",
     metadata: removed,
   });

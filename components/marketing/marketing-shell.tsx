@@ -20,7 +20,7 @@ const FOOTER_COLUMNS = [
     title: "Product",
     links: [
       { href: "/features", label: "Features" },
-      { href: "/networks", label: "For networks & dioceses" },
+      { href: "/networks", label: "For networks & networks" },
       { href: "/pricing", label: "Pricing" },
       { href: "/book-demo", label: "Book a demo" },
       { href: "/news", label: "Product news" },
@@ -29,14 +29,14 @@ const FOOTER_COLUMNS = [
   {
     title: "Company",
     links: [
-      { href: "/about", label: "About ChurchPay" },
+      { href: "/about", label: "About MosquePay" },
       { href: "/faq", label: "FAQ" },
       { href: "/contact", label: "Contact" },
       { href: "/join", label: "Get started" },
     ],
   },
   {
-    title: "For your church",
+    title: "For your mosque",
     links: [
       { href: "/member/login", label: "Member portal" },
       { href: "/admin/login", label: "Admin dashboard" },
@@ -62,10 +62,10 @@ export function MarketingShell({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen flex-col bg-[#faf8f3] text-slate-900 antialiased">
       <header className="sticky top-0 z-50 border-b border-[#e9e2d4] bg-[#faf8f3]/90 backdrop-blur-md">
         <div className="mx-auto flex h-[4.5rem] max-w-7xl items-center justify-between gap-6 px-5 lg:px-8">
-          <Link href="/" className="flex shrink-0 items-center" aria-label="ChurchPay home">
+          <Link href="/" className="flex shrink-0 items-center" aria-label="MosquePay home">
             <Image
-              src="/brand/churchpay-sidebar-logo.png"
-              alt="ChurchPay"
+              src="/brand/mosquepay-sidebar-logo.png"
+              alt="MosquePay"
               width={1032}
               height={245}
               className="h-9 w-auto max-w-[11rem] object-contain lg:h-10"
@@ -141,18 +141,18 @@ export function MarketingShell({ children }: { children: ReactNode }) {
           <div className="flex flex-col gap-12 lg:flex-row lg:justify-between">
             <div className="max-w-xs">
               <Image
-                src="/brand/churchpay-sidebar-logo.png"
-                alt="ChurchPay"
+                src="/brand/mosquepay-sidebar-logo.png"
+                alt="MosquePay"
                 width={1032}
                 height={245}
                 className="h-9 w-auto max-w-[10rem] object-contain"
               />
               <p className="mt-4 text-sm leading-6 text-slate-600">
-                Giving, Gift Aid, services, congregation records, and pastoral care for UK
-                churches, in one calm, joined-up platform.
+                Donations, Zakat &amp; Sadaqah, Gift Aid, Jumu&apos;ah, congregation
+                records, and welfare for UK mosques, in one calm, joined-up platform.
               </p>
               <p className="mt-4 text-xs font-semibold uppercase tracking-[0.22em] text-brand/70">
-                Faith. Community. Together.
+                Smart Payments. Stronger Communities.
               </p>
             </div>
             <div className="grid flex-1 grid-cols-2 gap-10 sm:grid-cols-4 lg:max-w-3xl">
@@ -178,8 +178,8 @@ export function MarketingShell({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="mt-12 flex flex-col gap-3 border-t border-[#e3dccb] pt-7 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-            <p>&copy; {new Date().getFullYear()} ChurchPay. All rights reserved.</p>
-            <p>Made for UK churches, charities, and networks.</p>
+            <p>&copy; {new Date().getFullYear()} MosquePay. All rights reserved.</p>
+            <p>Made for UK mosques, charities, and networks.</p>
           </div>
         </div>
       </footer>

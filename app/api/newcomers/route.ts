@@ -3,12 +3,12 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import { sendWebsiteNotification } from "@/lib/email/website-notifications";
-import { getChurchAdminNotificationRecipients } from "@/lib/email/website-recipients";
+import { getMosqueAdminNotificationRecipients } from "@/lib/email/website-recipients";
 import { renderSimpleMessageEmail } from "@/lib/email/templates";
 import { sendWithLog } from "@/lib/email/send-with-log";
-import type { ChurchSiteSectionStyle } from "@/lib/db/types";
+import type { MosqueSiteSectionStyle } from "@/lib/db/types";
 import {
   parseRecipientList,
   rejectHoneypot,
@@ -30,7 +30,7 @@ function textValue(value: unknown) {
 }
 
 function validateConfiguredNewcomerFields(
-  style: ChurchSiteSectionStyle | null,
+  style: MosqueSiteSectionStyle | null,
   values: {
     phone: string | null;
     location: string | null;
@@ -62,25 +62,25 @@ function validateConfiguredNewcomerFields(
 async function sendNewcomerAutoReply({
   to,
   name,
-  churchName,
+  mosqueName,
   replyTo,
   style,
-  churchId,
+  mosqueId,
 }: {
   to: string;
   name: string;
-  churchName: string;
+  mosqueName: string;
   replyTo?: string | null;
-  style: ChurchSiteSectionStyle | null;
-  churchId: string | null;
+  style: MosqueSiteSectionStyle | null;
+  mosqueId: string | null;
 }) {
   if (!process.env.RESEND_API_KEY) return;
   const body =
     style?.form_autoresponder_body ||
-    `Thank you for your enquiry. Your details have reached ${churchName} and the church will be in touch.`;
+    `Thank you for your enquiry. Your details have reached ${mosqueName} and the mosque will be in touch.`;
 
   await sendWithLog({
-    churchId,
+    mosqueId,
     toEmail: to,
     toName: name,
     emailType: "newcomer_autoresponder",
@@ -90,16 +90,16 @@ async function sendNewcomerAutoReply({
     replyTo: replyTo || null,
     subject:
       style?.form_autoresponder_subject ||
-      `We received your enquiry for ${churchName}`,
+      `We received your enquiry for ${mosqueName}`,
     html: renderSimpleMessageEmail({
       eyebrow: "Enquiry received",
       title: "Thanks for your interest",
-      preview: "Your membership enquiry has reached the church.",
+      preview: "Your membership enquiry has reached the mosque.",
       greeting: `Hello ${name},`,
       paragraphs: [body],
     }),
     text: `Hello ${name},\n\n${body}`,
-    metadata: { church_name: churchName },
+    metadata: { mosque_name: mosqueName },
   });
 }
 
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
   if (_rejectMock) return _rejectMock;
 
   try {
-    const churchSlug = getChurchSlugFromRequest(request);
+    const mosqueSlug = getMosqueSlugFromRequest(request);
     const body = (await request.json()) as Record<string, unknown>;
     const honeypot = rejectHoneypot(body);
     if (honeypot) return honeypot;
@@ -135,11 +135,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (isSupabaseConfigured()) {
-      const church = await db.getChurchBySlug(churchSlug);
-      if (!church) {
-        return NextResponse.json({ error: "Church not found." }, { status: 404 });
+      const mosque = await db.getMosqueBySlug(mosqueSlug);
+      if (!mosque) {
+        return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
       }
-      const site = sectionId ? await db.getChurchSite(church.id) : null;
+      const site = sectionId ? await db.getMosqueSite(mosque.id) : null;
       const formStyle =
         site?.sections.find((section) => section.id === sectionId)?.style ??
         site?.custom_pages
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
         consent: body.consent === true,
       });
       if (validation) return validation;
-      const newcomer = await db.addNewcomer(church.id, {
+      const newcomer = await db.addNewcomer(mosque.id, {
         first_name: first_name!,
         last_name: last_name!,
         email: email!,
@@ -179,18 +179,18 @@ export async function POST(request: NextRequest) {
         converted_member_id: null,
         converted_at: null,
       });
-      const recipients = await getChurchAdminNotificationRecipients(
-        church,
+      const recipients = await getMosqueAdminNotificationRecipients(
+        mosque,
         parseRecipientList(formStyle?.form_notification_recipients)
       );
       await sendWebsiteNotification({
-        church,
+        mosque,
         replyTo: email,
         subject: `[Newcomer intake] ${first_name} ${last_name}`,
         eyebrow: "Newcomer intake",
         title: "New membership newcomer",
         preview: `New newcomer from ${first_name} ${last_name}.`,
-        intro: "A prospective member has submitted the church website newcomer intake form.",
+        intro: "A prospective member has submitted the mosque website newcomer intake form.",
         rows: [
           { label: "Name", value: `${first_name} ${last_name}` },
           { label: "Email", value: email },
@@ -205,19 +205,19 @@ export async function POST(request: NextRequest) {
       await sendNewcomerAutoReply({
         to: email!,
         name: first_name!,
-        churchName: church.name,
-        replyTo: church.support_email,
+        mosqueName: mosque.name,
+        replyTo: mosque.support_email,
         style: formStyle,
-        churchId: church.id,
+        mosqueId: mosque.id,
       });
       return NextResponse.json({ id: newcomer.id, success: true });
     }
 
-    const church = mockDb.getChurchBySlug(churchSlug);
-    if (!church) {
-      return NextResponse.json({ error: "Church not found." }, { status: 404 });
+    const mosque = mockDb.getMosqueBySlug(mosqueSlug);
+    if (!mosque) {
+      return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
     }
-    const site = sectionId ? mockDb.getChurchSite(churchSlug) : null;
+    const site = sectionId ? mockDb.getMosqueSite(mosqueSlug) : null;
     const formStyle =
       site?.sections.find((section) => section.id === sectionId)?.style ??
       site?.custom_pages
@@ -233,7 +233,7 @@ export async function POST(request: NextRequest) {
     });
     if (validation) return validation;
     const newcomer = mockDb.addNewcomer({
-      church_slug: churchSlug,
+      mosque_slug: mosqueSlug,
       first_name: first_name!,
       last_name: last_name!,
       email: email!,
@@ -245,19 +245,19 @@ export async function POST(request: NextRequest) {
       stage: "expression_of_interest",
       assigned_to: null,
     });
-    const recipients = await getChurchAdminNotificationRecipients(
-      church,
+    const recipients = await getMosqueAdminNotificationRecipients(
+      mosque,
       parseRecipientList(formStyle?.form_notification_recipients)
     );
 
     await sendWebsiteNotification({
-      church,
+      mosque,
       replyTo: email,
       subject: `[Newcomer intake] ${first_name} ${last_name}`,
       eyebrow: "Newcomer intake",
       title: "New membership newcomer",
       preview: `New newcomer from ${first_name} ${last_name}.`,
-      intro: "A prospective member has submitted the church website newcomer intake form.",
+      intro: "A prospective member has submitted the mosque website newcomer intake form.",
       rows: [
         { label: "Name", value: `${first_name} ${last_name}` },
         { label: "Email", value: email },
@@ -273,10 +273,10 @@ export async function POST(request: NextRequest) {
     await sendNewcomerAutoReply({
       to: email!,
       name: first_name!,
-      churchName: church.name,
-      replyTo: church.support_email,
+      mosqueName: mosque.name,
+      replyTo: mosque.support_email,
       style: formStyle,
-      churchId: null,
+      mosqueId: null,
     });
 
     return NextResponse.json({ id: newcomer.id, success: true });

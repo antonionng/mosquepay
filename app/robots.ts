@@ -4,7 +4,7 @@ function siteUrl(): string {
   const url =
     process.env.NEXT_PUBLIC_SITE_URL ??
     process.env.VERCEL_PROJECT_PRODUCTION_URL ??
-    "https://www.churchpay.co.uk";
+    "https://www.mosque-pay.com";
   return url.startsWith("http") ? url : `https://${url}`;
 }
 
@@ -15,7 +15,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/admin", "/api", "/member"],
+        disallow: ["/admin", "/api", "/member", "/operator", "/oauth"],
       },
     ],
     sitemap: `${base}/sitemap.xml`,

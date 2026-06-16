@@ -25,7 +25,7 @@ export type ApplyPaymentEditOptions = {
   /** When true, set event_id to `eventId` (which may be null to detach). */
   changeEvent?: boolean;
   /** The validated event id to link, or null to detach. Caller validates it
-   *  belongs to the church. */
+   *  belongs to the mosque. */
   eventId?: string | null;
 };
 
@@ -34,7 +34,7 @@ export type ApplyPaymentEditResult =
   | { ok: false; status: number; error: string };
 
 export async function applyPaymentEdit(
-  churchId: string,
+  mosqueId: string,
   payment: Payment,
   opts: ApplyPaymentEditOptions,
 ): Promise<ApplyPaymentEditResult> {
@@ -66,7 +66,7 @@ export async function applyPaymentEdit(
   ) as string | null;
 
   const linkedDonations = await db
-    .getDonationsByPaymentId(payment.id, churchId)
+    .getDonationsByPaymentId(payment.id, mosqueId)
     .catch(() => []);
   const existingDonation = linkedDonations[0] ?? null;
 
@@ -86,7 +86,7 @@ export async function applyPaymentEdit(
     };
   }
 
-  const updated = await db.updatePayment(payment.id, churchId, updates);
+  const updated = await db.updatePayment(payment.id, mosqueId, updates);
   if (!updated) {
     return { ok: false, status: 500, error: "Could not update payment." };
   }
@@ -95,7 +95,7 @@ export async function applyPaymentEdit(
   try {
     if (newCharity > 0) {
       if (existingDonation) {
-        await db.updateDonation(existingDonation.id, churchId, {
+        await db.updateDonation(existingDonation.id, mosqueId, {
           amount: newCharity,
           event_id: newEventId,
           gift_aid_eligible_amount: existingDonation.gift_aid_declaration_id
@@ -107,7 +107,7 @@ export async function applyPaymentEdit(
         const email = payment.user_email ?? "";
         const declaration = email
           ? await db
-              .getActiveGiftAidDeclarationByEmail(churchId, email)
+              .getActiveGiftAidDeclarationByEmail(mosqueId, email)
               .catch(() => null)
           : null;
         const giftAidStatus = declaration
@@ -115,7 +115,7 @@ export async function applyPaymentEdit(
           : email
             ? "eligible"
             : "unknown";
-        await db.addDonation(churchId, {
+        await db.addDonation(mosqueId, {
           event_id: newEventId,
           payment_id: payment.id,
           donor_name: payment.user_name ?? null,
@@ -134,7 +134,7 @@ export async function applyPaymentEdit(
         donationAction = "created";
       }
     } else if (existingDonation) {
-      await db.deleteDonation(existingDonation.id, churchId);
+      await db.deleteDonation(existingDonation.id, mosqueId);
       donationAction = "deleted";
     }
   } catch (err) {

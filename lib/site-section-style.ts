@@ -1,15 +1,15 @@
 import type {
-  ChurchSiteCustomPage,
-  ChurchSiteFooterLink,
-  ChurchSiteFooterLinkGroup,
-  ChurchSiteFooterSettings,
-  ChurchSiteHeaderNavItem,
-  ChurchSiteHeaderSettings,
-  ChurchSiteSection,
-  ChurchSiteSectionStyle,
+  MosqueSiteCustomPage,
+  MosqueSiteFooterLink,
+  MosqueSiteFooterLinkGroup,
+  MosqueSiteFooterSettings,
+  MosqueSiteHeaderNavItem,
+  MosqueSiteHeaderSettings,
+  MosqueSiteSection,
+  MosqueSiteSectionStyle,
 } from "@/lib/db/types";
 
-const SECTION_TYPES: ChurchSiteSection["type"][] = [
+const SECTION_TYPES: MosqueSiteSection["type"][] = [
   "hero",
   "about",
   "service_details",
@@ -178,22 +178,22 @@ function sanitizeFieldList(value: unknown): string[] | null {
   return fields.length > 0 ? fields : null;
 }
 
-function sanitizeImagePosition(value: string | null | undefined): ChurchSiteSectionStyle["image_position"] {
+function sanitizeImagePosition(value: string | null | undefined): MosqueSiteSectionStyle["image_position"] {
   if (!value || typeof value !== "string") return null;
   const t = value.trim().toLowerCase();
-  return IMAGE_POS.has(t) ? (t as NonNullable<ChurchSiteSectionStyle["image_position"]>) : null;
+  return IMAGE_POS.has(t) ? (t as NonNullable<MosqueSiteSectionStyle["image_position"]>) : null;
 }
 
-function sanitizeImageShape(value: string | null | undefined): ChurchSiteSectionStyle["image_shape"] {
+function sanitizeImageShape(value: string | null | undefined): MosqueSiteSectionStyle["image_shape"] {
   if (!value || typeof value !== "string") return null;
   const t = value.trim().toLowerCase();
-  return IMAGE_SHAPE.has(t) ? (t as NonNullable<ChurchSiteSectionStyle["image_shape"]>) : null;
+  return IMAGE_SHAPE.has(t) ? (t as NonNullable<MosqueSiteSectionStyle["image_shape"]>) : null;
 }
 
-function sanitizeFormMode(value: string | null | undefined): ChurchSiteSectionStyle["form_mode"] {
+function sanitizeFormMode(value: string | null | undefined): MosqueSiteSectionStyle["form_mode"] {
   if (!value || typeof value !== "string") return null;
   const t = value.trim().toLowerCase();
-  return FORM_MODES.has(t) ? (t as NonNullable<ChurchSiteSectionStyle["form_mode"]>) : null;
+  return FORM_MODES.has(t) ? (t as NonNullable<MosqueSiteSectionStyle["form_mode"]>) : null;
 }
 
 function sanitizeToken<T extends string>(
@@ -208,10 +208,10 @@ function sanitizeToken<T extends string>(
 /** Server-safe normalization for persisted section.style */
 export function sanitizeSectionStyle(
   raw: unknown
-): ChurchSiteSectionStyle | undefined {
+): MosqueSiteSectionStyle | undefined {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
   const o = raw as Record<string, unknown>;
-  const out: ChurchSiteSectionStyle = {};
+  const out: MosqueSiteSectionStyle = {};
 
   const primary = normalizeHex(typeof o.primary_color === "string" ? o.primary_color : null);
   if (primary) out.primary_color = primary;
@@ -246,25 +246,25 @@ export function sanitizeSectionStyle(
   const formMode = sanitizeFormMode(typeof o.form_mode === "string" ? o.form_mode : null);
   if (formMode) out.form_mode = formMode;
 
-  const backgroundTone = sanitizeToken<NonNullable<ChurchSiteSectionStyle["background_tone"]>>(
+  const backgroundTone = sanitizeToken<NonNullable<MosqueSiteSectionStyle["background_tone"]>>(
     typeof o.background_tone === "string" ? o.background_tone : null,
     BACKGROUND_TONES
   );
   if (backgroundTone) out.background_tone = backgroundTone;
 
-  const contentWidth = sanitizeToken<NonNullable<ChurchSiteSectionStyle["content_width"]>>(
+  const contentWidth = sanitizeToken<NonNullable<MosqueSiteSectionStyle["content_width"]>>(
     typeof o.content_width === "string" ? o.content_width : null,
     CONTENT_WIDTHS
   );
   if (contentWidth) out.content_width = contentWidth;
 
-  const spacing = sanitizeToken<NonNullable<ChurchSiteSectionStyle["spacing"]>>(
+  const spacing = sanitizeToken<NonNullable<MosqueSiteSectionStyle["spacing"]>>(
     typeof o.spacing === "string" ? o.spacing : null,
     SPACING_OPTIONS
   );
   if (spacing) out.spacing = spacing;
 
-  const buttonVariant = sanitizeToken<NonNullable<ChurchSiteSectionStyle["button_variant"]>>(
+  const buttonVariant = sanitizeToken<NonNullable<MosqueSiteSectionStyle["button_variant"]>>(
     typeof o.button_variant === "string" ? o.button_variant : null,
     BUTTON_VARIANTS
   );
@@ -336,17 +336,17 @@ export function sanitizeSectionStyle(
 }
 
 export type SiteSectionLike = {
-  style?: ChurchSiteSectionStyle | null;
+  style?: MosqueSiteSectionStyle | null;
 };
 
 export function mergeHeroPrimaryColor(
   section: SiteSectionLike | null | undefined,
-  churchPrimaryColor: string | null | undefined
+  mosquePrimaryColor: string | null | undefined
 ): string {
   const fromSection = normalizeHex(section?.style?.primary_color ?? null);
   if (fromSection) return fromSection;
-  const fromChurch = normalizeHex(churchPrimaryColor ?? null);
-  if (fromChurch) return fromChurch;
+  const fromMosque = normalizeHex(mosquePrimaryColor ?? null);
+  if (fromMosque) return fromMosque;
   return DEFAULT_HERO_PRIMARY;
 }
 
@@ -430,20 +430,20 @@ export function sectionContentWidthStyle(section: SiteSectionLike | null | undef
   return {};
 }
 
-function parseSectionType(v: unknown): ChurchSiteSection["type"] {
+function parseSectionType(v: unknown): MosqueSiteSection["type"] {
   if (typeof v !== "string") return "about";
-  return SECTION_TYPES.includes(v as ChurchSiteSection["type"])
-    ? (v as ChurchSiteSection["type"])
+  return SECTION_TYPES.includes(v as MosqueSiteSection["type"])
+    ? (v as MosqueSiteSection["type"])
     : "about";
 }
 
 /** Normalize and sanitize sections from PATCH body before persistence. */
-export function sanitizeSiteSections(input: unknown): ChurchSiteSection[] | undefined {
+export function sanitizeSiteSections(input: unknown): MosqueSiteSection[] | undefined {
   if (!Array.isArray(input)) return undefined;
   return input.map((item, idx) => {
     const o = item && typeof item === "object" && !Array.isArray(item) ? (item as Record<string, unknown>) : {};
     const style = sanitizeSectionStyle(o.style);
-    const section: ChurchSiteSection = {
+    const section: MosqueSiteSection = {
       id: typeof o.id === "string" && o.id.length > 0 ? o.id : `section-${idx}`,
       type: parseSectionType(o.type),
       heading: typeof o.heading === "string" ? o.heading : "",
@@ -460,9 +460,9 @@ export function sanitizeSiteSections(input: unknown): ChurchSiteSection[] | unde
 
 /** Preserve per-section style for non-hero blocks when the editor payload omits `style`. */
 export function mergeSectionStylesPreserve(
-  incoming: ChurchSiteSection[],
-  previous: ChurchSiteSection[] | undefined | null
-): ChurchSiteSection[] {
+  incoming: MosqueSiteSection[],
+  previous: MosqueSiteSection[] | undefined | null
+): MosqueSiteSection[] {
   if (!previous?.length) return incoming;
   return incoming.map((s) => {
     const prev = previous.find((p) => p.id === s.id);
@@ -475,10 +475,10 @@ export function mergeSectionStylesPreserve(
   });
 }
 
-export function sanitizeCustomPages(input: unknown): ChurchSiteCustomPage[] | undefined {
+export function sanitizeCustomPages(input: unknown): MosqueSiteCustomPage[] | undefined {
   if (!Array.isArray(input)) return undefined;
   const seen = new Set<string>();
-  const pages: ChurchSiteCustomPage[] = [];
+  const pages: MosqueSiteCustomPage[] = [];
 
   input.slice(0, 24).forEach((item, idx) => {
     const o =
@@ -520,7 +520,7 @@ export function sanitizeCustomPages(input: unknown): ChurchSiteCustomPage[] | un
     .map((page, idx) => ({ ...page, order: idx + 1 }));
 }
 
-export function defaultHeaderNavItems(): ChurchSiteHeaderNavItem[] {
+export function defaultHeaderNavItems(): MosqueSiteHeaderNavItem[] {
   return [
     { id: "home", label: "Home", href: "/", visible: true, order: 1 },
     { id: "events", label: "Events", href: "/events", visible: true, order: 2 },
@@ -530,25 +530,25 @@ export function defaultHeaderNavItems(): ChurchSiteHeaderNavItem[] {
   ];
 }
 
-export function defaultHeaderSettings(): ChurchSiteHeaderSettings {
+export function defaultHeaderSettings(): MosqueSiteHeaderSettings {
   return {
     show_logo: true,
-    show_church_name: true,
-    show_church_number: true,
+    show_mosque_name: true,
+    show_mosque_number: true,
     nav_items: defaultHeaderNavItems(),
     cta_label: "Join Us",
     cta_href: "/join",
   };
 }
 
-export function sanitizeHeaderSettings(input: unknown): ChurchSiteHeaderSettings | undefined {
+export function sanitizeHeaderSettings(input: unknown): MosqueSiteHeaderSettings | undefined {
   if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
   const o = input as Record<string, unknown>;
   const defaults = defaultHeaderSettings();
   const rawItems = Array.isArray(o.nav_items) ? o.nav_items : defaults.nav_items;
   const navItems = rawItems
     .slice(0, 12)
-    .map((item, idx): ChurchSiteHeaderNavItem | null => {
+    .map((item, idx): MosqueSiteHeaderNavItem | null => {
       const row =
         item && typeof item === "object" && !Array.isArray(item)
           ? (item as Record<string, unknown>)
@@ -567,14 +567,14 @@ export function sanitizeHeaderSettings(input: unknown): ChurchSiteHeaderSettings
         order: typeof row.order === "number" && row.order >= 0 ? row.order : idx + 1,
       };
     })
-    .filter((item): item is ChurchSiteHeaderNavItem => Boolean(item))
+    .filter((item): item is MosqueSiteHeaderNavItem => Boolean(item))
     .sort((a, b) => a.order - b.order)
     .map((item, idx) => ({ ...item, order: idx + 1 }));
 
   return {
     show_logo: o.show_logo !== false,
-    show_church_name: o.show_church_name !== false,
-    show_church_number: o.show_church_number !== false,
+    show_mosque_name: o.show_mosque_name !== false,
+    show_mosque_number: o.show_mosque_number !== false,
     nav_items: navItems.length ? navItems : defaults.nav_items,
     cta_label:
       sanitizeShortText(typeof o.cta_label === "string" ? o.cta_label : null) ??
@@ -583,11 +583,11 @@ export function sanitizeHeaderSettings(input: unknown): ChurchSiteHeaderSettings
   };
 }
 
-function sanitizeFooterLinks(input: unknown): ChurchSiteFooterLink[] {
+function sanitizeFooterLinks(input: unknown): MosqueSiteFooterLink[] {
   const rawLinks = Array.isArray(input) ? input : [];
   return rawLinks
     .slice(0, 12)
-    .map((item, idx): ChurchSiteFooterLink | null => {
+    .map((item, idx): MosqueSiteFooterLink | null => {
       const row =
         item && typeof item === "object" && !Array.isArray(item)
           ? (item as Record<string, unknown>)
@@ -606,16 +606,16 @@ function sanitizeFooterLinks(input: unknown): ChurchSiteFooterLink[] {
         order: typeof row.order === "number" && row.order >= 0 ? row.order : idx + 1,
       };
     })
-    .filter((item): item is ChurchSiteFooterLink => Boolean(item))
+    .filter((item): item is MosqueSiteFooterLink => Boolean(item))
     .sort((a, b) => a.order - b.order)
     .map((item, idx) => ({ ...item, order: idx + 1 }));
 }
 
-export function defaultFooterSettings(): ChurchSiteFooterSettings {
+export function defaultFooterSettings(): MosqueSiteFooterSettings {
   return {
     show_logo: true,
-    show_church_name: true,
-    show_church_number: true,
+    show_mosque_name: true,
+    show_mosque_number: true,
     show_contact_details: true,
     tagline: null,
     badge_text: "Member website",
@@ -647,14 +647,14 @@ export function defaultFooterSettings(): ChurchSiteFooterSettings {
   };
 }
 
-export function sanitizeFooterSettings(input: unknown): ChurchSiteFooterSettings | undefined {
+export function sanitizeFooterSettings(input: unknown): MosqueSiteFooterSettings | undefined {
   if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
   const o = input as Record<string, unknown>;
   const defaults = defaultFooterSettings();
   const rawGroups = Array.isArray(o.link_groups) ? o.link_groups : defaults.link_groups;
   const linkGroups = rawGroups
     .slice(0, 4)
-    .map((item, idx): ChurchSiteFooterLinkGroup | null => {
+    .map((item, idx): MosqueSiteFooterLinkGroup | null => {
       const row =
         item && typeof item === "object" && !Array.isArray(item)
           ? (item as Record<string, unknown>)
@@ -672,14 +672,14 @@ export function sanitizeFooterSettings(input: unknown): ChurchSiteFooterSettings
         order: typeof row.order === "number" && row.order >= 0 ? row.order : idx + 1,
       };
     })
-    .filter((item): item is ChurchSiteFooterLinkGroup => Boolean(item))
+    .filter((item): item is MosqueSiteFooterLinkGroup => Boolean(item))
     .sort((a, b) => a.order - b.order)
     .map((item, idx) => ({ ...item, order: idx + 1 }));
 
   return {
     show_logo: o.show_logo !== false,
-    show_church_name: o.show_church_name !== false,
-    show_church_number: o.show_church_number !== false,
+    show_mosque_name: o.show_mosque_name !== false,
+    show_mosque_number: o.show_mosque_number !== false,
     show_contact_details: o.show_contact_details !== false,
     tagline:
       sanitizeLongText(typeof o.tagline === "string" ? o.tagline : null, 360) ?? null,

@@ -3,7 +3,7 @@ import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
 import * as db from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 
 const STATUS_DATES = {
   exported: "exported_at",
@@ -22,16 +22,16 @@ export async function GET(
     return NextResponse.json({ error: "Database not configured." }, { status: 503 });
   }
 
-  const churchId = await resolveChurch(request);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueId = await resolveMosque(request);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
 
-  const forbidden = await requireAdminApiPermission("charity:write", churchId);
+  const forbidden = await requireAdminApiPermission("charity:write", mosqueId);
   if (forbidden) return forbidden;
 
   const { id } = await params;
-  const items = await db.getGiftAidClaimItems(churchId, id);
+  const items = await db.getGiftAidClaimItems(mosqueId, id);
   return NextResponse.json({ items });
 }
 
@@ -46,12 +46,12 @@ export async function PATCH(
     return NextResponse.json({ error: "Database not configured." }, { status: 503 });
   }
 
-  const churchId = await resolveChurch(request);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueId = await resolveMosque(request);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
 
-  const forbidden = await requireAdminApiPermission("charity:write", churchId);
+  const forbidden = await requireAdminApiPermission("charity:write", mosqueId);
   if (forbidden) return forbidden;
 
   const { id } = await params;
@@ -75,18 +75,18 @@ export async function PATCH(
     updates[STATUS_DATES[status as keyof typeof STATUS_DATES]] = now;
   }
 
-  const claim = await db.updateGiftAidClaimBatch(id, churchId, updates);
+  const claim = await db.updateGiftAidClaimBatch(id, mosqueId, updates);
   if (!claim) {
     return NextResponse.json({ error: "Claim not found." }, { status: 404 });
   }
 
   if (status === "exported" || status === "filed" || status === "paid") {
-    const items = await db.getGiftAidClaimItems(churchId, id);
+    const items = await db.getGiftAidClaimItems(mosqueId, id);
     await Promise.all(
       items
         .filter((item) => item.donation_id)
         .map((item) =>
-          db.updateDonation(item.donation_id as string, churchId, {
+          db.updateDonation(item.donation_id as string, mosqueId, {
             gift_aid_claimed_at: now,
           })
         )
@@ -94,7 +94,7 @@ export async function PATCH(
   }
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "gift_aid_claim_batch_updated",
     entityType: "gift_aid_claim_batch",
     entityId: id,
@@ -105,7 +105,7 @@ export async function PATCH(
   return NextResponse.json({ claim });
 }
 
-async function resolveChurch(request: NextRequest) {
-  const churchSlug = getChurchSlugFromRequest(request);
-  return db.resolveChurchId(churchSlug);
+async function resolveMosque(request: NextRequest) {
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  return db.resolveMosqueId(mosqueSlug);
 }

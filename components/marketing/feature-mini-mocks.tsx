@@ -50,9 +50,9 @@ function Reveal({
 /** Gift Aid claim panel: recent gifts with +25% tags and an HMRC-ready total. */
 export function GivingClaimMock() {
   const gifts = [
-    { name: "Sarah Adeyemi", detail: "Tithe · declared", amount: "£25.00", uplift: "£6.25" },
+    { name: "Sarah Adeyemi", detail: "Zakat · declared", amount: "£25.00", uplift: "£6.25" },
     { name: "The Okafor family", detail: "Online giving · declared", amount: "£60.00", uplift: "£15.00" },
-    { name: "Cash collection", detail: "Sunday service · GASDS", amount: "£182.40", uplift: "£45.60" },
+    { name: "Cash collection", detail: "Friday Jumu'ah · GASDS", amount: "£182.40", uplift: "£45.60" },
   ];
 
   return (

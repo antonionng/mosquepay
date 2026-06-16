@@ -1,5 +1,5 @@
 import * as db from "@/lib/db";
-import type { Member, Church } from "@/lib/db/types";
+import type { Member, Mosque } from "@/lib/db/types";
 import { coerceButtonsInEmailHtml } from "@/lib/email/coerce-buttons";
 import { renderBrandedEmail } from "@/lib/email/templates";
 import { sendWithLog } from "@/lib/email/send-with-log";
@@ -14,7 +14,7 @@ export type Recipient = {
 };
 
 export async function sendBatch({
-  churchId,
+  mosqueId,
   templateKey,
   subject,
   htmlBody,
@@ -22,7 +22,7 @@ export async function sendBatch({
   audienceLabel,
   fromOverride,
 }: {
-  churchId: string;
+  mosqueId: string;
   templateKey: string | null;
   subject: string;
   htmlBody: string;
@@ -47,13 +47,13 @@ export async function sendBatch({
       applyMergeTags(htmlBody, recipient.context),
     );
     const brandedBody = renderBrandedEmail({
-      eyebrow: audienceLabel ?? "Church update",
+      eyebrow: audienceLabel ?? "Mosque update",
       title: personalSubject,
       preview: personalSubject,
       children: personalBody,
     });
     const result = await sendWithLog({
-      churchId,
+      mosqueId,
       toEmail: recipient.email,
       toName: recipient.name,
       memberId: recipient.member_id ?? null,
@@ -109,13 +109,13 @@ export async function sendBatch({
     }
   }
 
-  await db.logMessages(churchId, sentRows);
+  await db.logMessages(mosqueId, sentRows);
   return { sent, failed, skipped: 0 };
 }
 
 export function buildMemberContext(
   member: Member,
-  church: Church | null,
+  mosque: Mosque | null,
   extra: Partial<MergeTagContext> = {}
 ): Record<string, string | undefined> {
   const [first = member.full_name, ...rest] = member.full_name.split(/\s+/);
@@ -124,7 +124,7 @@ export function buildMemberContext(
     last_name: rest.join(" "),
     full_name: member.full_name,
     email: member.email,
-    church_name: church?.name ?? "the church",
+    mosque_name: mosque?.name ?? "the mosque",
     ...extra,
   };
 }

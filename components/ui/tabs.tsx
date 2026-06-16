@@ -32,7 +32,7 @@ const TabsTrigger = React.forwardRef<
     className={cn(
       // Flat brand-blue active state (was violet→blue gradient which clashed
       // with the rest of the new flat-blue brand system). Keeps the high
-      // contrast for accessibility but reads as part of the ChurchPay shell.
+      // contrast for accessibility but reads as part of the MosquePay shell.
       "inline-flex items-center justify-center whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium text-dash-muted ring-offset-white transition-all hover:bg-dash-surface hover:text-dash-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dash-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
       "data-[state=active]:bg-dash-surface data-[state=active]:text-[hsl(var(--dash-ring))] data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-[hsl(var(--dash-ring)/0.25)]",
       className

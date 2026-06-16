@@ -1,8 +1,8 @@
 import type { NextRequest } from "next/server";
 
-export const DEFAULT_CHURCH_SLUG = "st-marys-demo";
-export const ADMIN_CHURCH_COOKIE = "churchpay_admin_church_slug";
-const TENANT_HEADER = "x-church-slug";
+export const DEFAULT_MOSQUE_SLUG = "central-jamia-demo";
+export const ADMIN_MOSQUE_COOKIE = "mosquepay_admin_mosque_slug";
+const TENANT_HEADER = "x-mosque-slug";
 const RESERVED_SUBDOMAINS = new Set(["www", "app", "admin", "api", "localhost"]);
 
 function normalizeSlug(value?: string | null): string | null {
@@ -16,15 +16,15 @@ function normalizeSlug(value?: string | null): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
-export function getDefaultChurchSlug() {
-  return DEFAULT_CHURCH_SLUG;
+export function getDefaultMosqueSlug() {
+  return DEFAULT_MOSQUE_SLUG;
 }
 
-export function resolveChurchSlug(value?: string | null) {
-  return normalizeSlug(value) ?? DEFAULT_CHURCH_SLUG;
+export function resolveMosqueSlug(value?: string | null) {
+  return normalizeSlug(value) ?? DEFAULT_MOSQUE_SLUG;
 }
 
-export function getChurchSlugFromHost(host?: string | null): string | null {
+export function getMosqueSlugFromHost(host?: string | null): string | null {
   if (!host) return null;
   const hostname = host.split(":")[0]?.toLowerCase();
   if (!hostname || hostname === "localhost") return null;
@@ -36,20 +36,20 @@ export function getChurchSlugFromHost(host?: string | null): string | null {
   return normalizeSlug(subdomain);
 }
 
-export function getChurchSlugFromRequest(request: NextRequest): string {
-  const querySlug = normalizeSlug(request.nextUrl.searchParams.get("church"));
+export function getMosqueSlugFromRequest(request: NextRequest): string {
+  const querySlug = normalizeSlug(request.nextUrl.searchParams.get("mosque"));
   if (querySlug) return querySlug;
 
   const headerSlug = normalizeSlug(request.headers.get(TENANT_HEADER));
   if (headerSlug) return headerSlug;
 
-  const hostSlug = getChurchSlugFromHost(request.headers.get("host"));
+  const hostSlug = getMosqueSlugFromHost(request.headers.get("host"));
   if (hostSlug) return hostSlug;
 
-  const adminCookieSlug = normalizeSlug(request.cookies.get(ADMIN_CHURCH_COOKIE)?.value);
+  const adminCookieSlug = normalizeSlug(request.cookies.get(ADMIN_MOSQUE_COOKIE)?.value);
   if (adminCookieSlug) return adminCookieSlug;
 
-  return DEFAULT_CHURCH_SLUG;
+  return DEFAULT_MOSQUE_SLUG;
 }
 
 

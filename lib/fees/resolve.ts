@@ -1,4 +1,4 @@
-export type ChurchFeeDefaults = {
+export type MosqueFeeDefaults = {
   default_member_levy_amount: number | null;
   default_member_dining_amount: number | null;
   default_guest_dining_amount: number | null;
@@ -30,7 +30,7 @@ export type EventFeeContext = {
 };
 
 /**
- * Per-recipient override that takes precedence over both the church default
+ * Per-recipient override that takes precedence over both the mosque default
  * and the profile-level levy_waived/dining_waived flags. Lets a treasurer
  * mark "for this one service only" adjustments from the recipients panel.
  */
@@ -49,7 +49,7 @@ function toAmount(value: number | null | undefined): number | null {
 export function resolveMemberLevy(
   member: MemberFeeProfile | null | undefined,
   event: EventFeeContext,
-  defaults: ChurchFeeDefaults | null | undefined,
+  defaults: MosqueFeeDefaults | null | undefined,
   override?: EventFeeOverride | null
 ): number {
   if (override?.levy_waived) return 0;
@@ -71,7 +71,7 @@ export function resolveMemberLevy(
 export function resolveMemberDining(
   member: MemberFeeProfile | null | undefined,
   event: EventFeeContext,
-  defaults: ChurchFeeDefaults | null | undefined,
+  defaults: MosqueFeeDefaults | null | undefined,
   attendingDining: boolean,
   override?: EventFeeOverride | null
 ): number {
@@ -97,7 +97,7 @@ export function resolveMemberDining(
 export function resolveGuestDining(
   guest: GuestFeeProfile | null | undefined,
   event: EventFeeContext,
-  defaults: ChurchFeeDefaults | null | undefined,
+  defaults: MosqueFeeDefaults | null | undefined,
   override?: EventFeeOverride | null
 ): number {
   if (!event.enable_guest_tickets && !event.enable_dining_rsvp) return 0;
@@ -127,7 +127,7 @@ export type FeeLineItem = {
 export function buildMemberFeeBreakdown(args: {
   member: MemberFeeProfile | null | undefined;
   event: EventFeeContext;
-  defaults: ChurchFeeDefaults | null | undefined;
+  defaults: MosqueFeeDefaults | null | undefined;
   attendingCeremony: boolean;
   attendingDining: boolean;
   memberOverride?: EventFeeOverride | null;
@@ -205,10 +205,10 @@ export function formatFeeLabel(item: FeeLineItem): string {
 
 /**
  * Resolve the amount that will actually be charged for a fee, given a
- * possible per-event override and the church-level default. Returns null when
+ * possible per-event override and the mosque-level default. Returns null when
  * no value is available anywhere (caller decides whether that is an error).
  *
- * Mirrors the resolver precedence: explicit event amount → church default.
+ * Mirrors the resolver precedence: explicit event amount → mosque default.
  * Treats `0` on the event as an intentional override (zero is still a price),
  * and only falls through to the default when the event value is null/undefined.
  */

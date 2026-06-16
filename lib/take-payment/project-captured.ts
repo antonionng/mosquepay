@@ -18,7 +18,7 @@ import {
 } from "./categorize";
 
 export type ProjectCapturedInput = {
-  churchId: string;
+  mosqueId: string;
   mooovPaymentId: string;
   amountMajor: number;
   currency: string;
@@ -77,7 +77,7 @@ export async function projectTakePaymentCaptured(
     ? splitAmountByLineItems(input.lineItems as LineItemInput[])
     : splitAmountByCategory(input.amountMajor, input.category);
 
-  const payment = await db.addPayment(input.churchId, {
+  const payment = await db.addPayment(input.mosqueId, {
     rsvp_id: null,
     event_id: input.eventId,
     user_email: input.payerEmail ?? "",
@@ -105,7 +105,7 @@ export async function projectTakePaymentCaptured(
 
   // Record charity income as a donation row so the per-service Gift Aid
   // panel + close batch can see it. We do this for EVERY charity entry,
-  // not just payers who already have a declaration on file: many churches
+  // not just payers who already have a declaration on file: many mosques
   // collect on the night and upload signed declarations (or import donor
   // profiles) later. The claim batcher matches donation -> declaration by
   // email at close time (lib/gift-aid/eligible.ts), so an email-bearing
@@ -132,7 +132,7 @@ export async function projectTakePaymentCaptured(
         ? "eligible"
         : "unknown";
     try {
-      const donation = await db.addDonation(input.churchId, {
+      const donation = await db.addDonation(input.mosqueId, {
         event_id: input.eventId,
         payment_id: payment.id,
         donor_name: input.payerName,

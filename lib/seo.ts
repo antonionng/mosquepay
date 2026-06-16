@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 
-export const SITE_ORIGIN = "https://www.churchpay.co.uk";
+export const SITE_ORIGIN = "https://www.mosque-pay.com";
 
 export const SOCIAL_SHARE_IMAGE = {
   url: "/social-share.png",
   width: 1200,
   height: 630,
-  alt: "ChurchPay - Faith. Community. Together. All-in-one membership, giving, events, and management platform for churches.",
+  alt: "MosquePay — Smart Payments. Stronger Communities. The all-in-one platform for mosques to manage membership, payments, donations, Zakat, Sadaqah, and Gift Aid.",
   type: "image/png",
 };
 
@@ -14,26 +14,33 @@ export function socialShareImageUrl(origin: string = SITE_ORIGIN): string {
   return `${origin.replace(/\/$/, "")}${SOCIAL_SHARE_IMAGE.url}`;
 }
 
-export const CHURCHPAY_KEYWORDS = [
-  "church management software",
-  "church management software UK",
-  "church website builder",
-  "church member portal",
-  "church CRM",
-  "church payments",
-  "church giving software",
-  "online church donations",
-  "church event RSVP",
-  "service notice management",
+export const MOSQUEPAY_KEYWORDS = [
+  "mosque management software",
+  "masjid management software",
+  "mosque management software UK",
+  "mosque website builder",
+  "masjid website builder",
+  "mosque member portal",
+  "mosque membership management",
+  "mosque CRM",
+  "mosque payments",
+  "mosque donation app",
+  "online mosque donations",
+  "Zakat collection software",
+  "Zakat and Sadaqah collection",
+  "Sadaqah donations",
+  "mosque direct debit",
+  "Friday Jumu'ah donations",
+  "mosque event RSVP",
+  "Jumu'ah notice management",
   "Gift Aid software",
   "GASDS software",
+  "Muslim charity Gift Aid",
   "newcomer CRM",
-  "member portal",
-  "church charity donations",
-  "church network management",
-  "church hall management",
-  "church accounting and reporting",
-  "tithe and offering software",
+  "mosque charity donations",
+  "mosque network management",
+  "mosque hall booking",
+  "mosque accounting and reporting",
 ];
 
 type MarketingMetadataOptions = {
@@ -51,7 +58,7 @@ export function marketingMetadata({
 }: MarketingMetadataOptions): Metadata {
   const canonicalPath = path === "/" ? "/" : path.replace(/\/+$/, "");
   const url = `${SITE_ORIGIN}${canonicalPath}`;
-  const keywordList = Array.from(new Set([...CHURCHPAY_KEYWORDS, ...keywords]));
+  const keywordList = Array.from(new Set([...MOSQUEPAY_KEYWORDS, ...keywords]));
 
   return {
     title,
@@ -76,7 +83,7 @@ export function marketingMetadata({
       title,
       description,
       url,
-      siteName: "ChurchPay",
+      siteName: "MosquePay",
       locale: "en_GB",
       images: [SOCIAL_SHARE_IMAGE],
     },
@@ -89,34 +96,36 @@ export function marketingMetadata({
   };
 }
 
-export const churchPayStructuredData = {
+export const mosquePayStructuredData = {
   "@context": "https://schema.org",
   "@graph": [
     {
       "@type": "Organization",
       "@id": `${SITE_ORIGIN}/#organization`,
-      name: "ChurchPay",
-      legalName: "ChurchPay",
-      slogan: "Faith. Community. Together.",
+      name: "MosquePay",
+      legalName: "MosquePay",
+      slogan: "Smart Payments. Stronger Communities.",
       url: SITE_ORIGIN,
       logo: {
         "@type": "ImageObject",
-        url: `${SITE_ORIGIN}/brand/churchpay-logo.png`,
+        url: `${SITE_ORIGIN}/brand/mosquepay-logo.png`,
       },
       image: socialShareImageUrl(),
       description:
-        "ChurchPay is an all-in-one membership, payments, and management platform for UK churches, charities, and church networks. It brings together church websites, online giving, Gift Aid and GASDS claims, member and newcomer CRM, services and events, pastoral care, and treasurer reporting.",
+        "MosquePay is an all-in-one membership, payments, and management platform for UK mosques, Islamic centres, Muslim charities, and mosque networks. It brings together mosque websites, online donations, Zakat and Sadaqah collection, Gift Aid and GASDS claims, member and newcomer CRM, Jumu'ah and events, community welfare, and treasurer reporting.",
       areaServed: {
         "@type": "Country",
         name: "United Kingdom",
       },
       knowsAbout: [
-        "Church management",
-        "Gift Aid and GASDS",
-        "Church giving and donations",
+        "Mosque and masjid management",
+        "Zakat and Sadaqah collection",
+        "Mosque donations and online giving",
+        "Gift Aid and GASDS for Muslim charities",
         "Member and congregation CRM",
-        "Church website hosting",
-        "Treasurer reporting",
+        "Jumu'ah, prayers, and event management",
+        "Mosque website hosting",
+        "Community welfare and treasurer reporting",
       ],
       sameAs: [SITE_ORIGIN],
     },
@@ -124,7 +133,7 @@ export const churchPayStructuredData = {
       "@type": "WebSite",
       "@id": `${SITE_ORIGIN}/#website`,
       url: SITE_ORIGIN,
-      name: "ChurchPay",
+      name: "MosquePay",
       publisher: { "@id": `${SITE_ORIGIN}/#organization` },
       inLanguage: "en-GB",
       potentialAction: {
@@ -136,33 +145,33 @@ export const churchPayStructuredData = {
     {
       "@type": "SoftwareApplication",
       "@id": `${SITE_ORIGIN}/#software`,
-      name: "ChurchPay",
+      name: "MosquePay",
       applicationCategory: "BusinessApplication",
-      applicationSubCategory: "Church Management Software",
+      applicationSubCategory: "Mosque Management Software",
       operatingSystem: "Web",
       url: SITE_ORIGIN,
       image: socialShareImageUrl(),
       screenshot: socialShareImageUrl(),
       softwareHelp: `${SITE_ORIGIN}/features`,
-      keywords: CHURCHPAY_KEYWORDS.join(", "),
+      keywords: MOSQUEPAY_KEYWORDS.join(", "),
       audience: {
         "@type": "Audience",
         audienceType:
-          "Churches, charities, church networks, and church hall groups in the United Kingdom",
+          "Mosques, charities, mosque networks, and mosque hall groups in the United Kingdom",
       },
       publisher: { "@id": `${SITE_ORIGIN}/#organization` },
       description:
-        "ChurchPay is software for church websites, payments, services, giving, donations, Gift Aid, service notices, member portals, newcomer CRM, pastoral workflows, reporting, and multi-church administration.",
+        "MosquePay is software for mosque websites, payments, donations, Zakat and Sadaqah, Gift Aid, Jumu'ah and prayer notices, member portals, newcomer CRM, community welfare workflows, reporting, and multi-mosque administration.",
       featureList: [
-        "Church website builder",
-        "Member portal",
+        "Mosque website builder",
+        "Member portal and membership management",
         "Event RSVP and payments",
-        "Giving and donation collection",
+        "Donations, Zakat, and Sadaqah collection",
         "Gift Aid and GASDS claims",
-        "Service notices and service management",
+        "Jumu'ah, prayer notices, and event management",
         "Newcomer CRM and mentoring",
-        "Charity and pastoral workflows",
-        "Network and multi-church administration",
+        "Charity campaigns and community welfare",
+        "Network and multi-mosque administration",
       ],
       offers: {
         "@type": "Offer",

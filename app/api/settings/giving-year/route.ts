@@ -1,20 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
-import { defaultChurchYearBounds } from "@/lib/giving/pro-rata";
+import { defaultMosqueYearBounds } from "@/lib/giving/pro-rata";
 
 export async function GET(request: NextRequest) {
   try {
     const unauthorized = await requireAdminApiAuth();
     if (unauthorized) return unauthorized;
 
-    const churchSlug = getChurchSlugFromRequest(request);
+    const mosqueSlug = getMosqueSlugFromRequest(request);
 
     if (!isSupabaseConfigured()) {
-      const bounds = defaultChurchYearBounds();
+      const bounds = defaultMosqueYearBounds();
       return NextResponse.json({
         current: {
           label: bounds.label,
@@ -27,23 +27,23 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const churchId = await db.resolveChurchId(churchSlug);
-    if (!churchId) {
-      return NextResponse.json({ error: "Church not found." }, { status: 404 });
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("payments:write", churchId);
+    const forbidden = await requireAdminApiPermission("payments:write", mosqueId);
     if (forbidden) return forbidden;
 
-    const [current, years, churchGiving] = await Promise.all([
-      db.getCurrentChurchYear(churchId),
-      db.listChurchGivingYears(churchId),
-      db.getChurchGiving(churchId),
+    const [current, years, mosqueGiving] = await Promise.all([
+      db.getCurrentMosqueYear(mosqueId),
+      db.listMosqueGivingYears(mosqueId),
+      db.getMosqueGiving(mosqueId),
     ]);
 
     return NextResponse.json({
       current,
       years,
-      suggested_annual_amount: churchGiving[0]?.amount ?? null,
+      suggested_annual_amount: mosqueGiving[0]?.amount ?? null,
     });
   } catch (e) {
     console.error("Giving year GET error:", e);
@@ -60,12 +60,12 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Database not configured." }, { status: 503 });
     }
 
-    const churchSlug = getChurchSlugFromRequest(request);
-    const churchId = await db.resolveChurchId(churchSlug);
-    if (!churchId) {
-      return NextResponse.json({ error: "Church not found." }, { status: 404 });
+    const mosqueSlug = getMosqueSlugFromRequest(request);
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("payments:write", churchId);
+    const forbidden = await requireAdminApiPermission("payments:write", mosqueId);
     if (forbidden) return forbidden;
 
     const body = await request.json();
@@ -80,7 +80,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const year = await db.upsertChurchGivingYear(churchId, {
+    const year = await db.upsertMosqueGivingYear(mosqueId, {
       id: body.id ?? undefined,
       label,
       start_date: startDate,
@@ -93,7 +93,7 @@ export async function PUT(request: NextRequest) {
     });
 
     await writeAuditLog({
-      churchId,
+      mosqueId,
       action: "updated",
       entityType: "giving_year",
       entityId: year.id,

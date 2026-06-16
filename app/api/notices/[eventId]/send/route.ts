@@ -3,13 +3,13 @@ import { createHash, randomBytes } from "crypto";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import { writeAuditLog } from "@/lib/audit";
 import {
   generateGuestInvitationToken,
   hashGuestInvitationToken,
 } from "@/lib/guest-tokens";
-import { buildPublicUrl, churchScopedGuestPath } from "@/lib/public-links";
+import { buildPublicUrl, mosqueScopedGuestPath } from "@/lib/public-links";
 import { sendGuestInviteEmail } from "@/lib/email/guest";
 import { renderNoticeEmail } from "@/lib/email/templates";
 import { sendWithLog } from "@/lib/email/send-with-log";
@@ -45,20 +45,20 @@ export async function POST(request: NextRequest, { params }: Params) {
         ? body.test_recipient_name.trim()
         : "";
     const { eventId } = await params;
-    const churchSlug = getChurchSlugFromRequest(request);
-    const churchId = await db.resolveChurchId(churchSlug);
-    if (!churchId) {
-      return NextResponse.json({ error: "Church not found." }, { status: 404 });
+    const mosqueSlug = getMosqueSlugFromRequest(request);
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("notice:write", churchId);
+    const forbidden = await requireAdminApiPermission("notice:write", mosqueId);
     if (forbidden) return forbidden;
 
-    const [event, church, notice, members, feeDefaults] = await Promise.all([
-      db.getEventById(eventId, churchId),
-      db.getChurchById(churchId),
-      db.getServiceNotice(eventId, churchId),
-      db.getMembers(churchId, { status: "active" }),
-      db.getChurchFeeDefaults(churchId),
+    const [event, mosque, notice, members, feeDefaults] = await Promise.all([
+      db.getEventById(eventId, mosqueId),
+      db.getMosqueById(mosqueId),
+      db.getServiceNotice(eventId, mosqueId),
+      db.getMembers(mosqueId, { status: "active" }),
+      db.getMosqueFeeDefaults(mosqueId),
     ]);
 
     if (!event) {
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     const agendaItems = notice?.agenda_items?.length
       ? notice.agenda_items
       : defaultAgendaItems();
-    const openingText = notice?.opening_text ?? renderDefaultNoticeOpening(event, church);
+    const openingText = notice?.opening_text ?? renderDefaultNoticeOpening(event, mosque);
     const menuItems = notice?.menu_items ?? [];
     const notices = notice?.notices ?? [];
     const failures: Array<{ email: string; message: string }> = [];
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest, { params }: Params) {
             rsvp_url: rsvpUrl,
           });
         }
-        await db.createServiceNoticeAccessLink(churchId, {
+        await db.createServiceNoticeAccessLink(mosqueId, {
           event_id: event.id,
           notice_id: notice?.id ?? null,
           send_id: null,
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         });
 
         const result = await sendWithLog({
-          churchId,
+          mosqueId,
           toEmail: member.email,
           toName: member.full_name,
           emailType: "notice_member",
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest, { params }: Params) {
           subject: `${testRecipientEmail ? "[Test] " : ""}Notice: ${event.title}`,
           html: renderNoticeEmail({
             memberName: member.full_name,
-            churchName: church?.name ?? "your church",
+            mosqueName: mosque?.name ?? "your mosque",
             eventTitle: event.title,
             eventDate: event.event_date,
             venue,
@@ -183,11 +183,11 @@ export async function POST(request: NextRequest, { params }: Params) {
     let honoraryGuestInvitesSent = 0;
 
     if (!testRecipientEmail && notice?.include_honorary_guests !== false) {
-      const honoraryGuests = await db.listHonoraryGuests(churchId);
+      const honoraryGuests = await db.listHonoraryGuests(mosqueId);
       for (const guest of honoraryGuests) {
         if (!guest.email) continue;
         try {
-          const existing = await db.listGuestInvitationsForEvent(eventId, churchId);
+          const existing = await db.listGuestInvitationsForEvent(eventId, mosqueId);
           const already = existing.some(
             (inv) =>
               inv.recipient_email?.toLowerCase() === guest.email?.toLowerCase() &&
@@ -197,7 +197,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
           const guestToken = generateGuestInvitationToken();
           const tokenHash = hashGuestInvitationToken(guestToken);
-          await db.createGuestInvitation(churchId, {
+          await db.createGuestInvitation(mosqueId, {
             event_id: eventId,
             inviter_member_id: null,
             inviter_admin_user_id: null,
@@ -212,12 +212,12 @@ export async function POST(request: NextRequest, { params }: Params) {
 
           const inviteUrl = buildPublicUrl(
             siteUrl.replace(/\/$/, ""),
-            churchScopedGuestPath(church?.slug ?? churchSlug, guestToken)
+            mosqueScopedGuestPath(mosque?.slug ?? mosqueSlug, guestToken)
           );
           const result = await sendGuestInviteEmail({
             toEmail: guest.email,
             toName: guest.full_name,
-            churchName: church?.name ?? "your church",
+            mosqueName: mosque?.name ?? "your mosque",
             eventTitle: event.title,
             eventDate: event.event_date,
             eventTime: event.event_time,
@@ -239,7 +239,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       }
     }
 
-    const send = await db.createServiceNoticeSend(churchId, {
+    const send = await db.createServiceNoticeSend(mosqueId, {
       event_id: event.id,
       notice_id: notice?.id ?? null,
       sent_by: "admin",
@@ -250,13 +250,13 @@ export async function POST(request: NextRequest, { params }: Params) {
     });
 
     if (!testRecipientEmail && sentCount > 0) {
-      await db.setServiceNoticeStatus(event.id, churchId, "sent", {
+      await db.setServiceNoticeStatus(event.id, mosqueId, "sent", {
         notice_last_sent_at: new Date().toISOString(),
       });
     }
 
     await writeAuditLog({
-      churchId,
+      mosqueId,
       action: "sent",
       entityType: "notice",
       entityId: notice?.id ?? event.id,

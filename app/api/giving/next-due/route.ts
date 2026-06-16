@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { computeNextGivingForMember } from "@/lib/giving/next-due";
 
@@ -13,23 +13,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ year: null, members: [] });
   }
 
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("payments:write", churchId);
+  const forbidden = await requireAdminApiPermission("payments:write", mosqueId);
   if (forbidden) return forbidden;
 
-  const [members, allGiving, currentYear, churchGiving] = await Promise.all([
-    db.getMembers(churchId, { status: "active" }),
-    db.getMemberGiving(churchId),
-    db.getCurrentChurchYear(churchId),
-    db.getChurchGiving(churchId),
+  const [members, allGiving, currentYear, mosqueGiving] = await Promise.all([
+    db.getMembers(mosqueId, { status: "active" }),
+    db.getMemberGiving(mosqueId),
+    db.getCurrentMosqueYear(mosqueId),
+    db.getMosqueGiving(mosqueId),
   ]);
 
   const defaultAmount =
-    currentYear?.annual_giving_amount ?? churchGiving[0]?.amount ?? null;
+    currentYear?.annual_giving_amount ?? mosqueGiving[0]?.amount ?? null;
 
   const givingByEmail = new Map<string, typeof allGiving>();
   for (const giving of allGiving) {

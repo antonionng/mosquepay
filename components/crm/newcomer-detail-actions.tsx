@@ -69,7 +69,7 @@ export function NewcomerDetailActions({
     setDeleteError(null);
     setDeleting(true);
     try {
-      const res = await fetch(`/api/newcomers/church/${newcomerId}`, { method: "DELETE" });
+      const res = await fetch(`/api/newcomers/mosque/${newcomerId}`, { method: "DELETE" });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(body.error ?? "Could not delete newcomer.");
@@ -88,7 +88,7 @@ export function NewcomerDetailActions({
     setChanging(true);
     setStageError(null);
     try {
-      const res = await fetch(`/api/newcomers/church/${newcomerId}`, {
+      const res = await fetch(`/api/newcomers/mosque/${newcomerId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stage: newStage }),
@@ -110,7 +110,7 @@ export function NewcomerDetailActions({
     setConvertError(null);
     setConverting(true);
     try {
-      const res = await fetch(`/api/newcomers/church/${newcomerId}/convert`, {
+      const res = await fetch(`/api/newcomers/mosque/${newcomerId}/convert`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),

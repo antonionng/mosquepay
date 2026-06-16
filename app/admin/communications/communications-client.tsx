@@ -172,7 +172,7 @@ export function CommunicationsClient({
       template_key: "custom.",
       name: "",
       subject: "",
-      html_body: "<p>Hello {{first_name}},</p><p></p><p>With every blessing,<br/>{{church_name}}</p>",
+      html_body: "<p>Hello {{first_name}},</p><p></p><p>With every blessing,<br/>{{mosque_name}}</p>",
     });
   }
 
@@ -295,7 +295,7 @@ export function CommunicationsClient({
           event_id: aiEventId,
           notes:
             aiNotes ||
-            "Draft a reusable communications template. Keep merge tags and make it suitable for church admins to adapt later.",
+            "Draft a reusable communications template. Keep merge tags and make it suitable for mosque admins to adapt later.",
         }),
       });
       const body = await res.json();
@@ -810,7 +810,7 @@ export function CommunicationsClient({
                   </code>{" "}
                   and{" "}
                   <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">
-                    {`{{church_name}}`}
+                    {`{{mosque_name}}`}
                   </code>
                   . System templates can be edited but not deleted.
                 </div>
@@ -967,7 +967,7 @@ export function CommunicationsClient({
         open={deleteTemplateId !== null}
         onOpenChange={(open) => !open && setDeleteTemplateId(null)}
         title="Delete template?"
-        description="This removes the custom template for this church. System templates cannot be deleted."
+        description="This removes the custom template for this mosque. System templates cannot be deleted."
         confirmLabel="Delete template"
         tone="danger"
         loading={deleteTemplateId ? busy === `del-${deleteTemplateId}` : false}

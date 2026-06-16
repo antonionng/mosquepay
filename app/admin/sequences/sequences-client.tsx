@@ -484,7 +484,7 @@ export function SequencesClient({
             <div>
               <p className="font-medium text-dash-text">Database required</p>
               <p className="mt-1 text-dash-muted">
-                Sequences are stored per church in Supabase. Set the Supabase
+                Sequences are stored per mosque in Supabase. Set the Supabase
                 env vars to enable this page.
               </p>
             </div>
@@ -968,7 +968,7 @@ export function SequencesClient({
                     </span>
                   </summary>
                   <p className="mt-2 text-xs text-dash-muted">
-                    Use this when a church meets on a different week (or
+                    Use this when a mosque meets on a different week (or
                     weekday) in some months, for example {`"3rd Saturday`} in
                     most months but {`2nd Saturday in June"`}.
                   </p>

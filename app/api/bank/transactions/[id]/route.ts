@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -25,12 +25,12 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("payments:write", churchId);
+  const forbidden = await requireAdminApiPermission("payments:write", mosqueId);
   if (forbidden) return forbidden;
 
   const body = await request.json();
@@ -52,7 +52,7 @@ export async function PATCH(
         { status: 400 }
       );
     }
-    updated = await db.updateBankTransaction(id, churchId, {
+    updated = await db.updateBankTransaction(id, mosqueId, {
       status: "matched",
       matched_source_type: sourceType,
       matched_source_id: sourceType === "manual" ? null : (sourceId ?? null),
@@ -61,7 +61,7 @@ export async function PATCH(
       notes: body.notes ?? null,
     });
   } else if (action === "unmatch") {
-    updated = await db.updateBankTransaction(id, churchId, {
+    updated = await db.updateBankTransaction(id, mosqueId, {
       status: "unmatched",
       matched_source_type: null,
       matched_source_id: null,
@@ -69,7 +69,7 @@ export async function PATCH(
       matched_at: null,
     });
   } else if (action === "ignore") {
-    updated = await db.updateBankTransaction(id, churchId, {
+    updated = await db.updateBankTransaction(id, mosqueId, {
       status: "ignored",
       notes: body.notes ?? null,
     });
@@ -82,7 +82,7 @@ export async function PATCH(
   }
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: `bank_transaction_${action}`,
     entityType: "bank_transaction",
     entityId: id,

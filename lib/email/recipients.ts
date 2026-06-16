@@ -1,11 +1,11 @@
 // lib/email/recipients.ts
 //
 // One place to resolve "who gets the treasurer / secretary email"
-// for a given church. Every notification sender used to either
+// for a given mosque. Every notification sender used to either
 // hardcode a single address or skip the problem entirely; with the
 // admin_users table already in place this can be centralised.
 //
-// The helper respects church_notification_settings (added in
+// The helper respects mosque_notification_settings (added in
 // migration 064) so a treasurer can mute "new subscription enrolled"
 // without losing the more critical "subscription failed" alert. The
 // kill-switch row (role='__all__') is honoured first.
@@ -23,13 +23,13 @@ export type TreasurerRecipient = {
 /**
  * Every admin role that can be considered for finance / membership
  * notifications. Treasurer + secretary are the obvious ones; we also
- * include master and the wider leadership roles so a church that has
+ * include master and the wider leadership roles so a mosque that has
  * delegated visibility (e.g. an pastoral_care who tracks subscriptions for
  * pastoral context, or the charity steward when charitable Gift Aid
  * is involved) doesn't have to chase a treasurer for an update.
  *
  * This is the broad "could be notified" gate; per-event muting is
- * handled in church_notification_settings via the admin Settings UI.
+ * handled in mosque_notification_settings via the admin Settings UI.
  */
 const ADMIN_NOTIFY_ROLES = new Set<string>([
   "treasurer",
@@ -44,26 +44,26 @@ const ADMIN_NOTIFY_ROLES = new Set<string>([
 ]);
 
 /**
- * Returns the active admin users for a church whose role makes them a
+ * Returns the active admin users for a mosque whose role makes them a
  * newcomer for treasurer-style finance notifications. We include
- * super_admin / platform_owner as a fallback so a brand-new church
+ * super_admin / platform_owner as a fallback so a brand-new mosque
  * without a designated treasurer still has a human in the loop.
  *
- * Filtered to the specific church first (no cross-church leakage), then
- * enriched with the church's notification settings: any admin whose
- * role is muted for `eventType` (or covered by the church-wide
+ * Filtered to the specific mosque first (no cross-mosque leakage), then
+ * enriched with the mosque's notification settings: any admin whose
+ * role is muted for `eventType` (or covered by the mosque-wide
  * '__all__' kill-switch) is dropped from the list.
  */
 export async function resolveTreasurerRecipients(
-  churchId: string,
+  mosqueId: string,
   eventType: string,
 ): Promise<TreasurerRecipient[]> {
   let admins: AdminUser[];
   try {
-    admins = await db.listAdminUsersForChurch(churchId);
+    admins = await db.listAdminUsersForMosque(mosqueId);
   } catch (err) {
-    console.error("resolveTreasurerRecipients: listAdminUsersForChurch failed", {
-      church_id: churchId,
+    console.error("resolveTreasurerRecipients: listAdminUsersForMosque failed", {
+      mosque_id: mosqueId,
       message: err instanceof Error ? err.message : String(err),
     });
     return [];
@@ -74,7 +74,7 @@ export async function resolveTreasurerRecipients(
   const enabledByRole = new Map<string, boolean>();
   async function isEnabled(role: string): Promise<boolean> {
     if (enabledByRole.has(role)) return enabledByRole.get(role)!;
-    const enabled = await db.notificationEnabled(churchId, role, eventType);
+    const enabled = await db.notificationEnabled(mosqueId, role, eventType);
     enabledByRole.set(role, enabled);
     return enabled;
   }
@@ -84,12 +84,12 @@ export async function resolveTreasurerRecipients(
     if (a.active === false) continue;
     if (!a.email) continue;
     if (!ADMIN_NOTIFY_ROLES.has(a.role)) continue;
-    // Tenant safety: church-scoped admins must match this church. The
-    // listAdminUsersForChurch query already returns either matches or
-    // global-scope (church_id=null) rows; we keep the global ones too
+    // Tenant safety: mosque-scoped admins must match this mosque. The
+    // listAdminUsersForMosque query already returns either matches or
+    // global-scope (mosque_id=null) rows; we keep the global ones too
     // so platform owners receive notifications when nobody else is
     // configured.
-    if (a.church_id != null && a.church_id !== churchId) continue;
+    if (a.mosque_id != null && a.mosque_id !== mosqueId) continue;
     if (!(await isEnabled(a.role))) continue;
     out.push({
       email: a.email,

@@ -17,7 +17,7 @@ export default async function VerifyMemberPage({
 
   if (!member) notFound();
 
-  const church = await db.getChurchById(member.church_id);
+  const mosque = await db.getMosqueById(member.mosque_id);
   const isCurrent = member.membership_status === "active";
 
   return (
@@ -51,15 +51,15 @@ export default async function VerifyMemberPage({
               <p className="text-xs text-slate-500">{rankLabel(member.rank)}</p>
             )}
           </div>
-          {church && (
+          {mosque && (
             <div>
-              <p className="text-xs uppercase tracking-wider text-slate-500">Church</p>
+              <p className="text-xs uppercase tracking-wider text-slate-500">Mosque</p>
               <p className="text-base font-medium text-slate-900">
-                {church.name}
-                {church.church_number ? ` · No. ${church.church_number}` : ""}
+                {mosque.name}
+                {mosque.mosque_number ? ` · No. ${mosque.mosque_number}` : ""}
               </p>
-              {church.city && (
-                <p className="text-xs text-slate-500">{church.city}</p>
+              {mosque.city && (
+                <p className="text-xs text-slate-500">{mosque.city}</p>
               )}
             </div>
           )}
@@ -74,7 +74,7 @@ export default async function VerifyMemberPage({
             </p>
           </div>
           <p className="border-t border-slate-100 pt-4 text-xs text-slate-400">
-            Verified by ChurchPay at{" "}
+            Verified by MosquePay at{" "}
             {new Date().toLocaleString("en-GB", {
               dateStyle: "medium",
               timeStyle: "short",

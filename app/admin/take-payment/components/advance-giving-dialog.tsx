@@ -195,7 +195,7 @@ export function AdvanceGivingDialog({
           <DialogTitle>Charge advance giving</DialogTitle>
           <DialogDescription>
             Take next year&apos;s giving from a member at the desk. Any
-            advance discount your church has set will be applied.
+            advance discount your mosque has set will be applied.
           </DialogDescription>
         </DialogHeader>
 

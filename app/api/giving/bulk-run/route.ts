@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -62,14 +62,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const churchSlug = getChurchSlugFromRequest(request);
-    const churchId = await db.resolveChurchId(churchSlug);
-    if (!churchId) {
-      return NextResponse.json({ error: "Church not found." }, { status: 404 });
+    const mosqueSlug = getMosqueSlugFromRequest(request);
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
     }
     const forbidden = await requireAdminApiPermission(
       "payments:write",
-      churchId
+      mosqueId
     );
     if (forbidden) return forbidden;
 
@@ -101,11 +101,11 @@ export async function POST(request: NextRequest) {
     let giftAidEnabled = false;
 
     if (givingId) {
-      const churchGivingList = await db.getChurchGiving(churchId);
-      const template = churchGivingList.find((d) => d.id === givingId);
+      const mosqueGivingList = await db.getMosqueGiving(mosqueId);
+      const template = mosqueGivingList.find((d) => d.id === givingId);
       if (!template) {
         return NextResponse.json(
-          { error: "Church giving template not found." },
+          { error: "Mosque giving template not found." },
           { status: 404 }
         );
       }
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const allMembers = await db.getMembers(churchId, { status: "active" });
+    const allMembers = await db.getMembers(mosqueId, { status: "active" });
     const targets = memberIds
       ? allMembers.filter((m) => memberIds.includes(m.id))
       : allMembers;
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const existing = await db.getMemberGiving(churchId);
+    const existing = await db.getMemberGiving(mosqueId);
     const existingKeys = new Set(
       existing.map(
         (d) => `${d.member_email}|${d.period_start}|${d.period_end}`
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const giving = await db.createMemberGiving(churchId, {
+      const giving = await db.createMemberGiving(mosqueId, {
         member_email: member.email,
         member_name: member.full_name,
         member_id: member.id,
@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
       });
 
       await db.createMemberGivingInstalments(
-        churchId,
+        mosqueId,
         schedule.map((row) => ({
           member_giving_id: giving.id,
           sequence: row.sequence,
@@ -208,10 +208,10 @@ export async function POST(request: NextRequest) {
     }
 
     await writeAuditLog({
-      churchId,
+      mosqueId,
       action: "bulk_giving_run",
       entityType: "giving",
-      entityId: churchId,
+      entityId: mosqueId,
       summary: `Bulk giving run created ${created.length} giving records`,
       metadata: {
         period_start: periodStart,

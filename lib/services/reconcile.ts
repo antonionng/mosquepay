@@ -32,7 +32,7 @@ export type ReconcilePaymentInput = {
   created_at: string;
 };
 
-export type PaymentMethodGroup = "cash" | "churchpay" | "other";
+export type PaymentMethodGroup = "cash" | "mosquepay" | "other";
 
 export function isCollectedStatus(status: string): boolean {
   return status === "succeeded" || status === "completed" || status === "paid";
@@ -49,20 +49,20 @@ export function isReversedStatus(status: string): boolean {
 }
 
 // Map a raw payment_method onto the three buckets a treasurer reconciles:
-// physical cash, ChurchPay (Mooov card / QR / online), and everything else
+// physical cash, MosquePay (Mooov card / QR / online), and everything else
 // (cheque, BACS, legacy). A null method is historically an online card row.
 export function methodGroup(
   method: string | null | undefined,
 ): PaymentMethodGroup {
   if (method === "cash") return "cash";
   if (method === "card_qr" || method === "card_online" || method == null)
-    return "churchpay";
+    return "mosquepay";
   return "other";
 }
 
 export const METHOD_GROUP_LABEL: Record<PaymentMethodGroup, string> = {
   cash: "Cash",
-  churchpay: "ChurchPay (card)",
+  mosquepay: "MosquePay (card)",
   other: "Cheque / BACS",
 };
 
@@ -133,7 +133,7 @@ export function stripsFor(amount: number, rafflePrice: number): number {
 function emptyMethodTotals(): Record<PaymentMethodGroup, MethodTotal> {
   return {
     cash: { amount: 0, count: 0 },
-    churchpay: { amount: 0, count: 0 },
+    mosquepay: { amount: 0, count: 0 },
     other: { amount: 0, count: 0 },
   };
 }

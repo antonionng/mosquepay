@@ -5,7 +5,7 @@ import {
   BarChart3,
   CalendarDays,
   Check,
-  Church,
+  Landmark,
   Globe,
   HandHeart,
   HeartHandshake,
@@ -43,16 +43,16 @@ const PILLARS = [
   {
     Icon: CalendarDays,
     title: "Services & events",
-    body: "Plan Sunday services, midweek groups, and special events. Send service notices, take RSVPs, and track hospitality without chasing paper.",
+    body: "Plan Friday Jumu'ah, midweek groups, and special events. Send service notices, take RSVPs, and track hospitality without chasing paper.",
   },
   {
     Icon: HeartHandshake,
-    title: "Pastoral care",
+    title: "Welfare",
     body: "Care cases, visit logs, and gentle follow-up prompts so nobody slips through the cracks. Visible only to the people who should see them.",
   },
   {
     Icon: Globe,
-    title: "Church website",
+    title: "Mosque website",
     body: "A simple public site with service times, events, giving pages, news, and newcomer forms, published from the same admin you already use.",
   },
   {
@@ -99,7 +99,7 @@ const HOW_IT_WORKS = [
   {
     step: "3",
     title: "Your team sees one clear picture",
-    body: "Treasurers reconcile in minutes, pastors see who needs care, and Gift Aid claims are ready when HMRC asks.",
+    body: "Treasurers reconcile in minutes, imams see who needs care, and Gift Aid claims are ready when HMRC asks.",
   },
 ];
 
@@ -108,26 +108,26 @@ const TESTIMONIALS = [
     quote:
       "Our giving records, Gift Aid declarations, and bank statements finally agree with each other. Claim season went from weeks to an afternoon.",
     name: "Sarah Whitfield",
-    role: "Church Treasurer",
+    role: "Mosque Treasurer",
     initials: "SW",
   },
   {
     quote:
       "Newcomers used to slip through between Sundays. Now every visit is logged and every follow-up is prompted. Our welcome team loves it.",
     name: "Robert Clarke",
-    role: "Lead Pastor",
+    role: "Lead Imam",
     initials: "RC",
   },
   {
     quote:
-      "Service notices, RSVPs, and the church website all come from the same place. I stopped maintaining three different lists.",
+      "Service notices, RSVPs, and the mosque website all come from the same place. I stopped maintaining three different lists.",
     name: "David Patterson",
-    role: "Church Administrator",
+    role: "Mosque Administrator",
     initials: "DP",
   },
 ];
 
-const PRICING_TEASER = (["church_essentials", "church_complete", "church_group"] as const).map(
+const PRICING_TEASER = (["mosque_essentials", "mosque_complete", "mosque_group"] as const).map(
   (code) => PLAN_DEFINITIONS[code]
 );
 
@@ -143,9 +143,9 @@ export function MarketingHome() {
         <div className="relative mx-auto grid max-w-7xl items-start gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.88fr)] lg:gap-12">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-[#e3dccb] bg-white px-4 py-2 shadow-sm">
-              <Church className="h-4 w-4 text-brand" />
+              <Landmark className="h-4 w-4 text-brand" />
               <span className="text-sm font-medium text-slate-600">
-                Built for UK churches, charities &amp; networks
+                Built for UK mosques, charities &amp; networks
               </span>
             </div>
             <h1 className="mt-7 max-w-2xl font-heading text-[2.6rem] font-bold leading-[1.08] tracking-tight text-slate-900 sm:text-5xl lg:text-[3.4rem]">
@@ -153,8 +153,8 @@ export function MarketingHome() {
               <span className="text-brand">All in one place.</span>
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-8 text-slate-600">
-              ChurchPay brings together online giving, Gift Aid &amp; GASDS, member records,
-              service notices, newcomer follow-up, pastoral care, and treasurer reporting, so
+              MosquePay brings together online giving, Gift Aid &amp; GASDS, member records,
+              service notices, newcomer follow-up, welfare, and treasurer reporting, so
               your team spends Sunday with people, not spreadsheets.
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
@@ -162,7 +162,7 @@ export function MarketingHome() {
                 href="/book-demo"
                 className="inline-flex items-center gap-2 rounded-xl bg-brand px-7 py-3.5 text-sm font-semibold text-white shadow-[0_12px_28px_-8px_rgba(11,67,184,0.5)] transition-colors hover:bg-brand-dark"
               >
-                Book a church demo
+                Book a mosque demo
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
@@ -194,7 +194,7 @@ export function MarketingHome() {
             <div className="overflow-hidden rounded-[2rem] border border-[#e9e2d4] shadow-[0_24px_60px_-24px_rgba(30,41,59,0.3)]">
               <Image
                 src="/marketing/placeholder-worship.png"
-                alt="A congregation worshipping together on a Sunday morning, hands raised in a warmly lit church"
+                alt="A congregation worshipping together on a Sunday morning, hands raised in a warmly lit mosque"
                 width={1600}
                 height={1100}
                 className="aspect-[4/3] w-full object-cover sm:aspect-[16/10]"
@@ -207,20 +207,20 @@ export function MarketingHome() {
                   they&rsquo;re in the room with everyone else.&rdquo;
                 </p>
                 <p className="mt-2 text-xs font-semibold text-brand">
-                  A church on ChurchPay
+                  A mosque on MosquePay
                 </p>
               </div>
             </div>
           </div>
           <div>
-            <MarketingKicker>Why we built ChurchPay</MarketingKicker>
+            <MarketingKicker>Why we built MosquePay</MarketingKicker>
             <h2 className="mt-4 font-heading text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
               Your team should be worshipping, not reconciling.
             </h2>
             <p className="mt-5 text-base leading-7 text-slate-600">
               Every hour your volunteers spend counting cash, chasing Gift Aid forms, or
               copying names between spreadsheets is an hour they are not with the
-              congregation. ChurchPay quietly handles the admin in the background, so Sunday
+              congregation. MosquePay quietly handles the admin in the background, so Sunday
               feels like Sunday again.
             </p>
             <ul className="mt-7 space-y-3.5">
@@ -241,7 +241,7 @@ export function MarketingHome() {
               href="/about"
               className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-brand transition-colors hover:text-brand-dark"
             >
-              Read why churches switch
+              Read why mosques switch
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -251,9 +251,9 @@ export function MarketingHome() {
       {/* Pillars */}
       <MarketingSection tinted>
         <div className="max-w-3xl">
-          <MarketingKicker>Everything your church needs</MarketingKicker>
+          <MarketingKicker>Everything your mosque needs</MarketingKicker>
           <h2 className="mt-4 font-heading text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-            One shared record for treasurers, pastors, and welcome teams.
+            One shared record for treasurers, imams, and welcome teams.
           </h2>
           <p className="mt-4 text-base leading-7 text-slate-600">
             Stop reconciling parallel spreadsheets. Every module reads and writes the same
@@ -289,8 +289,8 @@ export function MarketingHome() {
               meant to.
             </h2>
             <p className="mt-5 text-base leading-7 text-slate-600">
-              Most churches run more than one pot: the general fund, a building appeal, a
-              mission partner, a seasonal collection. ChurchPay lets you run each one as a
+              Most mosques run more than one pot: the general fund, a building appeal, a
+              mission partner, a seasonal collection. MosquePay lets you run each one as a
               named campaign with its own giving link, so designated gifts stay designated
               from the moment of giving through to the treasurer&apos;s report.
             </p>
@@ -375,9 +375,9 @@ export function MarketingHome() {
       {/* Testimonials */}
       <MarketingSection>
         <div className="mx-auto max-w-2xl text-center">
-          <MarketingKicker>Loved by church teams</MarketingKicker>
+          <MarketingKicker>Loved by mosque teams</MarketingKicker>
           <h2 className="mt-4 font-heading text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-            What churches say after switching.
+            What mosques say after switching.
           </h2>
         </div>
         <div className="mt-12 grid gap-6 lg:grid-cols-3">
@@ -405,10 +405,10 @@ export function MarketingHome() {
         <div className="mx-auto max-w-2xl text-center">
           <MarketingKicker>Simple pricing</MarketingKicker>
           <h2 className="mt-4 font-heading text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-            Plans that grow with your church.
+            Plans that grow with your mosque.
           </h2>
           <p className="mt-4 text-base leading-7 text-slate-600">
-            From a single congregation to a multi-church network. No setup fees, no surprises.
+            From a single congregation to a multi-mosque network. No setup fees, no surprises.
           </p>
         </div>
         <div className="mt-12 grid gap-6 lg:grid-cols-3">
@@ -459,11 +459,11 @@ export function MarketingHome() {
           <div className="max-w-2xl">
             <MarketingKicker>For networks &amp; denominations</MarketingKicker>
             <h2 className="mt-3 font-heading text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-              Overseeing a diocese, circuit, association, or network of churches?
+              Overseeing a network, circuit, association, or network of mosques?
             </h2>
             <p className="mt-3 text-base leading-7 text-slate-600">
-              Roll ChurchPay out across every church in your care, with central oversight,
-              cross-church reporting, one invoice, and each church keeping its own identity
+              Roll MosquePay out across every mosque in your care, with central oversight,
+              cross-mosque reporting, one invoice, and each mosque keeping its own identity
               and bank account.
             </p>
           </div>
@@ -471,15 +471,15 @@ export function MarketingHome() {
             href="/networks"
             className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-brand px-7 py-3.5 text-sm font-semibold text-white shadow-[0_12px_28px_-8px_rgba(11,67,184,0.5)] transition-colors hover:bg-brand-dark"
           >
-            ChurchPay for networks
+            MosquePay for networks
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
       </MarketingSection>
 
       <MarketingCtaBand
-        title="See ChurchPay with your church's name on the screen."
-        body="A 30-minute walkthrough of giving, Gift Aid, congregation records, services, newcomers, pastoral care, and treasurer reporting, tailored to how your church works."
+        title="See MosquePay with your mosque's name on the screen."
+        body="A 30-minute walkthrough of giving, Gift Aid, congregation records, services, newcomers, welfare, and treasurer reporting, tailored to how your mosque works."
         secondaryLabel="Talk to us first"
         secondaryHref="/contact"
       />

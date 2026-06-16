@@ -8,28 +8,28 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import { listChurches, getChurchSubscription } from "@/lib/db";
-import type { Church, ChurchSubscription } from "@/lib/db/types";
+import { listMosques, getMosqueSubscription } from "@/lib/db";
+import type { Mosque, MosqueSubscription } from "@/lib/db/types";
 import { formatDate } from "@/lib/utils";
 import { getPlanDefinition } from "@/lib/billing/plans";
 import { requireOperatorPageAccess } from "@/lib/auth/operator-page";
 
-type ChurchWithSub = {
-  church: Church;
-  subscription: ChurchSubscription | null;
+type MosqueWithSub = {
+  mosque: Mosque;
+  subscription: MosqueSubscription | null;
 };
 
-async function getBillingData(): Promise<ChurchWithSub[]> {
+async function getBillingData(): Promise<MosqueWithSub[]> {
   if (!isSupabaseConfigured()) return [];
 
   try {
-    const churches = await listChurches();
+    const mosques = await listMosques();
     const results = await Promise.all(
-      churches.map(async (church) => {
-        const subscription = await getChurchSubscription(church.id).catch(
+      mosques.map(async (mosque) => {
+        const subscription = await getMosqueSubscription(mosque.id).catch(
           () => null
         );
-        return { church, subscription };
+        return { mosque, subscription };
       })
     );
     return results;
@@ -122,7 +122,7 @@ export default async function BillingPage() {
         <div>
           <h1 className="admin-page-title">Billing</h1>
           <p className="admin-page-copy">
-            Church subscriptions and revenue overview
+            Mosque subscriptions and revenue overview
           </p>
         </div>
       </div>
@@ -154,10 +154,10 @@ export default async function BillingPage() {
         <div className="admin-surface p-10 text-center">
           <CreditCard className="mx-auto h-10 w-10 text-slate-600" />
           <p className="mt-3 text-sm text-slate-500">
-            No church subscriptions found
+            No mosque subscriptions found
           </p>
           <p className="mt-1 text-xs text-slate-600">
-            Subscriptions will appear here once churches are onboarded
+            Subscriptions will appear here once mosques are onboarded
           </p>
         </div>
       ) : (
@@ -165,7 +165,7 @@ export default async function BillingPage() {
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Church</th>
+                <th>Mosque</th>
                 <th>Plan</th>
                 <th>Status</th>
                 <th className="hidden sm:table-cell">Amount</th>
@@ -174,14 +174,14 @@ export default async function BillingPage() {
               </tr>
             </thead>
             <tbody>
-              {data.map(({ church, subscription: sub }) => (
-                <tr key={church.id}>
+              {data.map(({ mosque, subscription: sub }) => (
+                <tr key={mosque.id}>
                   <td>
                     <Link
-                      href={`/operator/churches/${church.slug}`}
+                      href={`/operator/mosques/${mosque.slug}`}
                       className="font-medium text-white hover:text-blue-400 transition-colors"
                     >
-                      {church.name}
+                      {mosque.name}
                     </Link>
                   </td>
                   <td className="text-slate-300 capitalize">

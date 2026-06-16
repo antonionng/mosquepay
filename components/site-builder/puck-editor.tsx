@@ -15,12 +15,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import type { ChurchSiteSection } from "@/lib/db/types";
+import type { MosqueSiteSection } from "@/lib/db/types";
 import { mergeHeroPrimaryColor, sanitizeSectionStyle } from "@/lib/site-section-style";
 
-type SiteSection = ChurchSiteSection;
+type SiteSection = MosqueSiteSection;
 
-type ChurchSite = {
+type MosqueSite = {
   page_title: string;
   page_description: string | null;
   sections: SiteSection[];
@@ -152,13 +152,13 @@ export function puckDataToSections(data: Data): SiteSection[] {
 }
 
 export function PuckEditor({
-  churchSlug,
+  mosqueSlug,
   initialSections,
   pageTitle: initialPageTitle,
   pageDescription: initialPageDescription,
   primaryColor = "#3b82f6",
 }: {
-  churchSlug: string;
+  mosqueSlug: string;
   initialSections: SiteSection[];
   pageTitle: string;
   pageDescription: string | null;
@@ -194,7 +194,7 @@ export function PuckEditor({
       setSaving(true);
       try {
         const sections = puckDataToSections(data);
-        const res = await fetch(`/api/churches/${churchSlug}/site`, {
+        const res = await fetch(`/api/mosques/${mosqueSlug}/site`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -211,13 +211,13 @@ export function PuckEditor({
         setSaving(false);
       }
     },
-    [churchSlug, pageTitle, pageDescription, flash]
+    [mosqueSlug, pageTitle, pageDescription, flash]
   );
 
   const handleAiGenerate = useCallback(async () => {
     setGenerating(true);
     try {
-      const res = await fetch(`/api/churches/${churchSlug}/ai-draft`, {
+      const res = await fetch(`/api/mosques/${mosqueSlug}/ai-draft`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -230,7 +230,7 @@ export function PuckEditor({
       });
       if (!res.ok) throw new Error("Draft generation failed");
       const json = await res.json();
-      const draft = json.draft as ChurchSite;
+      const draft = json.draft as MosqueSite;
       setPageTitle(draft.page_title);
       setPageDescription(draft.page_description ?? "");
       setPuckData(sectionsToPuckData(draft.sections, primaryColor));
@@ -245,7 +245,7 @@ export function PuckEditor({
     } finally {
       setGenerating(false);
     }
-  }, [churchSlug, aiBrief, aiTone, aiAudience, aiFocus, primaryColor, puckData, flash]);
+  }, [mosqueSlug, aiBrief, aiTone, aiAudience, aiFocus, primaryColor, puckData, flash]);
 
   return (
     <div className="flex flex-col">
@@ -361,7 +361,7 @@ export function PuckEditor({
           </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <Textarea
-              placeholder="Short church brief. Describe your church…"
+              placeholder="Short mosque brief. Describe your mosque…"
               rows={3}
               value={aiBrief}
               onChange={(e) => setAiBrief(e.target.value)}

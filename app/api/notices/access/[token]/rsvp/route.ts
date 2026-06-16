@@ -57,7 +57,7 @@ export async function POST(
     return NextResponse.json({ error: "Notice link has expired." }, { status: 410 });
   }
 
-  const event = await db.getEventById(accessLink.event_id, accessLink.church_id);
+  const event = await db.getEventById(accessLink.event_id, accessLink.mosque_id);
   if (!event) {
     return NextResponse.json({ error: "Event not found." }, { status: 404 });
   }
@@ -86,7 +86,7 @@ export async function POST(
   // alongside a settled payment via the Mooov webhook.
   if (attendingCeremony && event.enable_payments) {
     const resolved = await resolveCheckoutFeesForMember({
-      churchId: accessLink.church_id,
+      mosqueId: accessLink.mosque_id,
       event,
       memberEmail: accessLink.recipient_email,
       attendingCeremony: true,
@@ -124,7 +124,7 @@ export async function POST(
   const existing = await db.getRsvpByEventAndEmail(
     event.id,
     accessLink.recipient_email,
-    accessLink.church_id
+    accessLink.mosque_id
   );
 
   const wasPledgedBefore = existing?.raffle_wine_pledged === true;
@@ -135,7 +135,7 @@ export async function POST(
   // not narrow `event`/`accessLink` inside a nested function declaration).
   const recipientEmail = accessLink.recipient_email;
   const recipientName = accessLink.recipient_name;
-  const churchIdForEmail = accessLink.church_id;
+  const mosqueIdForEmail = accessLink.mosque_id;
   const eventTitleForEmail = event.title;
   const eventDateForEmail = event.event_date;
   const eventTimeForEmail = event.event_time;
@@ -144,11 +144,11 @@ export async function POST(
   async function maybeSendWinePledgeEmail() {
     if (!shouldEmailWinePledge) return;
     try {
-      const church = await db.getChurchById(churchIdForEmail);
+      const mosque = await db.getMosqueById(mosqueIdForEmail);
       await sendWinePledgeConfirmationEmail({
         toEmail: recipientEmail,
         toName: recipientName ?? recipientEmail,
-        churchName: church?.name ?? "your church",
+        mosqueName: mosque?.name ?? "your mosque",
         eventTitle: eventTitleForEmail,
         eventDate: eventDateForEmail,
         eventTime: eventTimeForEmail,
@@ -162,7 +162,7 @@ export async function POST(
   }
 
   if (existing) {
-    const rsvp = await db.updateRsvp(existing.id, accessLink.church_id, {
+    const rsvp = await db.updateRsvp(existing.id, accessLink.mosque_id, {
       attending_ceremony: attendingCeremony,
       attending_dining: attendingDining,
       number_of_guests: guests.length,
@@ -175,7 +175,7 @@ export async function POST(
     });
     if (rsvp && guests.length > 0) {
       await db.addEventGuests(
-        accessLink.church_id,
+        accessLink.mosque_id,
         guests.map((guest) => ({
           rsvp_id: rsvp.id,
           event_id: event.id,
@@ -195,10 +195,10 @@ export async function POST(
   }
 
   const member =
-    (await db.getMemberByEmail(accessLink.recipient_email, accessLink.church_id)) ??
+    (await db.getMemberByEmail(accessLink.recipient_email, accessLink.mosque_id)) ??
     null;
 
-  const rsvp = await db.addRsvp(accessLink.church_id, {
+  const rsvp = await db.addRsvp(accessLink.mosque_id, {
     event_id: event.id,
     user_name: accessLink.recipient_name ?? member?.full_name ?? accessLink.recipient_email,
     user_email: accessLink.recipient_email,
@@ -219,7 +219,7 @@ export async function POST(
 
   if (guests.length > 0) {
     await db.addEventGuests(
-      accessLink.church_id,
+      accessLink.mosque_id,
       guests.map((guest) => ({
         rsvp_id: rsvp.id,
         event_id: event.id,

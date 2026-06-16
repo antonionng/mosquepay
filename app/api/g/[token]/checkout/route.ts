@@ -3,8 +3,8 @@
 // Updates and deletions to the resulting guest/rsvp rows happen elsewhere.
 //
 // Payment surface: 100% Mooov (Mooov Connect -> hosted Stripe Checkout on
-// the church's connected PSP). No direct Stripe SDK calls and no fallback.
-// If the church has not connected Mooov the guest sees a 503 + clear copy
+// the mosque's connected PSP). No direct Stripe SDK calls and no fallback.
+// If the mosque has not connected Mooov the guest sees a 503 + clear copy
 // and the RSVP is rolled back to payment_pending without a Stripe session.
 import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
@@ -14,22 +14,22 @@ import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { sendGuestWelcomeEmail } from "@/lib/email/guest";
 import {
-  churchScopedGuestPath,
-  churchScopedGuestSuccessPath,
-  churchScopedNewcomerPath,
+  mosqueScopedGuestPath,
+  mosqueScopedGuestSuccessPath,
+  mosqueScopedNewcomerPath,
 } from "@/lib/public-links";
 import { createServiceClient } from "@/lib/supabase/server";
 import { callMooovConnect, MooovApiError } from "@/lib/mooov";
 
 async function loadMooovMerchant(
   supa: ReturnType<typeof createServiceClient>,
-  churchId: string,
+  mosqueId: string,
 ): Promise<string | null> {
   const { data, error } = await supa
     .schema("mooov")
-    .from("churches")
+    .from("mosques")
     .select("merchant_id, status")
-    .eq("id", churchId)
+    .eq("id", mosqueId)
     .maybeSingle<{ merchant_id: string; status: string }>();
   if (error) throw error;
   if (!data) return null;
@@ -62,8 +62,8 @@ export async function POST(
     const fullName = String(body.full_name ?? "").trim();
     const email = String(body.email ?? "").trim() || null;
     const phone = String(body.phone ?? "").trim() || null;
-    const motherChurchName = String(body.mother_church_name ?? "").trim() || null;
-    const motherChurchNumber = String(body.mother_church_number ?? "").trim() || null;
+    const motherMosqueName = String(body.mother_mosque_name ?? "").trim() || null;
+    const motherMosqueNumber = String(body.mother_mosque_number ?? "").trim() || null;
     const constitution = String(body.constitution ?? "").trim() || null;
     const rank = String(body.rank ?? "").trim() || null;
     const partnerName = String(body.partner_name ?? "").trim() || null;
@@ -90,8 +90,8 @@ export async function POST(
         fullName,
         email,
         phone,
-        motherChurchName,
-        motherChurchNumber,
+        motherMosqueName,
+        motherMosqueNumber,
         constitution,
         rank,
         partnerName,
@@ -136,8 +136,8 @@ type DbArgs = {
   fullName: string;
   email: string | null;
   phone: string | null;
-  motherChurchName: string | null;
-  motherChurchNumber: string | null;
+  motherMosqueName: string | null;
+  motherMosqueNumber: string | null;
   constitution: string | null;
   rank: string | null;
   partnerName: string | null;
@@ -163,7 +163,7 @@ async function handleDb(args: DbArgs) {
     return NextResponse.json({ error: "This invitation has reached its limit." }, { status: 410 });
   }
 
-  const event = await db.getEventById(invitation.event_id, invitation.church_id);
+  const event = await db.getEventById(invitation.event_id, invitation.mosque_id);
   if (!event) {
     return NextResponse.json({ error: "Event no longer available." }, { status: 404 });
   }
@@ -171,11 +171,11 @@ async function handleDb(args: DbArgs) {
     return NextResponse.json({ error: "Guests are not accepted for this event." }, { status: 403 });
   }
 
-  const church = await db.getChurchById(invitation.church_id);
+  const mosque = await db.getMosqueById(invitation.mosque_id);
 
   const payerIsGuest = invitation.payer === "guest";
   // Server-side safety: when the event is flagged "dining waived for all"
-  // (church is covering dining), force the dining total to zero even if the
+  // (mosque is covering dining), force the dining total to zero even if the
   // client posted a non-zero amount. Per-guest event overrides are applied
   // for honorary guests in the recipients panel; the one-off guest at this
   // checkout point does not yet have a stable guest_id so we honour only
@@ -186,12 +186,12 @@ async function handleDb(args: DbArgs) {
     ? args.serviceFee + effectiveDining + args.charityAmount
     : args.charityAmount;
 
-  const guestRecord = await db.upsertGuest(invitation.church_id, {
+  const guestRecord = await db.upsertGuest(invitation.mosque_id, {
     full_name: args.fullName,
     email: args.email,
     phone: args.phone,
-    mother_church_name: args.motherChurchName,
-    mother_church_number: args.motherChurchNumber,
+    mother_mosque_name: args.motherMosqueName,
+    mother_mosque_number: args.motherMosqueNumber,
     constitution: args.constitution,
     rank: args.rank,
     dietary_requirements: args.dietary,
@@ -208,19 +208,19 @@ async function handleDb(args: DbArgs) {
     const newcomerToken = generateNewcomerToken();
     await db.setGuestNewcomerTokenHash(
       guestRecord.id,
-      invitation.church_id,
+      invitation.mosque_id,
       hashNewcomerToken(newcomerToken)
     );
     const origin = (
       process.env.NEXT_PUBLIC_SITE_URL ?? args.request.nextUrl.origin
     ).replace(/\/$/, "");
-    newcomerPortalUrl = `${origin}${churchScopedNewcomerPath(
-      church?.slug ?? "church",
+    newcomerPortalUrl = `${origin}${mosqueScopedNewcomerPath(
+      mosque?.slug ?? "mosque",
       newcomerToken
     )}`;
   }
 
-  const rsvp = await db.addRsvp(invitation.church_id, {
+  const rsvp = await db.addRsvp(invitation.mosque_id, {
     event_id: event.id,
     user_name: args.fullName,
     user_email: args.email ?? "",
@@ -236,7 +236,7 @@ async function handleDb(args: DbArgs) {
     status: total > 0 ? "payment_pending" : "confirmed",
   });
 
-  await db.addEventGuests(invitation.church_id, [
+  await db.addEventGuests(invitation.mosque_id, [
     {
       rsvp_id: rsvp.id,
       event_id: event.id,
@@ -252,7 +252,7 @@ async function handleDb(args: DbArgs) {
   ]);
 
   if (args.partnerName) {
-    await db.addEventGuests(invitation.church_id, [
+    await db.addEventGuests(invitation.mosque_id, [
       {
         rsvp_id: rsvp.id,
         event_id: event.id,
@@ -275,7 +275,7 @@ async function handleDb(args: DbArgs) {
       await sendGuestWelcomeEmail({
         toEmail: args.email,
         toName: args.fullName,
-        churchName: church?.name ?? "the church",
+        mosqueName: mosque?.name ?? "the mosque",
         eventTitle: event.title,
         eventDate: event.event_date,
         eventTime: event.event_time,
@@ -295,34 +295,34 @@ async function handleDb(args: DbArgs) {
       message: err instanceof Error ? err.message : String(err),
     });
     return NextResponse.json(
-      { error: "Payments are not configured for this church." },
+      { error: "Payments are not configured for this mosque." },
       { status: 503 }
     );
   }
 
   let merchantId: string | null;
   try {
-    merchantId = await loadMooovMerchant(supa, invitation.church_id);
+    merchantId = await loadMooovMerchant(supa, invitation.mosque_id);
   } catch (err) {
     console.error("guest checkout: mooov merchant lookup failed", {
-      church_id: invitation.church_id,
+      mosque_id: invitation.mosque_id,
       message: err instanceof Error ? err.message : String(err),
     });
     return NextResponse.json(
-      { error: "Could not look up payment processor for this church." },
+      { error: "Could not look up payment processor for this mosque." },
       { status: 500 }
     );
   }
   if (!merchantId) {
-    // The church has not finished Mooov Connect. The RSVP was already
+    // The mosque has not finished Mooov Connect. The RSVP was already
     // persisted above with status='payment_pending'; we surface a 503 so
     // the public guest page can render a clear message and an admin can
     // complete onboarding before re-sharing the invite link.
     return NextResponse.json(
       {
         error:
-          "This church has not finished setting up online payments yet. Please contact the church directly.",
-        code: "church_not_connected",
+          "This mosque has not finished setting up online payments yet. Please contact the mosque directly.",
+        code: "mosque_not_connected",
       },
       { status: 503 }
     );
@@ -340,17 +340,17 @@ async function handleDb(args: DbArgs) {
     (args.serviceFee + effectiveDining + args.charityAmount) * 100
   );
   const currency = "GBP";
-  const paymentId = `evt_${invitation.church_id}_${rsvp.id}_${Date.now().toString(36)}`;
+  const paymentId = `evt_${invitation.mosque_id}_${rsvp.id}_${Date.now().toString(36)}`;
   const idempotencyKey = `evt_rsvp_${rsvp.id}_${Date.now().toString(36)}`;
   const description = event.title
     ? `${event.title}${args.fullName ? ` -- ${args.fullName}` : ""}`
     : "Event booking";
-  const churchSlug = church?.slug ?? "church";
-  const successUrl = `${siteUrl}${churchScopedGuestSuccessPath(
-    churchSlug,
+  const mosqueSlug = mosque?.slug ?? "mosque";
+  const successUrl = `${siteUrl}${mosqueScopedGuestSuccessPath(
+    mosqueSlug,
     args.token
   )}`;
-  const cancelUrl = `${siteUrl}${churchScopedGuestPath(churchSlug, args.token)}`;
+  const cancelUrl = `${siteUrl}${mosqueScopedGuestPath(mosqueSlug, args.token)}`;
 
   // guest_descriptor carries everything the Mooov webhook handler needs to
   // project this charge into LP-side rows when payment.captured arrives.
@@ -361,7 +361,7 @@ async function handleDb(args: DbArgs) {
     event_id: event.id,
     guest_id: guestRecord.id,
     guest_invitation_id: invitation.id,
-    church_slug: churchSlug,
+    mosque_slug: mosqueSlug,
     donor_email: args.email,
     donor_name: args.fullName,
     dining_total: effectiveDining,
@@ -372,9 +372,9 @@ async function handleDb(args: DbArgs) {
     standalone: false,
   };
   const initialMetadata: Record<string, unknown> = {
-    source: "churchpay_guest_checkout",
-    church_slug: churchSlug,
-    church_id: invitation.church_id,
+    source: "mosquepay_guest_checkout",
+    mosque_slug: mosqueSlug,
+    mosque_id: invitation.mosque_id,
     intent: "event",
     rsvp_id: rsvp.id,
     event_id: event.id,
@@ -384,7 +384,7 @@ async function handleDb(args: DbArgs) {
     .from("payment_attempts")
     .insert({
       payment_id: paymentId,
-      church_id: invitation.church_id,
+      mosque_id: invitation.mosque_id,
       member_id: null,
       amount: totalMinor,
       currency,
@@ -396,7 +396,7 @@ async function handleDb(args: DbArgs) {
     });
   if (insertError) {
     console.error("guest checkout: preflight insert failed", {
-      church_id: invitation.church_id,
+      mosque_id: invitation.mosque_id,
       payment_id: paymentId,
       code: insertError.code,
       message: insertError.message,
@@ -431,8 +431,8 @@ async function handleDb(args: DbArgs) {
         customer_email: args.email ?? undefined,
         metadata: {
           intent: "event",
-          church_id: invitation.church_id,
-          church_slug: churchSlug,
+          mosque_id: invitation.mosque_id,
+          mosque_slug: mosqueSlug,
           rsvp_id: rsvp.id,
           event_id: event.id,
         },
@@ -492,8 +492,8 @@ async function handleDb(args: DbArgs) {
         return NextResponse.json(
           {
             error:
-              "This church has not finished setting up online payments yet. Please contact the church directly.",
-            code: "church_setup_incomplete",
+              "This mosque has not finished setting up online payments yet. Please contact the mosque directly.",
+            code: "mosque_setup_incomplete",
             setup_url: err.setupHint.setupUrl,
           },
           { status: 503 }
@@ -544,7 +544,7 @@ async function handleMock(args: MockArgs) {
   }
 
   const event = mockDb.getEventById(invitation.event_id, {
-    church_slug: invitation.church_slug,
+    mosque_slug: invitation.mosque_slug,
   });
   if (!event) {
     return NextResponse.json({ error: "Event no longer available." }, { status: 404 });
@@ -561,7 +561,7 @@ async function handleMock(args: MockArgs) {
     is_member: event.guest_policy === "blue_table",
     event_id: event.id,
     source: invitation.inviter_member_id ? "member_invite" : "self_invite_event",
-    church_slug: invitation.church_slug,
+    mosque_slug: invitation.mosque_slug,
   });
 
   const total =
@@ -583,7 +583,7 @@ async function handleMock(args: MockArgs) {
     payment_completed: total === 0,
     payment_id: null,
     status: total > 0 ? "payment_pending" : "confirmed",
-    church_slug: invitation.church_slug,
+    mosque_slug: invitation.mosque_slug,
   });
 
   mockDb.addEventGuests(
@@ -600,7 +600,7 @@ async function handleMock(args: MockArgs) {
         source: invitation.inviter_member_id ? "member_party" : "self_invite",
       },
     ],
-    invitation.church_slug
+    invitation.mosque_slug
   );
   if (args.partnerName) {
     mockDb.addEventGuests(
@@ -617,7 +617,7 @@ async function handleMock(args: MockArgs) {
           source: invitation.inviter_member_id ? "member_party" : "self_invite",
         },
       ],
-      invitation.church_slug
+      invitation.mosque_slug
     );
   }
   mockDb.recordGuestInvitationUse(invitation.id);

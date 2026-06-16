@@ -130,7 +130,7 @@ export function NextGivingPanel() {
             Next giving by member
           </h3>
           <p className="mt-1 text-sm text-slate-500">
-            When each active member&apos;s next annual giving bill falls due, aligned to the church&apos;s
+            When each active member&apos;s next annual giving bill falls due, aligned to the mosque&apos;s
             giving year.
           </p>
         </div>

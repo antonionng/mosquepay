@@ -1,7 +1,7 @@
 {
-  "name": "Church Member Portal",
-  "short_name": "Church",
-  "description": "Notice, RSVPs, giving, donations, and your digital church card.",
+  "name": "MosquePay Member Portal",
+  "short_name": "MosquePay",
+  "description": "Notices, RSVPs, donations, Zakat & Sadaqah, and your digital mosque card.",
   "start_url": "/member?utm_source=pwa",
   "scope": "/member",
   "display": "standalone",
@@ -12,19 +12,19 @@
   "lang": "en-GB",
   "icons": [
     {
-      "src": "/brand/churchpay-logo-mark.png",
+      "src": "/brand/mosquepay-logo-mark.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/brand/churchpay-logo-mark.png",
+      "src": "/brand/mosquepay-logo-mark.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/brand/churchpay-logo-mark.png",
+      "src": "/brand/mosquepay-logo-mark.png",
       "sizes": "1024x1024",
       "type": "image/png",
       "purpose": "any maskable"
@@ -35,19 +35,19 @@
       "name": "Notice",
       "short_name": "Notice",
       "url": "/member?focus=notice",
-      "icons": [{ "src": "/brand/churchpay-logo-mark.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/brand/mosquepay-logo-mark.png", "sizes": "192x192" }]
     },
     {
       "name": "Pay giving",
       "short_name": "Pay",
       "url": "/member/giving",
-      "icons": [{ "src": "/brand/churchpay-logo-mark.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/brand/mosquepay-logo-mark.png", "sizes": "192x192" }]
     },
     {
       "name": "Member card",
       "short_name": "Card",
       "url": "/member/card",
-      "icons": [{ "src": "/brand/churchpay-logo-mark.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/brand/mosquepay-logo-mark.png", "sizes": "192x192" }]
     }
   ]
 }

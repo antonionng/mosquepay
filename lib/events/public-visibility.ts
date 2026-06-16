@@ -1,6 +1,6 @@
 /**
  * Single source of truth for whether an event is allowed to appear on the
- * public church website (homepage events block, /events list, /events/[slug]
+ * public mosque website (homepage events block, /events list, /events/[slug]
  * detail page, public ICS feed, sitemap, newcomer self-registration event
  * list, AI draft suggestions, etc).
  *
@@ -10,7 +10,7 @@
  *   3. event_type in PUBLIC_EVENT_TYPES            (naturally public)
  *      OR feature_on_website = true                (admin override)
  *
- * Regular church services and churches of instruction are private by default.
+ * Regular mosque services and mosques of instruction are private by default.
  * If an admin wants a specific special_service or special_service on the public
  * site they flip `feature_on_website` in the service form.
  *

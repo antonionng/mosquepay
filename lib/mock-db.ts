@@ -4,13 +4,32 @@
  */
 
 import type {
-  ChurchSiteCustomPage,
-  ChurchSiteFooterSettings,
-  ChurchSiteHeaderSettings,
-  ChurchSiteSection,
+  AdminUser,
+  MosqueSiteCustomPage,
+  MosqueSiteFooterSettings,
+  MosqueSiteHeaderSettings,
+  MosqueSiteSection,
+  Network,
 } from "@/lib/db/types";
+type PlatformMosqueStats = {
+  mosque_id: string;
+  mosque_slug: string;
+  mosque_name: string;
+  network_id: string | null;
+  members: number;
+  active_members: number;
+  upcoming_events: number;
+  outstanding_giving: number;
+  paid_giving_amount: number;
+  donations_amount: number;
+  last_service_at: string | null;
+};
+import {
+  PLATFORM_DEMO_MOSQUES,
+  demoEmailFor,
+} from "@/lib/platform-demo-mosques";
 import { shouldUseInMemoryMock } from "@/lib/db/with-fallback";
-import { DEFAULT_CHURCH_SLUG } from "@/lib/tenant";
+import { DEFAULT_MOSQUE_SLUG } from "@/lib/tenant";
 
 /** True while module init seed runs (allows seed without Supabase). */
 let mockDbSeeding = false;
@@ -29,16 +48,16 @@ function uuid() {
   return crypto.randomUUID();
 }
 
-type ChurchScoped = {
-  church_slug: string;
+type MosqueScoped = {
+  mosque_slug: string;
 };
 
-function withChurchSlug(slug?: string): string {
-  return (slug ?? DEFAULT_CHURCH_SLUG).trim().toLowerCase();
+function withMosqueSlug(slug?: string): string {
+  return (slug ?? DEFAULT_MOSQUE_SLUG).trim().toLowerCase();
 }
 
-// --- Churches and church websites ---
-export type MockChurch = {
+// --- Mosques and mosque websites ---
+export type MockMosque = {
   id: string;
   slug: string;
   name: string;
@@ -50,7 +69,7 @@ export type MockChurch = {
   secondary_color: string | null;
   support_email: string | null;
   support_phone: string | null;
-  church_number: string | null;
+  mosque_number: string | null;
   consecrated_at: string | null;
   governing_body: string | null;
   service_schedule: string | null;
@@ -82,146 +101,47 @@ export type MockChurch = {
   updated_at: string;
 };
 
-export type MockChurchSite = ChurchScoped & {
+export type MockMosqueSite = MosqueScoped & {
   id: string;
   page_title: string;
   page_description: string | null;
-  sections: ChurchSiteSection[];
-  custom_pages: ChurchSiteCustomPage[];
-  header_settings: ChurchSiteHeaderSettings | null;
-  footer_settings: ChurchSiteFooterSettings | null;
+  sections: MosqueSiteSection[];
+  custom_pages: MosqueSiteCustomPage[];
+  header_settings: MosqueSiteHeaderSettings | null;
+  footer_settings: MosqueSiteFooterSettings | null;
   published: boolean;
   updated_at: string;
 };
 
-const churches: MockChurch[] = [
-  {
-    id: uuid(),
-    slug: DEFAULT_CHURCH_SLUG,
-    name: "St Mary's Church",
-    city: "London",
-    country: "United Kingdom",
-    tagline: "Memberhood, charity, and timeless tradition.",
-    logo_url: null,
-    primary_color: "#111827",
-    secondary_color: "#b45309",
-    support_email: "secretary@covenantchurch4344.org",
-    support_phone: null,
-    church_number: "4344",
-    consecrated_at: "1922-04-03",
-    governing_body: "Member of London Metropolitan Grand Church",
-    service_schedule:
-      "Regular services are held in January, March, June, and November.",
-    secretary_name: "Church Secretary",
-    secretary_address: "Mark members Hall, 86 St James's Street, London, SW1A 1PL",
-    secretary_phone: "01582 461961",
-    charity_donation_url: "https://gtap.uk/L4344",
-    gift_aid_pack_name: "Covenant Gift Aid pack",
-    data_protection_notice:
-      "A member database is held by the Church Secretary for church business.",
-    newcomer_notice:
-      "Members travelling abroad should confirm regularity before newcomer churches under other jurisdictions.",
-    loi_contact: "Contact the Secretary for Church of Instruction dates.",
-    wifi_details: "MMH Guest WiFi details available at the venue.",
-    service_location: "Mark members Hall, 86 St James's Street, London, SW1A 1PL",
-    service_location_url: "https://maps.app.goo.gl/HsCmZTMVbHkM26ck6",
-    accessibility_notes: "Step-free access via the side entrance. Hearing loop available in the temple. Please contact the secretary in advance if you need additional arrangements.",
-    default_dress_code: "Lounge suit, black tie. White gloves provided.",
-    is_active: true,
-    network_id: null,
-    custom_domain: null,
-    custom_domain_verified_at: null,
-    custom_domain_verification_token: null,
-    accepts_self_registration: true,
-    current_charity_campaign_id: null,
-    gift_aid_default_mode: "both",
-    gift_aid_pack_email: null,
-    gift_aid_pack_charity_number: null,
-    hmrc_charity_reference: null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-];
+const mosques: MockMosque[] = [];
+const mosqueSites: MockMosqueSite[] = [];
 
-const churchSites: MockChurchSite[] = [
-  {
-    id: uuid(),
-    church_slug: DEFAULT_CHURCH_SLUG,
-    page_title: "St Mary's Church",
-    page_description: "A London church rooted in fellowship, service, and meaningful ritual.",
-    custom_pages: [],
-    header_settings: null,
-    footer_settings: null,
-    sections: [
-      {
-        id: uuid(),
-        type: "hero",
-        heading: "Welcome to St Mary's Church",
-        body: "Join a modern memberhood with deep heritage in the heart of London.",
-        cta_label: "Express Interest",
-        cta_href: "/join",
-        visible: true,
-        order: 1,
-      },
-      {
-        id: uuid(),
-        type: "service_details",
-        heading: "Services at Mark members' Hall",
-        body: "Regular services, social dining, and charity events throughout the year.",
-        cta_label: "View Events",
-        cta_href: "/events",
-        visible: true,
-        order: 2,
-      },
-      {
-        id: uuid(),
-        type: "charity",
-        heading: "Charity and Community",
-        body: "We support local and national causes through regular giving and fundraising.",
-        cta_label: "Our Charity Work",
-        cta_href: "/charity",
-        visible: true,
-        order: 3,
-      },
-      {
-        id: uuid(),
-        type: "contact",
-        heading: "Speak With Our Team",
-        body: "If you are interested in joining or newcomer, we are happy to hear from you.",
-        cta_label: "Contact Us",
-        cta_href: "/contact",
-        visible: true,
-        order: 4,
-      },
-    ],
-    published: true,
-    updated_at: new Date().toISOString(),
-  },
-];
+type MockNetwork = Network & { created_at: string; updated_at: string };
+const networks: MockNetwork[] = [];
 
-export function listChurches(): MockChurch[] {
+export function listMosques(): MockMosque[] {
   assertInMemoryMock();
-  return [...churches].sort((a, b) => a.name.localeCompare(b.name));
+  return [...mosques].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function getChurchBySlug(slug: string): MockChurch | null {
+export function getMosqueBySlug(slug: string): MockMosque | null {
   assertInMemoryMock();
-  const safeSlug = withChurchSlug(slug);
-  return churches.find((l) => l.slug === safeSlug && l.is_active) ?? null;
+  const safeSlug = withMosqueSlug(slug);
+  return mosques.find((l) => l.slug === safeSlug && l.is_active) ?? null;
 }
 
-export function upsertChurch(
-  input: Partial<Omit<MockChurch, "id" | "created_at" | "updated_at">> & Pick<MockChurch, "slug" | "name">
-): MockChurch {
+export function upsertMosque(
+  input: Partial<Omit<MockMosque, "id" | "created_at" | "updated_at">> & Pick<MockMosque, "slug" | "name">
+): MockMosque {
   assertInMemoryMock();
-  const safeSlug = withChurchSlug(input.slug);
+  const safeSlug = withMosqueSlug(input.slug);
   const now = new Date().toISOString();
-  const existing = churches.find((l) => l.slug === safeSlug);
+  const existing = mosques.find((l) => l.slug === safeSlug);
   if (existing) {
     Object.assign(existing, input, { slug: safeSlug, updated_at: now });
     return existing;
   }
-  const church: MockChurch = {
+  const mosque: MockMosque = {
     id: uuid(),
     slug: safeSlug,
     name: input.name,
@@ -233,7 +153,7 @@ export function upsertChurch(
     secondary_color: input.secondary_color ?? null,
     support_email: input.support_email ?? null,
     support_phone: input.support_phone ?? null,
-    church_number: input.church_number ?? null,
+    mosque_number: input.mosque_number ?? null,
     consecrated_at: input.consecrated_at ?? null,
     governing_body: input.governing_body ?? null,
     service_schedule: input.service_schedule ?? null,
@@ -264,19 +184,19 @@ export function upsertChurch(
     created_at: now,
     updated_at: now,
   };
-  churches.push(church);
-  return church;
+  mosques.push(mosque);
+  return mosque;
 }
 
-export function getChurchSite(churchSlug?: string): MockChurchSite {
+export function getMosqueSite(mosqueSlug?: string): MockMosqueSite {
   assertInMemoryMock();
-  const safeSlug = withChurchSlug(churchSlug);
-  const existing = churchSites.find((s) => s.church_slug === safeSlug);
+  const safeSlug = withMosqueSlug(mosqueSlug);
+  const existing = mosqueSites.find((s) => s.mosque_slug === safeSlug);
   if (existing) return existing;
-  const site: MockChurchSite = {
+  const site: MockMosqueSite = {
     id: uuid(),
-    church_slug: safeSlug,
-    page_title: "Church Homepage",
+    mosque_slug: safeSlug,
+    page_title: "Mosque Homepage",
     page_description: null,
     sections: [],
     custom_pages: [],
@@ -285,15 +205,15 @@ export function getChurchSite(churchSlug?: string): MockChurchSite {
     published: true,
     updated_at: new Date().toISOString(),
   };
-  churchSites.push(site);
+  mosqueSites.push(site);
   return site;
 }
 
-export function updateChurchSite(
-  churchSlug: string,
+export function updateMosqueSite(
+  mosqueSlug: string,
   updates: Partial<
     Pick<
-      MockChurchSite,
+      MockMosqueSite,
       | "page_title"
       | "page_description"
       | "sections"
@@ -303,15 +223,15 @@ export function updateChurchSite(
       | "published"
     >
   >
-): MockChurchSite {
+): MockMosqueSite {
   assertInMemoryMock();
-  const site = getChurchSite(churchSlug);
+  const site = getMosqueSite(mosqueSlug);
   Object.assign(site, updates, { updated_at: new Date().toISOString() });
   return site;
 }
 
 // --- Newcomers ---
-export type MockNewcomer = ChurchScoped & {
+export type MockNewcomer = MosqueScoped & {
   id: string;
   first_name: string;
   last_name: string;
@@ -343,18 +263,18 @@ export type MockNewcomer = ChurchScoped & {
 
 const newcomers: MockNewcomer[] = [];
 
-export function getNewcomers(opts?: { church_slug?: string }): MockNewcomer[] {
+export function getNewcomers(opts?: { mosque_slug?: string }): MockNewcomer[] {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
   return [...newcomers]
-    .filter((newcomer) => newcomer.church_slug === churchSlug)
+    .filter((newcomer) => newcomer.mosque_slug === mosqueSlug)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
 
-export function getNewcomerById(id: string, opts?: { church_slug?: string }): MockNewcomer | null {
+export function getNewcomerById(id: string, opts?: { mosque_slug?: string }): MockNewcomer | null {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
-  return newcomers.find((l) => l.id === id && l.church_slug === churchSlug) ?? null;
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
+  return newcomers.find((l) => l.id === id && l.mosque_slug === mosqueSlug) ?? null;
 }
 
 type AddNewcomerInput = Omit<
@@ -363,7 +283,7 @@ type AddNewcomerInput = Omit<
   | "created_at"
   | "updated_at"
   | "stage_changed_at"
-  | "church_slug"
+  | "mosque_slug"
   | "proposer_member_id"
   | "proposer_name"
   | "seconder_member_id"
@@ -378,7 +298,7 @@ type AddNewcomerInput = Omit<
   | "converted_member_id"
   | "converted_at"
 > & {
-  church_slug?: string;
+  mosque_slug?: string;
   proposer_member_id?: string | null;
   proposer_name?: string | null;
   seconder_member_id?: string | null;
@@ -422,7 +342,7 @@ export function addNewcomer(data: AddNewcomerInput): MockNewcomer {
     notes: data.notes ?? null,
     converted_member_id: data.converted_member_id ?? null,
     converted_at: data.converted_at ?? null,
-    church_slug: withChurchSlug(data.church_slug),
+    mosque_slug: withMosqueSlug(data.mosque_slug),
     created_at: now,
     updated_at: now,
     stage_changed_at: now,
@@ -433,12 +353,12 @@ export function addNewcomer(data: AddNewcomerInput): MockNewcomer {
 
 export function updateNewcomer(
   id: string,
-  updates: Partial<Omit<MockNewcomer, "id" | "created_at" | "church_slug">>,
-  opts?: { church_slug?: string }
+  updates: Partial<Omit<MockNewcomer, "id" | "created_at" | "mosque_slug">>,
+  opts?: { mosque_slug?: string }
 ): MockNewcomer | null {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
-  const i = newcomers.findIndex((l) => l.id === id && l.church_slug === churchSlug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
+  const i = newcomers.findIndex((l) => l.id === id && l.mosque_slug === mosqueSlug);
   if (i === -1) return null;
   const now = new Date().toISOString();
   if (updates.stage) newcomers[i].stage_changed_at = now;
@@ -448,16 +368,16 @@ export function updateNewcomer(
 
 export function deleteNewcomer(
   id: string,
-  opts?: { church_slug?: string }
+  opts?: { mosque_slug?: string }
 ): { deleted: boolean } {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
-  const i = newcomers.findIndex((l) => l.id === id && l.church_slug === churchSlug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
+  const i = newcomers.findIndex((l) => l.id === id && l.mosque_slug === mosqueSlug);
   if (i === -1) return { deleted: false };
   newcomers.splice(i, 1);
   for (let j = newcomerActivities.length - 1; j >= 0; j--) {
     const a = newcomerActivities[j];
-    if (a.newcomer_id === id && a.church_slug === churchSlug) {
+    if (a.newcomer_id === id && a.mosque_slug === mosqueSlug) {
       newcomerActivities.splice(j, 1);
     }
   }
@@ -467,12 +387,12 @@ export function deleteNewcomer(
 export function updateNewcomerActivity(
   id: string,
   updates: Partial<Pick<MockNewcomerActivity, "title" | "description" | "service_date" | "attendees" | "due_date" | "completed">>,
-  opts?: { church_slug?: string }
+  opts?: { mosque_slug?: string }
 ): MockNewcomerActivity | null {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
   const i = newcomerActivities.findIndex(
-    (a) => a.id === id && a.church_slug === churchSlug
+    (a) => a.id === id && a.mosque_slug === mosqueSlug
   );
   if (i === -1) return null;
   Object.assign(newcomerActivities[i], updates);
@@ -481,13 +401,13 @@ export function updateNewcomerActivity(
 
 export function getLatestNewcomerActivity(
   newcomerId: string,
-  opts?: { church_slug?: string }
+  opts?: { mosque_slug?: string }
 ): MockNewcomerActivity | null {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
   return (
     newcomerActivities
-      .filter((a) => a.newcomer_id === newcomerId && a.church_slug === churchSlug)
+      .filter((a) => a.newcomer_id === newcomerId && a.mosque_slug === mosqueSlug)
       .sort(
         (a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -496,7 +416,7 @@ export function getLatestNewcomerActivity(
 }
 
 // --- Newcomer activities ---
-export type MockNewcomerActivity = ChurchScoped & {
+export type MockNewcomerActivity = MosqueScoped & {
   id: string;
   newcomer_id: string;
   activity_type: string;
@@ -512,22 +432,22 @@ export type MockNewcomerActivity = ChurchScoped & {
 
 const newcomerActivities: MockNewcomerActivity[] = [];
 
-export function getNewcomerActivities(newcomerId: string, opts?: { church_slug?: string }): MockNewcomerActivity[] {
+export function getNewcomerActivities(newcomerId: string, opts?: { mosque_slug?: string }): MockNewcomerActivity[] {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
   return newcomerActivities
-    .filter((a) => a.newcomer_id === newcomerId && a.church_slug === churchSlug)
+    .filter((a) => a.newcomer_id === newcomerId && a.mosque_slug === mosqueSlug)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
 
 export function addNewcomerActivity(
-  data: Omit<MockNewcomerActivity, "id" | "created_at" | "church_slug"> & { church_slug?: string }
+  data: Omit<MockNewcomerActivity, "id" | "created_at" | "mosque_slug"> & { mosque_slug?: string }
 ): MockNewcomerActivity {
   assertInMemoryMock();
   const activity: MockNewcomerActivity = {
     id: uuid(),
     ...data,
-    church_slug: withChurchSlug(data.church_slug),
+    mosque_slug: withMosqueSlug(data.mosque_slug),
     created_at: new Date().toISOString(),
   };
   newcomerActivities.push(activity);
@@ -535,7 +455,7 @@ export function addNewcomerActivity(
 }
 
 // --- Events ---
-export type MockEvent = ChurchScoped & {
+export type MockEvent = MosqueScoped & {
   id: string;
   title: string;
   slug: string;
@@ -587,26 +507,26 @@ export type MockEvent = ChurchScoped & {
 
 const events: MockEvent[] = [];
 
-export function getEvents(opts?: { published?: boolean; upcoming?: boolean; church_slug?: string }): MockEvent[] {
+export function getEvents(opts?: { published?: boolean; upcoming?: boolean; mosque_slug?: string }): MockEvent[] {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
   let list = [...events];
-  list = list.filter((event) => event.church_slug === churchSlug);
+  list = list.filter((event) => event.mosque_slug === mosqueSlug);
   if (opts?.published !== undefined) list = list.filter((e) => e.published === opts.published);
   if (opts?.upcoming) list = list.filter((e) => new Date(e.event_date) >= new Date());
   return list.sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime());
 }
 
-export function getEventById(id: string, opts?: { church_slug?: string }): MockEvent | null {
+export function getEventById(id: string, opts?: { mosque_slug?: string }): MockEvent | null {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
-  return events.find((e) => e.id === id && e.church_slug === churchSlug) ?? null;
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
+  return events.find((e) => e.id === id && e.mosque_slug === mosqueSlug) ?? null;
 }
 
-export function getEventBySlug(slug: string, opts?: { church_slug?: string }): MockEvent | null {
+export function getEventBySlug(slug: string, opts?: { mosque_slug?: string }): MockEvent | null {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
-  return events.find((e) => e.slug === slug && e.published && e.church_slug === churchSlug) ?? null;
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
+  return events.find((e) => e.slug === slug && e.published && e.mosque_slug === mosqueSlug) ?? null;
 }
 
 type AddEventInput = Omit<
@@ -614,7 +534,7 @@ type AddEventInput = Omit<
   | "id"
   | "created_at"
   | "updated_at"
-  | "church_slug"
+  | "mosque_slug"
   | "sequence_id"
   | "sequence_position"
   | "notice_status"
@@ -624,7 +544,7 @@ type AddEventInput = Omit<
   | "notice_last_sent_at"
   | "feature_on_website"
 > & {
-  church_slug?: string;
+  mosque_slug?: string;
   sequence_id?: string | null;
   sequence_position?: number | null;
   notice_status?: MockEvent["notice_status"];
@@ -649,7 +569,7 @@ export function addEvent(data: AddEventInput): MockEvent {
     notice_last_sent_at: null,
     feature_on_website: false,
     ...data,
-    church_slug: withChurchSlug(data.church_slug),
+    mosque_slug: withMosqueSlug(data.mosque_slug),
     created_at: now,
     updated_at: now,
   };
@@ -657,26 +577,26 @@ export function addEvent(data: AddEventInput): MockEvent {
   return event;
 }
 
-export function updateEvent(id: string, updates: Partial<MockEvent>, opts?: { church_slug?: string }): MockEvent | null {
+export function updateEvent(id: string, updates: Partial<MockEvent>, opts?: { mosque_slug?: string }): MockEvent | null {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
-  const i = events.findIndex((e) => e.id === id && e.church_slug === churchSlug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
+  const i = events.findIndex((e) => e.id === id && e.mosque_slug === mosqueSlug);
   if (i === -1) return null;
   Object.assign(events[i], updates, { updated_at: new Date().toISOString() });
   return events[i];
 }
 
-export function deleteEvent(id: string, opts?: { church_slug?: string }): MockEvent | null {
+export function deleteEvent(id: string, opts?: { mosque_slug?: string }): MockEvent | null {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
-  const i = events.findIndex((e) => e.id === id && e.church_slug === churchSlug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
+  const i = events.findIndex((e) => e.id === id && e.mosque_slug === mosqueSlug);
   if (i === -1) return null;
   const [removed] = events.splice(i, 1);
   return removed;
 }
 
 // --- RSVPs ---
-export type MockRsvp = ChurchScoped & {
+export type MockRsvp = MosqueScoped & {
   id: string;
   event_id: string;
   user_name: string;
@@ -700,21 +620,21 @@ export type MockRsvp = ChurchScoped & {
 
 const rsvps: MockRsvp[] = [];
 
-export function getRsvpsByEventId(eventId: string, opts?: { church_slug?: string }): MockRsvp[] {
+export function getRsvpsByEventId(eventId: string, opts?: { mosque_slug?: string }): MockRsvp[] {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
-  return rsvps.filter((r) => r.event_id === eventId && r.church_slug === churchSlug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
+  return rsvps.filter((r) => r.event_id === eventId && r.mosque_slug === mosqueSlug);
 }
 
 export function addRsvp(
-  data: Omit<MockRsvp, "id" | "created_at" | "updated_at" | "church_slug"> & { church_slug?: string }
+  data: Omit<MockRsvp, "id" | "created_at" | "updated_at" | "mosque_slug"> & { mosque_slug?: string }
 ): MockRsvp {
   assertInMemoryMock();
   const now = new Date().toISOString();
   const rsvp: MockRsvp = {
     id: uuid(),
     ...data,
-    church_slug: withChurchSlug(data.church_slug),
+    mosque_slug: withMosqueSlug(data.mosque_slug),
     created_at: now,
     updated_at: now,
   };
@@ -725,24 +645,24 @@ export function addRsvp(
 export function updateRsvp(
   id: string,
   updates: Partial<Pick<MockRsvp, "payment_id" | "payment_completed" | "status">>,
-  opts?: { church_slug?: string }
+  opts?: { mosque_slug?: string }
 ): MockRsvp | null {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
-  const i = rsvps.findIndex((r) => r.id === id && r.church_slug === churchSlug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
+  const i = rsvps.findIndex((r) => r.id === id && r.mosque_slug === mosqueSlug);
   if (i === -1) return null;
   Object.assign(rsvps[i], updates, { updated_at: new Date().toISOString() });
   return rsvps[i];
 }
 
-export function getRsvpById(id: string, opts?: { church_slug?: string }): MockRsvp | null {
+export function getRsvpById(id: string, opts?: { mosque_slug?: string }): MockRsvp | null {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
-  return rsvps.find((r) => r.id === id && r.church_slug === churchSlug) ?? null;
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
+  return rsvps.find((r) => r.id === id && r.mosque_slug === mosqueSlug) ?? null;
 }
 
 // --- Payments ---
-export type MockPayment = ChurchScoped & {
+export type MockPayment = MosqueScoped & {
   id: string;
   rsvp_id: string | null;
   event_id: string | null;
@@ -766,23 +686,23 @@ export type MockPayment = ChurchScoped & {
 
 const payments: MockPayment[] = [];
 
-export function getPayments(opts?: { church_slug?: string }): MockPayment[] {
+export function getPayments(opts?: { mosque_slug?: string }): MockPayment[] {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
   return [...payments]
-    .filter((payment) => payment.church_slug === churchSlug)
+    .filter((payment) => payment.mosque_slug === mosqueSlug)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
 
 export function addPayment(
-  data: Omit<MockPayment, "id" | "created_at" | "updated_at" | "church_slug"> & { church_slug?: string }
+  data: Omit<MockPayment, "id" | "created_at" | "updated_at" | "mosque_slug"> & { mosque_slug?: string }
 ): MockPayment {
   assertInMemoryMock();
   const now = new Date().toISOString();
   const payment: MockPayment = {
     id: uuid(),
     ...data,
-    church_slug: withChurchSlug(data.church_slug),
+    mosque_slug: withMosqueSlug(data.mosque_slug),
     created_at: now,
     updated_at: now,
   };
@@ -791,7 +711,7 @@ export function addPayment(
 }
 
 // --- Event Guests ---
-export type MockEventGuest = ChurchScoped & {
+export type MockEventGuest = MosqueScoped & {
   id: string;
   rsvp_id: string | null;
   event_id: string;
@@ -818,15 +738,15 @@ export type MockEventGuestInput = {
   guest_id?: string | null;
   guest_invitation_id?: string | null;
   source?: MockEventGuest["source"];
-  church_slug?: string;
+  mosque_slug?: string;
 };
 
 export function addEventGuests(
   guests: MockEventGuestInput[],
-  churchSlug?: string
+  mosqueSlug?: string
 ): MockEventGuest[] {
   assertInMemoryMock();
-  const slug = withChurchSlug(churchSlug);
+  const slug = withMosqueSlug(mosqueSlug);
   return guests.map((g) => {
     const guest: MockEventGuest = {
       id: uuid(),
@@ -840,7 +760,7 @@ export function addEventGuests(
       guest_invitation_id: g.guest_invitation_id ?? null,
       source: g.source ?? "member_party",
       welcome_email_sent_at: null,
-      church_slug: withChurchSlug(g.church_slug ?? slug),
+      mosque_slug: withMosqueSlug(g.mosque_slug ?? slug),
       created_at: new Date().toISOString(),
     };
     eventGuests.push(guest);
@@ -848,37 +768,37 @@ export function addEventGuests(
   });
 }
 
-export function getGuestsByRsvp(rsvpId: string, opts?: { church_slug?: string }): MockEventGuest[] {
+export function getGuestsByRsvp(rsvpId: string, opts?: { mosque_slug?: string }): MockEventGuest[] {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
-  return eventGuests.filter((g) => g.rsvp_id === rsvpId && g.church_slug === churchSlug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
+  return eventGuests.filter((g) => g.rsvp_id === rsvpId && g.mosque_slug === mosqueSlug);
 }
 
-export function getGuestsByEvent(eventId: string, opts?: { church_slug?: string }): MockEventGuest[] {
+export function getGuestsByEvent(eventId: string, opts?: { mosque_slug?: string }): MockEventGuest[] {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
-  return eventGuests.filter((g) => g.event_id === eventId && g.church_slug === churchSlug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
+  return eventGuests.filter((g) => g.event_id === eventId && g.mosque_slug === mosqueSlug);
 }
 
-export function listEventGuestsForChurch(
-  opts?: { church_slug?: string; eventId?: string; guestId?: string }
+export function listEventGuestsForMosque(
+  opts?: { mosque_slug?: string; eventId?: string; guestId?: string }
 ): MockEventGuest[] {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
   return eventGuests
-    .filter((g) => g.church_slug === churchSlug)
+    .filter((g) => g.mosque_slug === mosqueSlug)
     .filter((g) => (opts?.eventId ? g.event_id === opts.eventId : true))
     .filter((g) => (opts?.guestId ? g.guest_id === opts.guestId : true));
 }
 
 // --- Guests directory + guest invitations ---
-export type MockGuest = ChurchScoped & {
+export type MockGuest = MosqueScoped & {
   id: string;
   full_name: string;
   email: string | null;
   phone: string | null;
-  mother_church_name: string | null;
-  mother_church_number: string | null;
+  mother_mosque_name: string | null;
+  mother_mosque_number: string | null;
   constitution: string | null;
   rank: string | null;
   dietary_requirements: string | null;
@@ -901,13 +821,13 @@ export type MockGuest = ChurchScoped & {
 const guestsDirectory: MockGuest[] = [];
 
 export function listGuests(opts?: {
-  church_slug?: string;
+  mosque_slug?: string;
   search?: string;
   includeArchived?: boolean;
 }): MockGuest[] {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
-  let list = guestsDirectory.filter((g) => g.church_slug === churchSlug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
+  let list = guestsDirectory.filter((g) => g.mosque_slug === mosqueSlug);
   if (!opts?.includeArchived) {
     list = list.filter((g) => g.archived_at === null);
   }
@@ -917,34 +837,34 @@ export function listGuests(opts?: {
       (g) =>
         g.full_name.toLowerCase().includes(term) ||
         (g.email ?? "").toLowerCase().includes(term) ||
-        (g.mother_church_name ?? "").toLowerCase().includes(term)
+        (g.mother_mosque_name ?? "").toLowerCase().includes(term)
     );
   }
   return list;
 }
 
-export function getGuestById(id: string, opts?: { church_slug?: string }): MockGuest | null {
+export function getGuestById(id: string, opts?: { mosque_slug?: string }): MockGuest | null {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
-  return guestsDirectory.find((g) => g.id === id && g.church_slug === churchSlug) ?? null;
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
+  return guestsDirectory.find((g) => g.id === id && g.mosque_slug === mosqueSlug) ?? null;
 }
 
 export function createGuestRecord(
-  data: Partial<Omit<MockGuest, "id" | "created_at" | "updated_at" | "church_slug">> & {
+  data: Partial<Omit<MockGuest, "id" | "created_at" | "updated_at" | "mosque_slug">> & {
     full_name: string;
-    church_slug?: string;
+    mosque_slug?: string;
   }
 ): MockGuest {
   assertInMemoryMock();
   const now = new Date().toISOString();
   const guest: MockGuest = {
     id: uuid(),
-    church_slug: withChurchSlug(data.church_slug),
+    mosque_slug: withMosqueSlug(data.mosque_slug),
     full_name: data.full_name,
     email: data.email ?? null,
     phone: data.phone ?? null,
-    mother_church_name: data.mother_church_name ?? null,
-    mother_church_number: data.mother_church_number ?? null,
+    mother_mosque_name: data.mother_mosque_name ?? null,
+    mother_mosque_number: data.mother_mosque_number ?? null,
     constitution: data.constitution ?? null,
     rank: data.rank ?? null,
     dietary_requirements: data.dietary_requirements ?? null,
@@ -969,13 +889,13 @@ export function createGuestRecord(
 
 export function updateGuestRecord(
   id: string,
-  patch: Partial<Omit<MockGuest, "id" | "church_slug" | "created_at">>,
-  opts?: { church_slug?: string }
+  patch: Partial<Omit<MockGuest, "id" | "mosque_slug" | "created_at">>,
+  opts?: { mosque_slug?: string }
 ): MockGuest | null {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
   const guest = guestsDirectory.find(
-    (g) => g.id === id && g.church_slug === churchSlug
+    (g) => g.id === id && g.mosque_slug === mosqueSlug
   );
   if (!guest) return null;
   Object.assign(guest, patch, { updated_at: new Date().toISOString() });
@@ -987,14 +907,14 @@ export function upsertGuest(
     full_name: string;
     email?: string | null;
     phone?: string | null;
-    mother_church_name?: string | null;
-    mother_church_number?: string | null;
+    mother_mosque_name?: string | null;
+    mother_mosque_number?: string | null;
     constitution?: string | null;
     rank?: string | null;
     dietary_requirements?: string | null;
     is_member?: boolean;
     event_id?: string | null;
-    church_slug?: string;
+    mosque_slug?: string;
     source?:
       | "admin"
       | "member_invite"
@@ -1004,18 +924,18 @@ export function upsertGuest(
   }
 ): MockGuest {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(input.church_slug);
+  const mosqueSlug = withMosqueSlug(input.mosque_slug);
   const email = input.email?.trim() || null;
   const fullName = input.full_name.trim();
-  const motherChurchName = input.mother_church_name?.trim() || null;
+  const motherMosqueName = input.mother_mosque_name?.trim() || null;
 
   const existing = guestsDirectory.find((g) => {
-    if (g.church_slug !== churchSlug) return false;
+    if (g.mosque_slug !== mosqueSlug) return false;
     if (email && g.email) return g.email.toLowerCase() === email.toLowerCase();
     if (!email) {
       const sameName = g.full_name.toLowerCase() === fullName.toLowerCase();
       const sameMother =
-        (g.mother_church_name ?? null) === (motherChurchName ?? null);
+        (g.mother_mosque_name ?? null) === (motherMosqueName ?? null);
       return sameName && sameMother;
     }
     return false;
@@ -1030,9 +950,9 @@ export function upsertGuest(
         full_name: fullName || existing.full_name,
         email: email ?? existing.email,
         phone: input.phone?.trim() ?? existing.phone,
-        mother_church_name: motherChurchName ?? existing.mother_church_name,
-        mother_church_number:
-          input.mother_church_number?.trim() ?? existing.mother_church_number,
+        mother_mosque_name: motherMosqueName ?? existing.mother_mosque_name,
+        mother_mosque_number:
+          input.mother_mosque_number?.trim() ?? existing.mother_mosque_number,
         constitution: input.constitution?.trim() ?? existing.constitution,
         rank: input.rank?.trim() ?? existing.rank,
         dietary_requirements:
@@ -1047,7 +967,7 @@ export function upsertGuest(
         first_seen_event_id:
           existing.first_seen_event_id ?? input.event_id ?? null,
       },
-      { church_slug: churchSlug }
+      { mosque_slug: mosqueSlug }
     )!;
   }
 
@@ -1055,8 +975,8 @@ export function upsertGuest(
     full_name: fullName,
     email,
     phone: input.phone?.trim() || null,
-    mother_church_name: motherChurchName,
-    mother_church_number: input.mother_church_number?.trim() || null,
+    mother_mosque_name: motherMosqueName,
+    mother_mosque_number: input.mother_mosque_number?.trim() || null,
     constitution: input.constitution?.trim() || null,
     rank: input.rank?.trim() || null,
     dietary_requirements: input.dietary_requirements?.trim() || null,
@@ -1069,13 +989,13 @@ export function upsertGuest(
     newcomer_token_hash: null,
     source: input.source ?? "admin",
     email_confirmed_at: null,
-    church_slug: churchSlug,
+    mosque_slug: mosqueSlug,
   });
 }
 
 export function archiveGuestRecord(
   id: string,
-  opts?: { church_slug?: string }
+  opts?: { mosque_slug?: string }
 ): MockGuest | null {
   return updateGuestRecord(
     id,
@@ -1086,19 +1006,19 @@ export function archiveGuestRecord(
 
 export function restoreGuestRecord(
   id: string,
-  opts?: { church_slug?: string }
+  opts?: { mosque_slug?: string }
 ): MockGuest | null {
   return updateGuestRecord(id, { archived_at: null }, opts);
 }
 
 export function hardDeleteGuestRecordIfUnused(
   id: string,
-  opts?: { church_slug?: string }
+  opts?: { mosque_slug?: string }
 ): boolean {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
   const idx = guestsDirectory.findIndex(
-    (g) => g.id === id && g.church_slug === churchSlug
+    (g) => g.id === id && g.mosque_slug === mosqueSlug
   );
   if (idx === -1) return false;
   if ((guestsDirectory[idx].visit_count ?? 0) > 0) return false;
@@ -1108,13 +1028,13 @@ export function hardDeleteGuestRecordIfUnused(
 
 export function getGuestByNewcomerTokenHash(
   tokenHash: string,
-  opts?: { church_slug?: string }
+  opts?: { mosque_slug?: string }
 ): MockGuest | null {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
   return (
     guestsDirectory.find(
-      (g) => g.newcomer_token_hash === tokenHash && g.church_slug === churchSlug
+      (g) => g.newcomer_token_hash === tokenHash && g.mosque_slug === mosqueSlug
     ) ?? null
   );
 }
@@ -1122,12 +1042,12 @@ export function getGuestByNewcomerTokenHash(
 export function setGuestNewcomerTokenHash(
   id: string,
   tokenHash: string,
-  opts?: { church_slug?: string }
+  opts?: { mosque_slug?: string }
 ): MockGuest | null {
   return updateGuestRecord(id, { newcomer_token_hash: tokenHash }, opts);
 }
 
-export type MockGuestInvitation = ChurchScoped & {
+export type MockGuestInvitation = MosqueScoped & {
   id: string;
   event_id: string;
   inviter_member_id: string | null;
@@ -1156,18 +1076,18 @@ export function createGuestInvitation(
     | "last_used_at"
     | "revoked_at"
     | "guest_id"
-    | "church_slug"
+    | "mosque_slug"
   > & {
-    church_slug?: string;
+    mosque_slug?: string;
     guest_id?: string | null;
     uses?: number;
   }
 ): MockGuestInvitation {
   assertInMemoryMock();
-  const { church_slug: providedSlug, guest_id, ...rest } = data;
+  const { mosque_slug: providedSlug, guest_id, ...rest } = data;
   const inv: MockGuestInvitation = {
     id: uuid(),
-    church_slug: withChurchSlug(providedSlug),
+    mosque_slug: withMosqueSlug(providedSlug),
     uses: data.uses ?? 0,
     last_used_at: null,
     revoked_at: null,
@@ -1188,12 +1108,12 @@ export function getGuestInvitationByTokenHash(
 
 export function listGuestInvitationsForEvent(
   eventId: string,
-  opts?: { church_slug?: string }
+  opts?: { mosque_slug?: string }
 ): MockGuestInvitation[] {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
   return guestInvitations
-    .filter((i) => i.event_id === eventId && i.church_slug === churchSlug)
+    .filter((i) => i.event_id === eventId && i.mosque_slug === mosqueSlug)
     .sort(
       (a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -1202,25 +1122,25 @@ export function listGuestInvitationsForEvent(
 
 export function getGuestInvitationById(
   id: string,
-  opts?: { church_slug?: string }
+  opts?: { mosque_slug?: string }
 ): MockGuestInvitation | null {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
   return (
     guestInvitations.find(
-      (i) => i.id === id && i.church_slug === churchSlug
+      (i) => i.id === id && i.mosque_slug === mosqueSlug
     ) ?? null
   );
 }
 
 export function listGuestInvitationsForGuest(
   guestId: string,
-  opts?: { church_slug?: string }
+  opts?: { mosque_slug?: string }
 ): MockGuestInvitation[] {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
   return guestInvitations
-    .filter((i) => i.guest_id === guestId && i.church_slug === churchSlug)
+    .filter((i) => i.guest_id === guestId && i.mosque_slug === mosqueSlug)
     .sort(
       (a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -1229,13 +1149,13 @@ export function listGuestInvitationsForGuest(
 
 export function listGuestInvitationsForMember(
   memberId: string,
-  opts?: { church_slug?: string }
+  opts?: { mosque_slug?: string }
 ): MockGuestInvitation[] {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
   return guestInvitations
     .filter(
-      (i) => i.inviter_member_id === memberId && i.church_slug === churchSlug
+      (i) => i.inviter_member_id === memberId && i.mosque_slug === mosqueSlug
     )
     .sort(
       (a, b) =>
@@ -1254,12 +1174,12 @@ export function recordGuestInvitationUse(id: string): MockGuestInvitation | null
 
 export function revokeGuestInvitation(
   id: string,
-  opts?: { church_slug?: string }
+  opts?: { mosque_slug?: string }
 ): MockGuestInvitation | null {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
   const inv = guestInvitations.find(
-    (i) => i.id === id && i.church_slug === churchSlug
+    (i) => i.id === id && i.mosque_slug === mosqueSlug
   );
   if (!inv) return null;
   inv.revoked_at = new Date().toISOString();
@@ -1267,7 +1187,7 @@ export function revokeGuestInvitation(
 }
 
 // --- Members ---
-export type MockMember = ChurchScoped & {
+export type MockMember = MosqueScoped & {
   id: string;
   auth_user_id: string | null;
   email: string;
@@ -1301,10 +1221,10 @@ export type MockMember = ChurchScoped & {
 
 const members: MockMember[] = [];
 
-export function getMembers(opts?: { church_slug?: string; status?: string; search?: string }): MockMember[] {
+export function getMembers(opts?: { mosque_slug?: string; status?: string; search?: string }): MockMember[] {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
-  let list = members.filter((m) => m.church_slug === churchSlug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
+  let list = members.filter((m) => m.mosque_slug === mosqueSlug);
   if (opts?.status) list = list.filter((m) => m.membership_status === opts.status);
   if (opts?.search) {
     const q = opts.search.toLowerCase();
@@ -1313,27 +1233,27 @@ export function getMembers(opts?: { church_slug?: string; status?: string; searc
   return list.sort((a, b) => a.full_name.localeCompare(b.full_name));
 }
 
-export function getMemberById(id: string, opts?: { church_slug?: string }): MockMember | null {
+export function getMemberById(id: string, opts?: { mosque_slug?: string }): MockMember | null {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
-  return members.find((m) => m.id === id && m.church_slug === churchSlug) ?? null;
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
+  return members.find((m) => m.id === id && m.mosque_slug === mosqueSlug) ?? null;
 }
 
-export function getMemberByEmail(email: string, opts?: { church_slug?: string }): MockMember | null {
+export function getMemberByEmail(email: string, opts?: { mosque_slug?: string }): MockMember | null {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
-  return members.find((m) => m.email.toLowerCase() === email.toLowerCase() && m.church_slug === churchSlug) ?? null;
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
+  return members.find((m) => m.email.toLowerCase() === email.toLowerCase() && m.mosque_slug === mosqueSlug) ?? null;
 }
 
 export function createMember(
-  data: Omit<MockMember, "id" | "created_at" | "updated_at" | "church_slug"> & { church_slug?: string }
+  data: Omit<MockMember, "id" | "created_at" | "updated_at" | "mosque_slug"> & { mosque_slug?: string }
 ): MockMember {
   assertInMemoryMock();
   const now = new Date().toISOString();
   const member: MockMember = {
     id: uuid(),
     ...data,
-    church_slug: withChurchSlug(data.church_slug),
+    mosque_slug: withMosqueSlug(data.mosque_slug),
     created_at: now,
     updated_at: now,
   };
@@ -1343,12 +1263,12 @@ export function createMember(
 
 export function updateMember(
   id: string,
-  updates: Partial<Omit<MockMember, "id" | "church_slug" | "created_at">>,
-  opts?: { church_slug?: string }
+  updates: Partial<Omit<MockMember, "id" | "mosque_slug" | "created_at">>,
+  opts?: { mosque_slug?: string }
 ): MockMember | null {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
-  const i = members.findIndex((m) => m.id === id && m.church_slug === churchSlug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
+  const i = members.findIndex((m) => m.id === id && m.mosque_slug === mosqueSlug);
   if (i === -1) return null;
   const oldEmail = members[i].email;
   const normalisedEmail =
@@ -1362,12 +1282,12 @@ export function updateMember(
   Object.assign(members[i], next, { updated_at: new Date().toISOString() });
   if (normalisedEmail !== undefined && normalisedEmail !== oldEmail) {
     for (const p of payments) {
-      if (p.church_slug === churchSlug && p.user_email.toLowerCase() === oldEmail.toLowerCase()) {
+      if (p.mosque_slug === mosqueSlug && p.user_email.toLowerCase() === oldEmail.toLowerCase()) {
         p.user_email = normalisedEmail;
       }
     }
     for (const r of rsvps) {
-      if (r.church_slug === churchSlug && r.user_email.toLowerCase() === oldEmail.toLowerCase()) {
+      if (r.mosque_slug === mosqueSlug && r.user_email.toLowerCase() === oldEmail.toLowerCase()) {
         r.user_email = normalisedEmail;
       }
     }
@@ -1375,24 +1295,24 @@ export function updateMember(
   return members[i];
 }
 
-export function getRsvpDietaryByEmail(email: string, opts?: { church_slug?: string }): Array<{ event_id: string; dietary_requirements: string | null; created_at: string }> {
+export function getRsvpDietaryByEmail(email: string, opts?: { mosque_slug?: string }): Array<{ event_id: string; dietary_requirements: string | null; created_at: string }> {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
   return rsvps
-    .filter((r) => r.user_email.toLowerCase() === email.toLowerCase() && r.church_slug === churchSlug && r.dietary_requirements)
+    .filter((r) => r.user_email.toLowerCase() === email.toLowerCase() && r.mosque_slug === mosqueSlug && r.dietary_requirements)
     .map((r) => ({ event_id: r.event_id, dietary_requirements: r.dietary_requirements, created_at: r.created_at }));
 }
 
-export function getPaymentsByEmail(email: string, opts?: { church_slug?: string }): MockPayment[] {
+export function getPaymentsByEmail(email: string, opts?: { mosque_slug?: string }): MockPayment[] {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
   return payments
-    .filter((p) => p.user_email.toLowerCase() === email.toLowerCase() && p.church_slug === churchSlug)
+    .filter((p) => p.user_email.toLowerCase() === email.toLowerCase() && p.mosque_slug === mosqueSlug)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
 
 // --- Blog posts ---
-export type MockBlogPost = ChurchScoped & {
+export type MockBlogPost = MosqueScoped & {
   id: string;
   title: string;
   slug: string;
@@ -1409,38 +1329,38 @@ export type MockBlogPost = ChurchScoped & {
 
 const blogPosts: MockBlogPost[] = [];
 
-export function getBlogPosts(opts?: { published?: boolean; church_slug?: string }): MockBlogPost[] {
+export function getBlogPosts(opts?: { published?: boolean; mosque_slug?: string }): MockBlogPost[] {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
   let list = [...blogPosts];
-  list = list.filter((post) => post.church_slug === churchSlug);
+  list = list.filter((post) => post.mosque_slug === mosqueSlug);
   if (opts?.published !== undefined) {
     list = list.filter((p) => p.published && p.published_at && new Date(p.published_at) <= new Date());
   }
   return list.sort((a, b) => new Date((b.published_at ?? b.created_at)).getTime() - new Date((a.published_at ?? a.created_at)).getTime());
 }
 
-export function getBlogPostById(id: string, opts?: { church_slug?: string }): MockBlogPost | null {
+export function getBlogPostById(id: string, opts?: { mosque_slug?: string }): MockBlogPost | null {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
-  return blogPosts.find((p) => p.id === id && p.church_slug === churchSlug) ?? null;
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
+  return blogPosts.find((p) => p.id === id && p.mosque_slug === mosqueSlug) ?? null;
 }
 
-export function getBlogPostBySlug(slug: string, opts?: { church_slug?: string }): MockBlogPost | null {
+export function getBlogPostBySlug(slug: string, opts?: { mosque_slug?: string }): MockBlogPost | null {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
-  return blogPosts.find((p) => p.slug === slug && p.published && p.church_slug === churchSlug) ?? null;
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
+  return blogPosts.find((p) => p.slug === slug && p.published && p.mosque_slug === mosqueSlug) ?? null;
 }
 
 export function addBlogPost(
-  data: Omit<MockBlogPost, "id" | "created_at" | "updated_at" | "church_slug"> & { church_slug?: string }
+  data: Omit<MockBlogPost, "id" | "created_at" | "updated_at" | "mosque_slug"> & { mosque_slug?: string }
 ): MockBlogPost {
   assertInMemoryMock();
   const now = new Date().toISOString();
   const post: MockBlogPost = {
     id: uuid(),
     ...data,
-    church_slug: withChurchSlug(data.church_slug),
+    mosque_slug: withMosqueSlug(data.mosque_slug),
     created_at: now,
     updated_at: now,
   };
@@ -1448,17 +1368,17 @@ export function addBlogPost(
   return post;
 }
 
-export function updateBlogPost(id: string, updates: Partial<MockBlogPost>, opts?: { church_slug?: string }): MockBlogPost | null {
+export function updateBlogPost(id: string, updates: Partial<MockBlogPost>, opts?: { mosque_slug?: string }): MockBlogPost | null {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
-  const i = blogPosts.findIndex((p) => p.id === id && p.church_slug === churchSlug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
+  const i = blogPosts.findIndex((p) => p.id === id && p.mosque_slug === mosqueSlug);
   if (i === -1) return null;
   Object.assign(blogPosts[i], updates, { updated_at: new Date().toISOString() });
   return blogPosts[i];
 }
 
 // --- Charity Campaigns ---
-export type MockCharityCampaign = ChurchScoped & {
+export type MockCharityCampaign = MosqueScoped & {
   id: string;
   name: string;
   description: string | null;
@@ -1473,23 +1393,23 @@ export type MockCharityCampaign = ChurchScoped & {
 
 const charityCampaigns: MockCharityCampaign[] = [];
 
-export function getCharityCampaigns(opts?: { church_slug?: string }): MockCharityCampaign[] {
+export function getCharityCampaigns(opts?: { mosque_slug?: string }): MockCharityCampaign[] {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
   return [...charityCampaigns]
-    .filter((c) => c.church_slug === churchSlug)
+    .filter((c) => c.mosque_slug === mosqueSlug)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
 
 export function addCharityCampaign(
-  data: Omit<MockCharityCampaign, "id" | "created_at" | "updated_at" | "church_slug"> & { church_slug?: string }
+  data: Omit<MockCharityCampaign, "id" | "created_at" | "updated_at" | "mosque_slug"> & { mosque_slug?: string }
 ): MockCharityCampaign {
   assertInMemoryMock();
   const now = new Date().toISOString();
   const campaign: MockCharityCampaign = {
     id: uuid(),
     ...data,
-    church_slug: withChurchSlug(data.church_slug),
+    mosque_slug: withMosqueSlug(data.mosque_slug),
     created_at: now,
     updated_at: now,
   };
@@ -1498,7 +1418,7 @@ export function addCharityCampaign(
 }
 
 // --- Donations ---
-export type MockDonation = ChurchScoped & {
+export type MockDonation = MosqueScoped & {
   id: string;
   donor_name: string;
   donor_email: string;
@@ -1516,22 +1436,22 @@ export type MockDonation = ChurchScoped & {
 
 const donations: MockDonation[] = [];
 
-export function getDonations(opts?: { church_slug?: string }): MockDonation[] {
+export function getDonations(opts?: { mosque_slug?: string }): MockDonation[] {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
   return [...donations]
-    .filter((d) => d.church_slug === churchSlug)
+    .filter((d) => d.mosque_slug === mosqueSlug)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
 
 export function addDonation(
-  data: Omit<MockDonation, "id" | "created_at" | "church_slug"> & { church_slug?: string }
+  data: Omit<MockDonation, "id" | "created_at" | "mosque_slug"> & { mosque_slug?: string }
 ): MockDonation {
   assertInMemoryMock();
   const donation: MockDonation = {
     id: uuid(),
     ...data,
-    church_slug: withChurchSlug(data.church_slug),
+    mosque_slug: withMosqueSlug(data.mosque_slug),
     created_at: new Date().toISOString(),
   };
   donations.push(donation);
@@ -1539,7 +1459,7 @@ export function addDonation(
 }
 
 // --- Gift Aid Declarations ---
-export type MockGiftAidDeclaration = ChurchScoped & {
+export type MockGiftAidDeclaration = MosqueScoped & {
   id: string;
   donor_name: string;
   donor_email: string;
@@ -1553,272 +1473,524 @@ export type MockGiftAidDeclaration = ChurchScoped & {
 
 const giftAidDeclarations: MockGiftAidDeclaration[] = [];
 
-export function getGiftAidDeclarations(opts?: { church_slug?: string }): MockGiftAidDeclaration[] {
+export function getGiftAidDeclarations(opts?: { mosque_slug?: string }): MockGiftAidDeclaration[] {
   assertInMemoryMock();
-  const churchSlug = withChurchSlug(opts?.church_slug);
+  const mosqueSlug = withMosqueSlug(opts?.mosque_slug);
   return [...giftAidDeclarations]
-    .filter((g) => g.church_slug === churchSlug)
+    .filter((g) => g.mosque_slug === mosqueSlug)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
 
 export function addGiftAidDeclaration(
-  data: Omit<MockGiftAidDeclaration, "id" | "created_at" | "church_slug"> & { church_slug?: string }
+  data: Omit<MockGiftAidDeclaration, "id" | "created_at" | "mosque_slug"> & { mosque_slug?: string }
 ): MockGiftAidDeclaration {
   assertInMemoryMock();
   const declaration: MockGiftAidDeclaration = {
     id: uuid(),
     ...data,
-    church_slug: withChurchSlug(data.church_slug),
+    mosque_slug: withMosqueSlug(data.mosque_slug),
     created_at: new Date().toISOString(),
   };
   giftAidDeclarations.push(declaration);
   return declaration;
 }
 
+// --- Platform mock (operator console) ---
+export function listNetworks(): Network[] {
+  assertInMemoryMock();
+  return [...networks].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function getNetworkBySlug(slug: string): Network | null {
+  assertInMemoryMock();
+  const normalized = slug.trim().toLowerCase();
+  return networks.find((n) => n.slug === normalized) ?? null;
+}
+
+export function listMosquesByNetwork(networkId: string): MockMosque[] {
+  assertInMemoryMock();
+  return mosques.filter((c) => c.network_id === networkId && c.is_active);
+}
+
+export function listNetworkOfficers(
+  _networkId: string
+): import("@/lib/db/types").NetworkOfficerDirectoryEntry[] {
+  assertInMemoryMock();
+  return [];
+}
+
+export function listMosqueAnnualReturns(
+  networkId: string
+): import("@/lib/db/types").MosqueAnnualReturn[] {
+  assertInMemoryMock();
+  return listMosquesByNetwork(networkId).map((mosque) => {
+    const mosqueMembers = members.filter((m) => m.mosque_slug === mosque.slug);
+    const active = mosqueMembers.filter((m) => m.membership_status === "active");
+    return {
+      mosque_id: mosque.id,
+      network_id: mosque.network_id,
+      mosque_name: mosque.name,
+      mosque_number: mosque.mosque_number,
+      active_members: active.length,
+      resigned_members: mosqueMembers.filter((m) => m.membership_status === "resigned").length,
+      excluded_members: mosqueMembers.filter((m) => m.membership_status === "excluded").length,
+      memberships_ytd: Math.max(1, Math.floor(active.length / 3)),
+      passings_ytd: 0,
+      raisings_ytd: 0,
+    };
+  });
+}
+
+export function listPlatformAdminUsers(): AdminUser[] {
+  assertInMemoryMock();
+  const now = new Date().toISOString();
+  return [
+    {
+      id: uuid(),
+      mosque_id: null,
+      auth_user_id: null,
+      email: "ag@experrt.com",
+      full_name: "Platform Owner",
+      role: "super_admin",
+      permissions: [],
+      active: true,
+      created_at: now,
+      updated_at: now,
+      last_login: null,
+      mfa_enabled: false,
+      mfa_secret: null,
+      mfa_backup_codes: null,
+      mfa_enrolled_at: null,
+    },
+  ];
+}
+
+export function listTenantAdminUsers(): AdminUser[] {
+  assertInMemoryMock();
+  const now = new Date().toISOString();
+  return PLATFORM_DEMO_MOSQUES.flatMap((profile) => {
+    const mosque = mosques.find((c) => c.slug === profile.slug);
+    if (!mosque) return [];
+    const secretary =
+      profile.officers.find((o) =>
+        /secretary|clerk|administrator/i.test(o.office_title)
+      ) ?? profile.officers[1];
+    return [
+      {
+        id: uuid(),
+        mosque_id: mosque.id,
+        auth_user_id: null,
+        email: demoEmailFor(profile.slug, "secretary"),
+        full_name: secretary.full_name,
+        role: "secretary",
+        permissions: [],
+        active: true,
+        created_at: now,
+        updated_at: now,
+        last_login: null,
+        mfa_enabled: false,
+        mfa_secret: null,
+        mfa_backup_codes: null,
+        mfa_enrolled_at: null,
+      },
+    ];
+  });
+}
+
+export function getPlatformMosqueStats(): PlatformMosqueStats[] {
+  assertInMemoryMock();
+  const now = new Date();
+  return listMosques().map((mosque) => {
+    const mosqueEvents = events.filter((e) => e.mosque_slug === mosque.slug);
+    const mosqueMembers = members.filter((m) => m.mosque_slug === mosque.slug);
+    const mosqueDonations = donations.filter((d) => d.mosque_slug === mosque.slug);
+    const upcoming = mosqueEvents.filter((e) => new Date(e.event_date) >= now);
+    const past = mosqueEvents
+      .filter((e) => new Date(e.event_date) < now)
+      .sort((a, b) => +new Date(b.event_date) - +new Date(a.event_date));
+    const donationTotal = mosqueDonations.reduce((sum, d) => sum + d.amount, 0);
+    return {
+      mosque_id: mosque.id,
+      mosque_slug: mosque.slug,
+      mosque_name: mosque.name,
+      network_id: mosque.network_id,
+      members: mosqueMembers.length,
+      active_members: mosqueMembers.filter((m) => m.membership_status === "active").length,
+      upcoming_events: upcoming.length,
+      outstanding_giving: Math.max(
+        0,
+        mosqueMembers.filter((m) => m.membership_status === "active").length % 4
+      ),
+      paid_giving_amount: Math.round(donationTotal * 0.65),
+      donations_amount: donationTotal,
+      last_service_at: past[0]?.event_date ?? null,
+    };
+  });
+}
+
+export function getPlatformOverviewData() {
+  return {
+    stats: getPlatformMosqueStats(),
+    networks: listNetworks(),
+    mosques: listMosques(),
+    platformAdmins: listPlatformAdminUsers(),
+    tenantAdmins: listTenantAdminUsers(),
+  };
+}
+
 // --- Seed data ---
+let platformDemoSeeded = false;
+
 function seedData() {
   mockDbSeeding = true;
   try {
+  if (platformDemoSeeded) return;
+
   const now = new Date();
   const daysAgo = (d: number) => new Date(now.getTime() - d * 86400000).toISOString();
   const daysFromNow = (d: number) => new Date(now.getTime() + d * 86400000).toISOString();
 
-  if (newcomers.length > 0) return;
-
-  const seedNewcomers = [
-    { first_name: "James", last_name: "Harrison", email: "james.h@example.com", phone: "07700 100001", location: "London", source: "website", how_heard_about_us: "Google", initial_message: "Interested in church life", stage: "expression_of_interest", assigned_to: null },
-    { first_name: "Robert", last_name: "Mitchell", email: "r.mitchell@example.com", phone: "07700 100002", location: "Surrey", source: "referral", how_heard_about_us: "A friend", initial_message: "Would like to visit", stage: "initial_contact", assigned_to: "WM" },
-    { first_name: "William", last_name: "Clarke", email: "w.clarke@example.com", phone: "07700 100003", location: "Kent", source: "event", how_heard_about_us: "Open day", initial_message: null, stage: "service_scheduled", assigned_to: "SW" },
-    { first_name: "David", last_name: "Thompson", email: "d.thompson@example.com", phone: null, location: "London", source: "website", how_heard_about_us: "UGLE website", initial_message: "What does membership involve?", stage: "approved", assigned_to: "WM" },
-    { first_name: "Michael", last_name: "Wright", email: "m.wright@example.com", phone: "07700 100005", location: "Essex", source: "referral", how_heard_about_us: "Member in church", initial_message: "Ready to join", stage: "welcomed", assigned_to: "WM" },
-    { first_name: "Andrew", last_name: "Baker", email: "a.baker@example.com", phone: null, location: "London", source: "website", how_heard_about_us: null, initial_message: "General enquiry", stage: "expression_of_interest", assigned_to: null },
-    { first_name: "Thomas", last_name: "Evans", email: "t.evans@example.com", phone: "07700 100007", location: "Hertfordshire", source: "social_media", how_heard_about_us: "Facebook", initial_message: null, stage: "initial_contact", assigned_to: "JW" },
-    { first_name: "Philip", last_name: "Grant", email: "p.grant@example.com", phone: "07700 100008", location: "London", source: "referral", how_heard_about_us: "Existing member", initial_message: "Recommended by a friend", stage: "proposal_church", assigned_to: "WM" },
-    { first_name: "Stephen", last_name: "Ward", email: "s.ward@example.com", phone: null, location: "Buckinghamshire", source: "website", how_heard_about_us: "Google", initial_message: null, stage: "on_hold", assigned_to: null },
-    { first_name: "Daniel", last_name: "Scott", email: "d.scott@example.com", phone: "07700 100010", location: "London", source: "event", how_heard_about_us: "Open day 2025", initial_message: "Not for me at this time", stage: "declined", assigned_to: "SW" },
+  const networkDefs: Array<Omit<Network, "id" | "created_at" | "updated_at">> = [
+    {
+      slug: "anglican-uk",
+      name: "Anglican Networks (UK)",
+      jurisdiction: "England & Wales",
+      country: "GB",
+      contact_email: "networks@mosquepay.demo",
+      contact_phone: null,
+      primary_color: "#1e3a5f",
+      notes: null,
+      is_active: true,
+    },
+    {
+      slug: "free-mosques-uk",
+      name: "Free Mosques Group",
+      jurisdiction: "United Kingdom",
+      country: "GB",
+      contact_email: "freemosques@mosquepay.demo",
+      contact_phone: null,
+      primary_color: "#005eb8",
+      notes: null,
+      is_active: true,
+    },
+    {
+      slug: "catholic-uk",
+      name: "Roman Catholic Networks (UK)",
+      jurisdiction: "England & Wales",
+      country: "GB",
+      contact_email: "catholic@mosquepay.demo",
+      contact_phone: null,
+      primary_color: "#7c1c2e",
+      notes: null,
+      is_active: true,
+    },
+    {
+      slug: "orthodox-uk",
+      name: "Orthodox Mosques (UK)",
+      jurisdiction: "Great Britain",
+      country: "GB",
+      contact_email: "orthodox@mosquepay.demo",
+      contact_phone: null,
+      primary_color: "#1a237e",
+      notes: null,
+      is_active: true,
+    },
   ];
 
-  seedNewcomers.forEach((l, i) => {
-    const newcomer = addNewcomer({ ...l, church_slug: DEFAULT_CHURCH_SLUG });
-    newcomers[newcomers.length - 1].created_at = daysAgo(i * 3 + 1);
-    newcomers[newcomers.length - 1].updated_at = daysAgo(i * 2);
-    if (i < 5) {
-      addNewcomerActivity({
-        newcomer_id: newcomer.id,
-        activity_type: "note",
-        title: "Initial contact made",
-        description: `Called ${l.first_name} to discuss church membership.`,
-        service_date: null,
-        attendees: null,
-        due_date: null,
-        completed: true,
-        created_by: "Admin",
-        church_slug: DEFAULT_CHURCH_SLUG,
-      });
-      newcomerActivities[newcomerActivities.length - 1].created_at = daysAgo(i * 3 + 2);
-    }
-    if (i < 3) {
-      addNewcomerActivity({
-        newcomer_id: newcomer.id,
-        activity_type: "service",
-        title: "Informal service at church",
-        description: `${l.first_name} attended an informal service with the WM and SW.`,
-        service_date: daysAgo(i * 2),
-        attendees: ["WM", "SW", `${l.first_name} ${l.last_name}`],
-        due_date: null,
-        completed: true,
-        created_by: "WM",
-        church_slug: DEFAULT_CHURCH_SLUG,
-      });
-      newcomerActivities[newcomerActivities.length - 1].created_at = daysAgo(i * 2);
-    }
-    if (i === 0) {
-      addNewcomerActivity({
-        newcomer_id: newcomer.id,
-        activity_type: "email",
-        title: "Follow-up email sent",
-        description: "Sent information pack and church history booklet.",
-        service_date: null,
-        attendees: null,
-        due_date: null,
-        completed: true,
-        created_by: "Secretary",
-        church_slug: DEFAULT_CHURCH_SLUG,
-      });
-      newcomerActivities[newcomerActivities.length - 1].created_at = daysAgo(1);
-      addNewcomerActivity({
-        newcomer_id: newcomer.id,
-        activity_type: "phone_call",
-        title: "Phone conversation",
-        description: "Discussed next steps and answered questions about the membership process.",
-        service_date: null,
-        attendees: null,
-        due_date: null,
-        completed: true,
-        created_by: "WM",
-        church_slug: DEFAULT_CHURCH_SLUG,
-      });
-      newcomerActivities[newcomerActivities.length - 1].created_at = daysAgo(4);
-      addNewcomerActivity({
-        newcomer_id: newcomer.id,
-        activity_type: "task",
-        title: "Arrange second informal service",
-        description: null,
-        service_date: null,
-        attendees: null,
-        due_date: daysFromNow(7),
-        completed: false,
-        created_by: "SW",
-        church_slug: DEFAULT_CHURCH_SLUG,
-      });
-      newcomerActivities[newcomerActivities.length - 1].created_at = daysAgo(0);
-    }
-  });
+  const networkIdBySlug = new Map<string, string>();
+  for (const def of networkDefs) {
+    const ts = new Date().toISOString();
+    const row: MockNetwork = {
+      id: uuid(),
+      ...def,
+      created_at: ts,
+      updated_at: ts,
+    };
+    networks.push(row);
+    networkIdBySlug.set(def.slug, row.id);
+  }
 
-  const guestServiceDefaults = { enable_service_fee: false, service_fee_amount: null, service_fee_description: null, enable_guest_tickets: false, guest_ticket_price: null, guest_ticket_description: null, guest_policy: "blue_table" as const, enable_raffle_wine_pledge: false, raffle_wine_description: "Bring a bottle of wine for the evening raffle" as string | null };
-  const seedEvents: Array<AddEventInput> = [
-    { title: "Regular Service – April", slug: "regular-service-april", description: "Monthly regular service with ceremony.", event_type: "regular_service", event_date: daysFromNow(5), event_time: "18:30", location: "Mark members' Hall", temple_room: "Temple 1", dress_code: "Dark lounge suit", enable_rsvp: true, rsvp_deadline: daysFromNow(3), max_attendees: 60, enable_payments: true, enable_dining_rsvp: true, dining_price: 45, dining_description: "Three course fellowship meal", enable_charity_donation: true, charity_name: "Church Charitable Foundation", charity_description: "Support MCF", charity_suggested_amounts: [5, 10, 20], charity_allow_custom: true, enable_raffle_donation: true, raffle_description: "Charity raffle", raffle_suggested_amounts: [2, 5, 10], raffle_allow_custom: true, ...guestServiceDefaults, enable_guest_tickets: true, guest_ticket_price: 45, guest_ticket_description: "Guest dining ticket", featured_image_url: null, published: true },
-    { title: "Special service Service", slug: "special_service-service", description: "Annual special_service of the new Lead Pastor.", event_type: "special_service", event_date: daysFromNow(30), event_time: "16:00", location: "Mark members' Hall", temple_room: "Grand Temple", dress_code: "Morning dress", enable_rsvp: true, rsvp_deadline: daysFromNow(25), max_attendees: 120, enable_payments: true, enable_dining_rsvp: true, dining_price: 65, dining_description: "Four course special_service banquet", enable_charity_donation: true, charity_name: "London Grand Rank Benevolent Fund", charity_description: null, charity_suggested_amounts: [10, 25, 50], charity_allow_custom: true, enable_raffle_donation: true, raffle_description: "Grand raffle", raffle_suggested_amounts: [5, 10], raffle_allow_custom: false, ...guestServiceDefaults, enable_guest_tickets: true, guest_ticket_price: 65, guest_ticket_description: "Guest banquet ticket", featured_image_url: null, published: true },
-    { title: "Summer Social Evening", slug: "summer-social", description: "Annual summer social for members and guests.", event_type: "social", event_date: daysFromNow(60), event_time: "19:00", location: "The Ivy, London", temple_room: null, dress_code: "Smart casual", enable_rsvp: true, rsvp_deadline: daysFromNow(55), max_attendees: 40, enable_payments: true, enable_dining_rsvp: false, dining_price: null, dining_description: null, enable_charity_donation: false, charity_name: null, charity_description: null, charity_suggested_amounts: null, charity_allow_custom: false, enable_raffle_donation: false, raffle_description: null, raffle_suggested_amounts: null, raffle_allow_custom: false, ...guestServiceDefaults, featured_image_url: null, published: true },
-    { title: "Regular Service – March", slug: "regular-service-march", description: "Monthly regular service.", event_type: "regular_service", event_date: daysAgo(15), event_time: "18:30", location: "Mark members' Hall", temple_room: "Temple 1", dress_code: "Dark lounge suit", enable_rsvp: true, rsvp_deadline: daysAgo(17), max_attendees: 60, enable_payments: true, enable_dining_rsvp: true, dining_price: 45, dining_description: "Three course fellowship meal", enable_charity_donation: true, charity_name: "MCF", charity_description: null, charity_suggested_amounts: [5, 10, 20], charity_allow_custom: true, enable_raffle_donation: true, raffle_description: "Charity raffle", raffle_suggested_amounts: [2, 5], raffle_allow_custom: true, ...guestServiceDefaults, featured_image_url: null, published: true },
-    { title: "Committee of General Purposes", slug: "cgp-service-april", description: "Pre-service committee.", event_type: "committee", event_date: daysFromNow(3), event_time: "17:00", location: "Mark members' Hall", temple_room: "Committee Room", dress_code: "Lounge suit", enable_rsvp: false, rsvp_deadline: null, max_attendees: 12, enable_payments: false, enable_dining_rsvp: false, dining_price: null, dining_description: null, enable_charity_donation: false, charity_name: null, charity_description: null, charity_suggested_amounts: null, charity_allow_custom: false, enable_raffle_donation: false, raffle_description: null, raffle_suggested_amounts: null, raffle_allow_custom: false, ...guestServiceDefaults, featured_image_url: null, published: true },
-  ];
+  function networkForDenomination(denomination: string): string | null {
+    if (denomination === "Anglican") return networkIdBySlug.get("anglican-uk") ?? null;
+    if (denomination === "Roman Catholic") return networkIdBySlug.get("catholic-uk") ?? null;
+    if (denomination === "Orthodox") return networkIdBySlug.get("orthodox-uk") ?? null;
+    return networkIdBySlug.get("free-mosques-uk") ?? null;
+  }
 
-  seedEvents.forEach((e) => addEvent(e));
+  const guestServiceDefaults = {
+    enable_service_fee: false,
+    service_fee_amount: null,
+    service_fee_description: null,
+    enable_guest_tickets: false,
+    guest_ticket_price: null,
+    guest_ticket_description: null,
+    guest_policy: "blue_table" as const,
+    enable_raffle_wine_pledge: false,
+    raffle_wine_description: "Bring a bottle of wine for the evening raffle" as string | null,
+  };
 
-  const memberNames = [
-    ["John", "Smith", "john.smith@example.com"],
-    ["Peter", "Brown", "peter.brown@example.com"],
-    ["Richard", "Taylor", "richard.taylor@example.com"],
-    ["George", "Wilson", "george.wilson@example.com"],
-    ["Edward", "Davis", "edward.davis@example.com"],
-    ["Charles", "Jones", "charles.jones@example.com"],
-    ["Henry", "Miller", "henry.miller@example.com"],
-    ["Philip", "Anderson", "philip.anderson@example.com"],
-  ];
-
-  memberNames.forEach(([first, last, email], i) => {
-    createMember({
-      auth_user_id: null,
-      email,
-      full_name: `${first} ${last}`,
-      phone: i % 2 === 0 ? `07700 20000${i}` : null,
-      address_line_1: `${10 + i} Example Road`,
-      address_line_2: null,
-      city: i % 2 === 0 ? "London" : "Essex",
-      county: i % 2 === 0 ? null : "Essex",
-      postcode: `SW1A ${i + 1}AA`,
-      country: "United Kingdom",
-      country_list: i % 5 === 0,
-      royal_arch: i % 3 === 0,
-      honorary: false,
-      office_title: [
-        "Lead Pastor",
-        "Senior Warden",
-        "Junior Warden",
-        "Secretary",
-        "Treasurer",
-        "Charity Steward",
-        "PastoralCare",
-        null,
-      ][i],
-      officer_sort_order: i < 7 ? i + 1 : null,
-      directory_sort_order: i + 1,
-      rank: ["EA", "FC", "MM", "MM", "MM", "MM", "MM", "MM"][i],
-      dietary_requirements: ["Vegetarian", null, "Gluten-free", null, null, "Vegan", null, "No nuts"][i],
-      date_of_membership: daysAgo(365 + i * 90),
-      membership_email_sent: true,
-      membership_status: i === 7 ? "resigned" : "active",
-      stripe_customer_id: null,
+  for (const profile of PLATFORM_DEMO_MOSQUES) {
+    upsertMosque({
+      slug: profile.slug,
+      name: profile.name,
+      city: profile.city,
+      country: profile.country,
+      tagline: profile.tagline,
+      governing_body: profile.governing_body,
+      mosque_number: profile.mosque_number,
+      primary_color: profile.primary_color,
+      secondary_color: profile.secondary_color,
+      support_email: profile.support_email,
+      support_phone: profile.support_phone,
+      secretary_name: profile.secretary_name,
+      secretary_address: profile.secretary_address,
+      secretary_phone: profile.secretary_phone,
+      service_schedule: profile.service_schedule,
+      service_location: profile.service_location,
+      service_location_url: profile.service_location_url,
+      accessibility_notes: profile.accessibility_notes,
+      default_dress_code: profile.default_dress_code,
+      hmrc_charity_reference: profile.hmrc_charity_reference,
+      gift_aid_pack_name: profile.gift_aid_pack_name,
+      gift_aid_pack_email: profile.gift_aid_pack_email,
+      charity_donation_url: profile.charity_donation_url,
+      data_protection_notice: `Member records are held by ${profile.secretary_name} for mosque administration.`,
+      newcomer_notice: `Visitors are welcome. Contact ${profile.support_email} before your first visit.`,
+      network_id: networkForDenomination(profile.denomination),
+      gift_aid_default_mode: "both",
+      accepts_self_registration: true,
     });
-  });
 
-  const paymentStatuses = ["succeeded", "succeeded", "succeeded", "succeeded", "succeeded", "pending", "succeeded", "refunded"];
-  memberNames.forEach(([first, last, email], i) => {
-    const dining = [45, 45, 65, 45, 45, 45, 65, 45][i];
-    const charity = [10, 20, 25, 5, 15, 10, 50, 0][i];
-    const raffle = [5, 10, 10, 5, 0, 5, 10, 5][i];
-    addPayment({
-      rsvp_id: null,
-      event_id: events[i % events.length]?.id ?? null,
-      user_email: email,
-      user_name: `${first} ${last}`,
-      stripe_payment_intent_id: `pi_mock_${i}`,
-      dining_amount: dining,
-      charity_amount: charity,
-      raffle_amount: raffle,
-      service_fee_amount: 0,
-      guest_ticket_amount: 0,
-      total_amount: dining + charity + raffle,
-      currency: "gbp",
-      charity_name: "Church Charitable Foundation",
-      status: paymentStatuses[i],
-      refund_amount: paymentStatuses[i] === "refunded" ? dining + charity + raffle : 0,
-      completed_at: paymentStatuses[i] === "succeeded" ? daysAgo(i * 2 + 1) : null,
+    updateMosqueSite(profile.slug, {
+      page_title: profile.name,
+      page_description: profile.tagline,
+      sections: [
+        {
+          id: uuid(),
+          type: "hero",
+          heading: `Welcome to ${profile.name}`,
+          body: `${profile.tagline} (${profile.denomination} · ${profile.city})`,
+          cta_label: "Express Interest",
+          cta_href: "/join",
+          visible: true,
+          order: 1,
+        },
+        {
+          id: uuid(),
+          type: "service_details",
+          heading: "Service times",
+          body: profile.service_schedule,
+          cta_label: "View Events",
+          cta_href: "/events",
+          visible: true,
+          order: 2,
+        },
+        {
+          id: uuid(),
+          type: "charity",
+          heading: "Giving & Gift Aid",
+          body: "Support our community work through one-off gifts and regular giving.",
+          cta_label: "Give",
+          cta_href: "/charity",
+          visible: true,
+          order: 3,
+        },
+        {
+          id: uuid(),
+          type: "contact",
+          heading: "Contact us",
+          body: `Reach ${profile.secretary_name} at ${profile.support_phone}.`,
+          cta_label: "Contact",
+          cta_href: "/contact",
+          visible: true,
+          order: 4,
+        },
+      ],
+      published: true,
     });
-    payments[payments.length - 1].created_at = daysAgo(i * 2 + 1);
-  });
 
-  const seedBlogPosts = [
-    { title: "Welcome to St Mary's Church", slug: "welcome", excerpt: "A warm welcome to all newcomers.", content: "We are delighted to welcome you to St Mary's Church.", category: "news", author_name: "Secretary", published: true, published_at: daysAgo(10), featured_image_url: null },
-    { title: "Spring Charity Drive Results", slug: "spring-charity", excerpt: "Our spring charity drive raised over £2,000.", content: "Thanks to the generosity of our members...", category: "charity", author_name: "Charity Steward", published: true, published_at: daysAgo(5), featured_image_url: null },
-    { title: "Special service Preview", slug: "special_service-preview", excerpt: "Looking ahead to the special_service.", content: "The upcoming special_service service...", category: "events", author_name: "WM", published: false, published_at: null, featured_image_url: null },
-  ];
-  seedBlogPosts.forEach((b) => addBlogPost(b));
-
-  addCharityCampaign({ name: "MCF Festival 2026", description: "Church festival contribution to the Church Charitable Foundation.", target_amount: 5000, raised_amount: 3250, status: "active", start_date: daysAgo(90), end_date: daysFromNow(270) });
-  addCharityCampaign({ name: "Local Food Bank Appeal", description: "Supporting our local community food bank through the winter months.", target_amount: 1500, raised_amount: 1500, status: "completed", start_date: daysAgo(180), end_date: daysAgo(30) });
-  addCharityCampaign({ name: "Blood Bikes Sponsorship", description: "Sponsoring a blood bike for the volunteer service.", target_amount: 3000, raised_amount: 850, status: "active", start_date: daysAgo(30), end_date: daysFromNow(150) });
-
-  const donationData = [
-    { donor_name: "John Smith", donor_email: "john.smith@example.com", amount: 50, source: "campaign" as const, gift_aid_eligible: true, gift_aid_declared: true },
-    { donor_name: "Peter Brown", donor_email: "peter.brown@example.com", amount: 100, source: "campaign" as const, gift_aid_eligible: true, gift_aid_declared: true },
-    { donor_name: "Richard Taylor", donor_email: "richard.taylor@example.com", amount: 25, source: "event" as const, gift_aid_eligible: true, gift_aid_declared: false },
-    { donor_name: "George Wilson", donor_email: "george.wilson@example.com", amount: 200, source: "direct" as const, gift_aid_eligible: false, gift_aid_declared: false },
-    { donor_name: "Edward Davis", donor_email: "edward.davis@example.com", amount: 75, source: "campaign" as const, gift_aid_eligible: true, gift_aid_declared: true },
-    { donor_name: "Charles Jones", donor_email: "charles.jones@example.com", amount: 30, source: "event" as const, gift_aid_eligible: true, gift_aid_declared: true },
-    { donor_name: "Henry Miller", donor_email: "henry.miller@example.com", amount: 150, source: "direct" as const, gift_aid_eligible: true, gift_aid_declared: false },
-    { donor_name: "Philip Anderson", donor_email: "philip.anderson@example.com", amount: 40, source: "campaign" as const, gift_aid_eligible: false, gift_aid_declared: false },
-  ];
-  donationData.forEach((d, i) => {
-    addDonation({
-      ...d,
-      currency: "gbp",
-      campaign_id: charityCampaigns[i % charityCampaigns.length]?.id ?? null,
-      event_id: i % 2 === 0 ? events[0]?.id ?? null : null,
-      payment_id: payments[i]?.id ?? null,
-      status: "completed",
-    });
-    donations[donations.length - 1].created_at = daysAgo(i * 3 + 1);
-  });
-
-  addGiftAidDeclaration({ donor_name: "John Smith", donor_email: "john.smith@example.com", donor_address: "12 High Street, London, EC1A 1BB", declaration_date: daysAgo(365), status: "active", total_donations: 250, reclaimable_amount: 62.5 });
-  addGiftAidDeclaration({ donor_name: "Peter Brown", donor_email: "peter.brown@example.com", donor_address: "5 Oak Lane, Surrey, GU1 2AB", declaration_date: daysAgo(200), status: "active", total_donations: 400, reclaimable_amount: 100 });
-  addGiftAidDeclaration({ donor_name: "Edward Davis", donor_email: "edward.davis@example.com", donor_address: "8 Park Road, Kent, ME1 3CD", declaration_date: daysAgo(150), status: "active", total_donations: 175, reclaimable_amount: 43.75 });
-  addGiftAidDeclaration({ donor_name: "Charles Jones", donor_email: "charles.jones@example.com", donor_address: "22 Church Street, Essex, CM1 4EF", declaration_date: daysAgo(500), status: "expired", total_donations: 120, reclaimable_amount: 30 });
-
-  events.forEach((event) => {
-    if (event.enable_rsvp) {
-      const attendees = memberNames.slice(0, Math.min(4, memberNames.length));
-      attendees.forEach(([first, last, email]) => {
-        addRsvp({
-          event_id: event.id,
-          user_name: `${first} ${last}`,
-          user_email: email,
-          user_phone: null,
-          attending_ceremony: true,
-          attending_dining: event.enable_dining_rsvp,
-          number_of_guests: Math.random() > 0.7 ? 1 : 0,
-          dietary_requirements: null,
-          special_requests: null,
-          payment_required: event.enable_payments,
-          payment_completed: Math.random() > 0.3,
-          payment_id: null,
-          status: "confirmed",
-        });
+    profile.officers.forEach((officer, i) => {
+      createMember({
+        auth_user_id: null,
+        email: demoEmailFor(profile.slug, `officer-${i + 1}`),
+        full_name: officer.full_name,
+        phone: profile.support_phone,
+        address_line_1: profile.secretary_address,
+        address_line_2: null,
+        city: profile.city,
+        county: null,
+        postcode: null,
+        country: profile.country,
+        country_list: false,
+        royal_arch: false,
+        honorary: false,
+        office_title: officer.office_title,
+        officer_sort_order: i + 1,
+        directory_sort_order: i + 1,
+        rank: officer.rank ?? "MM",
+        dietary_requirements: null,
+        date_of_membership: daysAgo(400 + i * 30),
+        membership_email_sent: true,
+        membership_status: "active",
+        stripe_customer_id: null,
+        show_on_website: i < 3,
+        public_bio: `${officer.office_title} at ${profile.name}.`,
+        mosque_slug: profile.slug,
       });
-    }
-  });
+    });
+
+    profile.member_names.forEach((name, i) => {
+      createMember({
+        auth_user_id: null,
+        email: demoEmailFor(profile.slug, `member-${i + 1}`),
+        full_name: name,
+        phone: `07700 ${String(30000 + i).slice(-5)}`,
+        address_line_1: `${12 + i} Mosque Lane`,
+        address_line_2: null,
+        city: profile.city,
+        county: null,
+        postcode: null,
+        country: profile.country,
+        country_list: i % 4 === 0,
+        royal_arch: false,
+        honorary: false,
+        office_title: null,
+        officer_sort_order: null,
+        directory_sort_order: 20 + i,
+        rank: "MM",
+        dietary_requirements: null,
+        date_of_membership: daysAgo(200 + i * 45),
+        membership_email_sent: true,
+        membership_status: "active",
+        stripe_customer_id: null,
+        mosque_slug: profile.slug,
+      });
+    });
+
+    profile.newcomer_names.forEach((person, i) => {
+      addNewcomer({
+        first_name: person.first,
+        last_name: person.last,
+        email: demoEmailFor(profile.slug, `newcomer-${i + 1}`),
+        phone: null,
+        location: profile.city,
+        source: "website",
+        how_heard_about_us: profile.denomination,
+        initial_message: `Interested in ${profile.name}.`,
+        stage: person.stage,
+        assigned_to: profile.officers[0]?.full_name.split(" ").pop() ?? null,
+        mosque_slug: profile.slug,
+      });
+    });
+
+    const campaign = addCharityCampaign({
+      name: `${profile.denomination} Community Fund`,
+      description: `Supporting outreach and welfare at ${profile.name}.`,
+      target_amount: 2500,
+      raised_amount: 900 + profile.member_names.length * 120,
+      status: "active",
+      start_date: daysAgo(60),
+      end_date: daysFromNow(200),
+      mosque_slug: profile.slug,
+    });
+
+    const upcomingSlug = `sunday-${profile.slug}`;
+    addEvent({
+      title: `Jumu'ah Prayers`,
+      slug: upcomingSlug,
+      description: `Regular Friday Jumu'ah at ${profile.name}.`,
+      event_type: "mosque_service",
+      event_date: daysFromNow(7 + (profile.slug.length % 5)),
+      event_time: "10:30",
+      location: profile.service_location,
+      temple_room: null,
+      dress_code: profile.default_dress_code,
+      enable_rsvp: true,
+      rsvp_deadline: daysFromNow(5),
+      max_attendees: 80,
+      enable_payments: false,
+      enable_dining_rsvp: false,
+      dining_price: null,
+      dining_description: null,
+      enable_charity_donation: true,
+      charity_name: `${profile.denomination} Appeal`,
+      charity_description: "Support community ministries.",
+      charity_suggested_amounts: [5, 10, 20, 50],
+      charity_allow_custom: true,
+      enable_raffle_donation: false,
+      raffle_description: null,
+      raffle_suggested_amounts: null,
+      raffle_allow_custom: false,
+      ...guestServiceDefaults,
+      featured_image_url: null,
+      published: true,
+      mosque_slug: profile.slug,
+    });
+
+    addEvent({
+      title: `Past Service — ${profile.city}`,
+      slug: `past-${profile.slug}`,
+      description: "Recent service with collection recorded.",
+      event_type: "mosque_service",
+      event_date: daysAgo(14),
+      event_time: "10:30",
+      location: profile.service_location,
+      temple_room: null,
+      dress_code: profile.default_dress_code,
+      enable_rsvp: false,
+      rsvp_deadline: null,
+      max_attendees: null,
+      enable_payments: true,
+      enable_dining_rsvp: false,
+      dining_price: null,
+      dining_description: null,
+      enable_charity_donation: true,
+      charity_name: "Community Fund",
+      charity_description: null,
+      charity_suggested_amounts: [5, 10, 20],
+      charity_allow_custom: true,
+      enable_raffle_donation: false,
+      raffle_description: null,
+      raffle_suggested_amounts: null,
+      raffle_allow_custom: false,
+      ...guestServiceDefaults,
+      featured_image_url: null,
+      published: true,
+      mosque_slug: profile.slug,
+    });
+
+    profile.member_names.slice(0, 3).forEach((name, i) => {
+      addDonation({
+        donor_name: name,
+        donor_email: demoEmailFor(profile.slug, `member-${i + 1}`),
+        amount: 25 + i * 15,
+        currency: "gbp",
+        source: "campaign",
+        campaign_id: campaign.id,
+        event_id: null,
+        payment_id: null,
+        gift_aid_eligible: true,
+        gift_aid_declared: i % 2 === 0,
+        status: "completed",
+        mosque_slug: profile.slug,
+      });
+    });
+
+    addBlogPost({
+      title: `${profile.name} news`,
+      slug: `welcome-${profile.slug}`,
+      excerpt: profile.tagline,
+      content: `Latest news from ${profile.name} in ${profile.city}.`,
+      category: "news",
+      author_name: profile.secretary_name,
+      published: true,
+      published_at: daysAgo(3),
+      featured_image_url: null,
+      mosque_slug: profile.slug,
+    });
+  }
+
+  platformDemoSeeded = true;
   } finally {
     mockDbSeeding = false;
   }

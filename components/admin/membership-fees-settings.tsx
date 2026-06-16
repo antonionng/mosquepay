@@ -262,7 +262,7 @@ export function MembershipFeesSettings() {
                   </div>
                 </div>
                 <p className="text-xs leading-relaxed text-dash-muted sm:col-span-2">
-                  Members still pay the full giving amount. ChurchPay records only £
+                  Members still pay the full giving amount. MosquePay records only £
                   {Number(fees.charitable_amount || 0).toFixed(2)} as Gift Aid eligible when a valid declaration is on file.
                 </p>
               </div>
@@ -381,7 +381,7 @@ export function MembershipFeesSettings() {
                   </p>
                   <p className="text-xs text-dash-muted">
                     Existing members signing up to monthly partway through
-                    the church year see whichever options you enable below.
+                    the mosque year see whichever options you enable below.
                     The default (Reslice over remaining months) is always
                     available.
                   </p>

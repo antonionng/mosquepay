@@ -109,26 +109,34 @@ async function ensureAuthUser() {
   return data.user;
 }
 
-async function ensureAdminUserRow(authUserId) {
+async function ensureAdminUserRow(_authUserId) {
   const { data: existing, error: selectError } = await admin
     .from("admin_users")
     .select("*")
     .eq("email", EMAIL)
+    .is("mosque_id", null)
     .maybeSingle();
   if (selectError) throw selectError;
+
+  const legacyRow = {
+    email: EMAIL,
+    name: FULL_NAME,
+    role: "super_admin",
+    mosque_id: null,
+    is_platform_owner: true,
+  };
 
   if (existing) {
     const updates = {};
     if (existing.role !== "super_admin") updates.role = "super_admin";
-    if (existing.church_id !== null) updates.church_id = null;
-    if (existing.active !== true) updates.active = true;
-    if (existing.full_name !== FULL_NAME) updates.full_name = FULL_NAME;
-    if (existing.auth_user_id !== authUserId) updates.auth_user_id = authUserId;
+    if (existing.mosque_id !== null) updates.mosque_id = null;
+    const existingName = existing.name ?? existing.full_name;
+    if (existingName !== FULL_NAME) updates.name = FULL_NAME;
+    if (existing.is_platform_owner !== true) updates.is_platform_owner = true;
     if (Object.keys(updates).length === 0) {
       console.log("admin_users row already aligned.");
       return existing;
     }
-    updates.updated_at = new Date().toISOString();
     const { data, error } = await admin
       .from("admin_users")
       .update(updates)
@@ -142,15 +150,7 @@ async function ensureAdminUserRow(authUserId) {
 
   const { data, error } = await admin
     .from("admin_users")
-    .insert({
-      email: EMAIL,
-      full_name: FULL_NAME,
-      role: "super_admin",
-      church_id: null,
-      active: true,
-      permissions: [],
-      auth_user_id: authUserId,
-    })
+    .insert(legacyRow)
     .select("*")
     .single();
   if (error) throw error;
@@ -165,7 +165,7 @@ async function main() {
   console.log("Platform owner ready.");
   console.log(`  Email:          ${adminRow.email}`);
   console.log(`  Role:           ${adminRow.role}`);
-  console.log(`  Church scope:    ${adminRow.church_id ?? "(global)"}`);
+  console.log(`  Mosque scope:    ${adminRow.mosque_id ?? "(global)"}`);
   console.log(`  Auth user id:   ${user.id}`);
   console.log(`  Login at:       /admin/login`);
 }

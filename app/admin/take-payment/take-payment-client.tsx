@@ -36,7 +36,7 @@ type Props = {
   /** Recent + upcoming events for the optional "Link to service" picker. */
   events: EventOption[];
   /** Slug for the public self-service kiosk link card. */
-  churchSlug: string | null;
+  mosqueSlug: string | null;
 };
 
 // Take-payment shell. Owns:
@@ -51,7 +51,7 @@ export function TakePaymentClient({
   mooovStatus,
   members,
   events,
-  churchSlug,
+  mosqueSlug,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -72,7 +72,7 @@ export function TakePaymentClient({
   //   ?category=<id>    preselects the contribution category
   // Both come from the service detail page's "Take a payment for this
   // service" CTAs so the duty officer lands on a pre-filled form.
-  // Auto-suggest today's service when there's exactly one on, so the operator
+  // Auto-suggest today's Jumu'ah when there's exactly one on, so the operator
   // confirms rather than has to remember. A deep-linked ?event_id wins; an
   // explicit choice later overrides either.
   const todaysServiceId = (() => {
@@ -301,7 +301,7 @@ export function TakePaymentClient({
             <ShieldAlert className="h-5 w-5 flex-none" />
             <div className="space-y-2">
               <p className="font-medium">
-                This church has not connected its payment processor yet.
+                This mosque has not connected its payment processor yet.
               </p>
               <p className="text-sm">
                 {mooovStatus === "needs_repair"
@@ -431,7 +431,7 @@ export function TakePaymentClient({
         />
       ) : null}
 
-      {churchSlug ? <KioskLinkCard churchSlug={churchSlug} /> : null}
+      {mosqueSlug ? <KioskLinkCard mosqueSlug={mosqueSlug} /> : null}
     </Shell>
   );
 }
@@ -453,7 +453,7 @@ function Shell({
       <div className="flex items-center justify-between gap-3 px-1 lg:hidden">
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-dash-faint">
-            Church admin
+            Mosque admin
           </p>
           <h1 className="truncate text-base font-semibold text-dash-text">
             Take payment

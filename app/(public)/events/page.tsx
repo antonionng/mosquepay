@@ -4,42 +4,42 @@ import { isSupabaseConfigured, shouldUseInMemoryMock } from "@/lib/db/with-fallb
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { Calendar, MapPin, ArrowRight } from "lucide-react";
-import { getDefaultChurchSlug, resolveChurchSlug } from "@/lib/tenant";
+import { getDefaultMosqueSlug, resolveMosqueSlug } from "@/lib/tenant";
 import { marketingMetadata } from "@/lib/seo";
-import { churchScopedEventPath } from "@/lib/public-links";
+import { mosqueScopedEventPath } from "@/lib/public-links";
 import { filterPubliclyVisible } from "@/lib/events/public-visibility";
 import { formatDate } from "@/lib/utils";
 
 export const metadata = marketingMetadata({
-  title: "Church Event RSVP and Payment Software | ChurchPay Events",
+  title: "Mosque Event RSVP and Payment Software | MosquePay Events",
   description:
-    "Manage church services, fellowship meals, social events, dining choices, RSVPs, online event payments, notice links, attendee lists, and charitable donation add-ons with ChurchPay.",
+    "Manage mosque services, community meals, social events, dining choices, RSVPs, online event payments, notice links, attendee lists, and charitable donation add-ons with MosquePay.",
   path: "/events",
   keywords: [
-    "Church event software",
-    "church RSVP software",
-    "fellowship meal payments",
-    "Church service management",
+    "Mosque event software",
+    "mosque RSVP software",
+    "community meal payments",
+    "Mosque service management",
   ],
 });
 
 type LinkMode = "query" | "scoped";
 
 export async function EventsPageContent({
-  church,
+  mosque,
   linkMode = "query",
 }: {
-  church?: string;
+  mosque?: string;
   linkMode?: LinkMode;
 }) {
-  const isTenantMode = Boolean(church);
-  const churchSlug = resolveChurchSlug(church);
-  const defaultSlug = getDefaultChurchSlug();
-  const withChurchLink = (href: string) => {
+  const isTenantMode = Boolean(mosque);
+  const mosqueSlug = resolveMosqueSlug(mosque);
+  const defaultSlug = getDefaultMosqueSlug();
+  const withMosqueLink = (href: string) => {
     if (linkMode === "scoped" && href.startsWith("/events/")) {
-      return churchScopedEventPath(churchSlug, href.replace("/events/", ""));
+      return mosqueScopedEventPath(mosqueSlug, href.replace("/events/", ""));
     }
-    return churchSlug === defaultSlug ? href : `${href}?church=${encodeURIComponent(churchSlug)}`;
+    return mosqueSlug === defaultSlug ? href : `${href}?mosque=${encodeURIComponent(mosqueSlug)}`;
   };
 
   if (!isTenantMode) {
@@ -57,9 +57,9 @@ export async function EventsPageContent({
   }>;
 
   if (useDb) {
-    const churchId = await db.resolveChurchId(churchSlug);
-    const raw = churchId
-      ? await db.getEvents(churchId, { published: true, upcoming: true })
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    const raw = mosqueId
+      ? await db.getEvents(mosqueId, { published: true, upcoming: true })
       : [];
     events = filterPubliclyVisible(raw).map((e) => ({
       id: e.id,
@@ -73,7 +73,7 @@ export async function EventsPageContent({
     const raw = mockDb.getEvents({
       published: true,
       upcoming: true,
-      church_slug: churchSlug,
+      mosque_slug: mosqueSlug,
     });
     events = filterPubliclyVisible(raw).map((e) => ({
       id: e.id,
@@ -93,7 +93,7 @@ export async function EventsPageContent({
         <div className="public-hero-shell">
           <div className="public-hero-copy">
             <p className="public-kicker">Events</p>
-            <h1 className="public-hero-title">Upcoming church events and gatherings.</h1>
+            <h1 className="public-hero-title">Upcoming mosque events and gatherings.</h1>
             <p className="public-hero-body">
               Services, social events, and charitable activities. See what&apos;s coming up and
               follow through for full details and RSVP information.
@@ -102,7 +102,7 @@ export async function EventsPageContent({
           <div className="public-hero-panel">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-200">What you&apos;ll find</p>
             <div className="mt-6 space-y-3 text-sm text-slate-300">
-              <p>Upcoming church services</p>
+              <p>Upcoming mosque services</p>
               <p>Social events and dining</p>
               <p>Published event details and RSVP information</p>
             </div>
@@ -117,7 +117,7 @@ export async function EventsPageContent({
               {events.map((e) => (
                 <Link
                   key={e.id}
-                  href={withChurchLink(`/events/${e.slug}`)}
+                  href={withMosqueLink(`/events/${e.slug}`)}
                   className="group public-grid-card block h-full"
                 >
                   <div className="mb-5 flex items-center justify-between gap-3">
@@ -157,8 +157,8 @@ export async function EventsPageContent({
               </div>
               <h3 className="mb-2 text-xl font-semibold text-slate-900">No upcoming events</h3>
               <p className="text-slate-600 max-w-md mx-auto">
-                Check back soon for upcoming church services and social events, or{" "}
-                <Link href={withChurchLink("/contact")} className="text-blue-600 hover:underline">
+                Check back soon for upcoming mosque services and social events, or{" "}
+                <Link href={withMosqueLink("/contact")} className="text-blue-600 hover:underline">
                   get in touch
                 </Link>{" "}
                 to learn more.
@@ -174,8 +174,8 @@ export async function EventsPageContent({
 export default async function EventsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ church?: string }>;
+  searchParams: Promise<{ mosque?: string }>;
 }) {
-  const { church } = await searchParams;
-  return <EventsPageContent church={church} />;
+  const { mosque } = await searchParams;
+  return <EventsPageContent mosque={mosque} />;
 }

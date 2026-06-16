@@ -12,8 +12,8 @@ export type GuestRow = {
   id: string;
   full_name: string;
   email: string | null;
-  mother_church_name: string | null;
-  mother_church_number: string | null;
+  mother_mosque_name: string | null;
+  mother_mosque_number: string | null;
   is_member: boolean;
   guest_category?: "guest" | "honorary_guest";
   dining_waived?: boolean;
@@ -82,7 +82,7 @@ export function GuestsDirectoryClient({
               <input
                 value={searchValue}
                 onChange={(event) => setSearchValue(event.target.value)}
-                placeholder="Search by name, email, or mother church..."
+                placeholder="Search by name, email, or mother mosque..."
                 className="w-full rounded-md border border-dash-border bg-white py-1.5 pl-8 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-dash-ring/30"
               />
             </div>
@@ -131,7 +131,7 @@ export function GuestsDirectoryClient({
                 <th className="px-5 py-3 text-left font-medium">Name</th>
                 <th className="px-5 py-3 text-left font-medium">Email</th>
                 <th className="px-5 py-3 text-left font-medium">
-                  Mother church
+                  Mother mosque
                 </th>
                 <th className="px-5 py-3 text-left font-medium">Visits</th>
                 <th className="px-5 py-3 text-left font-medium">Added</th>
@@ -191,11 +191,11 @@ export function GuestsDirectoryClient({
                     )}
                   </td>
                   <td className="px-5 py-3">
-                    {guest.mother_church_name ? (
+                    {guest.mother_mosque_name ? (
                       <>
-                        {guest.mother_church_name}
-                        {guest.mother_church_number
-                          ? ` No. ${guest.mother_church_number}`
+                        {guest.mother_mosque_name}
+                        {guest.mother_mosque_number
+                          ? ` No. ${guest.mother_mosque_number}`
                           : ""}
                       </>
                     ) : (

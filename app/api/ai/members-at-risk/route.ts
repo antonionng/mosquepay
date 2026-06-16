@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -21,28 +21,28 @@ export async function GET(request: NextRequest) {
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ rows: [] });
   }
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("members:read", churchId);
+  const forbidden = await requireAdminApiPermission("members:read", mosqueId);
   if (forbidden) return forbidden;
 
-  const members = await db.getMembers(churchId, { status: "active" });
+  const members = await db.getMembers(mosqueId, { status: "active" });
   const allGiving = await Promise.all(
     members.map((m) =>
-      db.getMemberGiving(churchId, { memberEmail: m.email }).catch(() => [])
+      db.getMemberGiving(mosqueId, { memberEmail: m.email }).catch(() => [])
     )
   ).catch(() => []);
-  const recentEvents = await db.getEvents(churchId, { upcoming: false });
+  const recentEvents = await db.getEvents(mosqueId, { upcoming: false });
   const past = recentEvents
     .filter((e) => new Date(e.event_date) < new Date())
     .slice(0, 5);
   const rsvpByEvent: Record<string, Awaited<ReturnType<typeof db.getRsvpsByEventId>>> = {};
   await Promise.all(
     past.map(async (e) => {
-      rsvpByEvent[e.id] = await db.getRsvpsByEventId(e.id, churchId).catch(() => []);
+      rsvpByEvent[e.id] = await db.getRsvpsByEventId(e.id, mosqueId).catch(() => []);
     })
   );
 

@@ -3,7 +3,7 @@
 // Gift Aid panel on the admin member profile.
 //
 // Designed for the post-service workflow described by the user: at the
-// fellowship meal the Charity Steward collects a stack of signed paper
+// community meal the Charity Steward collects a stack of signed paper
 // declarations, then sits down later and walks down the list, opening
 // each Member's profile and uploading the slip on their behalf.
 //

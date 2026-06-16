@@ -60,7 +60,7 @@ export const FEATURE_FLAGS: Record<
   site_builder: {
     key: "site_builder",
     label: "Public site builder",
-    description: "Drag-and-drop public site builder for the church.",
+    description: "Drag-and-drop public site builder for the mosque.",
     default: true,
   },
   member_portal: {
@@ -69,10 +69,10 @@ export const FEATURE_FLAGS: Record<
     description: "Member self-serve portal and installable app.",
     default: true,
   },
-  digital_church_card: {
-    key: "digital_church_card",
-    label: "Digital church card",
-    description: "Member church card always to hand.",
+  digital_mosque_card: {
+    key: "digital_mosque_card",
+    label: "Digital mosque card",
+    description: "Member mosque card always to hand.",
     default: true,
   },
   payments: {
@@ -159,22 +159,22 @@ export const FEATURE_FLAGS: Record<
     description: "Advanced member fields, leadership roles, and lifecycle tracking.",
     default: true,
   },
-  multi_church: {
-    key: "multi_church",
-    label: "Multiple churches",
-    description: "Separate records for connected churches.",
+  multi_mosque: {
+    key: "multi_mosque",
+    label: "Multiple mosques",
+    description: "Separate records for connected mosques.",
     default: true,
   },
-  cross_church_reporting: {
-    key: "cross_church_reporting",
-    label: "Cross-church reporting",
-    description: "Roll-up reporting across churches.",
+  cross_mosque_reporting: {
+    key: "cross_mosque_reporting",
+    label: "Cross-mosque reporting",
+    description: "Roll-up reporting across mosques.",
     default: true,
   },
   central_billing: {
     key: "central_billing",
     label: "Central billing",
-    description: "One invoice for connected churches.",
+    description: "One invoice for connected mosques.",
     default: true,
   },
   network_dashboards: {
@@ -208,31 +208,31 @@ export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
 const cache = new Map<string, { ts: number; value: Record<string, boolean> }>();
 const TTL_MS = 30_000;
 
-async function loadFlags(churchId: string): Promise<Record<string, boolean>> {
+async function loadFlags(mosqueId: string): Promise<Record<string, boolean>> {
   if (!isSupabaseConfigured()) return {};
   const now = Date.now();
-  const cached = cache.get(churchId);
+  const cached = cache.get(mosqueId);
   if (cached && now - cached.ts < TTL_MS) return cached.value;
-  const rows = await db.listChurchFeatureFlags(churchId);
-  const subscription = await db.getChurchSubscription(churchId).catch(() => null);
+  const rows = await db.listMosqueFeatureFlags(mosqueId);
+  const subscription = await db.getMosqueSubscription(mosqueId).catch(() => null);
   const value: Record<string, boolean> = entitlementsForPlan(
     subscription?.plan_code
   );
   value.charity =
     value.charity_campaigns || value.gift_aid || value.gasds || false;
   for (const row of rows) value[row.flag_key] = row.enabled;
-  cache.set(churchId, { ts: now, value });
+  cache.set(mosqueId, { ts: now, value });
   return value;
 }
 
 export async function isFeatureEnabled(
-  churchId: string | null | undefined,
+  mosqueId: string | null | undefined,
   flagKey: FeatureFlagKey
 ): Promise<boolean> {
   const meta = FEATURE_FLAGS[flagKey];
-  if (!churchId) return meta.default;
+  if (!mosqueId) return meta.default;
   try {
-    const flags = await loadFlags(churchId);
+    const flags = await loadFlags(mosqueId);
     if (flagKey in flags) return flags[flagKey];
     return meta.default;
   } catch {
@@ -240,10 +240,10 @@ export async function isFeatureEnabled(
   }
 }
 
-export async function getAllFlagsForChurch(
-  churchId: string
+export async function getAllFlagsForMosque(
+  mosqueId: string
 ): Promise<Record<FeatureFlagKey, boolean>> {
-  const flags = await loadFlags(churchId);
+  const flags = await loadFlags(mosqueId);
   const out = {} as Record<FeatureFlagKey, boolean>;
   for (const key of ENTITLEMENT_KEYS) {
     out[key] = key in flags ? flags[key] : FEATURE_FLAGS[key].default;
@@ -254,7 +254,7 @@ export async function getAllFlagsForChurch(
   return out;
 }
 
-export function clearFeatureFlagCache(churchId?: string) {
-  if (churchId) cache.delete(churchId);
+export function clearFeatureFlagCache(mosqueId?: string) {
+  if (mosqueId) cache.delete(mosqueId);
   else cache.clear();
 }

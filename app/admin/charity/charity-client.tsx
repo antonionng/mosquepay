@@ -117,7 +117,7 @@ export function AdminCharityClient({
   serviceCollections,
   gasdsClaims,
   currentCharityCampaignId,
-  churchSlug,
+  mosqueSlug,
 }: {
   campaigns: Campaign[];
   donations: Donation[];
@@ -125,7 +125,7 @@ export function AdminCharityClient({
   serviceCollections: ServiceCollection[];
   gasdsClaims: GasdsClaim[];
   currentCharityCampaignId?: string | null;
-  churchSlug?: string;
+  mosqueSlug?: string;
 }) {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
@@ -504,7 +504,7 @@ export function AdminCharityClient({
               </h2>
             </div>
             <p className="mt-2 text-sm leading-relaxed text-dash-muted">
-              Record small cash collections at the point they happen. ChurchPay tracks the annual GASDS allowance separately from Gift Aid declarations.
+              Record small cash collections at the point they happen. MosquePay tracks the annual GASDS allowance separately from Gift Aid declarations.
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div className="rounded-xl border border-dash-border bg-dash-surface-subtle p-4">
@@ -654,7 +654,7 @@ export function AdminCharityClient({
           <div className="dash-panel-header rounded-none border-dash-border bg-dash-surface-subtle">
             <h2 className="dash-panel-header-title">New charity campaign</h2>
             <p className="dash-panel-header-description">
-              Create a target-led campaign for this church.
+              Create a target-led campaign for this mosque.
             </p>
           </div>
           <form
@@ -734,7 +734,7 @@ export function AdminCharityClient({
       <CurrentCampaignPanel
         campaigns={campaigns}
         currentCharityCampaignId={currentCharityCampaignId ?? null}
-        churchSlug={churchSlug ?? "default"}
+        mosqueSlug={mosqueSlug ?? "default"}
         onSaved={() => router.refresh()}
       />
 
@@ -920,12 +920,12 @@ export function AdminCharityClient({
 function CurrentCampaignPanel({
   campaigns,
   currentCharityCampaignId,
-  churchSlug,
+  mosqueSlug,
   onSaved,
 }: {
   campaigns: Campaign[];
   currentCharityCampaignId: string | null;
-  churchSlug: string;
+  mosqueSlug: string;
   onSaved: () => void;
 }) {
   const [selected, setSelected] = useState<string>(
@@ -938,14 +938,14 @@ function CurrentCampaignPanel({
   const activeCampaigns = campaigns.filter((c) => c.status === "active");
   const current = campaigns.find((c) => c.id === currentCharityCampaignId);
   const dirty = (selected || null) !== (currentCharityCampaignId ?? null);
-  const giveUrl = `/give/${churchSlug}/charity`;
+  const giveUrl = `/give/${mosqueSlug}/charity`;
 
   const save = async (campaignId: string | null) => {
     setSaving(true);
     setError(null);
     setFeedback(null);
     try {
-      const res = await fetch("/api/churches/current-charity-campaign", {
+      const res = await fetch("/api/mosques/current-charity-campaign", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ campaign_id: campaignId }),
@@ -957,7 +957,7 @@ function CurrentCampaignPanel({
       }
       setFeedback(
         campaignId
-          ? "Designated as the church's current charity campaign."
+          ? "Designated as the mosque's current charity campaign."
           : "Cleared the designated campaign.",
       );
       onSaved();
@@ -978,8 +978,8 @@ function CurrentCampaignPanel({
           </h2>
           <p className="dash-panel-header-description">
             Pick the campaign that the standing-QR sticker and
-            <code className="mx-1 rounded bg-dash-surface px-1 text-xs">/give/{churchSlug}/charity</code>
-            link route to. Change it once a year when the church picks a new
+            <code className="mx-1 rounded bg-dash-surface px-1 text-xs">/give/{mosqueSlug}/charity</code>
+            link route to. Change it once a year when the mosque picks a new
             featured cause.
           </p>
         </div>

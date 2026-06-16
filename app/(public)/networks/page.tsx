@@ -23,40 +23,40 @@ import {
 import { marketingMetadata } from "@/lib/seo";
 
 export const metadata = marketingMetadata({
-  title: "ChurchPay for Networks, Dioceses, Circuits, and Multi-Church Groups",
+  title: "MosquePay for Networks, Networks, Circuits, and Multi-Mosque Groups",
   description:
-    "Roll out giving, Gift Aid, websites, and member records across a diocese, Methodist circuit, Baptist association, Pentecostal network, or multi-site church. Central oversight, per-church autonomy, one invoice.",
+    "Roll out giving, Gift Aid, websites, and member records across a network, Methodist circuit, Baptist association, Pentecostal network, or multi-site mosque. Central oversight, per-mosque autonomy, one invoice.",
   path: "/networks",
   keywords: [
-    "diocese church management software",
+    "network mosque management software",
     "Methodist circuit software",
-    "Baptist association church software",
-    "Pentecostal network church platform",
-    "multi-church management software",
-    "church network giving platform",
-    "denominational church software UK",
+    "Baptist association mosque software",
+    "Pentecostal network mosque platform",
+    "multi-mosque management software",
+    "mosque network giving platform",
+    "denominational mosque software UK",
   ],
 });
 
 const BUYER_PROFILES = [
   {
     Icon: Landmark,
-    title: "Anglican dioceses & deaneries",
-    body: "Parish-by-parish records with diocesan-level visibility. Each parish keeps its own website, giving page, and Gift Aid claims; the diocesan office sees the whole picture.",
+    title: "Anglican networks & deaneries",
+    body: "Community-by-community records with network-level visibility. Each community keeps its own website, giving page, and Gift Aid claims; the network office sees the whole picture.",
   },
   {
     Icon: Map,
     title: "Methodist circuits",
-    body: "Circuit stewards and superintendents get cross-church reporting and one invoice, while each chapel runs its own services, giving, and membership day to day.",
+    body: "Circuit stewards and superintendents get cross-mosque reporting and one invoice, while each chapel runs its own services, giving, and membership day to day.",
   },
   {
     Icon: Building2,
     title: "Baptist & independent associations",
-    body: "Churches stay independent — their own data, their own bank account, their own branding — and still benefit from a shared rollout, shared pricing, and shared support.",
+    body: "Mosques stay independent — their own data, their own bank account, their own branding — and still benefit from a shared rollout, shared pricing, and shared support.",
   },
   {
     Icon: Network,
-    title: "Pentecostal networks & multi-site churches",
+    title: "Pentecostal networks & multi-site mosques",
     body: "Plant a new site with its records, website, and giving links provisioned in bulk. Watch every campus from a single operator console.",
   },
 ];
@@ -64,33 +64,33 @@ const BUYER_PROFILES = [
 const NETWORK_FEATURES = [
   {
     Icon: Users,
-    title: "Separate church records",
-    body: "Every church in the network is its own tenant: members, giving, Gift Aid, and pastoral data are never pooled. Permissions decide who sees what.",
+    title: "Separate mosque records",
+    body: "Every mosque in the network is its own tenant: members, giving, Gift Aid, and pastoral data are never pooled. Permissions decide who sees what.",
   },
   {
     Icon: LayoutDashboard,
     title: "Operator console & dashboards",
-    body: "Network staff get a console of every church: subscription status, giving activity, and health-style portfolio signals at a glance.",
+    body: "Network staff get a console of every mosque: subscription status, giving activity, and health-style portfolio signals at a glance.",
   },
   {
     Icon: BarChart3,
-    title: "Cross-church reporting",
+    title: "Cross-mosque reporting",
     body: "Compare giving, attendance, and Gift Aid claims across the network without phoning each treasurer for a spreadsheet.",
   },
   {
     Icon: PoundSterling,
     title: "Central billing, one invoice",
-    body: "One subscription covering the whole network. Add a church for a per-church increment rather than negotiating each one separately.",
+    body: "One subscription covering the whole network. Add a mosque for a per-mosque increment rather than negotiating each one separately.",
   },
   {
     Icon: FileSpreadsheet,
     title: "Annual returns in one click",
-    body: "Network-wide annual returns export as a single CSV — built for the reporting that dioceses, circuits, and associations actually have to file.",
+    body: "Network-wide annual returns export as a single CSV — built for the reporting that networks, circuits, and associations actually have to file.",
   },
   {
     Icon: UserCheck,
     title: "Migration planning & named contact",
-    body: "Network plans include migration planning across all churches and a named contact who knows your structure, not a generic support queue.",
+    body: "Network plans include migration planning across all mosques and a named contact who knows your structure, not a generic support queue.",
   },
 ];
 
@@ -98,12 +98,12 @@ const ROLLOUT_STEPS = [
   {
     step: "1",
     title: "Map the network",
-    body: "We work with your office to list the churches, agree the order, and plan data migration. Bulk provisioning sets up every church record in one pass.",
+    body: "We work with your office to list the mosques, agree the order, and plan data migration. Bulk provisioning sets up every mosque record in one pass.",
   },
   {
     step: "2",
     title: "Roll out in waves",
-    body: "Churches go live in groups, each with its own website, giving links, and admin team. Early waves shape the playbook for the rest.",
+    body: "Mosques go live in groups, each with its own website, giving links, and admin team. Early waves shape the playbook for the rest.",
   },
   {
     step: "3",
@@ -112,7 +112,7 @@ const ROLLOUT_STEPS = [
   },
 ];
 
-const PRICING_TIERS = (["church_group", "network"] as const).map(
+const PRICING_TIERS = (["mosque_group", "network"] as const).map(
   (code) => PLAN_DEFINITIONS[code]
 );
 
@@ -130,16 +130,16 @@ export default function NetworksPage() {
             <div className="inline-flex items-center gap-2 rounded-full border border-[#e3dccb] bg-white px-4 py-2 shadow-sm">
               <Network className="h-4 w-4 text-brand" />
               <span className="text-sm font-medium text-slate-600">
-                For dioceses, circuits, associations &amp; networks
+                For networks, circuits, associations &amp; networks
               </span>
             </div>
             <h1 className="mt-7 font-heading text-[2.6rem] font-bold leading-[1.08] tracking-tight text-slate-900 sm:text-5xl">
-              One platform for every church in your care.
+              One platform for every mosque in your care.
               <span className="block text-brand">Without flattening what makes each one different.</span>
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
-              ChurchPay rolls out giving, Gift Aid, websites, and member records across a
-              whole network — each church keeps its own identity, data, and bank account,
+              MosquePay rolls out giving, Gift Aid, websites, and member records across a
+              whole network — each mosque keeps its own identity, data, and bank account,
               while your office gets central oversight, one invoice, and reporting that
               doesn&apos;t depend on chasing treasurers.
             </p>
@@ -167,13 +167,13 @@ export default function NetworksPage() {
         <div className="max-w-3xl">
           <MarketingKicker>Built for how your denomination works</MarketingKicker>
           <h2 className="mt-4 font-heading text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-            Dioceses, circuits, associations, and networks all run differently. ChurchPay
+            Networks, circuits, associations, and networks all run differently. MosquePay
             bends to fit.
           </h2>
           <p className="mt-4 text-base leading-7 text-slate-600">
-            Some structures hold authority at the centre, some hold it at the local church.
-            ChurchPay separates oversight from control: the network sees the whole estate,
-            each church governs its own data and money.
+            Some structures hold authority at the centre, some hold it at the local mosque.
+            MosquePay separates oversight from control: the network sees the whole estate,
+            each mosque governs its own data and money.
           </p>
         </div>
         <div className="mt-12 grid gap-5 sm:grid-cols-2">
@@ -240,10 +240,10 @@ export default function NetworksPage() {
         <div className="mx-auto max-w-2xl text-center">
           <MarketingKicker>Two ways to buy</MarketingKicker>
           <h2 className="mt-4 font-heading text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-            From a handful of churches to a whole denomination.
+            From a handful of mosques to a whole denomination.
           </h2>
           <p className="mt-4 text-base leading-7 text-slate-600">
-            Group covers connected churches with shared oversight. Network adds the operator
+            Group covers connected mosques with shared oversight. Network adds the operator
             console, network-wide dashboards, and migration support for full rollouts. No
             transaction markup on either.
           </p>
@@ -279,8 +279,8 @@ export default function NetworksPage() {
       </MarketingSection>
 
       <MarketingCtaBand
-        title="Planning a rollout across your churches?"
-        body="Tell us about your structure — how many churches, how they are governed, and what your office needs to see. We will map a rollout plan, wave by wave, before you commit to anything."
+        title="Planning a rollout across your mosques?"
+        body="Tell us about your structure — how many mosques, how they are governed, and what your office needs to see. We will map a rollout plan, wave by wave, before you commit to anything."
         ctaLabel="Talk to us"
         ctaHref="/contact"
         secondaryLabel="Book a demo"

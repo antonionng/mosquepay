@@ -8,14 +8,14 @@ const STATE_TTL_MS = MOOOV_CONNECT_STATE_TTL_SECONDS * 1000;
 export const MOOOV_CONNECT_STATE_COOKIE = "mooov_connect_state";
 
 type StatePayload = {
-  churchId: string;
-  churchSlug: string;
+  mosqueId: string;
+  mosqueSlug: string;
   nonce: string;
   iat: number;
 };
 
 function stateSecret() {
-  return process.env.SESSION_SECRET ?? "churchpay-dummy-secret-change-in-production";
+  return process.env.SESSION_SECRET ?? "mosquepay-dummy-secret-change-in-production";
 }
 
 function encode(value: unknown) {
@@ -31,8 +31,8 @@ function sign(payload: string) {
 }
 
 export function createMooovConnectState(input: {
-  churchId: string;
-  churchSlug: string;
+  mosqueId: string;
+  mosqueSlug: string;
 }) {
   const payload = encode({
     ...input,
@@ -62,7 +62,7 @@ export function verifyMooovConnectState(
   }
 
   const parsed = decode<StatePayload>(payload);
-  if (!parsed.churchId || !parsed.churchSlug || Date.now() - parsed.iat > STATE_TTL_MS) {
+  if (!parsed.mosqueId || !parsed.mosqueSlug || Date.now() - parsed.iat > STATE_TTL_MS) {
     return null;
   }
   return parsed;

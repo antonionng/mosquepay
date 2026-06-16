@@ -21,16 +21,16 @@ export async function GET(
     return new NextResponse("Calendar not found", { status: 404 });
   }
 
-  const church = await db.getChurchById(member.church_id);
-  const events = await db.getEvents(member.church_id, { published: true });
+  const mosque = await db.getMosqueById(member.mosque_id);
+  const events = await db.getEvents(member.mosque_id, { published: true });
 
   const url = new URL(request.url);
   const origin = `${url.protocol}//${url.host}`;
   const ics = eventsToIcs({
-    calendarName: church?.name ?? "Church calendar",
+    calendarName: mosque?.name ?? "Mosque calendar",
     events,
     origin,
-    churchSlug: church?.slug ?? null,
+    mosqueSlug: mosque?.slug ?? null,
   });
 
   return new NextResponse(ics, {
@@ -38,7 +38,7 @@ export async function GET(
     headers: {
       "Content-Type": "text/calendar; charset=utf-8",
       "Cache-Control": "private, max-age=600",
-      "Content-Disposition": `inline; filename="church-${member.church_id}.ics"`,
+      "Content-Disposition": `inline; filename="mosque-${member.mosque_id}.ics"`,
     },
   });
 }

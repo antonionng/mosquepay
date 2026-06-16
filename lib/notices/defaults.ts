@@ -1,13 +1,13 @@
-import type { Event, Church } from "@/lib/db/types";
+import type { Event, Mosque } from "@/lib/db/types";
 
 type NoticeEvent = Pick<Event, "event_date" | "event_time" | "location" | "temple_room">;
-type NoticeChurch = Pick<Church, "city"> | null | undefined;
+type NoticeMosque = Pick<Mosque, "city"> | null | undefined;
 
 export function defaultAgendaItems() {
   return [
     "Welcome and opening prayer.",
     "Worship and readings.",
-    "Church family notices.",
+    "Mosque family notices.",
     "PastoralCare update.",
     "Giving, Gift Aid, and charity focus.",
     "Upcoming services and events.",
@@ -35,18 +35,18 @@ export function formatNoticeTime(time: string | null) {
   return `${hour12}.${String(minutes).padStart(2, "0")} ${suffix}`;
 }
 
-export function getNoticeVenue(event: NoticeEvent, church?: NoticeChurch) {
+export function getNoticeVenue(event: NoticeEvent, mosque?: NoticeMosque) {
   return [
     event.location,
     event.temple_room,
-    !event.location && church?.city ? church.city : null,
+    !event.location && mosque?.city ? mosque.city : null,
   ]
     .filter(Boolean)
     .join(", ");
 }
 
-export function renderDefaultNoticeOpening(event: NoticeEvent, church?: NoticeChurch) {
-  const venue = getNoticeVenue(event, church) || "the church venue";
+export function renderDefaultNoticeOpening(event: NoticeEvent, mosque?: NoticeMosque) {
+  const venue = getNoticeVenue(event, mosque) || "the mosque venue";
   const date = formatNoticeDate(event.event_date);
   const time = formatNoticeTime(event.event_time);
   const timeText = time ? ` at ${time} SHARP` : "";

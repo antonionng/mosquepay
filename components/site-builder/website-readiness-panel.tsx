@@ -15,7 +15,7 @@ type ReadinessCheck = {
 type ReadinessPayload = {
   supabaseConfigured: boolean;
   databaseMode: boolean;
-  selectedChurch: boolean;
+  selectedMosque: boolean;
   checks: ReadinessCheck[];
 };
 

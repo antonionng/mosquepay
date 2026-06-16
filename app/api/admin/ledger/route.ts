@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -15,13 +15,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ entries: [] });
   }
 
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
 
-  const forbidden = await requireAdminApiPermission("payments:write", churchId);
+  const forbidden = await requireAdminApiPermission("payments:write", mosqueId);
   if (forbidden) return forbidden;
 
   const url = request.nextUrl;
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       ) as Array<"payment" | "giving" | "donation">)
     : undefined;
 
-  const entries = await db.getTreasurerLedger(churchId, {
+  const entries = await db.getTreasurerLedger(mosqueId, {
     from,
     to,
     sourceTypes,

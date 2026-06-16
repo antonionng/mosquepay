@@ -1,36 +1,53 @@
-# ChurchPay
+# MosquePay
 
-ChurchPay is a web platform for Church churches, Networks, Districts, and hall groups.
+MosquePay is a UK web platform for mosques, masjids, Islamic centres, Muslim
+charities, and mosque networks. Tagline: "Smart Payments. Stronger Communities."
 
-## What ChurchPay Does
+## What MosquePay Does
 
-ChurchPay helps church teams manage:
+MosquePay helps mosque teams manage:
 
-- Public church websites and custom pages
-- Member portals and digital member records
-- Church services, notice, RSVPs, dining choices, and events
-- Online giving, event payments, charity donations, and receipts
-- Gift Aid declarations and GASDS claim records
-- Newcomer enquiries, newcomer pipelines, mentoring, and onboarding
-- Charity campaigns, pastoral activity, Pastoral Care notes, and reporting
-- Network, District, and multi-church administration
+- Public mosque websites and custom pages
+- Member portals, membership management, and digital member records
+- Jumu'ah, daily prayers, events, RSVPs, and community meals
+- Online donations, Zakat, Sadaqah, event payments, and receipts
+- Recurring giving and direct debit / card subscriptions
+- Gift Aid declarations and GASDS claim records for Muslim charities
+- Newcomer enquiries, pipelines, mentoring, and onboarding
+- Charity campaigns, community welfare records, and reporting
+- Mosque networks and multi-mosque administration
 - Staff roles, permissions, audit logs, and platform governance
+
+## Key Terms
+
+- Imam, khutbah, Jumu'ah, Salah, adhan
+- Zakat (obligatory charity) and Sadaqah (voluntary charity)
+- Gift Aid and GASDS (UK charity tax relief that applies to mosques)
+- Trustees, mosque committee, treasurer, secretary
+- Members, congregation, newcomers, welfare
 
 ## Useful Pages
 
-- Overview: https://www.churchpay.co.uk/
-- Features: https://www.churchpay.co.uk/features
-- Pricing: https://www.churchpay.co.uk/pricing
-- Demo booking: https://www.churchpay.co.uk/book-demo
-- FAQ: https://www.churchpay.co.uk/faq
-- Contact: https://www.churchpay.co.uk/contact
-- Privacy: https://www.churchpay.co.uk/privacy
-- GDPR: https://www.churchpay.co.uk/gdpr
+- Overview: https://www.mosque-pay.com/
+- Features: https://www.mosque-pay.com/features
+- Pricing: https://www.mosque-pay.com/pricing
+- Demo booking: https://www.mosque-pay.com/book-demo
+- FAQ: https://www.mosque-pay.com/faq
+- Contact: https://www.mosque-pay.com/contact
+- Privacy: https://www.mosque-pay.com/privacy
+- GDPR: https://www.mosque-pay.com/gdpr
 
 ## Search Context
 
-ChurchPay is relevant to searches for Church church management software, church websites, church member website builders, online giving payments, event RSVP software, notice management, Gift Aid and GASDS tools, Church charity donations, member portals, newcomer CRM, mentoring workflows, Pastoral Care pastoral records, Network administration, and multi-church reporting.
+MosquePay is relevant to searches for mosque management software, masjid
+management software, mosque and masjid website builders, online donations and
+mosque donation apps, Zakat and Sadaqah collection, recurring giving and direct
+debit for mosques, event RSVP software, Jumu'ah and prayer notice management,
+Gift Aid and GASDS tools for Muslim charities, mosque member portals, newcomer
+CRM, mentoring workflows, community welfare records, mosque network
+administration, and multi-mosque reporting.
 
 ## Contact
 
-For product questions, partnership enquiries, or a walkthrough, use https://www.churchpay.co.uk/book-demo or https://www.churchpay.co.uk/contact.
+For product questions, partnership enquiries, or a walkthrough, use
+https://www.mosque-pay.com/book-demo or https://www.mosque-pay.com/contact.

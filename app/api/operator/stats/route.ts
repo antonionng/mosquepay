@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import { listChurches, getChurchSubscription, getPayments } from "@/lib/db";
+import { listMosques, getMosqueSubscription, getPayments } from "@/lib/db";
 import { requireOperatorApiAuth } from "@/lib/auth/api";
 
 export async function GET() {
@@ -9,8 +9,8 @@ export async function GET() {
 
   if (!isSupabaseConfigured()) {
     return NextResponse.json({
-      churchCount: 0,
-      activeChurches: 0,
+      mosqueCount: 0,
+      activeMosques: 0,
       activeSubscriptions: 0,
       trialingSubscriptions: 0,
       totalRevenue: 0,
@@ -18,11 +18,11 @@ export async function GET() {
   }
 
   try {
-    const churches = await listChurches();
-    const activeChurches = churches.filter((l) => l.is_active).length;
+    const mosques = await listMosques();
+    const activeMosques = mosques.filter((l) => l.is_active).length;
 
     const subs = await Promise.all(
-      churches.map((l) => getChurchSubscription(l.id).catch(() => null))
+      mosques.map((l) => getMosqueSubscription(l.id).catch(() => null))
     );
     const activeSubscriptions = subs.filter(
       (s) => s?.status === "active"
@@ -31,17 +31,17 @@ export async function GET() {
       (s) => s?.status === "trialing"
     ).length;
 
-    const paymentsByChurch = await Promise.all(
-      churches.map((l) => getPayments(l.id).catch(() => []))
+    const paymentsByMosque = await Promise.all(
+      mosques.map((l) => getPayments(l.id).catch(() => []))
     );
-    const totalRevenue = paymentsByChurch
+    const totalRevenue = paymentsByMosque
       .flat()
       .filter((p) => p.status === "succeeded" || p.status === "completed")
       .reduce((sum, p) => sum + p.total_amount, 0);
 
     return NextResponse.json({
-      churchCount: churches.length,
-      activeChurches,
+      mosqueCount: mosques.length,
+      activeMosques,
       activeSubscriptions,
       trialingSubscriptions,
       totalRevenue,

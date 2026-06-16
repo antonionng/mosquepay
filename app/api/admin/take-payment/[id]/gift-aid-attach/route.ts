@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as db from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -38,12 +38,12 @@ export async function POST(
     );
   }
   const { id: paymentId } = await params;
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("charity:write", churchId);
+  const forbidden = await requireAdminApiPermission("charity:write", mosqueId);
   if (forbidden) return forbidden;
 
   const body = (await request.json().catch(() => ({}))) as {
@@ -57,14 +57,14 @@ export async function POST(
     );
   }
 
-  const payment = await db.getPaymentById(paymentId, churchId);
+  const payment = await db.getPaymentById(paymentId, mosqueId);
   if (!payment) {
     return NextResponse.json({ error: "Payment not found." }, { status: 404 });
   }
-  const declaration = await db.getGiftAidDeclarationById(declarationId, churchId);
+  const declaration = await db.getGiftAidDeclarationById(declarationId, mosqueId);
   if (!declaration) {
     return NextResponse.json(
-      { error: "Declaration not found in this church." },
+      { error: "Declaration not found in this mosque." },
       { status: 404 }
     );
   }
@@ -112,7 +112,7 @@ export async function POST(
   try {
     const donations = await db.getDonationsByEmail(
       payment.user_email ?? "",
-      churchId
+      mosqueId
     );
     const existing = donations.find(
       (d) =>
@@ -128,7 +128,7 @@ export async function POST(
 
   let donationId: string | null = null;
   try {
-    const donation = await db.addDonation(churchId, {
+    const donation = await db.addDonation(mosqueId, {
       event_id: payment.event_id,
       payment_id: payment.id,
       donor_name: payment.user_name,
@@ -154,13 +154,13 @@ export async function POST(
 
   let actorEmail: string | null = null;
   try {
-    const admin = await getCurrentAdminContextAny(churchId);
+    const admin = await getCurrentAdminContextAny(mosqueId);
     actorEmail = admin?.email ?? null;
   } catch {
     /* non-fatal */
   }
   try {
-    await db.insertGiftAidDeclarationEvent(churchId, {
+    await db.insertGiftAidDeclarationEvent(mosqueId, {
       declaration_id: declarationId,
       event_type: "address_updated",
       actor_kind: "admin",
@@ -181,7 +181,7 @@ export async function POST(
   }
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "gift_aid_attached_to_payment",
     entityType: "payment",
     entityId: payment.id,

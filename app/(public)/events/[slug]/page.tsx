@@ -7,9 +7,9 @@ import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { EventRsvpForm } from "@/components/forms/event-rsvp-form";
 import { ArrowLeft, Calendar, MapPin, Clock, Users } from "lucide-react";
-import { getDefaultChurchSlug, resolveChurchSlug } from "@/lib/tenant";
+import { getDefaultMosqueSlug, resolveMosqueSlug } from "@/lib/tenant";
 import { socialShareImageUrl, SITE_ORIGIN } from "@/lib/seo";
-import { churchScopedEventPath, churchScopedEventsPath } from "@/lib/public-links";
+import { mosqueScopedEventPath, mosqueScopedEventsPath } from "@/lib/public-links";
 import { isPubliclyVisible } from "@/lib/events/public-visibility";
 
 function siteUrl(): string {
@@ -20,13 +20,13 @@ function siteUrl(): string {
   return url.startsWith("http") ? url : `https://${url}`;
 }
 
-async function loadEvent(slug: string, churchSlug: string) {
+async function loadEvent(slug: string, mosqueSlug: string) {
   if (isSupabaseConfigured()) {
-    const churchId = await db.resolveChurchId(churchSlug);
-    return churchId ? await db.getEventBySlug(slug, churchId) : null;
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    return mosqueId ? await db.getEventBySlug(slug, mosqueId) : null;
   }
   if (shouldUseInMemoryMock()) {
-    return mockDb.getEventBySlug(slug, { church_slug: churchSlug });
+    return mockDb.getEventBySlug(slug, { mosque_slug: mosqueSlug });
   }
   return null;
 }
@@ -36,17 +36,17 @@ export async function generateMetadata({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ church?: string }>;
+  searchParams: Promise<{ mosque?: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const { church } = await searchParams;
-  const churchSlug = resolveChurchSlug(church);
-  const event = await loadEvent(slug, churchSlug);
+  const { mosque } = await searchParams;
+  const mosqueSlug = resolveMosqueSlug(mosque);
+  const event = await loadEvent(slug, mosqueSlug);
   if (!event || !isPubliclyVisible(event)) return { title: "Event not found" };
   const description = (event.description ?? "").slice(0, 200) ||
     `${event.title} - ${formatDate(event.event_date)}`;
   const canonical = `${siteUrl()}/events/${slug}${
-    churchSlug !== getDefaultChurchSlug() ? `?church=${encodeURIComponent(churchSlug)}` : ""
+    mosqueSlug !== getDefaultMosqueSlug() ? `?mosque=${encodeURIComponent(mosqueSlug)}` : ""
   }`;
   const imageUrl = event.featured_image_url || socialShareImageUrl(siteUrl());
   return {
@@ -78,18 +78,18 @@ type LinkMode = "query" | "scoped";
 
 export async function EventPageContent({
   slug,
-  church,
+  mosque,
   linkMode = "query",
   bypassVisibility = false,
   adminPreviewBackHref,
 }: {
   slug: string;
-  church?: string;
+  mosque?: string;
   linkMode?: LinkMode;
   /**
    * Skip the `isPubliclyVisible` gate. The caller is responsible for
    * authorisation (e.g. the admin preview route, which uses
-   * `getAdminReadContext` to ensure only signed-in admins of this church can
+   * `getAdminReadContext` to ensure only signed-in admins of this mosque can
    * reach it). When true, a banner is rendered so the previewer knows the
    * page is not currently public.
    */
@@ -97,16 +97,16 @@ export async function EventPageContent({
   /** When previewing, where the back link should send the admin. */
   adminPreviewBackHref?: string;
 }) {
-  const churchSlug = resolveChurchSlug(church);
-  const defaultSlug = getDefaultChurchSlug();
-  const withChurchLink = (href: string) => {
+  const mosqueSlug = resolveMosqueSlug(mosque);
+  const defaultSlug = getDefaultMosqueSlug();
+  const withMosqueLink = (href: string) => {
     if (linkMode === "scoped" && href === "/events") {
-      return churchScopedEventsPath(churchSlug);
+      return mosqueScopedEventsPath(mosqueSlug);
     }
-    return churchSlug === defaultSlug ? href : `${href}?church=${encodeURIComponent(churchSlug)}`;
+    return mosqueSlug === defaultSlug ? href : `${href}?mosque=${encodeURIComponent(mosqueSlug)}`;
   };
 
-  const event = await loadEvent(slug, churchSlug);
+  const event = await loadEvent(slug, mosqueSlug);
   if (!event) notFound();
   const visibleToPublic = isPubliclyVisible(event);
   if (!visibleToPublic && !bypassVisibility) notFound();
@@ -129,7 +129,7 @@ export async function EventPageContent({
     image: event.featured_image_url ? [event.featured_image_url] : undefined,
     url:
       linkMode === "scoped"
-        ? `${siteUrl()}${churchScopedEventPath(churchSlug, slug)}`
+        ? `${siteUrl()}${mosqueScopedEventPath(mosqueSlug, slug)}`
         : `${siteUrl()}/events/${slug}`,
   };
 
@@ -171,7 +171,7 @@ export async function EventPageContent({
       <section className="public-hero">
         <div className="container-full relative z-10 max-w-4xl px-6 pb-16 pt-32 md:pb-20 md:pt-40">
           <Link 
-            href={withChurchLink("/events")}
+            href={withMosqueLink("/events")}
             className="mb-8 inline-flex items-center gap-2 text-sm text-white/60 transition-colors hover:text-blue-200"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -253,7 +253,7 @@ export async function EventPageContent({
               
               <EventRsvpForm
                 eventId={event.id}
-                churchSlug={churchSlug}
+                mosqueSlug={mosqueSlug}
                 enableDining={event.enable_dining_rsvp}
                 diningPrice={event.dining_price}
                 diningDescription={event.dining_description}
@@ -285,9 +285,9 @@ export default async function EventPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ church?: string }>;
+  searchParams: Promise<{ mosque?: string }>;
 }) {
   const { slug } = await params;
-  const { church } = await searchParams;
-  return <EventPageContent slug={slug} church={church} />;
+  const { mosque } = await searchParams;
+  return <EventPageContent slug={slug} mosque={mosque} />;
 }

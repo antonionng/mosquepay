@@ -1,9 +1,9 @@
-// Church member portal service worker.
+// Mosque member portal service worker.
 // Strategy: network-first for HTML and API, cache-first for static assets,
 // with a small offline shell fallback.
 
-const SHELL_CACHE = "church-portal-shell-v1";
-const RUNTIME_CACHE = "church-portal-runtime-v1";
+const SHELL_CACHE = "mosque-portal-shell-v1";
+const RUNTIME_CACHE = "mosque-portal-runtime-v1";
 const SHELL_ASSETS = ["/member", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {

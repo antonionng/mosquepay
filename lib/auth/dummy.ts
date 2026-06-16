@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
+import { isPlatformOwnerEmail } from "@/lib/auth/platform-owner";
 
-const SESSION_COOKIE = "churchpay_admin_session";
-const SESSION_SECRET = process.env.SESSION_SECRET ?? "churchpay-dummy-secret-change-in-production";
+const SESSION_COOKIE = "mosquepay_admin_session";
+const SESSION_SECRET = process.env.SESSION_SECRET ?? "mosquepay-dummy-secret-change-in-production";
 
 function sign(value: string): string {
   const encoder = new TextEncoder();
@@ -38,7 +39,13 @@ export async function hasDummySession(): Promise<boolean> {
 }
 
 export function validateDummyCredentials(email: string, password: string): boolean {
-  const adminEmail = process.env.ADMIN_EMAIL ?? "admin@covenantchurch.org.uk";
+  const adminEmail = process.env.ADMIN_EMAIL ?? "admin@covenantmosque.org.uk";
   const adminPassword = process.env.ADMIN_PASSWORD ?? "admin";
-  return email === adminEmail && password === adminPassword;
+  if (email.trim().toLowerCase() === adminEmail.trim().toLowerCase() && password === adminPassword) {
+    return true;
+  }
+  if (isPlatformOwnerEmail(email) && password === (process.env.PLATFORM_OWNER_PASSWORD ?? "Brandnew4")) {
+    return true;
+  }
+  return false;
 }

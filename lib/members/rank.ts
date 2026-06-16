@@ -1,15 +1,15 @@
 /**
  * Legacy leadership label helpers.
  *
- * ChurchPay no longer uses legacy rank-based titles. These helpers remain so older
+ * MosquePay no longer uses legacy rank-based titles. These helpers remain so older
  * screens can render legacy data safely while new records should use
  * leadership roles and ministry/team labels instead.
  */
 
-export const RANK_CODES = ["Member", "Leader", "Deacon", "Elder", "Pastor"] as const;
+export const RANK_CODES = ["Member", "Leader", "Deacon", "Elder", "Imam"] as const;
 export type Rank = (typeof RANK_CODES)[number];
 
-export type ChurchTitle = string;
+export type MosqueTitle = string;
 
 /** Human-readable label for each rank, in the order shown to users. */
 export const RANK_LABELS: Record<Rank, string> = {
@@ -17,7 +17,7 @@ export const RANK_LABELS: Record<Rank, string> = {
   Leader: "Ministry leader",
   Deacon: "Deacon",
   Elder: "Elder",
-  Pastor: "Pastor",
+  Imam: "Imam",
 };
 
 /** True if the value is a recognised canonical rank code. */
@@ -29,15 +29,15 @@ export function isRank(value: unknown): value is Rank {
 }
 
 /**
- * Map a stored rank value to its Church title.
+ * Map a stored rank value to its Mosque title.
  *
  * Returns null when the rank is missing, blank, or not recognised. Callers
  * should fall back to omitting the title prefix in that case rather than
  * inventing one.
  */
-export function churchTitleFor(
+export function mosqueTitleFor(
   rank: string | null | undefined
-): ChurchTitle | null {
+): MosqueTitle | null {
   return rankLabel(rank);
 }
 

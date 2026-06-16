@@ -4,7 +4,7 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import { writeAuditLog } from "@/lib/audit";
 
 const VALID_STATUSES = new Set(["active", "completed", "paused"]);
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
   if (unauthorized) return unauthorized;
 
   try {
-    const churchSlug = getChurchSlugFromRequest(request);
+    const mosqueSlug = getMosqueSlugFromRequest(request);
     const body = await request.json();
     const name = body.name?.trim();
     const targetAmount = Number(body.target_amount);
@@ -43,15 +43,15 @@ export async function POST(request: NextRequest) {
     };
 
     if (isSupabaseConfigured()) {
-      const churchId = await db.resolveChurchId(churchSlug);
-      if (!churchId) {
-        return NextResponse.json({ error: "Church not found." }, { status: 404 });
+      const mosqueId = await db.resolveMosqueId(mosqueSlug);
+      if (!mosqueId) {
+        return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
       }
-      const forbidden = await requireAdminApiPermission("charity:write", churchId);
+      const forbidden = await requireAdminApiPermission("charity:write", mosqueId);
       if (forbidden) return forbidden;
-      const campaign = await db.addCharityCampaign(churchId, input);
+      const campaign = await db.addCharityCampaign(mosqueId, input);
       await writeAuditLog({
-        churchId,
+        mosqueId,
         action: "created",
         entityType: "charity_campaign",
         entityId: campaign.id,
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
 
     const campaign = mockDb.addCharityCampaign({
       ...input,
-      church_slug: churchSlug,
+      mosque_slug: mosqueSlug,
     });
     return NextResponse.json({ campaign }, { status: 201 });
   } catch (error) {

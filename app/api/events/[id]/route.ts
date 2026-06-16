@@ -19,12 +19,12 @@ export async function PATCH(
     const unauthorized = await requireAdminApiAuth();
     if (unauthorized) return unauthorized;
 
-    // Resolve the church from the admin's actual scope (same path the page
-    // side uses). This is immune to stale ADMIN_CHURCH_COOKIE values, which
+    // Resolve the mosque from the admin's actual scope (same path the page
+    // side uses). This is immune to stale ADMIN_MOSQUE_COOKIE values, which
     // is the recurring source of "Save changes returns 401/403" bugs.
     const adminCtx = await getAdminReadContext();
-    const churchSlug =
-      adminCtx.mode === "database" ? adminCtx.churchSlug : "";
+    const mosqueSlug =
+      adminCtx.mode === "database" ? adminCtx.mosqueSlug : "";
     const body = await request.json();
 
     const updates: Record<string, unknown> = {};
@@ -98,18 +98,18 @@ export async function PATCH(
       updates.feature_on_website = body.feature_on_website;
 
     if (isSupabaseConfigured()) {
-      if (adminCtx.mode !== "database" || !adminCtx.churchId) {
-        return NextResponse.json({ error: "Church not selected." }, { status: 404 });
+      if (adminCtx.mode !== "database" || !adminCtx.mosqueId) {
+        return NextResponse.json({ error: "Mosque not selected." }, { status: 404 });
       }
-      const churchId = adminCtx.churchId;
-      const forbidden = await requireAdminApiPermission("services:write", churchId);
+      const mosqueId = adminCtx.mosqueId;
+      const forbidden = await requireAdminApiPermission("services:write", mosqueId);
       if (forbidden) return forbidden;
-      const updated = await db.updateEvent(id, churchId, updates as Parameters<typeof db.updateEvent>[2]);
+      const updated = await db.updateEvent(id, mosqueId, updates as Parameters<typeof db.updateEvent>[2]);
       if (!updated) {
         return NextResponse.json({ error: "Event not found." }, { status: 404 });
       }
       await writeAuditLog({
-        churchId,
+        mosqueId,
         action: "updated",
         entityType: "service",
         entityId: updated.id,
@@ -120,7 +120,7 @@ export async function PATCH(
     }
 
     const updated = mockDb.updateEvent(id, updates as Parameters<typeof mockDb.updateEvent>[1], {
-      church_slug: churchSlug,
+      mosque_slug: mosqueSlug,
     });
 
     if (!updated) {
@@ -150,18 +150,18 @@ export async function DELETE(
     if (unauthorized) return unauthorized;
 
     const adminCtx = await getAdminReadContext();
-    const churchSlug =
-      adminCtx.mode === "database" ? adminCtx.churchSlug : "";
+    const mosqueSlug =
+      adminCtx.mode === "database" ? adminCtx.mosqueSlug : "";
 
     if (isSupabaseConfigured()) {
-      if (adminCtx.mode !== "database" || !adminCtx.churchId) {
-        return NextResponse.json({ error: "Church not selected." }, { status: 404 });
+      if (adminCtx.mode !== "database" || !adminCtx.mosqueId) {
+        return NextResponse.json({ error: "Mosque not selected." }, { status: 404 });
       }
-      const churchId = adminCtx.churchId;
-      const forbidden = await requireAdminApiPermission("services:write", churchId);
+      const mosqueId = adminCtx.mosqueId;
+      const forbidden = await requireAdminApiPermission("services:write", mosqueId);
       if (forbidden) return forbidden;
 
-      const existing = await db.getEventById(id, churchId);
+      const existing = await db.getEventById(id, mosqueId);
       if (!existing) {
         return NextResponse.json({ error: "Event not found." }, { status: 404 });
       }
@@ -175,12 +175,12 @@ export async function DELETE(
         );
       }
 
-      const removed = await db.deleteEvent(id, churchId);
+      const removed = await db.deleteEvent(id, mosqueId);
       if (!removed) {
         return NextResponse.json({ error: "Event not found." }, { status: 404 });
       }
       await writeAuditLog({
-        churchId,
+        mosqueId,
         action: "deleted",
         entityType: "service",
         entityId: id,
@@ -189,7 +189,7 @@ export async function DELETE(
       return NextResponse.json({ success: true });
     }
 
-    const removed = mockDb.deleteEvent(id, { church_slug: churchSlug });
+    const removed = mockDb.deleteEvent(id, { mosque_slug: mosqueSlug });
     if (!removed) {
       return NextResponse.json({ error: "Event not found." }, { status: 404 });
     }

@@ -27,7 +27,7 @@ const NONE = "__none__";
  * attach a cash/QR payment to a service after the fact when the duty
  * officer forgot to pick one in the take-payment flow. Posts to
  * /api/admin/payments/[id] which validates the event belongs to the
- * active church.
+ * active mosque.
  */
 export function AttachToServiceCard({
   paymentId,

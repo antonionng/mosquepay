@@ -26,7 +26,7 @@ import { sendWithLog } from "@/lib/email/send-with-log";
 import { resolveTreasurerRecipients } from "@/lib/email/recipients";
 import type {
   GivingSchedule,
-  Church,
+  Mosque,
   Member,
   MemberGiving,
 } from "@/lib/db/types";
@@ -49,7 +49,7 @@ function formatDate(value: string | Date | null): string {
 
 function siteUrl() {
   return (
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://churchpay.co.uk"
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://mosque-pay.com"
   ).replace(/\/$/, "");
 }
 
@@ -67,15 +67,15 @@ function cadenceAdverb(cadence: string | null | undefined): string {
 // ---------------------------------------------------------------------------
 
 export async function notifyGivingSubscriptionActivated({
-  churchId,
-  church,
+  mosqueId,
+  mosque,
   member,
   schedule,
   givingRecord,
   cycleAmount,
 }: {
-  churchId: string;
-  church: Pick<Church, "id" | "name"> | null;
+  mosqueId: string;
+  mosque: Pick<Mosque, "id" | "name"> | null;
   member: Pick<Member, "id" | "email" | "full_name">;
   schedule: Pick<
     GivingSchedule,
@@ -84,7 +84,7 @@ export async function notifyGivingSubscriptionActivated({
   givingRecord: Pick<MemberGiving, "id" | "amount" | "currency">;
   cycleAmount: number;
 }) {
-  const churchName = church?.name ?? "your church";
+  const mosqueName = mosque?.name ?? "your mosque";
   const currency = (givingRecord.currency || "GBP").toUpperCase();
   const cycleAdverb = cadenceAdverb(schedule.cadence);
   const cycleAmountStr = formatGbp(cycleAmount, currency);
@@ -96,18 +96,18 @@ export async function notifyGivingSubscriptionActivated({
   const memberHtml = renderSimpleMessageEmail({
     eyebrow: "Subscription active",
     title: `Your giving plan is live`,
-    preview: `${cycleAmountStr} ${cycleAdverb} for ${churchName} giving.`,
+    preview: `${cycleAmountStr} ${cycleAdverb} for ${mosqueName} giving.`,
     greeting: `Dear ${member.full_name},`,
     paragraphs: [
-      `Thanks for setting up online giving with ${churchName}. Your subscription is active and the first cycle has been charged.`,
+      `Thanks for setting up online giving with ${mosqueName}. Your subscription is active and the first cycle has been charged.`,
       `${cycleAmountStr} will be collected ${cycleAdverb}, covering ${annualStr} of giving for the year. You can pause, change, or cancel any time from your member portal.`,
     ],
     cta: { label: "Manage my giving", href: memberPortalUrl() },
-    note: "If anything looks wrong, reply to this email or speak to your church treasurer.",
+    note: "If anything looks wrong, reply to this email or speak to your mosque treasurer.",
   });
 
   await sendWithLog({
-    churchId,
+    mosqueId,
     toEmail: member.email,
     toName: member.full_name,
     memberId: member.id,
@@ -115,7 +115,7 @@ export async function notifyGivingSubscriptionActivated({
     entityType: "giving_schedule",
     entityId: schedule.id,
     dedupeKey: `member_${dedupe}`,
-    subject: `Your ${churchName} giving subscription is active`,
+    subject: `Your ${mosqueName} giving subscription is active`,
     html: memberHtml,
     metadata: {
       schedule_id: schedule.id,
@@ -126,7 +126,7 @@ export async function notifyGivingSubscriptionActivated({
 
   // ---------- Treasurer ----------
   const treasurers = await resolveTreasurerRecipients(
-    churchId,
+    mosqueId,
     "giving_subscription_activated",
   );
   if (treasurers.length === 0) return;
@@ -134,7 +134,7 @@ export async function notifyGivingSubscriptionActivated({
     eyebrow: "New giving subscription",
     title: `${member.full_name} just enrolled`,
     preview: `${cycleAmountStr} ${cycleAdverb} via online subscription.`,
-    intro: `${member.full_name} (${member.email}) has set up a giving subscription with ${churchName}. The first cycle has cleared.`,
+    intro: `${member.full_name} (${member.email}) has set up a giving subscription with ${mosqueName}. The first cycle has cleared.`,
     rows: [
       { label: "Member", value: `${member.full_name} (${member.email})` },
       { label: "Cadence", value: cycleAdverb },
@@ -152,7 +152,7 @@ export async function notifyGivingSubscriptionActivated({
   });
   for (const t of treasurers) {
     await sendWithLog({
-      churchId,
+      mosqueId,
       toEmail: t.email,
       toName: t.fullName,
       adminUserId: t.adminUserId,
@@ -176,8 +176,8 @@ export async function notifyGivingSubscriptionActivated({
 // ---------------------------------------------------------------------------
 
 export async function notifyGivingCyclePaid({
-  churchId,
-  church,
+  mosqueId,
+  mosque,
   member,
   schedule,
   amountMajor,
@@ -187,8 +187,8 @@ export async function notifyGivingCyclePaid({
   cyclesTotal,
   nextChargeAt,
 }: {
-  churchId: string;
-  church: Pick<Church, "id" | "name"> | null;
+  mosqueId: string;
+  mosque: Pick<Mosque, "id" | "name"> | null;
   member: Pick<Member, "id" | "email" | "full_name">;
   schedule: Pick<GivingSchedule, "id" | "cadence">;
   amountMajor: number;
@@ -199,17 +199,17 @@ export async function notifyGivingCyclePaid({
   cyclesTotal: number | null;
   nextChargeAt: string | null;
 }) {
-  const churchName = church?.name ?? "your church";
+  const mosqueName = mosque?.name ?? "your mosque";
   const amountStr = formatGbp(amountMajor, currency);
   const cycleAdverb = cadenceAdverb(schedule.cadence);
 
   const html = renderSimpleMessageEmail({
     eyebrow: "Cycle collected",
     title: `Receipt: ${amountStr}`,
-    preview: `${amountStr} collected for your ${churchName} giving.`,
+    preview: `${amountStr} collected for your ${mosqueName} giving.`,
     greeting: `Dear ${member.full_name},`,
     paragraphs: [
-      `We've collected ${amountStr} for your ${churchName} giving subscription.`,
+      `We've collected ${amountStr} for your ${mosqueName} giving subscription.`,
       cyclesTotal != null
         ? `Cycle ${cyclePaidNumber} of ${cyclesTotal} for the giving year. Next charge: ${formatDate(nextChargeAt)}.`
         : `Next charge: ${formatDate(nextChargeAt)} (${cycleAdverb}).`,
@@ -219,7 +219,7 @@ export async function notifyGivingCyclePaid({
   });
 
   await sendWithLog({
-    churchId,
+    mosqueId,
     toEmail: member.email,
     toName: member.full_name,
     memberId: member.id,
@@ -227,7 +227,7 @@ export async function notifyGivingCyclePaid({
     entityType: "giving_schedule",
     entityId: schedule.id,
     dedupeKey: invoiceDedupeKey,
-    subject: `Receipt: ${amountStr} to ${churchName}`,
+    subject: `Receipt: ${amountStr} to ${mosqueName}`,
     html,
     metadata: {
       schedule_id: schedule.id,
@@ -242,8 +242,8 @@ export async function notifyGivingCyclePaid({
 // ---------------------------------------------------------------------------
 
 export async function notifyGivingCycleFailed({
-  churchId,
-  church,
+  mosqueId,
+  mosque,
   member,
   schedule,
   consecutiveFailures,
@@ -251,8 +251,8 @@ export async function notifyGivingCycleFailed({
   failureCategory,
   invoiceDedupeKey,
 }: {
-  churchId: string;
-  church: Pick<Church, "id" | "name"> | null;
+  mosqueId: string;
+  mosque: Pick<Mosque, "id" | "name"> | null;
   member: Pick<Member, "id" | "email" | "full_name">;
   schedule: Pick<GivingSchedule, "id" | "cadence" | "mooov_subscription_id">;
   consecutiveFailures: number;
@@ -261,16 +261,16 @@ export async function notifyGivingCycleFailed({
   /** Mooov invoice id derived dedupe key. */
   invoiceDedupeKey: string;
 }) {
-  const churchName = church?.name ?? "your church";
+  const mosqueName = mosque?.name ?? "your mosque";
 
   // ---------- Member ----------
   const memberHtml = renderSimpleMessageEmail({
     eyebrow: "Payment problem",
     title: `Your giving payment failed`,
-    preview: `${churchName} couldn't collect this cycle's giving.`,
+    preview: `${mosqueName} couldn't collect this cycle's giving.`,
     greeting: `Dear ${member.full_name},`,
     paragraphs: [
-      `We tried to collect your latest ${churchName} giving cycle but the payment was declined by your bank.`,
+      `We tried to collect your latest ${mosqueName} giving cycle but the payment was declined by your bank.`,
       `This often resolves itself when you update the card on file or your bank releases a hold. We'll automatically retry; if three attempts fail in a row your subscription will be paused and your treasurer notified.`,
     ],
     cta: { label: "Update payment details", href: memberPortalUrl() },
@@ -279,7 +279,7 @@ export async function notifyGivingCycleFailed({
       : "If you'd like to pay another way (BACS, cheque, cash), reply to this email and your treasurer will set it up.",
   });
   await sendWithLog({
-    churchId,
+    mosqueId,
     toEmail: member.email,
     toName: member.full_name,
     memberId: member.id,
@@ -287,7 +287,7 @@ export async function notifyGivingCycleFailed({
     entityType: "giving_schedule",
     entityId: schedule.id,
     dedupeKey: `member_${invoiceDedupeKey}`,
-    subject: `Action needed: ${churchName} giving payment failed`,
+    subject: `Action needed: ${mosqueName} giving payment failed`,
     html: memberHtml,
     metadata: {
       schedule_id: schedule.id,
@@ -304,7 +304,7 @@ export async function notifyGivingCycleFailed({
   const escalateLevels = new Set([1, 3, 5]);
   if (!escalateLevels.has(consecutiveFailures)) return;
   const treasurers = await resolveTreasurerRecipients(
-    churchId,
+    mosqueId,
     "giving_subscription_invoice_failed",
   );
   if (treasurers.length === 0) return;
@@ -319,7 +319,7 @@ export async function notifyGivingCycleFailed({
   const treasurerHtml = renderNotificationEmail({
     eyebrow: severity,
     title: `${member.full_name}'s giving payment failed`,
-    preview: `Failure ${consecutiveFailures}/5 — ${churchName} giving subscription.`,
+    preview: `Failure ${consecutiveFailures}/5 — ${mosqueName} giving subscription.`,
     intro: `Mooov reported a failed cycle charge on ${member.full_name}'s subscription. The member has been emailed automatically.`,
     rows: [
       { label: "Member", value: `${member.full_name} (${member.email})` },
@@ -341,7 +341,7 @@ export async function notifyGivingCycleFailed({
   });
   for (const t of treasurers) {
     await sendWithLog({
-      churchId,
+      mosqueId,
       toEmail: t.email,
       toName: t.fullName,
       adminUserId: t.adminUserId,
@@ -366,36 +366,36 @@ export async function notifyGivingCycleFailed({
 // ---------------------------------------------------------------------------
 
 export async function notifyGivingSubscriptionCanceled({
-  churchId,
-  church,
+  mosqueId,
+  mosque,
   member,
   schedule,
   cancelReason,
 }: {
-  churchId: string;
-  church: Pick<Church, "id" | "name"> | null;
+  mosqueId: string;
+  mosque: Pick<Mosque, "id" | "name"> | null;
   member: Pick<Member, "id" | "email" | "full_name">;
   schedule: Pick<GivingSchedule, "id" | "mooov_subscription_id">;
   cancelReason: string | null;
 }) {
-  const churchName = church?.name ?? "your church";
+  const mosqueName = mosque?.name ?? "your mosque";
   const dedupe =
     schedule.mooov_subscription_id ?? `sub_${schedule.id}_canceled`;
 
   const memberHtml = renderSimpleMessageEmail({
     eyebrow: "Subscription cancelled",
     title: `Your giving subscription has been cancelled`,
-    preview: `${churchName} giving subscription cancelled.`,
+    preview: `${mosqueName} giving subscription cancelled.`,
     greeting: `Dear ${member.full_name},`,
     paragraphs: [
-      `Your giving subscription with ${churchName} has been cancelled. Existing paid cycles stay paid; outstanding cycles flip to manual.`,
+      `Your giving subscription with ${mosqueName} has been cancelled. Existing paid cycles stay paid; outstanding cycles flip to manual.`,
       `If this wasn't intentional, please contact your treasurer or set up a new plan from the member portal.`,
     ],
     cta: { label: "Manage my giving", href: memberPortalUrl() },
     note: cancelReason ? `Reason: ${cancelReason}` : undefined,
   });
   await sendWithLog({
-    churchId,
+    mosqueId,
     toEmail: member.email,
     toName: member.full_name,
     memberId: member.id,
@@ -403,20 +403,20 @@ export async function notifyGivingSubscriptionCanceled({
     entityType: "giving_schedule",
     entityId: schedule.id,
     dedupeKey: `member_${dedupe}`,
-    subject: `Your ${churchName} giving subscription was cancelled`,
+    subject: `Your ${mosqueName} giving subscription was cancelled`,
     html: memberHtml,
     metadata: { schedule_id: schedule.id, cancel_reason: cancelReason },
   });
 
   const treasurers = await resolveTreasurerRecipients(
-    churchId,
+    mosqueId,
     "giving_subscription_canceled",
   );
   if (treasurers.length === 0) return;
   const treasurerHtml = renderNotificationEmail({
     eyebrow: "Subscription cancelled",
     title: `${member.full_name} cancelled`,
-    preview: `${churchName} giving subscription cancelled.`,
+    preview: `${mosqueName} giving subscription cancelled.`,
     intro: `Their existing paid cycles stay paid; any outstanding instalments revert to manual.`,
     rows: [
       { label: "Member", value: `${member.full_name} (${member.email})` },
@@ -426,7 +426,7 @@ export async function notifyGivingSubscriptionCanceled({
   });
   for (const t of treasurers) {
     await sendWithLog({
-      churchId,
+      mosqueId,
       toEmail: t.email,
       toName: t.fullName,
       adminUserId: t.adminUserId,
@@ -446,8 +446,8 @@ export async function notifyGivingSubscriptionCanceled({
 // ---------------------------------------------------------------------------
 
 export async function notifyGivingMethodChanged({
-  churchId,
-  church,
+  mosqueId,
+  mosque,
   member,
   givingRecord,
   method,
@@ -457,8 +457,8 @@ export async function notifyGivingMethodChanged({
   setBy,
   yearLabel,
 }: {
-  churchId: string;
-  church: Pick<Church, "id" | "name"> | null;
+  mosqueId: string;
+  mosque: Pick<Mosque, "id" | "name"> | null;
   member: Pick<Member, "id" | "email" | "full_name">;
   givingRecord: Pick<MemberGiving, "id" | "amount" | "currency">;
   method: "online_subscription" | "bacs" | "paid_in_full" | "fee_waived";
@@ -468,7 +468,7 @@ export async function notifyGivingMethodChanged({
   setBy: string | null;
   yearLabel: string | null;
 }) {
-  const churchName = church?.name ?? "your church";
+  const mosqueName = mosque?.name ?? "your mosque";
   const annualStr = formatGbp(givingRecord.amount, givingRecord.currency || "GBP");
   const yearTail = yearLabel ? ` for ${yearLabel}` : "";
 
@@ -481,7 +481,7 @@ export async function notifyGivingMethodChanged({
       eyebrow = "BACS recorded";
       title = `You're set up as a BACS payer`;
       paragraphs = [
-        `Your treasurer at ${churchName} has recorded that you pay this year's giving by BACS standing order${yearTail}.`,
+        `Your treasurer at ${mosqueName} has recorded that you pay this year's giving by BACS standing order${yearTail}.`,
         bacsMonthlyAmount != null
           ? `Agreed amount: ${formatGbp(bacsMonthlyAmount, "GBP")} per month, totalling ${annualStr} for the year.`
           : `Total for the year: ${annualStr}.`,
@@ -494,7 +494,7 @@ export async function notifyGivingMethodChanged({
       eyebrow = "Paid in full";
       title = `Your giving are settled`;
       paragraphs = [
-        `Your treasurer at ${churchName} has marked your giving${yearTail} as paid in full (${annualStr}).`,
+        `Your treasurer at ${mosqueName} has marked your giving${yearTail} as paid in full (${annualStr}).`,
         `Thank you — no further action is required for this year.`,
       ];
       break;
@@ -502,7 +502,7 @@ export async function notifyGivingMethodChanged({
       eyebrow = "Fee waived";
       title = `Your giving have been waived`;
       paragraphs = [
-        `Your treasurer at ${churchName} has waived your giving${yearTail}.`,
+        `Your treasurer at ${mosqueName} has waived your giving${yearTail}.`,
       ];
       if (waiverReason) {
         paragraphs.push(`Reason recorded: ${waiverReason}.`);
@@ -526,7 +526,7 @@ export async function notifyGivingMethodChanged({
   });
 
   await sendWithLog({
-    churchId,
+    mosqueId,
     toEmail: member.email,
     toName: member.full_name,
     memberId: member.id,
@@ -552,7 +552,7 @@ export async function notifyGivingMethodChanged({
   // role can mute the specific event in the Settings -> Notifications
   // tab if it's too chatty for them.
   const treasurers = await resolveTreasurerRecipients(
-    churchId,
+    mosqueId,
     `giving_method_changed_${method}`,
   );
   // Don't email the admin who just performed the action -- they
@@ -594,7 +594,7 @@ export async function notifyGivingMethodChanged({
     eyebrow: "Giving update",
     title: adminTitle,
     preview: adminTitle,
-    intro: `Recorded against ${churchName} — keeping the admin team in sync.`,
+    intro: `Recorded against ${mosqueName} — keeping the admin team in sync.`,
     rows: adminRows,
     message:
       "Manage this member's giving method or undo from the admin members page.",
@@ -602,7 +602,7 @@ export async function notifyGivingMethodChanged({
 
   for (const t of adminRecipients) {
     await sendWithLog({
-      churchId,
+      mosqueId,
       toEmail: t.email,
       toName: t.fullName,
       adminUserId: t.adminUserId,

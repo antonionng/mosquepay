@@ -49,11 +49,11 @@ export async function GET(request: NextRequest) {
   if (unauthorized) return unauthorized;
 
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
-    return NextResponse.json({ error: "Church not selected." }, { status: 404 });
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
+    return NextResponse.json({ error: "Mosque not selected." }, { status: 404 });
   }
-  const churchId = ctx.churchId;
-  const forbidden = await requireAdminApiPermission("payments:write", churchId);
+  const mosqueId = ctx.mosqueId;
+  const forbidden = await requireAdminApiPermission("payments:write", mosqueId);
   if (forbidden) return forbidden;
 
   const memberId = new URL(request.url).searchParams.get("member_id");
@@ -63,14 +63,14 @@ export async function GET(request: NextRequest) {
       { status: 400 }
     );
   }
-  const member = await db.getMemberById(memberId, churchId);
+  const member = await db.getMemberById(memberId, mosqueId);
   if (!member) {
     return NextResponse.json(
       { error: "Member not found." },
       { status: 404 }
     );
   }
-  const eligibility = await checkAdvanceEligibility(churchId, member);
+  const eligibility = await checkAdvanceEligibility(mosqueId, member);
   if (!eligibility.ok) {
     return NextResponse.json(
       {
@@ -84,33 +84,33 @@ export async function GET(request: NextRequest) {
 
   // Compute amounts WITHOUT mutating state. Mirrors the resolve helper
   // up to the point of insert.
-  const currentYear = await db.getCurrentChurchYear(churchId);
+  const currentYear = await db.getCurrentMosqueYear(mosqueId);
   if (!currentYear) {
     return NextResponse.json({
       eligible: false,
       code: "no_giving_year",
-      message: "Church has no current giving year configured.",
+      message: "Mosque has no current giving year configured.",
     });
   }
-  const allYears = await db.listChurchGivingYears(churchId);
+  const allYears = await db.listMosqueGivingYears(mosqueId);
   const next = allYears.find(
     (y) => y.start_date.slice(0, 10) > currentYear.end_date.slice(0, 10)
   );
   const nextLabel = next
     ? next.label
     : nextYearBounds(currentYear.start_date, currentYear.end_date).label;
-  const churchGiving = (await db.getChurchGiving(churchId))[0] ?? null;
+  const mosqueGiving = (await db.getMosqueGiving(mosqueId))[0] ?? null;
   const baseAmount =
     next?.annual_giving_amount ??
-    churchGiving?.amount ??
+    mosqueGiving?.amount ??
     currentYear.annual_giving_amount ??
     0;
-  const discountPct = churchGiving?.advance_discount_percent ?? 0;
+  const discountPct = mosqueGiving?.advance_discount_percent ?? 0;
   const chargedAmount =
     Math.round(baseAmount * (1 - discountPct / 100) * 100) / 100;
 
   // Already prepaid?
-  const memberGiving = await db.getMemberGiving(churchId, {
+  const memberGiving = await db.getMemberGiving(mosqueId, {
     memberEmail: member.email,
   });
   const existing = memberGiving.find(
@@ -131,7 +131,7 @@ export async function GET(request: NextRequest) {
     base_amount: baseAmount,
     discount_percent: discountPct,
     charged_amount: chargedAmount,
-    currency: (churchGiving?.currency ?? "gbp").toUpperCase(),
+    currency: (mosqueGiving?.currency ?? "gbp").toUpperCase(),
     already_prepaid: existing != null,
     existing_giving_id: existing?.id ?? null,
   });
@@ -153,12 +153,12 @@ export async function POST(request: NextRequest) {
   }
 
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
-    return NextResponse.json({ error: "Church not selected." }, { status: 404 });
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
+    return NextResponse.json({ error: "Mosque not selected." }, { status: 404 });
   }
-  const churchId = ctx.churchId;
-  const churchSlug = ctx.churchSlug;
-  const forbidden = await requireAdminApiPermission("payments:write", churchId);
+  const mosqueId = ctx.mosqueId;
+  const mosqueSlug = ctx.mosqueSlug;
+  const forbidden = await requireAdminApiPermission("payments:write", mosqueId);
   if (forbidden) return forbidden;
 
   let body: Record<string, unknown>;
@@ -197,7 +197,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const member = await db.getMemberById(memberId, churchId);
+  const member = await db.getMemberById(memberId, mosqueId);
   if (!member) {
     return NextResponse.json(
       { error: "Member not found." },
@@ -205,7 +205,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const eligibility = await checkAdvanceEligibility(churchId, member);
+  const eligibility = await checkAdvanceEligibility(mosqueId, member);
   if (!eligibility.ok) {
     return NextResponse.json(
       { error: eligibility.message, code: eligibility.code },
@@ -214,14 +214,14 @@ export async function POST(request: NextRequest) {
   }
 
   const resolved = await resolveOrCreateAdvanceGiving({
-    churchId,
+    mosqueId,
     member,
     amountOverride,
   });
 
   if (!resolved.already_existed) {
     await writeAuditLog({
-      churchId,
+      mosqueId,
       action: "advance_giving_created",
       entityType: "giving",
       entityId: resolved.member_giving_id,
@@ -239,8 +239,8 @@ export async function POST(request: NextRequest) {
 
   if (method === "card_qr") {
     return await mintCardQrForAdvanceGiving({
-      churchId,
-      churchSlug,
+      mosqueId,
+      mosqueSlug,
       member,
       resolvedAmount: resolved.charged_amount,
       currency: resolved.currency,
@@ -251,8 +251,8 @@ export async function POST(request: NextRequest) {
   }
 
   return await recordCashForAdvanceGiving({
-    churchId,
-    churchSlug,
+    mosqueId,
+    mosqueSlug,
     member,
     resolved,
     clientToken,
@@ -267,8 +267,8 @@ export async function POST(request: NextRequest) {
 // ---------------------------------------------------------------------------
 
 async function mintCardQrForAdvanceGiving(args: {
-  churchId: string;
-  churchSlug: string;
+  mosqueId: string;
+  mosqueSlug: string;
   member: NonNullable<Awaited<ReturnType<typeof db.getMemberById>>>;
   resolvedAmount: number;
   currency: string;
@@ -279,9 +279,9 @@ async function mintCardQrForAdvanceGiving(args: {
   const supa = createServiceClient();
   const { data: merchantRow } = await supa
     .schema("mooov")
-    .from("churches")
+    .from("mosques")
     .select("merchant_id, status")
-    .eq("id", args.churchId)
+    .eq("id", args.mosqueId)
     .maybeSingle<{ merchant_id: string; status: string }>();
   if (
     !merchantRow ||
@@ -290,8 +290,8 @@ async function mintCardQrForAdvanceGiving(args: {
   ) {
     return NextResponse.json(
       {
-        error: "This church has not finished setting up online payments yet.",
-        code: "church_not_connected",
+        error: "This mosque has not finished setting up online payments yet.",
+        code: "mosque_not_connected",
       },
       { status: 503 }
     );
@@ -302,7 +302,7 @@ async function mintCardQrForAdvanceGiving(args: {
     .schema("mooov")
     .from("payment_attempts")
     .select("payment_id, metadata")
-    .eq("church_id", args.churchId)
+    .eq("mosque_id", args.mosqueId)
     .eq("idempotency_key", idempotencyKey)
     .maybeSingle<{
       payment_id: string;
@@ -331,7 +331,7 @@ async function mintCardQrForAdvanceGiving(args: {
     source: "admin_take_payment_advance_giving",
     giving_id: args.givingId,
     member_id: args.member.id,
-    church_slug: args.churchSlug,
+    mosque_slug: args.mosqueSlug,
     donor_email: args.member.email,
     donor_name: args.member.full_name,
     next_year_label: args.nextYearLabel,
@@ -340,9 +340,9 @@ async function mintCardQrForAdvanceGiving(args: {
   };
 
   const initialMetadata: Record<string, unknown> = {
-    source: "churchpay_admin_take_payment_advance_giving",
-    church_slug: args.churchSlug,
-    church_id: args.churchId,
+    source: "mosquepay_admin_take_payment_advance_giving",
+    mosque_slug: args.mosqueSlug,
+    mosque_id: args.mosqueId,
     intent: "giving",
     giving_id: args.givingId,
     is_advance: true,
@@ -354,7 +354,7 @@ async function mintCardQrForAdvanceGiving(args: {
     .from("payment_attempts")
     .insert({
       payment_id: paymentId,
-      church_id: args.churchId,
+      mosque_id: args.mosqueId,
       member_id: null,
       amount: amountMinor,
       currency,
@@ -366,7 +366,7 @@ async function mintCardQrForAdvanceGiving(args: {
     });
   if (insertError) {
     console.error("advance giving qr mint: payment_attempts insert failed", {
-      church_id: args.churchId,
+      mosque_id: args.mosqueId,
       payment_id: paymentId,
       message: insertError.message,
       code: insertError.code,
@@ -398,7 +398,7 @@ async function mintCardQrForAdvanceGiving(args: {
           intent: "giving",
           source: "admin_take_payment_advance_giving",
           giving_id: args.givingId,
-          church_slug: args.churchSlug,
+          mosque_slug: args.mosqueSlug,
           next_year_label: args.nextYearLabel,
           is_advance: "true",
         },
@@ -463,14 +463,14 @@ async function mintCardQrForAdvanceGiving(args: {
 // ---------------------------------------------------------------------------
 
 async function recordCashForAdvanceGiving(args: {
-  churchId: string;
-  churchSlug: string;
+  mosqueId: string;
+  mosqueSlug: string;
   member: NonNullable<Awaited<ReturnType<typeof db.getMemberById>>>;
   resolved: Awaited<ReturnType<typeof resolveOrCreateAdvanceGiving>>;
   clientToken: string;
   note: string;
 }): Promise<NextResponse> {
-  const { churchId, churchSlug, member, resolved } = args;
+  const { mosqueId, mosqueSlug, member, resolved } = args;
   const supa = createServiceClient();
 
   const idempotencyKey = `advance_cash_${args.clientToken}`;
@@ -478,7 +478,7 @@ async function recordCashForAdvanceGiving(args: {
     .schema("mooov")
     .from("payment_attempts")
     .select("payment_id, amount, currency")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("idempotency_key", idempotencyKey)
     .maybeSingle<{
       payment_id: string;
@@ -499,7 +499,7 @@ async function recordCashForAdvanceGiving(args: {
   let createdByEmail: string | null = null;
   let createdByRole: string | null = null;
   try {
-    const admin = await getCurrentAdminContextAny(churchId);
+    const admin = await getCurrentAdminContextAny(mosqueId);
     createdByEmail = admin?.email ?? null;
     createdByRole = admin?.role ?? null;
   } catch (err) {
@@ -510,16 +510,16 @@ async function recordCashForAdvanceGiving(args: {
 
   const amountMinor = Math.round(resolved.charged_amount * 100);
   const currency = resolved.currency.toUpperCase();
-  const paymentId = `cash_advance_${churchId}_${Date.now().toString(36)}_${Math.random()
+  const paymentId = `cash_advance_${mosqueId}_${Date.now().toString(36)}_${Math.random()
     .toString(36)
     .slice(2, 10)}`;
   const description = `Advance giving — ${resolved.next_year_label}`;
   const capturedAt = new Date().toISOString();
 
   const metadata: Record<string, unknown> = {
-    source: "churchpay_admin_take_payment_advance_giving_cash",
-    church_slug: churchSlug,
-    church_id: churchId,
+    source: "mosquepay_admin_take_payment_advance_giving_cash",
+    mosque_slug: mosqueSlug,
+    mosque_id: mosqueId,
     intent: "giving",
     is_advance: true,
     next_year_label: resolved.next_year_label,
@@ -540,7 +540,7 @@ async function recordCashForAdvanceGiving(args: {
     .from("payment_attempts")
     .insert({
       payment_id: paymentId,
-      church_id: churchId,
+      mosque_id: mosqueId,
       member_id: null,
       amount: amountMinor,
       currency,
@@ -551,7 +551,7 @@ async function recordCashForAdvanceGiving(args: {
       metadata,
       guest_descriptor: {
         source: "admin_take_payment_advance_giving_cash",
-        church_slug: churchSlug,
+        mosque_slug: mosqueSlug,
         giving_id: resolved.member_giving_id,
         member_id: member.id,
         donor_email: member.email,
@@ -562,7 +562,7 @@ async function recordCashForAdvanceGiving(args: {
     });
   if (insertError) {
     console.error("advance giving cash: attempt insert failed", {
-      church_id: churchId,
+      mosque_id: mosqueId,
       message: insertError.message,
       code: insertError.code,
     });
@@ -572,14 +572,14 @@ async function recordCashForAdvanceGiving(args: {
     );
   }
 
-  // Project the public.payments row + Gift Aid donation if the church
+  // Project the public.payments row + Gift Aid donation if the mosque
   // has a charitable portion + active declaration.
   const giftAidRefused = member.gift_aid_consent_status === "declined";
   const declaration = giftAidRefused
     ? null
-    : await db.getActiveGiftAidDeclarationByEmail(churchId, member.email);
+    : await db.getActiveGiftAidDeclarationByEmail(mosqueId, member.email);
   const projection = await projectTakePaymentCaptured({
-    churchId,
+    mosqueId,
     mooovPaymentId: paymentId,
     amountMajor: resolved.charged_amount,
     currency,
@@ -600,7 +600,7 @@ async function recordCashForAdvanceGiving(args: {
   });
 
   // Flip the advance giving row to paid.
-  await db.updateMemberGivingStatus(resolved.member_giving_id, churchId, {
+  await db.updateMemberGivingStatus(resolved.member_giving_id, mosqueId, {
     status: "paid",
     payment_id: projection.paymentId,
     paid_at: capturedAt,

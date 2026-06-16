@@ -294,7 +294,7 @@ export default function MemberDashboardPage() {
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-dash-text">Make donation</p>
-            <p className="hidden text-xs text-dash-muted sm:block">Support the church</p>
+            <p className="hidden text-xs text-dash-muted sm:block">Support the mosque</p>
           </div>
           <ArrowRight className="hidden h-4 w-4 text-dash-faint transition-colors group-hover:text-pink-500 sm:block" />
         </Link>
@@ -417,7 +417,7 @@ export default function MemberDashboardPage() {
 
       {!loading && data?.notices.length ? (
         <div className="rounded-2xl border border-[hsl(var(--dash-ring)/0.25)] bg-[hsl(var(--dash-ring)/0.06)] px-6 py-5">
-          <h2 className="text-base font-semibold text-[hsl(var(--dash-ring-dark))]">Church Notices</h2>
+          <h2 className="text-base font-semibold text-[hsl(var(--dash-ring-dark))]">Mosque Notices</h2>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             {data.notices.map((notice) => (
               <div key={notice.id} className="rounded-xl bg-dash-surface/90 p-4 shadow-[var(--dash-shadow)]">

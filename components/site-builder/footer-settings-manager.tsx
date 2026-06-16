@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type {
-  ChurchSiteFooterLinkGroup,
-  ChurchSiteFooterSettings,
+  MosqueSiteFooterLinkGroup,
+  MosqueSiteFooterSettings,
 } from "@/lib/db/types";
+import { DEMO_MOSQUE_NAME } from "@/lib/demo-mosque";
 import { defaultFooterSettings } from "@/lib/site-section-style";
 import { cn } from "@/lib/utils";
 
@@ -30,7 +31,7 @@ const FOOTER_PRESETS = [
   {
     id: "full",
     name: "Full footer",
-    description: "Best for churches with joining, charity, events, and newcomer pages.",
+    description: "Best for mosques with joining, charity, events, and newcomer pages.",
     groups: [
       footerGroup("Explore", 1, [
         ["About", "/site/about"],
@@ -51,7 +52,7 @@ const FOOTER_PRESETS = [
     groups: [
       footerGroup("Get in touch", 1, [
         ["Contact", "/site/contact"],
-        ["Join the church", "/site/join"],
+        ["Join the mosque", "/site/join"],
         ["Visit a service", "/site/newcomers"],
       ]),
     ],
@@ -62,7 +63,7 @@ function footerGroup(
   title: string,
   order: number,
   links: Array<[label: string, href: string]>
-): ChurchSiteFooterLinkGroup {
+): MosqueSiteFooterLinkGroup {
   return {
     id: crypto.randomUUID(),
     title,
@@ -77,7 +78,7 @@ function footerGroup(
   };
 }
 
-function cloneFooterGroups(groups: readonly ChurchSiteFooterLinkGroup[]) {
+function cloneFooterGroups(groups: readonly MosqueSiteFooterLinkGroup[]) {
   return groups.map((group, groupIndex) => ({
     ...group,
     id: crypto.randomUUID(),
@@ -102,17 +103,17 @@ function initialsFromName(name: string) {
 
 function FooterPreview({
   settings,
-  churchName,
-  churchNumber,
+  mosqueName,
+  mosqueNumber,
   city,
   tagline,
   supportEmail,
   supportPhone,
   logoUrl,
 }: {
-  settings: ChurchSiteFooterSettings;
-  churchName: string;
-  churchNumber?: string | null;
+  settings: MosqueSiteFooterSettings;
+  mosqueName: string;
+  mosqueNumber?: string | null;
   city?: string | null;
   tagline?: string | null;
   supportEmail?: string | null;
@@ -133,7 +134,7 @@ function FooterPreview({
   const footerTagline =
     settings.tagline ??
     tagline ??
-    "A church website with services, charity, membership enquiries, and contact details.";
+    "A mosque website with services, charity, membership enquiries, and contact details.";
 
   return (
     <div className="rounded-3xl border border-slate-800 bg-slate-950 p-4 text-white shadow-dash">
@@ -160,25 +161,25 @@ function FooterPreview({
                   {logoUrl ? (
                     <Image
                       src={logoUrl}
-                      alt={`${churchName} logo`}
+                      alt={`${mosqueName} logo`}
                       width={44}
                       height={44}
                       unoptimized
                       className="h-full w-full bg-white object-contain p-1"
                     />
                   ) : (
-                    initialsFromName(churchName)
+                    initialsFromName(mosqueName)
                   )}
                 </div>
               ) : null}
-              {(settings.show_church_name || settings.show_church_number) ? (
+              {(settings.show_mosque_name || settings.show_mosque_number) ? (
                 <div>
-                  {settings.show_church_name ? (
-                    <p className="text-base font-semibold tracking-tight">{churchName}</p>
+                  {settings.show_mosque_name ? (
+                    <p className="text-base font-semibold tracking-tight">{mosqueName}</p>
                   ) : null}
-                  {settings.show_church_number ? (
+                  {settings.show_mosque_number ? (
                     <p className="text-sm text-slate-400">
-                      {[churchNumber ? `No. ${churchNumber}` : null, city].filter(Boolean).join(" / ")}
+                      {[mosqueNumber ? `No. ${mosqueNumber}` : null, city].filter(Boolean).join(" / ")}
                     </p>
                   ) : null}
                 </div>
@@ -221,15 +222,15 @@ function FooterPreview({
         </div>
         <div className="mt-8 border-t border-white/10 pt-6 text-xs text-slate-500">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <span>(c) {new Date().getFullYear()} {churchName}. All rights reserved.</span>
+            <span>(c) {new Date().getFullYear()} {mosqueName}. All rights reserved.</span>
             {settings.show_powered_by !== false ? (
               <a
-                href="https://churchpay.co.uk"
+                href="https://mosque-pay.com"
                 target="_blank"
                 rel="noreferrer"
                 className="transition-colors hover:text-slate-300"
               >
-                Powered by ChurchPay
+                Powered by MosquePay
               </a>
             ) : null}
           </div>
@@ -240,28 +241,28 @@ function FooterPreview({
 }
 
 export function FooterSettingsManager({
-  churchSlug,
+  mosqueSlug,
   initialSettings,
-  churchName,
-  churchNumber,
+  mosqueName,
+  mosqueNumber,
   city,
   tagline,
   supportEmail,
   supportPhone,
   logoUrl,
 }: {
-  churchSlug: string;
-  initialSettings?: ChurchSiteFooterSettings | null;
-  churchName?: string;
-  churchNumber?: string | null;
+  mosqueSlug: string;
+  initialSettings?: MosqueSiteFooterSettings | null;
+  mosqueName?: string;
+  mosqueNumber?: string | null;
   city?: string | null;
   tagline?: string | null;
   supportEmail?: string | null;
   supportPhone?: string | null;
   logoUrl?: string | null;
 }) {
-  const previewChurchName = churchName ?? "St Mary's Church";
-  const [settings, setSettings] = useState<ChurchSiteFooterSettings>(
+  const previewMosqueName = mosqueName ?? DEMO_MOSQUE_NAME;
+  const [settings, setSettings] = useState<MosqueSiteFooterSettings>(
     initialSettings ?? defaultFooterSettings()
   );
   const [saving, setSaving] = useState(false);
@@ -272,7 +273,7 @@ export function FooterSettingsManager({
     [settings.link_groups]
   );
 
-  function updateGroup(id: string, patch: Partial<ChurchSiteFooterLinkGroup>) {
+  function updateGroup(id: string, patch: Partial<MosqueSiteFooterLinkGroup>) {
     setSettings((current) => ({
       ...current,
       link_groups: current.link_groups.map((group) =>
@@ -339,7 +340,7 @@ export function FooterSettingsManager({
   function updateLink(
     groupId: string,
     linkId: string,
-    patch: Partial<ChurchSiteFooterLinkGroup["links"][number]>
+    patch: Partial<MosqueSiteFooterLinkGroup["links"][number]>
   ) {
     setSettings((current) => ({
       ...current,
@@ -376,7 +377,7 @@ export function FooterSettingsManager({
     setSaving(true);
     setMessage(null);
     try {
-      const response = await fetch(`/api/churches/${churchSlug}/site`, {
+      const response = await fetch(`/api/mosques/${mosqueSlug}/site`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ footer_settings: settings }),
@@ -412,10 +413,10 @@ export function FooterSettingsManager({
           <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
             {[
               ["show_logo", "Show logo"],
-              ["show_church_name", "Show church name"],
-              ["show_church_number", "Show church number"],
+              ["show_mosque_name", "Show mosque name"],
+              ["show_mosque_number", "Show mosque number"],
               ["show_contact_details", "Show contact details"],
-              ["show_powered_by", "Show \"Powered by ChurchPay\""],
+              ["show_powered_by", "Show \"Powered by MosquePay\""],
             ].map(([key, label]) => (
               <label
                 key={key}
@@ -423,7 +424,7 @@ export function FooterSettingsManager({
               >
                 <input
                   type="checkbox"
-                  checked={Boolean(settings[key as keyof ChurchSiteFooterSettings])}
+                  checked={Boolean(settings[key as keyof MosqueSiteFooterSettings])}
                   onChange={(event) =>
                     setSettings((current) => ({
                       ...current,
@@ -474,7 +475,7 @@ export function FooterSettingsManager({
                     tagline: event.target.value || null,
                   }))
                 }
-                placeholder="A short sentence about the church."
+                placeholder="A short sentence about the mosque."
                 rows={3}
               />
             </div>
@@ -618,8 +619,8 @@ export function FooterSettingsManager({
         </div>
         <FooterPreview
           settings={settings}
-          churchName={previewChurchName}
-          churchNumber={churchNumber}
+          mosqueName={previewMosqueName}
+          mosqueNumber={mosqueNumber}
           city={city}
           tagline={tagline}
           supportEmail={supportEmail}

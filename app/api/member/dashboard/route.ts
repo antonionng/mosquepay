@@ -27,7 +27,7 @@ export async function GET() {
 
     const member =
       (await db.getMemberByAuthUserId(user.id)) ??
-      (await db.getMemberByEmailAcrossChurches(memberEmail));
+      (await db.getMemberByEmailAcrossMosques(memberEmail));
 
     if (!member) {
       return NextResponse.json({
@@ -35,7 +35,7 @@ export async function GET() {
           full_name: user.user_metadata?.full_name ?? null,
           email: user.email,
         },
-        churchSlug: null,
+        mosqueSlug: null,
         upcomingEvents: 0,
         outstandingGiving: 0,
         recentPaymentsTotal: 0,
@@ -51,15 +51,15 @@ export async function GET() {
       });
     }
 
-    // Look up the church slug so the client can build cross-tenant URLs
-    // (e.g. /donate?church=<slug>) that work whether the member is on the
-    // church subdomain or the bare host. Tolerate a lookup failure --
+    // Look up the mosque slug so the client can build cross-tenant URLs
+    // (e.g. /donate?mosque=<slug>) that work whether the member is on the
+    // mosque subdomain or the bare host. Tolerate a lookup failure --
     // the dashboard doesn't depend on this and the donate page will fall
     // back to host/cookie resolution.
-    let churchSlug: string | null = null;
+    let mosqueSlug: string | null = null;
     try {
-      const church = await db.getChurchById(member.church_id);
-      churchSlug = church?.slug ?? null;
+      const mosque = await db.getMosqueById(member.mosque_id);
+      mosqueSlug = mosque?.slug ?? null;
     } catch {
       // non-fatal
     }
@@ -68,26 +68,26 @@ export async function GET() {
     // before we read. Cheap and best-effort: if the sweep fails, the
     // dashboard still renders correctly because the read-side filters
     // also exclude pending rows from the "active subscription" card.
-    await sweepAbandonedPendingSchedules(member.church_id).catch(() => 0);
+    await sweepAbandonedPendingSchedules(member.mosque_id).catch(() => 0);
 
-    const [upcomingEventRows, allEvents, payments, donations, givingRecords, churchGiving, rsvps, noticeLinks, activeGiftAidDeclaration, currentChurchYear, allChurchYears, givingSchedules] = await Promise.all([
-      db.getEvents(member.church_id, { published: true, upcoming: true }),
-      db.getEvents(member.church_id, { published: true }),
-      db.getPaymentsByEmail(member.email, member.church_id),
-      db.getDonationsByEmail(member.email, member.church_id),
-      db.getMemberGiving(member.church_id, { memberEmail: member.email }),
-      db.getChurchGiving(member.church_id),
-      db.getRsvpsByEmail(member.email, member.church_id),
-      db.getNoticeAccessLinksByEmail(member.email, member.church_id),
+    const [upcomingEventRows, allEvents, payments, donations, givingRecords, mosqueGiving, rsvps, noticeLinks, activeGiftAidDeclaration, currentMosqueYear, allMosqueYears, givingSchedules] = await Promise.all([
+      db.getEvents(member.mosque_id, { published: true, upcoming: true }),
+      db.getEvents(member.mosque_id, { published: true }),
+      db.getPaymentsByEmail(member.email, member.mosque_id),
+      db.getDonationsByEmail(member.email, member.mosque_id),
+      db.getMemberGiving(member.mosque_id, { memberEmail: member.email }),
+      db.getMosqueGiving(member.mosque_id),
+      db.getRsvpsByEmail(member.email, member.mosque_id),
+      db.getNoticeAccessLinksByEmail(member.email, member.mosque_id),
       db
-        .getActiveGiftAidDeclarationByMember(member.church_id, {
+        .getActiveGiftAidDeclarationByMember(member.mosque_id, {
           id: member.id,
           email: member.email,
         })
         .catch(() => null),
-      db.getCurrentChurchYear(member.church_id).catch(() => null),
-      db.listChurchGivingYears(member.church_id).catch(() => []),
-      db.getGivingSchedulesForMember(member.church_id, member.email).catch(() => []),
+      db.getCurrentMosqueYear(member.mosque_id).catch(() => null),
+      db.listMosqueGivingYears(member.mosque_id).catch(() => []),
+      db.getGivingSchedulesForMember(member.mosque_id, member.email).catch(() => []),
     ]);
     const giftAidDeclarationId = activeGiftAidDeclaration?.id ?? null;
 
@@ -128,16 +128,16 @@ export async function GET() {
     const advanceGiving = givingRecords.filter((d) => d.is_advance);
     const outstandingGiving = unpaidGiving.reduce((sum, d) => sum + (d.amount ?? 0), 0);
     const currentGiving = unpaidGiving[0] ?? givingRecords.find((d) => !d.is_advance) ?? null;
-    const givingConfig = churchGiving[0] ?? null;
+    const givingConfig = mosqueGiving[0] ?? null;
     const paidAmount = paidGiving.reduce((sum, d) => sum + (d.amount ?? 0), 0);
 
     // Resolve year position for the giving UX router on the member portal.
-    // Defaults are safe for churches that haven't configured a giving year:
+    // Defaults are safe for mosques that haven't configured a giving year:
     // we omit `yearPosition` and the portal falls back to the legacy view.
-    const yearPosition = currentChurchYear
+    const yearPosition = currentMosqueYear
       ? computeYearPosition({
-          yearStartDate: currentChurchYear.start_date,
-          yearEndDate: currentChurchYear.end_date,
+          yearStartDate: currentMosqueYear.start_date,
+          yearEndDate: currentMosqueYear.end_date,
           dateOfInitiation: member.date_of_membership ?? null,
           hasPaidCurrentYear:
             !!currentGiving && currentGiving.status === "paid",
@@ -149,18 +149,18 @@ export async function GET() {
       : null;
 
     // Resolve next giving year for the pay-in-advance card. Only surfaced
-    // when (a) the church has more than one giving year row configured or
+    // when (a) the mosque has more than one giving year row configured or
     // we can synthesise next year's bounds from the current one, AND (b)
     // the member is paid up for current year.
-    const nextChurchYear = currentChurchYear
-      ? allChurchYears.find(
+    const nextMosqueYear = currentMosqueYear
+      ? allMosqueYears.find(
           (y) =>
             y.start_date.slice(0, 10) >
-            currentChurchYear.end_date.slice(0, 10)
+            currentMosqueYear.end_date.slice(0, 10)
         ) ?? null
       : null;
-    const advanceForNextYear = nextChurchYear
-      ? advanceGiving.find((d) => d.advance_for_year_id === nextChurchYear.id) ??
+    const advanceForNextYear = nextMosqueYear
+      ? advanceGiving.find((d) => d.advance_for_year_id === nextMosqueYear.id) ??
         null
       : null;
     const advanceCardEligible =
@@ -169,9 +169,9 @@ export async function GET() {
       !!givingConfig &&
       givingConfig.active === true;
     const advanceBaseAmount =
-      nextChurchYear?.annual_giving_amount ??
+      nextMosqueYear?.annual_giving_amount ??
       givingConfig?.amount ??
-      currentChurchYear?.annual_giving_amount ??
+      currentMosqueYear?.annual_giving_amount ??
       null;
     const advanceDiscountPct = givingConfig?.advance_discount_percent ?? 0;
     const advanceDiscountedAmount =
@@ -225,7 +225,7 @@ export async function GET() {
     } | null = null;
     if (activeSchedule && currentGiving) {
       const instalments = await db
-        .getInstalmentsForGiving(currentGiving.id, member.church_id)
+        .getInstalmentsForGiving(currentGiving.id, member.mosque_id)
         .catch(() => []);
       const scoped = instalments.filter(
         (i) => i.schedule_id === activeSchedule.id
@@ -325,7 +325,7 @@ export async function GET() {
         membership_status: member.membership_status,
         portal_token: member.portal_token,
       },
-      churchSlug,
+      mosqueSlug,
       nextEvent: nextEvent
         ? {
             id: nextEvent.id,
@@ -390,7 +390,7 @@ export async function GET() {
         id: event.id,
         title: event.title,
         date: event.event_date,
-        text: event.description ?? "Upcoming church service.",
+        text: event.description ?? "Upcoming mosque service.",
       })),
       giving: currentGiving
         ? {
@@ -401,7 +401,7 @@ export async function GET() {
             givingId: currentGiving.id,
             memberEmail: currentGiving.member_email,
             memberName: currentGiving.member_name ?? member.full_name,
-            // allowInstalments is the AND of (church configured them) AND
+            // allowInstalments is the AND of (mosque configured them) AND
             // (the platform-level subscription path is enabled). Hides
             // the "Set up instalments" CTA in the portal until Mooov has
             // shipped the saved-charge subscription contract to prod.
@@ -411,9 +411,9 @@ export async function GET() {
             instalmentCount: givingConfig?.instalment_count ?? 12,
             instalmentFrequency: givingConfig?.instalment_frequency ?? "monthly",
             yearPosition,
-            yearLabel: currentChurchYear?.label ?? null,
-            yearStart: currentChurchYear?.start_date ?? null,
-            yearEnd: currentChurchYear?.end_date ?? null,
+            yearLabel: currentMosqueYear?.label ?? null,
+            yearStart: currentMosqueYear?.start_date ?? null,
+            yearEnd: currentMosqueYear?.end_date ?? null,
             strategies: givingConfig
               ? {
                   catch_up_lump_then_monthly:
@@ -428,7 +428,7 @@ export async function GET() {
               ? {
                   alreadyPaid: !!advanceForNextYear,
                   memberGivingId: advanceForNextYear?.id ?? null,
-                  nextYearLabel: nextChurchYear?.label ?? null,
+                  nextYearLabel: nextMosqueYear?.label ?? null,
                   baseAmount: advanceBaseAmount,
                   discountPercent: advanceDiscountPct,
                   amount: advanceDiscountedAmount,

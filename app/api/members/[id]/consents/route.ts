@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -16,15 +16,15 @@ export async function GET(
   if (unauthorized) return unauthorized;
   if (!isSupabaseConfigured()) return NextResponse.json({ consents: [] });
   const { id: memberId } = await params;
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("members:read", churchId);
+  const forbidden = await requireAdminApiPermission("members:read", mosqueId);
   if (forbidden) return forbidden;
   return NextResponse.json({
-    consents: await db.listMemberConsents(churchId, memberId),
+    consents: await db.listMemberConsents(mosqueId, memberId),
   });
 }
 
@@ -41,17 +41,17 @@ export async function POST(
     );
   }
   const { id: memberId } = await params;
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("members:write", churchId);
+  const forbidden = await requireAdminApiPermission("members:write", mosqueId);
   if (forbidden) return forbidden;
   const body = await request.json();
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
-  const consent = await db.recordMemberConsent(churchId, {
+  const consent = await db.recordMemberConsent(mosqueId, {
     member_id: memberId,
     consent_key: body.consent_key,
     granted: body.granted ?? true,
@@ -63,7 +63,7 @@ export async function POST(
     notes: body.notes ?? null,
   });
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "consent_recorded",
     entityType: "member_consent",
     entityId: consent.id,

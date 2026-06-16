@@ -3,7 +3,7 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
 import { isRank, RANK_CODES } from "@/lib/members/rank";
@@ -16,22 +16,22 @@ export async function GET(request: NextRequest) {
     const unauthorized = await requireAdminApiAuth();
     if (unauthorized) return unauthorized;
 
-    const churchSlug = getChurchSlugFromRequest(request);
+    const mosqueSlug = getMosqueSlugFromRequest(request);
     const search = request.nextUrl.searchParams.get("search") ?? undefined;
     const status = request.nextUrl.searchParams.get("status") ?? undefined;
 
     if (isSupabaseConfigured()) {
-      const churchId = await db.resolveChurchId(churchSlug);
-      if (!churchId) {
-        return NextResponse.json({ error: "Church not found." }, { status: 404 });
+      const mosqueId = await db.resolveMosqueId(mosqueSlug);
+      if (!mosqueId) {
+        return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
       }
-      const forbidden = await requireAdminApiPermission("members:read", churchId);
+      const forbidden = await requireAdminApiPermission("members:read", mosqueId);
       if (forbidden) return forbidden;
-      const members = await db.getMembers(churchId, { search, status });
+      const members = await db.getMembers(mosqueId, { search, status });
       return NextResponse.json({ members });
     }
 
-    const members = mockDb.getMembers({ church_slug: churchSlug, search, status });
+    const members = mockDb.getMembers({ mosque_slug: mosqueSlug, search, status });
     return NextResponse.json({ members });
   } catch (e) {
     console.error("Members GET error:", e);
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     const unauthorized = await requireAdminApiAuth();
     if (unauthorized) return unauthorized;
 
-    const churchSlug = getChurchSlugFromRequest(request);
+    const mosqueSlug = getMosqueSlugFromRequest(request);
     const body = await request.json();
     const {
       email,
@@ -88,19 +88,19 @@ export async function POST(request: NextRequest) {
     }
 
     if (isSupabaseConfigured()) {
-      const churchId = await db.resolveChurchId(churchSlug);
-      if (!churchId) {
-        return NextResponse.json({ error: "Church not found." }, { status: 404 });
+      const mosqueId = await db.resolveMosqueId(mosqueSlug);
+      if (!mosqueId) {
+        return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
       }
-      const forbidden = await requireAdminApiPermission("members:write", churchId);
+      const forbidden = await requireAdminApiPermission("members:write", mosqueId);
       if (forbidden) return forbidden;
 
-      const existing = await db.getMemberByEmail(email, churchId);
+      const existing = await db.getMemberByEmail(email, mosqueId);
       if (existing) {
         return NextResponse.json({ error: "A member with this email already exists." }, { status: 409 });
       }
 
-      const member = await db.createMember(churchId, {
+      const member = await db.createMember(mosqueId, {
         auth_user_id: null,
         email: email.trim().toLowerCase(),
         full_name,
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
         stripe_customer_id: null,
       });
 
-      const activeGiving = await db.getChurchGiving(churchId);
+      const activeGiving = await db.getMosqueGiving(mosqueId);
       if (activeGiving.length > 0) {
         const giving = activeGiving[0];
         const now = new Date();
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
           .toISOString()
           .split("T")[0];
 
-        await db.createMemberGiving(churchId, {
+        await db.createMemberGiving(mosqueId, {
           member_email: member.email,
           member_name: member.full_name,
           member_id: member.id,
@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
       }
 
       await writeAuditLog({
-        churchId,
+        mosqueId,
         action: "created",
         entityType: "member",
         entityId: member.id,
@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ member }, { status: 201 });
     }
 
-    const existing = mockDb.getMemberByEmail(email, { church_slug: churchSlug });
+    const existing = mockDb.getMemberByEmail(email, { mosque_slug: mosqueSlug });
     if (existing) {
       return NextResponse.json({ error: "A member with this email already exists." }, { status: 409 });
     }
@@ -189,7 +189,7 @@ export async function POST(request: NextRequest) {
       membership_email_sent: false,
       membership_status: membership_status ?? "active",
       stripe_customer_id: null,
-      church_slug: churchSlug,
+      mosque_slug: mosqueSlug,
     });
 
     return NextResponse.json({ member }, { status: 201 });

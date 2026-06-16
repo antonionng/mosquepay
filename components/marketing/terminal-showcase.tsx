@@ -11,6 +11,7 @@
 // All motion respects prefers-reduced-motion: the loop still advances, but
 // screens cross-fade without movement and the floating chips hold still.
 
+import { DEMO_MOSQUE_NAME } from "@/lib/demo-mosque";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
@@ -105,7 +106,7 @@ export function TerminalShowcase() {
               href="/book-demo"
               className="inline-flex items-center gap-2 rounded-xl bg-brand px-7 py-3.5 text-sm font-semibold text-white shadow-[0_12px_28px_-8px_rgba(11,67,184,0.5)] transition-colors hover:bg-brand-dark"
             >
-              Book a church demo
+              Book a mosque demo
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
@@ -200,7 +201,7 @@ function TabletDemo() {
             </span>
             <div>
               <p className="text-xs font-semibold leading-tight text-slate-900">
-                St Mary&apos;s Church
+                {DEMO_MOSQUE_NAME}
               </p>
               <p className="text-[10px] text-slate-500">Giving kiosk</p>
             </div>
@@ -305,14 +306,14 @@ function AmountScreen({ reducedMotion }: { reducedMotion: boolean }) {
         <span className="ml-2 text-base">Other amount</span>
       </motion.div>
       <div className="mt-4 grid grid-cols-2 gap-2.5">
-        {["Tithe", "Offering"].map((label, index) => (
+        {["Zakat", "Offering"].map((label, index) => (
           <motion.div
             key={label}
             initial={reducedMotion ? false : { opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.55 + index * 0.1, duration: 0.3 }}
             className={`rounded-2xl border px-4 py-3 text-sm font-semibold ${
-              label === "Tithe"
+              label === "Zakat"
                 ? "border-brand bg-brand/5 text-slate-900 ring-1 ring-brand"
                 : "border-[#e9e2d4] bg-white text-slate-600"
             }`}
@@ -359,7 +360,7 @@ function GiftAidScreen({ reducedMotion }: { reducedMotion: boolean }) {
         Boost your gift by 25% with Gift Aid
       </p>
       <p className="mt-1.5 text-xs leading-5 text-slate-500">
-        UK taxpayer? The church reclaims 25p for every £1, at no cost to you.
+        UK taxpayer? The mosque reclaims 25p for every £1, at no cost to you.
       </p>
 
       {/* The headline number ticking from £20 to £25 */}
@@ -469,7 +470,7 @@ function QrScreen({ reducedMotion }: { reducedMotion: boolean }) {
       <div className="mt-4 flex items-center gap-2 text-slate-700">
         <Banknote className="h-4 w-4 text-brand" />
         <span className="text-base font-semibold">£20.00</span>
-        <span className="text-xs text-slate-500">· Tithe · Gift Aid added</span>
+        <span className="text-xs text-slate-500">· Zakat · Gift Aid added</span>
       </div>
       <div className="mt-3 flex gap-2">
         {["Apple Pay", "Google Pay", "Card"].map((label, index) => (

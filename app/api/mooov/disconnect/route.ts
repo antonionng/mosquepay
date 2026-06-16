@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { createServiceClient } from "@/lib/supabase/server";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -14,7 +14,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // POST /api/mooov/disconnect
-// Revoke this church's Mooov grant. Per Mooov Connect contract
+// Revoke this mosque's Mooov grant. Per Mooov Connect contract
 // (gateway-prod-00028-c4l, 2026-05-22):
 //   POST https://api.mooov.money/v1/grants/{grant_id}/revoke
 // HMAC-signed with the platform key. 204 = revoked, 404 = grant not
@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
 //
 // We do NOT receive a grant.revoked webhook back from Mooov when we
 // welcomed the revoke ourselves (ant confirmed) -- so this handler is
-// the only place that writes status='revoked' on the church row for the
+// the only place that writes status='revoked' on the mosque row for the
 // admin-welcomed disconnect path.
 //
 // Underlying Stripe Connect account on Mooov's side is preserved across
@@ -35,25 +35,25 @@ export async function POST(request: NextRequest) {
   const unauthorized = await requireAdminApiAuth();
   if (unauthorized) return unauthorized;
 
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
   // Mooov disconnect is a payment-ops action: the treasurer is the natural
   // owner of the payments rail and is the one who'd flip Mooov off if it
   // misbehaves. Match the sidebar visibility gate
   // (components/layout/admin-sidebar.tsx) and the integration credentials
   // API so treasurer can actually use the Disconnect button shown to them.
-  const forbidden = await requireAdminApiPermission("payments:write", churchId);
+  const forbidden = await requireAdminApiPermission("payments:write", mosqueId);
   if (forbidden) return forbidden;
 
   const supa = createServiceClient();
   const { data: row, error: readErr } = await supa
     .schema("mooov")
-    .from("churches")
+    .from("mosques")
     .select("merchant_id, status, metadata")
-    .eq("id", churchId)
+    .eq("id", mosqueId)
     .maybeSingle<{
       merchant_id: string;
       status: string;
@@ -61,8 +61,8 @@ export async function POST(request: NextRequest) {
     }>();
 
   if (readErr) {
-    console.error("mooov/disconnect: church read failed", {
-      church_id: churchId,
+    console.error("mooov/disconnect: mosque read failed", {
+      mosque_id: mosqueId,
       message: readErr.message,
     });
     return NextResponse.json(
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
   }
   if (!row) {
     return NextResponse.json(
-      { error: "Mooov is not connected for this church." },
+      { error: "Mooov is not connected for this mosque." },
       { status: 400 }
     );
   }
@@ -84,11 +84,11 @@ export async function POST(request: NextRequest) {
   if (typeof grantId !== "string" || !grantId) {
     // No grant_id persisted: nothing to revoke server-side, but still
     // clean up our local row so the UI flips to disconnected.
-    await applyLocalRevoke(supa, churchId, row.metadata, {
+    await applyLocalRevoke(supa, mosqueId, row.metadata, {
       reason: "no_grant_id_persisted",
     });
     await writeAuditLog({
-      churchId,
+      mosqueId,
       action: "mooov_disconnected",
       entityType: "mooov_grant",
       entityId: row.merchant_id,
@@ -116,12 +116,12 @@ export async function POST(request: NextRequest) {
       // 404 = grant unknown to Mooov (already revoked, or never existed
       // on their side). Treated as success per the idempotent contract.
       if (err.status === 404) {
-        await applyLocalRevoke(supa, churchId, row.metadata, {
+        await applyLocalRevoke(supa, mosqueId, row.metadata, {
           reason: "grant_already_revoked_remotely",
           remote_status: 404,
         });
         await writeAuditLog({
-          churchId,
+          mosqueId,
           action: "mooov_disconnected",
           entityType: "mooov_grant",
           entityId: grantId,
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
         });
       }
       console.error("mooov/disconnect: revoke API failed", {
-        church_id: churchId,
+        mosque_id: mosqueId,
         grant_id: grantId,
         status: err.status,
         category: err.category,
@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
       );
     }
     console.error("mooov/disconnect: revoke unexpected error", {
-      church_id: churchId,
+      mosque_id: mosqueId,
       grant_id: grantId,
       message: err instanceof Error ? err.message : String(err),
     });
@@ -162,15 +162,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  await applyLocalRevoke(supa, churchId, row.metadata, {
+  await applyLocalRevoke(supa, mosqueId, row.metadata, {
     reason: "admin_clicked_disconnect",
   });
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "mooov_disconnected",
     entityType: "mooov_grant",
     entityId: grantId,
-    summary: `Mooov grant ${grantId} revoked by church admin.`,
+    summary: `Mooov grant ${grantId} revoked by mosque admin.`,
   });
 
   return NextResponse.json({ ok: true, revoked_remotely: true });
@@ -180,24 +180,24 @@ export async function POST(request: NextRequest) {
 // Reconnect via /api/mooov/connect/start later will upsert back to active.
 async function applyLocalRevoke(
   supa: ReturnType<typeof createServiceClient>,
-  churchId: string,
+  mosqueId: string,
   existingMetadata: Record<string, unknown> | null,
   extra: Record<string, unknown>
 ): Promise<void> {
   const merged: Record<string, unknown> = {
     ...(existingMetadata ?? {}),
     revoked_at: new Date().toISOString(),
-    revoked_via: "churchpay_admin_disconnect",
+    revoked_via: "mosquepay_admin_disconnect",
     ...extra,
   };
   const { error } = await supa
     .schema("mooov")
-    .from("churches")
+    .from("mosques")
     .update({ status: "revoked", metadata: merged })
-    .eq("id", churchId);
+    .eq("id", mosqueId);
   if (error) {
     console.error("mooov/disconnect: local state update failed", {
-      church_id: churchId,
+      mosque_id: mosqueId,
       message: error.message,
     });
     // Don't throw -- the remote revoke already succeeded; the local row

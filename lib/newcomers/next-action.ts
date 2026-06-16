@@ -32,7 +32,7 @@ const STAGE_NEXT_HINT: Record<string, string> = {
   service_2: "Begin proposal preparation",
   preflight_service: "Begin proposal preparation",
   application_completion: "Submit completed application",
-  proposal_church: "Schedule membership decision",
+  proposal_mosque: "Schedule membership decision",
   approved: "Schedule membership welcome",
   membership_class: "Schedule membership welcome",
   membership: "Convert to member",

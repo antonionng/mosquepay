@@ -1,4 +1,4 @@
-// Surfaces Mooov's typed `merchant_not_charge_capable` 422 to the church admin:
+// Surfaces Mooov's typed `merchant_not_charge_capable` 422 to the mosque admin:
 // a single-use, ~1h-TTL setup link that drops the admin onto step 2 of Mooov's
 // PSP-connect wizard without a Mooov login. Persisted into
 // payment_attempts.metadata.merchant_setup by app/api/giving/start; the latest
@@ -50,7 +50,7 @@ export function MooovSetupRequiredBanner({ hint }: { hint: MooovSetupHint }) {
   const expiryLabel = formatExpiry(hint.setup_url_expires_at);
   const bodyMessage =
     hint.message ??
-    "We tried to charge through this church's Mooov merchant, but the merchant has not finished connecting a payment provider yet.";
+    "We tried to charge through this mosque's Mooov merchant, but the merchant has not finished connecting a payment provider yet.";
 
   return (
     <Card className="border-amber-300 bg-amber-50 shadow-none">

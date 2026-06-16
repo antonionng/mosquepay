@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -20,12 +20,12 @@ export async function PATCH(
     );
   }
   const { id } = await params;
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("pastoral:write", churchId);
+  const forbidden = await requireAdminApiPermission("pastoral:write", mosqueId);
   if (forbidden) return forbidden;
 
   const body = await request.json();
@@ -39,7 +39,7 @@ export async function PATCH(
   if (body.case_id !== undefined) updates.case_id = body.case_id;
   if (body.severity) updates.severity = body.severity;
 
-  const updated = await db.updatePastoralCareAlert(id, churchId, updates);
+  const updated = await db.updatePastoralCareAlert(id, mosqueId, updates);
   if (!updated) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }

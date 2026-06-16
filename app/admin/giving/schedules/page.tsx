@@ -9,14 +9,14 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminGivingSchedulesPage() {
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
     return (
       <div className="space-y-4 sm:space-y-6">
         <div className="admin-page-head">
           <div>
             <h1 className="admin-page-title">Monthly subscriptions</h1>
             <p className="admin-page-copy">
-              All saved-charge giving schedules for this church. Health, progress,
+              All saved-charge giving schedules for this mosque. Health, progress,
               and per-member actions.
             </p>
           </div>
@@ -24,17 +24,17 @@ export default async function AdminGivingSchedulesPage() {
         <EmptyState
           icon={Repeat}
           title="Subscriptions need a database"
-          description="Connect Supabase and choose a church to see the giving schedules list."
+          description="Connect Supabase and choose a mosque to see the giving schedules list."
         />
       </div>
     );
   }
-  const churchId = ctx.churchId;
+  const mosqueId = ctx.mosqueId;
 
   const [schedules, counts, members] = await Promise.all([
-    db.listGivingSchedules(churchId, { limit: 500 }),
-    db.countGivingSchedulesByStatus(churchId),
-    db.getMembers(churchId),
+    db.listGivingSchedules(mosqueId, { limit: 500 }),
+    db.countGivingSchedulesByStatus(mosqueId),
+    db.getMembers(mosqueId),
   ]);
 
   // Build an email -> { id, full_name } map so we can deep-link to
@@ -55,7 +55,7 @@ export default async function AdminGivingSchedulesPage() {
         <div>
           <h1 className="admin-page-title">Monthly subscriptions</h1>
           <p className="admin-page-copy">
-            Saved-charge giving schedules for this church. Click a row for the
+            Saved-charge giving schedules for this mosque. Click a row for the
             full member view.
           </p>
         </div>

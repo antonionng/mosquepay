@@ -9,22 +9,22 @@ export default async function PublicGivingPayPage({
   searchParams,
 }: {
   params: Promise<{ givingId: string }>;
-  searchParams: Promise<{ email?: string; church?: string }>;
+  searchParams: Promise<{ email?: string; mosque?: string }>;
 }) {
   if (!isSupabaseConfigured()) notFound();
 
   const { givingId } = await params;
-  const { email, church } = await searchParams;
+  const { email, mosque } = await searchParams;
   if (!email) notFound();
 
-  const churchSlug = church ?? "st-marys-demo";
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) notFound();
+  const mosqueSlug = mosque ?? "central-jamia-demo";
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) notFound();
 
-  const [churchProfile, givingRecords, churchGiving] = await Promise.all([
-    db.getChurchById(churchId),
-    db.getMemberGiving(churchId, { memberEmail: email }),
-    db.getChurchGiving(churchId),
+  const [mosqueProfile, givingRecords, mosqueGiving] = await Promise.all([
+    db.getMosqueById(mosqueId),
+    db.getMemberGiving(mosqueId, { memberEmail: email }),
+    db.getMosqueGiving(mosqueId),
   ]);
   const giving = givingRecords.find((record) => record.id === givingId);
   if (!giving) notFound();
@@ -33,10 +33,10 @@ export default async function PublicGivingPayPage({
     <main className="min-h-screen bg-slate-100 px-4 py-10">
       <div className="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">
-          Church Giving
+          Mosque Giving
         </p>
         <h1 className="mt-3 text-2xl font-bold text-slate-950">
-          Pay {churchProfile?.name ?? "church"} giving
+          Pay {mosqueProfile?.name ?? "mosque"} giving
         </h1>
         <p className="mt-2 text-sm text-slate-600">
           This payment link is for {giving.member_name ?? email}. No portal account is required.
@@ -78,7 +78,7 @@ export default async function PublicGivingPayPage({
             givingId={giving.id}
             memberEmail={email}
             memberName={giving.member_name}
-            allowInstalments={churchGiving[0]?.allow_instalments === true}
+            allowInstalments={mosqueGiving[0]?.allow_instalments === true}
           />
         )}
       </div>

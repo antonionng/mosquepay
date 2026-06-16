@@ -34,16 +34,16 @@ export default async function IntegrationsPage({
 }) {
   const { mooov } = await searchParams;
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
     redirect("/admin");
   }
-  const [credentials, jobs, church, mooovConnection, mooovSetupHint] =
+  const [credentials, jobs, mosque, mooovConnection, mooovSetupHint] =
     await Promise.all([
-      db.listIntegrationCredentials(ctx.churchId),
-      db.listJobs({ churchId: ctx.churchId, limit: 25 }),
-      db.getChurchBySlug(ctx.churchSlug),
-      getMooovConnection(ctx.churchId),
-      getMooovPendingSetupHint(ctx.churchId),
+      db.listIntegrationCredentials(ctx.mosqueId),
+      db.listJobs({ mosqueId: ctx.mosqueId, limit: 25 }),
+      db.getMosqueBySlug(ctx.mosqueSlug),
+      getMooovConnection(ctx.mosqueId),
+      getMooovPendingSetupHint(ctx.mosqueId),
     ]);
   const repairHint = buildRepairHintFromConnection(mooovConnection);
   return (
@@ -51,8 +51,8 @@ export default async function IntegrationsPage({
       {repairHint ? <MooovRepairRequiredBanner hint={repairHint} /> : null}
       {mooovSetupHint ? <MooovSetupRequiredBanner hint={mooovSetupHint} /> : null}
       <IntegrationsClient
-        churchSlug={ctx.churchSlug}
-        churchName={church?.name ?? ""}
+        mosqueSlug={ctx.mosqueSlug}
+        mosqueName={mosque?.name ?? ""}
         credentials={JSON.parse(JSON.stringify(credentials))}
         jobs={JSON.parse(JSON.stringify(jobs))}
         mooovConnection={mooovConnection}
@@ -63,7 +63,7 @@ export default async function IntegrationsPage({
 }
 
 // Build the repair-required banner inputs from the latest
-// mooov.churches row. Returns null unless status='needs_repair' was set by
+// mooov.mosques row. Returns null unless status='needs_repair' was set by
 // the connect webhook in response to a payment.failed:account_invalid.
 function buildRepairHintFromConnection(
   conn: Awaited<ReturnType<typeof getMooovConnection>>
@@ -76,13 +76,13 @@ function buildRepairHintFromConnection(
     typeof meta.last_failure_reason === "string"
       ? meta.last_failure_reason
       : undefined;
-  // Mooov's allowlist today: churchpay.co.uk, www.churchpay.co.uk,
-  // *.vercel.app. Pin to www.churchpay.co.uk so the auto-bounce works
-  // for tenants on the church subdomain too (admin always lives on www).
+  // Mooov's allowlist today: mosque-pay.com, www.mosque-pay.com,
+  // *.vercel.app. Pin to www.mosque-pay.com so the auto-bounce works
+  // for tenants on the mosque subdomain too (admin always lives on www).
   const returnUrl =
     (process.env.MOOOV_REDIRECT_BASE_URL ??
       process.env.NEXT_PUBLIC_SITE_URL ??
-      "https://www.churchpay.co.uk").replace(/\/$/, "") +
+      "https://www.mosque-pay.com").replace(/\/$/, "") +
     "/admin/integrations";
   return {
     portalBaseUrl: process.env.MOOOV_PORTAL_BASE,
@@ -92,13 +92,13 @@ function buildRepairHintFromConnection(
   };
 }
 
-async function getMooovConnection(churchId: string) {
+async function getMooovConnection(mosqueId: string) {
   try {
     const { data } = await createServiceClient()
       .schema("mooov")
-      .from("churches")
+      .from("mosques")
       .select("merchant_id,status,metadata")
-      .eq("id", churchId)
+      .eq("id", mosqueId)
       .maybeSingle<{
         merchant_id: string;
         status: string;
@@ -123,10 +123,10 @@ async function getMooovConnection(churchId: string) {
 // ~1h TTL and a retry will mint a fresh one). Swallow errors here so a
 // transient DB blip never breaks the integrations page.
 async function getMooovPendingSetupHint(
-  churchId: string,
+  mosqueId: string,
 ): Promise<MooovSetupHint | null> {
   try {
-    // Read the LATEST attempt for this church unconditionally, then only
+    // Read the LATEST attempt for this mosque unconditionally, then only
     // surface the banner if THAT attempt is the merchant_setup_required
     // failure. Filtering by failure_reason in the query is wrong: after a
     // successful retry, the latest attempt has failure_reason=null but the
@@ -136,7 +136,7 @@ async function getMooovPendingSetupHint(
       .schema("mooov")
       .from("payment_attempts")
       .select("metadata,failure_reason")
-      .eq("church_id", churchId)
+      .eq("mosque_id", mosqueId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle<{

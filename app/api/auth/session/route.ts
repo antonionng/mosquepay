@@ -5,7 +5,7 @@ import {
   getCurrentAdminScope,
   getEffectivePermissions,
 } from "@/lib/auth/permissions";
-import { getAllFlagsForChurch, FEATURE_FLAGS } from "@/lib/feature-flags";
+import { getAllFlagsForMosque, FEATURE_FLAGS } from "@/lib/feature-flags";
 
 export async function GET() {
   const ok = await hasDummySession();
@@ -14,9 +14,9 @@ export async function GET() {
   let flags: Record<string, boolean> = Object.fromEntries(
     Object.entries(FEATURE_FLAGS).map(([key, meta]) => [key, meta.default])
   );
-  if (scope.kind === "church") {
+  if (scope.kind === "mosque") {
     try {
-      flags = await getAllFlagsForChurch(scope.churchId);
+      flags = await getAllFlagsForMosque(scope.mosqueId);
     } catch {
       // fall back to defaults
     }

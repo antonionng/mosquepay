@@ -73,7 +73,7 @@ type EventOption = { id: string; title: string; event_date: string };
 
 // How the money arrived, grouped for the treasurer's mental model:
 //   * cash  — physically handed over, counted into the tin.
-//   * card  — ChurchPay digital (QR / online card). null/legacy online rows
+//   * card  — MosquePay digital (QR / online card). null/legacy online rows
 //             fall here too since they were card payments before we tracked
 //             the method explicitly.
 //   * other — cheque / BACS / manual "other".
@@ -100,10 +100,10 @@ function methodMeta(pm: string | null | undefined): {
     case "other":
       return { label: "Other", icon: Coins, group: "other" };
     case "card_online":
-      return { label: "ChurchPay", icon: CreditCard, group: "card" };
+      return { label: "MosquePay", icon: CreditCard, group: "card" };
     case "card_qr":
     default:
-      return { label: "ChurchPay", icon: CreditCard, group: "card" };
+      return { label: "MosquePay", icon: CreditCard, group: "card" };
   }
 }
 
@@ -659,7 +659,7 @@ export function AdminPaymentsClient({
     },
   ];
 
-  // Cash vs ChurchPay (digital) split over completed income, for the
+  // Cash vs MosquePay (digital) split over completed income, for the
   // "How they paid" ratio panel. `other` (cheque/BACS) only shows if present.
   const methodTotals = succeeded.reduce(
     (acc, p) => {
@@ -693,7 +693,7 @@ export function AdminPaymentsClient({
   }> = [
     {
       key: "card",
-      label: "ChurchPay digital",
+      label: "MosquePay digital",
       amount: methodTotals.card.amount,
       count: methodTotals.card.count,
       pct: pctOf(methodTotals.card.amount),
@@ -981,10 +981,10 @@ export function AdminPaymentsClient({
       );
     }
     if (kind === "settlement") {
-      // ChurchPay (Mooov card) expected settlement, grouped by day. Net = gross
+      // MosquePay (Mooov card) expected settlement, grouped by day. Net = gross
       // collected minus refunds for card payments only. Reconcile each day's
       // net against the matching Mooov payout / bank credit. Cash and
-      // cheque/BACS are excluded (they don't settle via ChurchPay).
+      // cheque/BACS are excluded (they don't settle via MosquePay).
       const byDay = new Map<
         string,
         { gross: number; refund: number; count: number }
@@ -1010,7 +1010,7 @@ export function AdminPaymentsClient({
           (v.gross - v.refund).toFixed(2),
         ]);
       downloadCsv(
-        "churchpay-settlement.csv",
+        "mosquepay-settlement.csv",
         ["Date", "Card payments", "Gross", "Refunds", "Net expected to settle"],
         rows,
       );
@@ -1273,7 +1273,7 @@ export function AdminPaymentsClient({
         <div className="flex flex-col gap-1">
           <h2 className="text-base font-semibold text-dash-text">How they paid</h2>
           <p className="text-sm text-dash-muted">
-            Completed income split between ChurchPay digital and cash — counts and percentages for end-of-night reconciliation.
+            Completed income split between MosquePay digital and cash — counts and percentages for end-of-night reconciliation.
           </p>
         </div>
 
@@ -1398,7 +1398,7 @@ export function AdminPaymentsClient({
               ["charity", "Charity Totals"],
               ["refunds", "Refunds"],
               ["gift-aid", "Gift Aid"],
-              ["settlement", "ChurchPay Settlement"],
+              ["settlement", "MosquePay Settlement"],
               ["reconciliation", "Mooov Reconciliation"],
             ].map(([kind, label]) => (
               <Button
@@ -1477,7 +1477,7 @@ export function AdminPaymentsClient({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All methods</SelectItem>
-                  <SelectItem value="card">ChurchPay digital</SelectItem>
+                  <SelectItem value="card">MosquePay digital</SelectItem>
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="other">Cheque / BACS</SelectItem>
                 </SelectContent>

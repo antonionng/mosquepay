@@ -19,8 +19,8 @@ export type GuestFormValues = {
   full_name: string;
   email: string;
   phone: string;
-  mother_church_name: string;
-  mother_church_number: string;
+  mother_mosque_name: string;
+  mother_mosque_number: string;
   constitution: string;
   rank: string;
   dietary_requirements: string;
@@ -36,8 +36,8 @@ const EMPTY: GuestFormValues = {
   full_name: "",
   email: "",
   phone: "",
-  mother_church_name: "",
-  mother_church_number: "",
+  mother_mosque_name: "",
+  mother_mosque_number: "",
   constitution: "",
   rank: "",
   dietary_requirements: "",
@@ -129,7 +129,7 @@ export function GuestFormDialog({
             {mode === "create" ? "Add a guest" : "Edit guest"}
           </DialogTitle>
           <DialogDescription>
-            Newcomer members or other guests known to the church. Email is
+            Newcomer members or other guests known to the mosque. Email is
             optional, but lets us send them their invitation and receipts.
           </DialogDescription>
         </DialogHeader>
@@ -171,24 +171,24 @@ export function GuestFormDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="mother_church_name">Mother church</Label>
+            <Label htmlFor="mother_mosque_name">Mother mosque</Label>
             <Input
-              id="mother_church_name"
-              value={values.mother_church_name}
+              id="mother_mosque_name"
+              value={values.mother_mosque_name}
               onChange={(event) =>
-                update("mother_church_name", event.target.value)
+                update("mother_mosque_name", event.target.value)
               }
-              placeholder="St James's Church"
+              placeholder="St James's Mosque"
             />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="mother_church_number">Church number</Label>
+            <Label htmlFor="mother_mosque_number">Mosque number</Label>
             <Input
-              id="mother_church_number"
-              value={values.mother_church_number}
+              id="mother_mosque_number"
+              value={values.mother_mosque_number}
               onChange={(event) =>
-                update("mother_church_number", event.target.value)
+                update("mother_mosque_number", event.target.value)
               }
               placeholder="1234"
             />
@@ -255,7 +255,7 @@ export function GuestFormDialog({
               min="0"
               value={values.guest_dining_amount}
               onChange={(event) => update("guest_dining_amount", event.target.value)}
-              placeholder="Church default"
+              placeholder="Mosque default"
             />
           </div>
 

@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function TreasurerPage() {
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
     return (
       <div className="space-y-4 sm:space-y-6">
         <div className="admin-page-head">
@@ -22,29 +22,29 @@ export default async function TreasurerPage() {
         <EmptyState
           icon={Wallet}
           title="Treasurer needs a database"
-          description="Connect Supabase and choose a church to use the treasurer tools. Demo mode is read-only for finance."
+          description="Connect Supabase and choose a mosque to use the treasurer tools. Demo mode is read-only for finance."
         />
       </div>
     );
   }
-  const churchId = ctx.churchId;
+  const mosqueId = ctx.mosqueId;
 
-  const currentYear = await db.getCurrentChurchYear(churchId).catch(() => null);
+  const currentYear = await db.getCurrentMosqueYear(mosqueId).catch(() => null);
 
   const [
     ledger,
-    churchGiving,
+    mosqueGiving,
     members,
     outstandingInstalments,
     scheduleCounts,
     methodBreakdown,
   ] = await Promise.all([
-    db.getTreasurerLedger(churchId),
-    db.getChurchGiving(churchId),
-    db.getMembers(churchId, { status: "active" }),
-    db.getOutstandingInstalments(churchId),
-    db.countGivingSchedulesByStatus(churchId),
-    db.countMemberGivingByPaymentMethod(churchId, {
+    db.getTreasurerLedger(mosqueId),
+    db.getMosqueGiving(mosqueId),
+    db.getMembers(mosqueId, { status: "active" }),
+    db.getOutstandingInstalments(mosqueId),
+    db.countGivingSchedulesByStatus(mosqueId),
+    db.countMemberGivingByPaymentMethod(mosqueId, {
       yearStart: currentYear?.start_date,
       yearEnd: currentYear?.end_date,
     }),
@@ -53,7 +53,7 @@ export default async function TreasurerPage() {
   return (
     <TreasurerClient
       ledger={JSON.parse(JSON.stringify(ledger))}
-      churchGiving={JSON.parse(JSON.stringify(churchGiving))}
+      mosqueGiving={JSON.parse(JSON.stringify(mosqueGiving))}
       activeMembers={members.length}
       outstandingInstalments={JSON.parse(
         JSON.stringify(outstandingInstalments)

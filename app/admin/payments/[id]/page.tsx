@@ -36,22 +36,22 @@ export default async function AdminPaymentDetailPage({
 }) {
   const { id } = await params;
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
     redirect("/admin/payments");
   }
-  const churchId = ctx.churchId;
+  const mosqueId = ctx.mosqueId;
 
-  const payment = await db.getPaymentById(id, churchId);
+  const payment = await db.getPaymentById(id, mosqueId);
   if (!payment) notFound();
 
   const [event, rsvp, donations, auditLogs, allEvents] = await Promise.all([
     payment.event_id
-      ? db.getEventById(payment.event_id, churchId)
+      ? db.getEventById(payment.event_id, mosqueId)
       : Promise.resolve(null),
-    payment.rsvp_id ? db.getRsvpById(payment.rsvp_id, churchId) : Promise.resolve(null),
-    db.getDonationsByEmail(payment.user_email, churchId),
-    db.listAuditLogsByEntity(churchId, "payment", id),
-    db.getEvents(churchId),
+    payment.rsvp_id ? db.getRsvpById(payment.rsvp_id, mosqueId) : Promise.resolve(null),
+    db.getDonationsByEmail(payment.user_email, mosqueId),
+    db.listAuditLogsByEntity(mosqueId, "payment", id),
+    db.getEvents(mosqueId),
   ]);
 
   // Picker window: every upcoming service + 180 days of recent history,

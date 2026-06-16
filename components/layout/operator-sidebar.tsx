@@ -17,7 +17,7 @@ import { useState } from "react";
 
 const nav = [
   { href: "/operator", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/operator/churches", label: "Churches", icon: Building2 },
+  { href: "/operator/mosques", label: "Mosques", icon: Building2 },
   { href: "/operator/billing", label: "Billing", icon: CreditCard },
   { href: "/operator/support", label: "Support", icon: HeadphonesIcon },
 ];

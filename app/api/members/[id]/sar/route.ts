@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -21,18 +21,18 @@ export async function GET(
     );
   }
   const { id: memberId } = await params;
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("members:write", churchId);
+  const forbidden = await requireAdminApiPermission("members:write", mosqueId);
   if (forbidden) return forbidden;
 
-  const data = await db.buildSubjectAccessExport(memberId, churchId);
+  const data = await db.buildSubjectAccessExport(memberId, mosqueId);
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "sar_exported",
     entityType: "member",
     entityId: memberId,

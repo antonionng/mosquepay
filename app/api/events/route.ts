@@ -3,7 +3,7 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import { getAdminReadContext } from "@/lib/admin/read-context";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
@@ -12,21 +12,21 @@ import { filterPubliclyVisible } from "@/lib/events/public-visibility";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const churchSlug = getChurchSlugFromRequest(request);
+  const mosqueSlug = getMosqueSlugFromRequest(request);
 
   if (isSupabaseConfigured()) {
-    const churchId = await db.resolveChurchId(churchSlug);
-    if (!churchId) {
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    if (!mosqueId) {
       return NextResponse.json([]);
     }
-    const events = await db.getEvents(churchId, { published: true });
+    const events = await db.getEvents(mosqueId, { published: true });
     return NextResponse.json(filterPubliclyVisible(events));
   }
 
   const _rejectMock = rejectIfMockDisabled();
   if (_rejectMock) return _rejectMock;
 
-  const events = mockDb.getEvents({ church_slug: churchSlug });
+  const events = mockDb.getEvents({ mosque_slug: mosqueSlug });
   return NextResponse.json(filterPubliclyVisible(events));
 }
 
@@ -39,12 +39,12 @@ export async function POST(request: NextRequest) {
     if (unauthorized) return unauthorized;
 
     const adminCtx = await getAdminReadContext();
-    const churchSlug =
-      adminCtx.mode === "database" ? adminCtx.churchSlug : "";
+    const mosqueSlug =
+      adminCtx.mode === "database" ? adminCtx.mosqueSlug : "";
     const body = await request.json();
     const title = body.title?.trim();
     const slug = body.slug?.trim()?.toLowerCase().replace(/[^a-z0-9-]/g, "-");
-    const event_type = body.event_type ?? "church_service";
+    const event_type = body.event_type ?? "mosque_service";
     const event_date = body.event_date;
     if (!title || !slug || !event_date) {
       return NextResponse.json(
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
     } satisfies Omit<
       db.Event,
       | "id"
-      | "church_id"
+      | "mosque_id"
       | "created_at"
       | "updated_at"
       | "sequence_id"
@@ -129,15 +129,15 @@ export async function POST(request: NextRequest) {
     >;
 
     if (isSupabaseConfigured()) {
-      if (adminCtx.mode !== "database" || !adminCtx.churchId) {
-        return NextResponse.json({ error: "Church not selected." }, { status: 404 });
+      if (adminCtx.mode !== "database" || !adminCtx.mosqueId) {
+        return NextResponse.json({ error: "Mosque not selected." }, { status: 404 });
       }
-      const churchId = adminCtx.churchId;
-      const forbidden = await requireAdminApiPermission("services:write", churchId);
+      const mosqueId = adminCtx.mosqueId;
+      const forbidden = await requireAdminApiPermission("services:write", mosqueId);
       if (forbidden) return forbidden;
-      const event = await db.addEvent(churchId, eventData);
+      const event = await db.addEvent(mosqueId, eventData);
       await writeAuditLog({
-        churchId,
+        mosqueId,
         action: "created",
         entityType: "service",
         entityId: event.id,
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ id: event.id, success: true });
     }
 
-    const event = mockDb.addEvent({ ...eventData, church_slug: churchSlug });
+    const event = mockDb.addEvent({ ...eventData, mosque_slug: mosqueSlug });
     return NextResponse.json({ id: event.id, success: true });
   } catch (e) {
     console.error("Events API error:", e);

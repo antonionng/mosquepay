@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Award, CheckCircle2, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { churchTitleFor } from "@/lib/members/rank";
+import { mosqueTitleFor } from "@/lib/members/rank";
 
 export type OfficeRung = {
   id: string;
@@ -90,11 +90,11 @@ export function OfficesPanel({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-dash-text">
-            Church officers
+            Mosque officers
           </h2>
           <p className="mt-1 text-sm text-dash-muted">
             Pick a member for each office. To replace someone (e.g. install a
-            new Lead Pastor) just choose a different name. Changes save
+            new Lead Imam) just choose a different name. Changes save
             automatically and appear on every notice.
           </p>
         </div>
@@ -142,8 +142,8 @@ export function OfficesPanel({
                         href={`/admin/members/${holder.id}`}
                         className="font-medium text-blue-700 hover:underline"
                       >
-                        {churchTitleFor(holder.rank)
-                          ? `${churchTitleFor(holder.rank)} `
+                        {mosqueTitleFor(holder.rank)
+                          ? `${mosqueTitleFor(holder.rank)} `
                           : ""}
                         {holder.full_name}
                       </Link>
@@ -174,8 +174,8 @@ export function OfficesPanel({
                           : "";
                       return (
                         <option key={m.id} value={m.id}>
-                          {churchTitleFor(m.rank)
-                            ? `${churchTitleFor(m.rank)} `
+                          {mosqueTitleFor(m.rank)
+                            ? `${mosqueTitleFor(m.rank)} `
                             : ""}
                           {m.full_name}
                           {suffix}

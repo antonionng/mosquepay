@@ -27,23 +27,23 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const member = await db.getMemberByEmailAcrossChurches(email);
+    const member = await db.getMemberByEmailAcrossMosques(email);
     if (!member) {
       return NextResponse.json(GENERIC_RESPONSE);
     }
 
-    let churchName = "your church";
+    let mosqueName = "your mosque";
     try {
-      const church = await db.getChurchById(member.church_id);
-      if (church?.name) churchName = church.name;
+      const mosque = await db.getMosqueById(member.mosque_id);
+      if (mosque?.name) mosqueName = mosque.name;
     } catch {
-      // Non-fatal: fall back to the generic church name.
+      // Non-fatal: fall back to the generic mosque name.
     }
 
     const result = await sendMemberPasswordReset({
       request,
       member,
-      churchName,
+      mosqueName,
     });
     if (!result.sent) {
       console.warn("[member forgot-password] reset send failed", {

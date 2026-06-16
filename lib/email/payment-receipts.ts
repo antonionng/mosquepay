@@ -11,7 +11,7 @@
 import * as db from "@/lib/db";
 import { renderSimpleMessageEmail } from "@/lib/email/templates";
 import { sendWithLog } from "@/lib/email/send-with-log";
-import type { Church } from "@/lib/db/types";
+import type { Mosque } from "@/lib/db/types";
 
 function formatGbp(amountMajor: number, currency = "GBP") {
   return new Intl.NumberFormat("en-GB", {
@@ -22,7 +22,7 @@ function formatGbp(amountMajor: number, currency = "GBP") {
 
 function siteUrl() {
   return (
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://churchpay.co.uk"
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://mosque-pay.com"
   ).replace(/\/$/, "");
 }
 
@@ -57,7 +57,7 @@ const KIND_COPY: Record<
   standing_qr: {
     eyebrow: "Payment received",
     titlePrefix: "Receipt",
-    cta: "Open the church portal",
+    cta: "Open the mosque portal",
     href: "/member",
   },
 };
@@ -71,8 +71,8 @@ const KIND_COPY: Record<
  * receipt.
  */
 export async function sendOnlinePaymentReceipt({
-  churchId,
-  church,
+  mosqueId,
+  mosque,
   toEmail,
   toName,
   memberId,
@@ -83,8 +83,8 @@ export async function sendOnlinePaymentReceipt({
   mooovPaymentId,
   metadata,
 }: {
-  churchId: string;
-  church: Pick<Church, "id" | "name"> | null;
+  mosqueId: string;
+  mosque: Pick<Mosque, "id" | "name"> | null;
   toEmail: string;
   toName: string | null;
   memberId: string | null;
@@ -97,13 +97,13 @@ export async function sendOnlinePaymentReceipt({
 }) {
   if (!toEmail) return;
 
-  let churchName = church?.name ?? null;
-  if (!churchName) {
+  let mosqueName = mosque?.name ?? null;
+  if (!mosqueName) {
     try {
-      const row = await db.getChurchById(churchId);
-      churchName = row?.name ?? "your church";
+      const row = await db.getMosqueById(mosqueId);
+      mosqueName = row?.name ?? "your mosque";
     } catch {
-      churchName = "your church";
+      mosqueName = "your mosque";
     }
   }
 
@@ -113,10 +113,10 @@ export async function sendOnlinePaymentReceipt({
   const html = renderSimpleMessageEmail({
     eyebrow: copy.eyebrow,
     title,
-    preview: `${amountStr} to ${churchName}.`,
+    preview: `${amountStr} to ${mosqueName}.`,
     greeting: `Dear ${toName ?? "Member"},`,
     paragraphs: [
-      `We've received your payment of ${amountStr} to ${churchName}.`,
+      `We've received your payment of ${amountStr} to ${mosqueName}.`,
       description,
     ],
     cta: { label: copy.cta, href: `${siteUrl()}${copy.href}` },
@@ -124,7 +124,7 @@ export async function sendOnlinePaymentReceipt({
   });
 
   await sendWithLog({
-    churchId,
+    mosqueId,
     toEmail,
     toName,
     memberId,
@@ -132,7 +132,7 @@ export async function sendOnlinePaymentReceipt({
     entityType: "payment",
     entityId: mooovPaymentId,
     dedupeKey: mooovPaymentId,
-    subject: `${copy.titlePrefix}: ${amountStr} to ${churchName}`,
+    subject: `${copy.titlePrefix}: ${amountStr} to ${mosqueName}`,
     html,
     metadata: {
       ...(metadata ?? {}),

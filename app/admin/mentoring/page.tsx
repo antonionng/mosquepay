@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function MentoringPage() {
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
     return (
       <div className="space-y-4 sm:space-y-6">
         <div className="admin-page-head">
@@ -22,18 +22,18 @@ export default async function MentoringPage() {
         <EmptyState
           icon={GraduationCap}
           title="Mentoring needs a database"
-          description="Connect Supabase and choose a church to manage mentor assignments and officer discipleship."
+          description="Connect Supabase and choose a mosque to manage mentor assignments and officer discipleship."
         />
       </div>
     );
   }
-  const churchId = ctx.churchId;
+  const mosqueId = ctx.mosqueId;
 
   const [members, assignments, contacts, rungs] = await Promise.all([
-    db.getMembers(churchId, { status: "active" }),
-    db.listMentorAssignments(churchId, { active: true }),
-    db.listMentorContacts(churchId),
-    db.listOfficerLadder(churchId),
+    db.getMembers(mosqueId, { status: "active" }),
+    db.listMentorAssignments(mosqueId, { active: true }),
+    db.listMentorContacts(mosqueId),
+    db.listOfficerLadder(mosqueId),
   ]);
 
   const memberMini = members.map((m) => ({

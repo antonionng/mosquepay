@@ -18,7 +18,7 @@ function slugify(name: string): string {
     .slice(0, 60);
 }
 
-export function ProvisionChurchClient({ networks }: { networks: Network[] }) {
+export function ProvisionMosqueClient({ networks }: { networks: Network[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -26,7 +26,7 @@ export function ProvisionChurchClient({ networks }: { networks: Network[] }) {
   const [form, setForm] = useState({
     name: "",
     slug: "",
-    church_number: "",
+    mosque_number: "",
     city: "",
     secretary_name: "",
     secretary_email: "",
@@ -48,19 +48,19 @@ export function ProvisionChurchClient({ networks }: { networks: Network[] }) {
 
   async function submit() {
     if (!form.name.trim()) {
-      setFeedback("Church name is required.");
+      setFeedback("Mosque name is required.");
       return;
     }
     setBusy(true);
     try {
       const requestedInvite = form.send_invite;
-      const res = await fetch("/api/admin/platform/churches", {
+      const res = await fetch("/api/admin/platform/mosques", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: form.name.trim(),
           slug: form.slug.trim() || slugify(form.name),
-          church_number: form.church_number.trim() || null,
+          mosque_number: form.mosque_number.trim() || null,
           city: form.city.trim() || null,
           secretary_name: form.secretary_name.trim() || null,
           secretary_email: form.secretary_email.trim() || null,
@@ -69,22 +69,22 @@ export function ProvisionChurchClient({ networks }: { networks: Network[] }) {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Could not create church.");
-      let feedbackMessage = "Church created.";
+      if (!res.ok) throw new Error(data.error ?? "Could not create mosque.");
+      let feedbackMessage = "Mosque created.";
       if (form.secretary_email && requestedInvite) {
         feedbackMessage = data.invite?.sent
-          ? `Church created. Invite sent to ${form.secretary_email}.`
-          : `Church created. Invite failed: ${data.invite?.error ?? "unknown error"}`;
+          ? `Mosque created. Invite sent to ${form.secretary_email}.`
+          : `Mosque created. Invite failed: ${data.invite?.error ?? "unknown error"}`;
       } else if (form.secretary_email) {
-        feedbackMessage = `Church created with secretary ${form.secretary_email}. Send the invite from the church admin when ready.`;
+        feedbackMessage = `Mosque created with secretary ${form.secretary_email}. Send the invite from the mosque admin when ready.`;
       } else {
-        feedbackMessage = "Church created. Add officers from the church admin.";
+        feedbackMessage = "Mosque created. Add officers from the mosque admin.";
       }
       setFeedback(feedbackMessage);
       setForm({
         name: "",
         slug: "",
-        church_number: "",
+        mosque_number: "",
         city: "",
         secretary_name: "",
         secretary_email: "",
@@ -102,7 +102,7 @@ export function ProvisionChurchClient({ networks }: { networks: Network[] }) {
   if (!open) {
     return (
       <Button onClick={() => setOpen(true)}>
-        <Plus className="mr-2 h-4 w-4" /> Provision church
+        <Plus className="mr-2 h-4 w-4" /> Provision mosque
       </Button>
     );
   }
@@ -112,7 +112,7 @@ export function ProvisionChurchClient({ networks }: { networks: Network[] }) {
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-base font-semibold text-slate-900">
-            Provision a new church
+            Provision a new mosque
           </h2>
           <p className="text-xs text-slate-500">
             Creates the tenant, optionally links it to a network, and emails
@@ -126,12 +126,12 @@ export function ProvisionChurchClient({ networks }: { networks: Network[] }) {
 
       <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
         <div>
-          <Label htmlFor="prov-name">Church name</Label>
+          <Label htmlFor="prov-name">Mosque name</Label>
           <Input
             id="prov-name"
             value={form.name}
             onChange={(e) => update("name", e.target.value)}
-            placeholder="St George's Church No 1234"
+            placeholder="St George's Mosque No 1234"
           />
         </div>
         <div>
@@ -144,11 +144,11 @@ export function ProvisionChurchClient({ networks }: { networks: Network[] }) {
           />
         </div>
         <div>
-          <Label htmlFor="prov-num">Church number</Label>
+          <Label htmlFor="prov-num">Mosque number</Label>
           <Input
             id="prov-num"
-            value={form.church_number}
-            onChange={(e) => update("church_number", e.target.value)}
+            value={form.mosque_number}
+            onChange={(e) => update("mosque_number", e.target.value)}
           />
         </div>
         <div>
@@ -220,7 +220,7 @@ export function ProvisionChurchClient({ networks }: { networks: Network[] }) {
       <div className="mt-4 flex justify-end">
         <Button onClick={submit} disabled={busy}>
           {busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
-          Create church
+          Create mosque
         </Button>
       </div>
     </div>

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { AdminChurchSwitcher } from "@/components/layout/admin-church-switcher";
+import { AdminMosqueSwitcher } from "@/components/layout/admin-mosque-switcher";
 import {
   LayoutDashboard,
   Users,
@@ -43,7 +43,7 @@ const nav = [
   { href: "/admin/newcomers", label: "Newcomers", icon: Users, permission: "services:write", flag: "newcomer_crm" },
   { href: "/admin/members", label: "Members", icon: UserCheck, permission: "members:read" },
   { href: "/admin/guests", label: "Guests", icon: UserPlus, permission: "members:read", flag: "guest_links" },
-  { href: "/admin/services", label: "Services", icon: Clock, permission: "services:write" },
+  { href: "/admin/services", label: "Prayers & Jumu'ah", icon: Clock, permission: "services:write" },
   { href: "/admin/sequences", label: "Sequences", icon: Sparkles, permission: "services:write" },
   { href: "/admin/communications", label: "Communications", icon: Megaphone, permission: "members:write" },
   { href: "/admin/website", label: "Website", icon: Globe, permission: "website:write" },
@@ -54,7 +54,7 @@ const nav = [
   { href: "/admin/charity", label: "Charity", icon: Heart, permission: "charity:write", flag: "charity_campaigns" },
   { href: "/admin/donations", label: "Donations", icon: Gift, permission: "charity:write", flag: "gift_aid" },
   { href: "/admin/gift-aid", label: "Gift Aid", icon: Shield, permission: "charity:write", flag: "gift_aid" },
-  { href: "/admin/pastoral_care", label: "PastoralCare", icon: HeartHandshake, permission: "pastoral:read", flag: "pastoral_care" },
+  { href: "/admin/pastoral-care", label: "Welfare", icon: HeartHandshake, permission: "pastoral:read", flag: "pastoral_care" },
   { href: "/admin/mentoring", label: "Mentoring", icon: GraduationCap, permission: "members:write", flag: "mentor" },
   { href: "/admin/reports", label: "Reports", icon: BarChart3, permission: "audit:read" },
   { href: "/admin/audit-compliance", label: "Audit & Compliance", icon: ShieldCheck, permission: "audit:read", flag: "audit" },
@@ -219,11 +219,11 @@ export function AdminSidebar() {
             href="/admin"
             className="flex min-w-0 items-center"
             onClick={() => setMobileOpen(false)}
-            aria-label="ChurchPay admin"
+            aria-label="MosquePay admin"
           >
             <Image
-              src="/brand/churchpay-sidebar-logo.png"
-              alt="ChurchPay"
+              src="/brand/mosquepay-sidebar-logo.png"
+              alt="MosquePay"
               width={1032}
               height={245}
               priority
@@ -232,13 +232,13 @@ export function AdminSidebar() {
           </Link>
         </div>
 
-        {/* Church context (working-in selector + view live site).
+        {/* Mosque context (working-in selector + view live site).
             Sits at the top of the sidebar so it's the first thing users
             see — especially important on phone where this is the only
-            way to switch church. Closing the drawer happens after a
+            way to switch mosque. Closing the drawer happens after a
             successful change so the user lands on the refreshed page. */}
         <div className="shrink-0 border-b border-dash-border bg-dash-surface px-3 py-3">
-          <AdminChurchSwitcher
+          <AdminMosqueSwitcher
             variant="sidebar"
             onAfterChange={() => setMobileOpen(false)}
           />

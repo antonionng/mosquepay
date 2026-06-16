@@ -18,7 +18,7 @@ export function NewcomerBookButton({ token, eventId, eventTitle }: Props) {
     setPending(true);
     try {
       const res = await fetch(
-        `/api/newcomers/church/${encodeURIComponent(token)}/book/${encodeURIComponent(
+        `/api/newcomers/mosque/${encodeURIComponent(token)}/book/${encodeURIComponent(
           eventId
         )}`,
         { method: "POST" }

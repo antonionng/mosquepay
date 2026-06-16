@@ -8,14 +8,14 @@ import {
 import { marketingMetadata } from "@/lib/seo";
 
 export const metadata = marketingMetadata({
-  title: "Book a ChurchPay Demo | Church Platform Walkthrough",
+  title: "Book a MosquePay Demo | Mosque Platform Walkthrough",
   description:
-    "Book a ChurchPay demo for your church or network. See giving, Gift Aid and GASDS, church websites, service notices, member portals, newcomer follow-up, and treasurer reporting in action.",
+    "Book a MosquePay demo for your mosque or network. See giving, Gift Aid and GASDS, mosque websites, service notices, member portals, newcomer follow-up, and treasurer reporting in action.",
   path: "/book-demo",
   keywords: [
-    "book church software demo",
-    "church giving platform demo",
-    "church website demo",
+    "book mosque software demo",
+    "mosque giving platform demo",
+    "mosque website demo",
     "Gift Aid software demo",
   ],
 });
@@ -28,7 +28,7 @@ const EXPECTATIONS = [
   },
   {
     Icon: MonitorSmartphone,
-    title: "Tailored to your church",
+    title: "Tailored to your mosque",
     body: "Tell us your priorities and we'll demo those first: giving and Gift Aid, newcomers, services, or reporting.",
   },
   {
@@ -45,7 +45,7 @@ const DEMO_COVERS = [
   "Congregation records and member portal",
   "Service notices and event RSVPs",
   "Newcomer pipeline and follow-ups",
-  "Pastoral care with private access",
+  "Welfare with private access",
   "Treasurer reconciliation and reports",
 ];
 
@@ -57,10 +57,10 @@ export default function BookDemoPage() {
           <div className="max-w-3xl">
             <MarketingKicker>Book a demo</MarketingKicker>
             <h1 className="mt-4 font-heading text-4xl font-bold leading-tight tracking-tight text-slate-900 sm:text-5xl">
-              See ChurchPay working for a church like yours.
+              See MosquePay working for a mosque like yours.
             </h1>
             <p className="mt-6 text-lg leading-8 text-slate-600">
-              A 30-minute walkthrough with someone who understands church administration, not a
+              A 30-minute walkthrough with someone who understands mosque administration, not a
               generic sales pitch.
             </p>
           </div>
@@ -104,7 +104,7 @@ export default function BookDemoPage() {
               Request your walkthrough
             </h2>
             <p className="mb-8 mt-3 text-slate-600">
-              Tell us a little about your church and we&apos;ll be in touch to arrange a time.
+              Tell us a little about your mosque and we&apos;ll be in touch to arrange a time.
             </p>
             <BookDemoForm />
           </div>

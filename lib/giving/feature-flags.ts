@@ -6,7 +6,7 @@
 // and Covenant Special service is Tue 2 Jun — three days before Mooov's
 // prod cutover.
 //
-// Until CHURCHPAY_GIVING_SUBSCRIPTION_ENABLED is set to "true" on the
+// Until MOSQUEPAY_GIVING_SUBSCRIPTION_ENABLED is set to "true" on the
 // deployment's environment scope, the following paths are no-ops or
 // return a friendly 503:
 //
@@ -23,8 +23,8 @@ const TRUTHY = new Set(["true", "1", "yes", "on", "enabled"]);
 
 export function givingSubscriptionEnabled(): boolean {
   const raw =
-    process.env.CHURCHPAY_GIVING_SUBSCRIPTION_ENABLED ??
-    process.env.NEXT_PUBLIC_CHURCHPAY_GIVING_SUBSCRIPTION_ENABLED ??
+    process.env.MOSQUEPAY_GIVING_SUBSCRIPTION_ENABLED ??
+    process.env.NEXT_PUBLIC_MOSQUEPAY_GIVING_SUBSCRIPTION_ENABLED ??
     "";
   return TRUTHY.has(raw.trim().toLowerCase());
 }

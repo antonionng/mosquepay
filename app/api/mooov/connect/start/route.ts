@@ -11,13 +11,13 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-async function loadExistingMerchantHint(churchId: string): Promise<string | null> {
+async function loadExistingMerchantHint(mosqueId: string): Promise<string | null> {
   try {
     const { data, error } = await createServiceClient()
       .schema("mooov")
-      .from("churches")
+      .from("mosques")
       .select("merchant_id,status")
-      .eq("id", churchId)
+      .eq("id", mosqueId)
       .maybeSingle<{ merchant_id: string; status: string }>();
     if (error || data?.status !== "active") return null;
     return data.merchant_id;
@@ -28,9 +28,9 @@ async function loadExistingMerchantHint(churchId: string): Promise<string | null
 
 export async function GET(request: NextRequest) {
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
     return NextResponse.json(
-      { error: "Mooov Connect requires a database-backed church." },
+      { error: "Mooov Connect requires a database-backed mosque." },
       { status: 400 }
     );
   }
@@ -44,8 +44,8 @@ export async function GET(request: NextRequest) {
     config.redirectUri ??
     `${siteUrl.replace(/\/$/, "")}/oauth/mooov/callback`;
   const state = createMooovConnectState({
-    churchId: ctx.churchId,
-    churchSlug: ctx.churchSlug,
+    mosqueId: ctx.mosqueId,
+    mosqueSlug: ctx.mosqueSlug,
   });
   const url = new URL("/authorize", config.connectBaseUrl);
   url.searchParams.set("client_id", config.platformSlug);
@@ -53,19 +53,19 @@ export async function GET(request: NextRequest) {
   url.searchParams.set("state", state);
   // Least-privilege scope set: only what we actually call from server code.
   // Reintroducing customers:read / customers:write / webhooks:read bloats the
-  // church admin's consent screen with permissions we never exercise (Mooov
+  // mosque admin's consent screen with permissions we never exercise (Mooov
   // renders one row per requested scope). Re-add ONLY when a real code path
   // calls the corresponding endpoint. See e689a80 for the original rationale.
   //
   //   payments:write -> POST /v1/payment_intents (app/api/giving/start)
-  //   payments:read  -> reserved for the church UI's payment-history views
+  //   payments:read  -> reserved for the mosque UI's payment-history views
   //   refunds:write  -> reserved for the upcoming refund workflow
   url.searchParams.set(
     "scope",
     "payments:write payments:read refunds:write"
   );
   url.searchParams.set("mode", process.env.MOOOV_CONNECT_MODE ?? "test");
-  const merchantHint = await loadExistingMerchantHint(ctx.churchId);
+  const merchantHint = await loadExistingMerchantHint(ctx.mosqueId);
   if (merchantHint) {
     url.searchParams.set("platform_tenant_id_hint", merchantHint);
   }

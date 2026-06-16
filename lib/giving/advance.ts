@@ -10,7 +10,7 @@
 // recording. The giving + year resolution is identical.
 
 import * as db from "@/lib/db";
-import type { ChurchGivingYear, Member, MemberGiving } from "@/lib/db/types";
+import type { MosqueGivingYear, Member, MemberGiving } from "@/lib/db/types";
 import { nextYearBounds } from "@/lib/giving/year-position";
 
 export type AdvanceGivingGate =
@@ -40,9 +40,9 @@ export type AdvanceGivingResult = {
 };
 
 export type ResolveAdvanceArgs = {
-  churchId: string;
+  mosqueId: string;
   member: Member;
-  /** Optional override; defaults to whatever the church_giving template +
+  /** Optional override; defaults to whatever the mosque_giving template +
    *  next year's annual_giving_amount work out to. Useful for the admin
    *  flow when a treasurer wants to invoice an unusual amount. */
   amountOverride?: number;
@@ -54,19 +54,19 @@ export type ResolveAdvanceArgs = {
  * 409 instead of an opaque 500.
  */
 export async function checkAdvanceEligibility(
-  churchId: string,
+  mosqueId: string,
   member: Pick<Member, "email">
 ): Promise<AdvanceGivingGate> {
-  const currentYear = await db.getCurrentChurchYear(churchId);
+  const currentYear = await db.getCurrentMosqueYear(mosqueId);
   if (!currentYear) {
     return {
       ok: false,
       code: "no_giving_year",
       message:
-        "Your church has not configured a giving year yet. Please contact your church secretary.",
+        "Your mosque has not configured a giving year yet. Please contact your mosque secretary.",
     };
   }
-  const memberGiving = await db.getMemberGiving(churchId, {
+  const memberGiving = await db.getMemberGiving(mosqueId, {
     memberEmail: member.email,
   });
   const currentYearStart = currentYear.start_date.slice(0, 10);
@@ -82,7 +82,7 @@ export async function checkAdvanceEligibility(
       ok: false,
       code: "no_current_year_record",
       message:
-        "Current-year giving record is missing. Please contact your church secretary.",
+        "Current-year giving record is missing. Please contact your mosque secretary.",
     };
   }
   if (
@@ -109,17 +109,17 @@ export async function checkAdvanceEligibility(
 export async function resolveOrCreateAdvanceGiving(
   args: ResolveAdvanceArgs
 ): Promise<AdvanceGivingResult> {
-  const { churchId, member } = args;
+  const { mosqueId, member } = args;
 
-  const currentYear = await db.getCurrentChurchYear(churchId);
+  const currentYear = await db.getCurrentMosqueYear(mosqueId);
   if (!currentYear) {
-    throw new Error("Church has no current giving year configured.");
+    throw new Error("Mosque has no current giving year configured.");
   }
   const currentYearEnd = currentYear.end_date.slice(0, 10);
   const currentYearStart = currentYear.start_date.slice(0, 10);
 
-  const allYears = await db.listChurchGivingYears(churchId);
-  let next: ChurchGivingYear | null =
+  const allYears = await db.listMosqueGivingYears(mosqueId);
+  let next: MosqueGivingYear | null =
     allYears.find((y) => y.start_date.slice(0, 10) > currentYearEnd) ?? null;
 
   let nextYearId: string;
@@ -134,7 +134,7 @@ export async function resolveOrCreateAdvanceGiving(
     nextYearLabel = next.label;
   } else {
     const bounds = nextYearBounds(currentYearStart, currentYearEnd);
-    const created = await db.upsertChurchGivingYear(churchId, {
+    const created = await db.upsertMosqueGivingYear(mosqueId, {
       label: bounds.label,
       start_date: bounds.startDate,
       end_date: bounds.endDate,
@@ -148,7 +148,7 @@ export async function resolveOrCreateAdvanceGiving(
     nextYearLabel = bounds.label;
   }
 
-  const memberGiving = await db.getMemberGiving(churchId, {
+  const memberGiving = await db.getMemberGiving(mosqueId, {
     memberEmail: member.email,
   });
   const existing =
@@ -156,16 +156,16 @@ export async function resolveOrCreateAdvanceGiving(
       (d) => d.is_advance && d.advance_for_year_id === nextYearId
     ) ?? null;
 
-  const churchGiving = (await db.getChurchGiving(churchId))[0] ?? null;
+  const mosqueGiving = (await db.getMosqueGiving(mosqueId))[0] ?? null;
   const baseAmount =
     next?.annual_giving_amount ??
-    churchGiving?.amount ??
+    mosqueGiving?.amount ??
     currentYear.annual_giving_amount ??
     0;
   if (!baseAmount || baseAmount <= 0) {
     throw new Error("No annual giving amount configured for next year.");
   }
-  const discountPct = churchGiving?.advance_discount_percent ?? 0;
+  const discountPct = mosqueGiving?.advance_discount_percent ?? 0;
   const computedCharge =
     Math.round(baseAmount * (1 - discountPct / 100) * 100) / 100;
   const chargedAmount =
@@ -173,12 +173,12 @@ export async function resolveOrCreateAdvanceGiving(
       ? Math.round(args.amountOverride * 100) / 100
       : computedCharge;
   const charitableAmount =
-    churchGiving?.gift_aid_enabled === true
-      ? Math.min(churchGiving.charitable_amount ?? 0, chargedAmount)
+    mosqueGiving?.gift_aid_enabled === true
+      ? Math.min(mosqueGiving.charitable_amount ?? 0, chargedAmount)
       : 0;
   const currency = (
     existing?.currency ??
-    churchGiving?.currency ??
+    mosqueGiving?.currency ??
     "gbp"
   ).toLowerCase();
 
@@ -200,11 +200,11 @@ export async function resolveOrCreateAdvanceGiving(
     };
   }
 
-  const advanceRecord = await db.createMemberGiving(churchId, {
+  const advanceRecord = await db.createMemberGiving(mosqueId, {
     member_email: member.email,
     member_name: member.full_name,
     member_id: member.id,
-    giving_id: churchGiving?.id ?? null,
+    giving_id: mosqueGiving?.id ?? null,
     amount: chargedAmount,
     currency,
     period_start: nextYearStart,
@@ -216,7 +216,7 @@ export async function resolveOrCreateAdvanceGiving(
     paid_at: null,
     charitable_amount: charitableAmount,
     gift_aid_status:
-      churchGiving?.gift_aid_enabled && charitableAmount > 0
+      mosqueGiving?.gift_aid_enabled && charitableAmount > 0
         ? "eligible"
         : "unknown",
     gift_aid_eligible_amount: charitableAmount,

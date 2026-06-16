@@ -547,7 +547,7 @@ export function MentoringClient({
               Add or update succession rung
             </h2>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <Field label="Office (e.g. Lead Pastor)">
+              <Field label="Office (e.g. Lead Imam)">
                 <input
                   value={newRung.rung_label}
                   onChange={(e) =>

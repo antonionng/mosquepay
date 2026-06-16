@@ -23,23 +23,23 @@ export type GuestOption = {
   full_name: string;
   email: string | null;
   phone: string | null;
-  mother_church_name: string | null;
-  mother_church_number: string | null;
+  mother_mosque_name: string | null;
+  mother_mosque_number: string | null;
 };
 
 export type GuestInlineDraft = {
   full_name: string;
   email: string | null;
   phone: string | null;
-  mother_church_name: string | null;
-  mother_church_number: string | null;
+  mother_mosque_name: string | null;
+  mother_mosque_number: string | null;
 };
 
 // Discriminated union for the payer selection. The take-payment shell owns
 // the active selection and passes it down to both Charge and Cash tabs; each
 // tab posts the correct payload shape to its respective endpoint.
 //   - "anonymous": no attribution (default).
-//   - "member": existing Churchpay member from the members list.
+//   - "member": existing Mosquepay member from the members list.
 //   - "guest": existing guest from the guest directory.
 //   - "guest_inline": a brand-new guest typed inline; the server will find-
 //                     or-create on the guests table when the payment lands.
@@ -156,10 +156,10 @@ export type HistoryItem = {
 export const CATEGORIES = [
   {
     id: "general",
-    label: "General church payment",
+    label: "General mosque payment",
     giftAidable: false,
     explainer:
-      "General church income (admin, miscellaneous). Not a charitable donation.",
+      "General mosque income (admin, miscellaneous). Not a charitable donation.",
   },
   {
     id: "service_fee",
@@ -175,7 +175,7 @@ export const CATEGORIES = [
   },
   {
     id: "dining",
-    label: "Dining / fellowship meal",
+    label: "Dining / community meal",
     giftAidable: false,
     explainer: "Dining is a benefit in return, so not eligible for Gift Aid.",
   },
@@ -184,7 +184,7 @@ export const CATEGORIES = [
     label: "Charity collection",
     giftAidable: true,
     explainer:
-      "Voluntary donation to a registered Church charity. Eligible for Gift Aid with a declaration.",
+      "Voluntary donation to a registered Mosque charity. Eligible for Gift Aid with a declaration.",
   },
   {
     id: "raffle",

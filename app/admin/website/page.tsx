@@ -11,29 +11,29 @@ export const dynamic = "force-dynamic";
 export default async function AdminWebsitePage() {
   const ctx = await getAdminReadContext();
 
-  if (ctx.mode !== "database" || !ctx.churchId) {
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
     return (
       <div className="space-y-4 sm:space-y-6">
         <div className="admin-page-head">
           <div>
             <h1 className="admin-page-title">Website</h1>
             <p className="admin-page-copy">
-              Build the church website, manage brand settings, and connect domains.
+              Build the mosque website, manage brand settings, and connect domains.
             </p>
           </div>
         </div>
         <EmptyState
           icon={Globe}
-          title="Website needs a selected church"
-          description="Connect Supabase and choose a church to edit the public website."
+          title="Website needs a selected mosque"
+          description="Connect Supabase and choose a mosque to edit the public website."
         />
       </div>
     );
   }
 
-  const [church, rawSite] = await Promise.all([
-    db.getChurchById(ctx.churchId),
-    db.getChurchSite(ctx.churchId),
+  const [mosque, rawSite] = await Promise.all([
+    db.getMosqueById(ctx.mosqueId),
+    db.getMosqueSite(ctx.mosqueId),
   ]);
   const site = rawSite
     ? {
@@ -43,7 +43,7 @@ export default async function AdminWebsitePage() {
       }
     : rawSite;
 
-  if (!church) {
+  if (!mosque) {
     redirect("/admin");
   }
   return (
@@ -52,12 +52,12 @@ export default async function AdminWebsitePage() {
         <div>
           <h1 className="admin-page-title">Website</h1>
           <p className="admin-page-copy">
-            Build the public church site, manage brand settings, and connect domains.
+            Build the public mosque site, manage brand settings, and connect domains.
           </p>
         </div>
       </div>
 
-      <AdminWebsiteManager church={church} site={site} />
+      <AdminWebsiteManager mosque={mosque} site={site} />
     </div>
   );
 }

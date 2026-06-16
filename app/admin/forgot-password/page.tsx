@@ -46,8 +46,8 @@ export default function AdminForgotPasswordPage() {
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center text-center sm:mb-8">
           <Image
-            src="/brand/churchpay-admin-signin.png"
-            alt="ChurchPay"
+            src="/brand/mosquepay-admin-signin.png"
+            alt="MosquePay"
             width={1200}
             height={800}
             priority

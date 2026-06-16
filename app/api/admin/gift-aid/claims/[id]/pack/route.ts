@@ -15,7 +15,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as db from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -40,28 +40,28 @@ export async function GET(
     );
   }
   const { id: batchId } = await params;
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("charity:write", churchId);
+  const forbidden = await requireAdminApiPermission("charity:write", mosqueId);
   if (forbidden) return forbidden;
 
-  const [batches, church] = await Promise.all([
-    db.getGiftAidClaimBatches(churchId),
-    db.getChurchById(churchId),
+  const [batches, mosque] = await Promise.all([
+    db.getGiftAidClaimBatches(mosqueId),
+    db.getMosqueById(mosqueId),
   ]);
   const batch = batches.find((b) => b.id === batchId);
-  if (!batch || !church) {
+  if (!batch || !mosque) {
     return NextResponse.json({ error: "Batch not found." }, { status: 404 });
   }
 
   const [items, declarationLinks, previous, collections] = await Promise.all([
-    db.getGiftAidClaimItems(churchId, batchId),
-    db.listClaimBatchDeclarations(churchId, batchId),
-    db.getMostRecentClaimBatchBefore(churchId, batch.created_at),
-    db.getServiceCollections(churchId).catch(() => []),
+    db.getGiftAidClaimItems(mosqueId, batchId),
+    db.listClaimBatchDeclarations(mosqueId, batchId),
+    db.getMostRecentClaimBatchBefore(mosqueId, batch.created_at),
+    db.getServiceCollections(mosqueId).catch(() => []),
   ]);
 
   // GASDS lives on the service collection this batch was created from (if
@@ -111,15 +111,15 @@ export async function GET(
   }
   const [newDeclarations, previouslySupplied, declarationAddressLookup] =
     await Promise.all([
-      db.getGiftAidDeclarationsByIds(churchId, newDeclarationIds),
-      db.getGiftAidDeclarationsByIds(churchId, previouslySuppliedIds),
-      db.getGiftAidDeclarationsByIds(churchId, Array.from(addressLookupIds)),
+      db.getGiftAidDeclarationsByIds(mosqueId, newDeclarationIds),
+      db.getGiftAidDeclarationsByIds(mosqueId, previouslySuppliedIds),
+      db.getGiftAidDeclarationsByIds(mosqueId, Array.from(addressLookupIds)),
     ]);
 
   let pack;
   try {
     pack = await buildClaimPack({
-      church,
+      mosque,
       batch,
       items,
       newDeclarations,
@@ -141,13 +141,13 @@ export async function GET(
 
   let actorEmail: string | null = null;
   try {
-    const admin = await getCurrentAdminContextAny(churchId);
+    const admin = await getCurrentAdminContextAny(mosqueId);
     actorEmail = admin?.email ?? null;
   } catch {
     /* non-fatal */
   }
   try {
-    await db.markClaimBatchPackGenerated(batchId, churchId, actorEmail);
+    await db.markClaimBatchPackGenerated(batchId, mosqueId, actorEmail);
   } catch (err) {
     console.warn("claim pack: stamp failed (non-fatal)", {
       batch_id: batchId,
@@ -156,7 +156,7 @@ export async function GET(
   }
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "gift_aid_claim_pack_downloaded",
     entityType: "gift_aid_claim_batch",
     entityId: batchId,

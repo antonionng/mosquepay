@@ -52,8 +52,8 @@ function MemberLoginContent() {
       <div className="w-full max-w-md">
         <div className="mb-6 flex flex-col items-center text-center sm:mb-8">
           <Image
-            src="/brand/churchpay-admin-signin.png"
-            alt="ChurchPay"
+            src="/brand/mosquepay-admin-signin.png"
+            alt="MosquePay"
             width={1200}
             height={800}
             priority
@@ -150,7 +150,7 @@ function MemberLoginContent() {
         </div>
 
         <p className="mt-5 text-center text-sm text-dash-muted sm:mt-6">
-          Need access? Ask your church Secretary or admin to send a member invite.
+          Need access? Ask your mosque Secretary or admin to send a member invite.
         </p>
         <p className="mt-3 text-center text-sm text-dash-muted">
           Are you an officer or admin?{" "}

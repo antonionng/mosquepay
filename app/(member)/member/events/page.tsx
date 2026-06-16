@@ -13,7 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-interface ChurchEvent {
+interface MosqueEvent {
   id: string;
   title: string;
   date: string;
@@ -40,31 +40,31 @@ function EventSkeleton() {
 }
 
 export default function MemberEventsPage() {
-  const [events, setEvents] = useState<ChurchEvent[]>([]);
+  const [events, setEvents] = useState<MosqueEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       try {
-        // Resolve the member's home church slug from the session so we don't
-        // hardcode st-marys-demo (which would show the wrong events for any
-        // member belonging to a different church on the platform).
-        let churchQuery = "";
+        // Resolve the member's home mosque slug from the session so we don't
+        // hardcode central-jamia-demo (which would show the wrong events for any
+        // member belonging to a different mosque on the platform).
+        let mosqueQuery = "";
         try {
           const sessionRes = await fetch("/api/auth/member/session");
           if (sessionRes.ok) {
             const sessionData = await sessionRes.json();
             const slug =
-              typeof sessionData?.user?.church_slug === "string"
-                ? sessionData.user.church_slug
+              typeof sessionData?.user?.mosque_slug === "string"
+                ? sessionData.user.mosque_slug
                 : null;
-            if (slug) churchQuery = `?church=${encodeURIComponent(slug)}`;
+            if (slug) mosqueQuery = `?mosque=${encodeURIComponent(slug)}`;
           }
         } catch {
           // Falls back to host-derived tenant in proxy.ts.
         }
-        const res = await fetch(`/api/events${churchQuery}`);
+        const res = await fetch(`/api/events${mosqueQuery}`);
         if (res.ok) {
           const data = await res.json();
           const list = Array.isArray(data) ? data : data.events ?? [];
@@ -101,7 +101,7 @@ export default function MemberEventsPage() {
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Events</h1>
-        <p className="text-slate-500 mt-1">Upcoming church events and services</p>
+        <p className="text-slate-500 mt-1">Upcoming mosque events and services</p>
       </div>
 
       <div className="space-y-4">
@@ -200,7 +200,7 @@ export default function MemberEventsPage() {
             </div>
             <p className="text-base font-medium text-slate-500">No upcoming events</p>
             <p className="text-sm text-slate-400 mt-1">
-              Check back soon for new events from your church.
+              Check back soon for new events from your mosque.
             </p>
           </div>
         )}

@@ -11,7 +11,8 @@ import {
 import * as db from "@/lib/db";
 import { getCurrentAdminScope } from "@/lib/auth/permissions";
 import { isPlatformOwnerScope, isPlatformScope } from "@/lib/auth/platform";
-import { isSupabaseConfigured } from "@/lib/db/with-fallback";
+import { isSupabaseConfigured, shouldUseInMemoryMock } from "@/lib/db/with-fallback";
+import * as mockDb from "@/lib/mock-db";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -22,7 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { LucideIcon } from "lucide-react";
-import { ProvisionChurchClient } from "./provision-client";
+import { ProvisionMosqueClient } from "./provision-client";
 import { FeatureFlagsClient } from "./feature-flags-client";
 import { PlatformConsoleManager } from "@/components/admin/platform-console-manager";
 
@@ -35,25 +36,36 @@ const GBP = new Intl.NumberFormat("en-GB", {
 });
 
 export default async function PlatformOverviewPage() {
-  if (!isSupabaseConfigured()) redirect("/admin");
+  if (!isSupabaseConfigured() && !shouldUseInMemoryMock()) redirect("/admin");
   const scope = await getCurrentAdminScope();
   if (!isPlatformScope(scope)) {
     redirect("/admin");
   }
 
-  const [stats, networks, churches, platformAdmins, tenantAdmins] = await Promise.all([
-    db.getPlatformChurchStats(),
-    db.listNetworks(),
-    db.listChurches(),
-    db.listPlatformAdminUsers(),
-    db.listTenantAdminUsers(),
-  ]);
+  const overview = shouldUseInMemoryMock()
+    ? mockDb.getPlatformOverviewData()
+    : null;
+  const [stats, networks, mosques, platformAdmins, tenantAdmins] = overview
+    ? [
+        overview.stats,
+        overview.networks,
+        overview.mosques,
+        overview.platformAdmins,
+        overview.tenantAdmins,
+      ]
+    : await Promise.all([
+        db.getPlatformMosqueStats(),
+        db.listNetworks(),
+        db.listMosques(),
+        db.listPlatformAdminUsers(),
+        db.listTenantAdminUsers(),
+      ]);
 
   const networkById = new Map(networks.map((p) => [p.id, p]));
 
   const totals = stats.reduce(
     (acc, s) => {
-      acc.churches += 1;
+      acc.mosques += 1;
       acc.members += s.members;
       acc.activeMembers += s.active_members;
       acc.upcomingEvents += s.upcoming_events;
@@ -63,7 +75,7 @@ export default async function PlatformOverviewPage() {
       return acc;
     },
     {
-      churches: 0,
+      mosques: 0,
       members: 0,
       activeMembers: 0,
       upcomingEvents: 0,
@@ -83,10 +95,10 @@ export default async function PlatformOverviewPage() {
             Platform console
           </p>
           <h1 className="text-2xl font-bold text-slate-900">
-            Cross-church overview
+            Cross-mosque overview
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-500">
-            One dashboard to see the health of every church on the platform.
+            One dashboard to see the health of every mosque on the platform.
             Operators only.
           </p>
         </div>
@@ -95,27 +107,27 @@ export default async function PlatformOverviewPage() {
             <Button variant="outline">Networks</Button>
           </Link>
           <Link href="/admin/onboarding">
-            <Button variant="outline">Onboard a church</Button>
+            <Button variant="outline">Onboard a mosque</Button>
           </Link>
         </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <ProvisionChurchClient
+        <ProvisionMosqueClient
           networks={networks.map((p) => ({ id: p.id, name: p.name }))}
         />
         <FeatureFlagsClient
-          churches={stats.map((s) => ({ id: s.church_id, name: s.church_name }))}
+          mosques={stats.map((s) => ({ id: s.mosque_id, name: s.mosque_name }))}
         />
       </div>
 
       <PlatformConsoleManager
-        churches={churches.map((church) => ({
-          id: church.id,
-          name: church.name,
-          slug: church.slug,
-          church_number: church.church_number,
-          network_id: church.network_id,
+        mosques={mosques.map((mosque) => ({
+          id: mosque.id,
+          name: mosque.name,
+          slug: mosque.slug,
+          mosque_number: mosque.mosque_number,
+          network_id: mosque.network_id,
         }))}
         networks={networks.map((network) => ({
           id: network.id,
@@ -127,7 +139,7 @@ export default async function PlatformOverviewPage() {
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat icon={Building2} label="Churches" value={String(totals.churches)} />
+        <Stat icon={Building2} label="Mosques" value={String(totals.mosques)} />
         <Stat
           icon={Users}
           label="Members"
@@ -151,14 +163,14 @@ export default async function PlatformOverviewPage() {
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-5 py-3">
           <h2 className="text-base font-semibold text-slate-900">
-            Per-church breakdown
+            Per-mosque breakdown
           </h2>
         </div>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Church</TableHead>
+                <TableHead>Mosque</TableHead>
                 <TableHead>Network</TableHead>
                 <TableHead className="text-right">Active</TableHead>
                 <TableHead className="text-right">Upcoming</TableHead>
@@ -173,14 +185,14 @@ export default async function PlatformOverviewPage() {
               {sorted.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} className="py-6 text-center text-sm text-slate-500">
-                    No churches yet. Use Networks or Onboarding to add the first one.
+                    No mosques yet. Use Networks or Onboarding to add the first one.
                   </TableCell>
                 </TableRow>
               ) : (
                 sorted.map((row) => (
-                  <TableRow key={row.church_id}>
+                  <TableRow key={row.mosque_id}>
                     <TableCell className="text-sm font-medium text-slate-900">
-                      {row.church_name}
+                      {row.mosque_name}
                     </TableCell>
                     <TableCell className="text-sm text-slate-500">
                       {row.network_id
@@ -209,7 +221,7 @@ export default async function PlatformOverviewPage() {
                     </TableCell>
                     <TableCell>
                       <Link
-                        href={`/api/admin/church-context?slug=${row.church_slug}`}
+                        href={`/api/admin/mosque-context?slug=${row.mosque_slug}`}
                         prefetch={false}
                         className="inline-flex items-center text-xs text-blue-600 hover:underline"
                       >

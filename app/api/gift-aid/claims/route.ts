@@ -4,7 +4,7 @@ import { getCurrentAdminScope } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit";
 import * as db from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import { eligibleDonationRows } from "@/lib/gift-aid/eligible";
 import { resolveDeclarationsForBatch } from "@/lib/gift-aid/new-declarations";
 
@@ -16,18 +16,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ claims: [], eligible: [] });
   }
 
-  const churchId = await resolveChurch(request);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueId = await resolveMosque(request);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
 
-  const forbidden = await requireAdminApiPermission("charity:write", churchId);
+  const forbidden = await requireAdminApiPermission("charity:write", mosqueId);
   if (forbidden) return forbidden;
 
   const [claims, donations, declarations] = await Promise.all([
-    db.getGiftAidClaimBatches(churchId),
-    db.getDonations(churchId),
-    db.getGiftAidDeclarations(churchId),
+    db.getGiftAidClaimBatches(mosqueId),
+    db.getDonations(mosqueId),
+    db.getGiftAidDeclarations(mosqueId),
   ]);
 
   return NextResponse.json({
@@ -44,12 +44,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Database not configured." }, { status: 503 });
   }
 
-  const churchId = await resolveChurch(request);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueId = await resolveMosque(request);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
 
-  const forbidden = await requireAdminApiPermission("charity:write", churchId);
+  const forbidden = await requireAdminApiPermission("charity:write", mosqueId);
   if (forbidden) return forbidden;
 
   const body = await request.json().catch(() => ({}));
@@ -64,8 +64,8 @@ export async function POST(request: NextRequest) {
   const scope = await getCurrentAdminScope();
 
   const [donations, declarations] = await Promise.all([
-    db.getDonations(churchId),
-    db.getGiftAidDeclarations(churchId),
+    db.getDonations(mosqueId),
+    db.getGiftAidDeclarations(mosqueId),
   ]);
   const allEligible = eligibleDonationRows(donations, declarations);
   const eligible =
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
   const periodStart = requestedPeriodStart ?? donationDates[0]!;
   const periodEnd = requestedPeriodEnd ?? donationDates[donationDates.length - 1]!;
   const eligibleAmount = eligible.reduce((sum, row) => sum + row.eligible_amount, 0);
-  const batch = await db.createGiftAidClaimBatch(churchId, {
+  const batch = await db.createGiftAidClaimBatch(mosqueId, {
     claim_reference: `GA-${periodStart}-${periodEnd}`,
     period_start: periodStart,
     period_end: periodEnd,
@@ -108,13 +108,13 @@ export async function POST(request: NextRequest) {
     paid_at: null,
     notes: typeof body.notes === "string" ? body.notes : null,
     created_by_email:
-      scope.kind === "dummy" || scope.kind === "platform" || scope.kind === "church"
+      scope.kind === "dummy" || scope.kind === "platform" || scope.kind === "mosque"
         ? scope.email
         : null,
   });
 
   await db.createGiftAidClaimItems(
-    churchId,
+    mosqueId,
     eligible.map((row) => ({
       claim_batch_id: batch.id,
       donation_id: row.id,
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
 
   await Promise.all(
     eligible.map((row) =>
-      db.updateDonation(row.id, churchId, {
+      db.updateDonation(row.id, mosqueId, {
         gift_aid_claim_batch_id: batch.id,
       })
     )
@@ -142,21 +142,21 @@ export async function POST(request: NextRequest) {
   let newDeclarationsCount = 0;
   try {
     const resolved = await resolveDeclarationsForBatch({
-      churchId,
+      mosqueId,
       newBatch: { created_at: batch.created_at, id: batch.id },
       donorDeclarationIds: eligible
         .map((row) => row.gift_aid_declaration_id)
         .filter((id): id is string => Boolean(id)),
     });
     if (resolved.links.length > 0) {
-      await db.linkDeclarationsToClaimBatch(churchId, batch.id, resolved.links);
+      await db.linkDeclarationsToClaimBatch(mosqueId, batch.id, resolved.links);
       // declarations_count = NEW declarations only (what UGLE retains this
       // cycle). donor_in_batch links are still persisted for the pack's
       // previously-supplied folder, but don't inflate the headline count.
       const newCount = resolved.links.filter(
         (link) => link.inclusion_reason === "new_in_window"
       ).length;
-      await db.setClaimBatchDeclarationsCount(batch.id, churchId, newCount);
+      await db.setClaimBatchDeclarationsCount(batch.id, mosqueId, newCount);
       newDeclarationsCount = newCount;
     }
   } catch (err) {
@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
   }
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "gift_aid_claim_batch_created",
     entityType: "gift_aid_claim_batch",
     entityId: batch.id,
@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
   );
 }
 
-async function resolveChurch(request: NextRequest) {
-  const churchSlug = getChurchSlugFromRequest(request);
-  return db.resolveChurchId(churchSlug);
+async function resolveMosque(request: NextRequest) {
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  return db.resolveMosqueId(mosqueSlug);
 }

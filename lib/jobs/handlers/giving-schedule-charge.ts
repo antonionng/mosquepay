@@ -60,7 +60,7 @@ export async function runGivingScheduleCharge(
   // shows up in cron logs.
   if (!givingSubscriptionEnabled()) {
     console.log(
-      "giving.schedule.charge: skipped (CHURCHPAY_GIVING_SUBSCRIPTION_ENABLED is not true)"
+      "giving.schedule.charge: skipped (MOSQUEPAY_GIVING_SUBSCRIPTION_ENABLED is not true)"
     );
     return result;
   }
@@ -75,7 +75,7 @@ export async function runGivingScheduleCharge(
       result.failed += 1;
       console.error("giving.schedule.charge: cycle failed for schedule", {
         schedule_id: schedule.id,
-        church_id: schedule.church_id,
+        mosque_id: schedule.mosque_id,
         message: err instanceof Error ? err.message : String(err),
       });
     }
@@ -106,7 +106,7 @@ async function chargeOne(
 
   const instalments = await db.getInstalmentsForGiving(
     schedule.member_giving_id,
-    schedule.church_id
+    schedule.mosque_id
   );
   const next = instalments
     .filter(
@@ -122,7 +122,7 @@ async function chargeOne(
     // Schedule still pointing at a charge date but no outstanding
     // instalments — likely a webhook race where the parent member_giving
     // got flipped paid. Reconcile here.
-    await db.updateGivingSchedule(schedule.id, schedule.church_id, {
+    await db.updateGivingSchedule(schedule.id, schedule.mosque_id, {
       status: "completed",
       next_charge_at: null,
     });
@@ -134,9 +134,9 @@ async function chargeOne(
   const supa = createServiceClient();
   const { data: merchantRow } = await supa
     .schema("mooov")
-    .from("churches")
+    .from("mosques")
     .select("merchant_id, status")
-    .eq("id", schedule.church_id)
+    .eq("id", schedule.mosque_id)
     .maybeSingle<{ merchant_id: string; status: string }>();
   if (
     !merchantRow ||
@@ -146,8 +146,8 @@ async function chargeOne(
     result.skipped += 1;
     return;
   }
-  const churchRow = await db.getChurchById(schedule.church_id);
-  const churchSlug = churchRow?.slug ?? "";
+  const mosqueRow = await db.getMosqueById(schedule.mosque_id);
+  const mosqueSlug = mosqueRow?.slug ?? "";
 
   const cycleNumber = next.sequence;
   const seq = String(cycleNumber).padStart(3, "0");
@@ -155,11 +155,11 @@ async function chargeOne(
   const idempotencyKey = `lp:giving:cycle:${schedule.id}:${seq}`;
   const amountMinor = Math.round(next.amount * 100);
   const currency = (next.currency ?? "GBP").toUpperCase();
-  const description = `Church giving — cycle ${cycleNumber}`;
+  const description = `Mosque giving — cycle ${cycleNumber}`;
 
   // Stamp the cycle's payment_id onto the instalment row so the cycle
   // webhook can correlate without re-deriving from payment_id parsing.
-  await db.updateInstalment(next.id, schedule.church_id, {
+  await db.updateInstalment(next.id, schedule.mosque_id, {
     payment_reference: paymentId,
   });
 
@@ -173,12 +173,12 @@ async function chargeOne(
     donor_email: schedule.member_email,
     cycle_number: cycleNumber,
     cycles_total: instalments.length,
-    church_slug: churchSlug,
+    mosque_slug: mosqueSlug,
   };
   const initialMetadata: Record<string, unknown> = {
-    source: "churchpay_giving_schedule_cycle",
-    church_id: schedule.church_id,
-    church_slug: churchSlug,
+    source: "mosquepay_giving_schedule_cycle",
+    mosque_id: schedule.mosque_id,
+    mosque_slug: mosqueSlug,
     intent: "giving_subscription_cycle",
     schedule_id: schedule.id,
     giving_id: schedule.member_giving_id,
@@ -186,7 +186,7 @@ async function chargeOne(
   };
 
   // Insert (or upsert) the payment_attempts row. Re-runs of the same
-  // cycle are protected by the (church_id, idempotency_key) unique
+  // cycle are protected by the (mosque_id, idempotency_key) unique
   // constraint; on conflict we let the existing row stand.
   const { error: insertErr } = await supa
     .schema("mooov")
@@ -194,7 +194,7 @@ async function chargeOne(
     .upsert(
       {
         payment_id: paymentId,
-        church_id: schedule.church_id,
+        mosque_id: schedule.mosque_id,
         member_id: null,
         amount: amountMinor,
         currency,
@@ -204,7 +204,7 @@ async function chargeOne(
         metadata: initialMetadata,
         guest_descriptor: guestDescriptor,
       },
-      { onConflict: "church_id,idempotency_key" }
+      { onConflict: "mosque_id,idempotency_key" }
     );
   if (insertErr) {
     console.error("giving.schedule.charge: payment_attempts upsert failed", {
@@ -234,7 +234,7 @@ async function chargeOne(
         instalment_id: next.id,
         cycle_number: String(cycleNumber),
         total_cycles: String(instalments.length),
-        church_slug: churchSlug,
+        mosque_slug: mosqueSlug,
       },
     });
 
@@ -258,7 +258,7 @@ async function chargeOne(
 
     if (charge.status === "requires_action" && charge.next_action) {
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-      await db.updateGivingSchedule(schedule.id, schedule.church_id, {
+      await db.updateGivingSchedule(schedule.id, schedule.mosque_id, {
         status: "action_required",
         next_action_client_secret: charge.next_action.client_secret,
         next_action_connected_account_id:
@@ -284,7 +284,7 @@ async function chargeOne(
       // last_failure_* metadata here.
       const failureCode = charge.error?.code ?? null;
       const failureCategory = charge.error?.category ?? null;
-      await db.updateGivingSchedule(schedule.id, schedule.church_id, {
+      await db.updateGivingSchedule(schedule.id, schedule.mosque_id, {
         last_failure_code: failureCode,
         last_failure_category: failureCategory,
         last_failure_at: new Date().toISOString(),
@@ -306,7 +306,7 @@ async function chargeOne(
       const isInFlight =
         err.status === 409 && /already processing/i.test(err.body);
       if (!isInFlight) {
-        await db.updateGivingSchedule(schedule.id, schedule.church_id, {
+        await db.updateGivingSchedule(schedule.id, schedule.mosque_id, {
           last_failure_code: err.category,
           last_failure_at: new Date().toISOString(),
         });

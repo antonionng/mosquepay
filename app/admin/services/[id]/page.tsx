@@ -3,9 +3,9 @@ import { headers } from "next/headers";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
-import { getDefaultChurchSlug } from "@/lib/tenant";
+import { getDefaultMosqueSlug } from "@/lib/tenant";
 import { getServiceReadiness } from "@/lib/services/readiness";
-import { churchScopedEventPath } from "@/lib/public-links";
+import { mosqueScopedEventPath } from "@/lib/public-links";
 import {
   isPubliclyVisible,
   PUBLIC_EVENT_TYPES,
@@ -31,20 +31,20 @@ export default async function AdminServiceDetailPage({
   const { id } = await params;
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
-  const churchId = ctx.mode === "database" ? ctx.churchId : null;
-  const churchSlug = ctx.mode === "database" ? ctx.churchSlug : getDefaultChurchSlug();
+  const mosqueId = ctx.mode === "database" ? ctx.mosqueId : null;
+  const mosqueSlug = ctx.mode === "database" ? ctx.mosqueSlug : getDefaultMosqueSlug();
 
   const event = useMock
     ? mockDb.getEventById(id)
-    : churchId
-      ? await db.getEventById(id, churchId)
+    : mosqueId
+      ? await db.getEventById(id, mosqueId)
       : null;
   if (!event) notFound();
 
   const rsvps = useMock
     ? mockDb.getRsvpsByEventId(id)
-    : churchId
-      ? await db.getRsvpsByEventId(id, churchId)
+    : mosqueId
+      ? await db.getRsvpsByEventId(id, mosqueId)
       : [];
 
   // Guests are saved into a separate `event_guests` table at RSVP time
@@ -52,29 +52,29 @@ export default async function AdminServiceDetailPage({
   // Without this load the admin page can only show the count, not the
   // actual names/dietary the member typed in.
   const eventGuests =
-    churchId && !useMock ? await db.getGuestsByEvent(id, churchId) : [];
+    mosqueId && !useMock ? await db.getGuestsByEvent(id, mosqueId) : [];
 
   let notice: Awaited<ReturnType<typeof db.getServiceNotice>> | null = null;
   let sends: Awaited<ReturnType<typeof db.listServiceNoticeSends>> = [];
-  if (churchId) {
-    notice = await db.getServiceNotice(id, churchId);
-    sends = await db.listServiceNoticeSends(churchId, id, 5);
+  if (mosqueId) {
+    notice = await db.getServiceNotice(id, mosqueId);
+    sends = await db.listServiceNoticeSends(mosqueId, id, 5);
   }
   const noticeSentCount = sends.reduce((a, s) => a + s.sent_count, 0);
 
-  const churchDefaults = churchId ? await db.getChurchFeeDefaults(churchId) : null;
+  const mosqueDefaults = mosqueId ? await db.getMosqueFeeDefaults(mosqueId) : null;
 
-  // Money raised against this service + lifetime church total. Both are
+  // Money raised against this service + lifetime mosque total. Both are
   // summed from the canonical `payments` table so the figure matches what
   // the treasurer sees in /admin/payments. Pending rows (in-flight QR /
   // unsettled cash) are included separately so the duty officer can see
   // money on the way in alongside money already on the ledger.
   const eventPayments =
-    churchId && !useMock
-      ? await db.getPaymentsByEventId(id, churchId)
+    mosqueId && !useMock
+      ? await db.getPaymentsByEventId(id, mosqueId)
       : [];
-  const churchPaymentsAll =
-    churchId && !useMock ? await db.getPayments(churchId) : [];
+  const mosquePaymentsAll =
+    mosqueId && !useMock ? await db.getPayments(mosqueId) : [];
 
   function bucketTotals(payments: Awaited<ReturnType<typeof db.getPayments>>) {
     const succeededSet = new Set([
@@ -120,9 +120,9 @@ export default async function AdminServiceDetailPage({
   }
 
   const serviceFinance = bucketTotals(eventPayments);
-  const churchFinance = bucketTotals(churchPaymentsAll);
-  const churchAllTimeTotal =
-    churchFinance.succeededTotal + churchFinance.pendingTotal;
+  const mosqueFinance = bucketTotals(mosquePaymentsAll);
+  const mosqueAllTimeTotal =
+    mosqueFinance.succeededTotal + mosqueFinance.pendingTotal;
 
   // Reconciliation: collected payments taken on (or within a day of) the
   // service date that are NOT attributed to any service. These are the
@@ -141,7 +141,7 @@ export default async function AdminServiceDetailPage({
     serviceDay,
     dayOffset(serviceDay, 1),
   ]);
-  const unattributedSameDay = churchPaymentsAll.filter(
+  const unattributedSameDay = mosquePaymentsAll.filter(
     (p) =>
       !p.event_id &&
       collectedStatuses.has(p.status) &&
@@ -158,8 +158,8 @@ export default async function AdminServiceDetailPage({
 
   // Services list for the "associate to a different service / detach" picker
   // inside the reconciliation panel and the per-payment edit controls.
-  const eventOptions = churchId
-    ? (await db.getEvents(churchId).catch(() => []))
+  const eventOptions = mosqueId
+    ? (await db.getEvents(mosqueId).catch(() => []))
         .map((e) => ({ id: e.id, title: e.title, event_date: e.event_date }))
         .sort((a, b) => b.event_date.localeCompare(a.event_date))
     : [];
@@ -169,7 +169,7 @@ export default async function AdminServiceDetailPage({
   // the totals before they hit Close. Migration 060 adds a preview of how
   // many new declarations will ship to UGLE with the pack.
   const eventDonations =
-    churchId && !useMock ? await db.getDonationsByEvent(id, churchId) : [];
+    mosqueId && !useMock ? await db.getDonationsByEvent(id, mosqueId) : [];
   const charityDonorAmount = eventDonations.reduce(
     (sum, d) => sum + Number(d.amount ?? 0),
     0,
@@ -182,9 +182,9 @@ export default async function AdminServiceDetailPage({
     (d) => typeof d.donor_email === "string" && d.donor_email.trim().length > 0,
   ).length;
   const giftAidDeclarations =
-    churchId && !useMock ? await db.getGiftAidDeclarations(churchId) : [];
+    mosqueId && !useMock ? await db.getGiftAidDeclarations(mosqueId) : [];
   const giftAidEligibleRows =
-    churchId && !useMock
+    mosqueId && !useMock
       ? eligibleDonationRows(eventDonations, giftAidDeclarations)
       : [];
   const giftAidEligibleAmount = giftAidEligibleRows.reduce(
@@ -199,7 +199,7 @@ export default async function AdminServiceDetailPage({
   let closedBatchId: string | null = null;
   let closedBatchDeclarationsCount = 0;
   let reliefChestDeliveredAt: string | null = null;
-  if (churchId && !useMock) {
+  if (mosqueId && !useMock) {
     try {
       const { resolveDeclarationsForBatch } = await import(
         "@/lib/gift-aid/new-declarations"
@@ -209,7 +209,7 @@ export default async function AdminServiceDetailPage({
         id: "preview",
       };
       const preview = await resolveDeclarationsForBatch({
-        churchId,
+        mosqueId,
         newBatch: previewBatch,
         donorDeclarationIds: giftAidEligibleRows
           .map((d) => d.gift_aid_declaration_id)
@@ -230,7 +230,7 @@ export default async function AdminServiceDetailPage({
         : null;
     if (serviceClosed) {
       try {
-        const collections = await db.getServiceCollections(churchId, {
+        const collections = await db.getServiceCollections(mosqueId, {
           eventId: id,
         });
         const collectionWithBatch = collections.find(
@@ -241,7 +241,7 @@ export default async function AdminServiceDetailPage({
             ?.gift_aid_pack_delivered_at ?? null;
         if (collectionWithBatch?.gift_aid_claim_batch_id) {
           closedBatchId = collectionWithBatch.gift_aid_claim_batch_id;
-          const batches = await db.getGiftAidClaimBatches(churchId);
+          const batches = await db.getGiftAidClaimBatches(mosqueId);
           const batch = batches.find((b) => b.id === closedBatchId);
           closedBatchDeclarationsCount = batch?.declarations_count ?? 0;
         }
@@ -288,7 +288,7 @@ export default async function AdminServiceDetailPage({
     published: event.published,
     hasNotice: Boolean(notice),
     noticeSentCount,
-    churchDefaults,
+    mosqueDefaults,
   });
 
   const reqHeaders = await headers();
@@ -296,7 +296,7 @@ export default async function AdminServiceDetailPage({
     reqHeaders.get("x-forwarded-host") ?? reqHeaders.get("host"),
     reqHeaders.get("x-forwarded-proto")
   );
-  const publicPath = churchScopedEventPath(churchSlug, event.slug);
+  const publicPath = mosqueScopedEventPath(mosqueSlug, event.slug);
   const publicUrl = `${origin}${publicPath}`;
   const previewPath = `/preview/services/${event.id}`;
 
@@ -336,7 +336,7 @@ export default async function AdminServiceDetailPage({
         "Guest policy is set to closed, so this service will never appear on the public site.";
     } else if (!publicByType) {
       visibilityReason =
-        "Regular services, churches of instruction, committees and emergencies stay private by default. Turn on \u201CFeature on website\u201D to publish it on the public church site.";
+        "Regular services, mosques of instruction, committees and emergencies stay private by default. Turn on \u201CFeature on website\u201D to publish it on the public mosque site.";
     }
   }
 
@@ -368,10 +368,10 @@ export default async function AdminServiceDetailPage({
       visibility={visibility}
       visibilityReason={visibilityReason}
       canFeatureOnWebsite={!publicByType && guestPolicy !== "closed"}
-      churchDefaults={churchDefaults}
+      mosqueDefaults={mosqueDefaults}
       finance={{
         service: serviceFinance,
-        churchAllTime: churchAllTimeTotal,
+        mosqueAllTime: mosqueAllTimeTotal,
         currency: "GBP",
       }}
       closeState={closeState}

@@ -9,7 +9,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { ADMIN_CHURCH_COOKIE } from "@/lib/tenant";
+import { ADMIN_MOSQUE_COOKIE } from "@/lib/tenant";
 
 async function getStaffAdminCookieEmail(): Promise<string | null> {
   try {
@@ -47,13 +47,13 @@ export type AdminRole =
 const ROLE_PERMISSIONS: Record<AdminRole, AdminPermission[]> = {
   super_admin: ["admin:all"],
   operator: ["admin:all"],
-  // Secretary is the de facto owner of a church: the person who provisions
-  // the ChurchPay account and is accountable for everything that happens
+  // Secretary is the de facto owner of a mosque: the person who provisions
+  // the MosquePay account and is accountable for everything that happens
   // under it (members, services, payments, charity, pastoral, settings).
-  // Tenant isolation is still enforced by admin_users.church_id, so this
-  // "admin:all" is scoped to the secretary's own church -- not platform-wide.
+  // Tenant isolation is still enforced by admin_users.mosque_id, so this
+  // "admin:all" is scoped to the secretary's own mosque -- not platform-wide.
   // Platform-wide god mode lives on super_admin / operator rows with
-  // church_id == null (see getCurrentAdminScope).
+  // mosque_id == null (see getCurrentAdminScope).
   secretary: ["admin:all"],
   treasurer: ["payments:write", "audit:read"],
   charity_steward: ["charity:write", "audit:read"],
@@ -72,7 +72,7 @@ const ROLE_PERMISSIONS: Record<AdminRole, AdminPermission[]> = {
  * Returns the canonical permission set for a role. The default fallback
  * matches what roleHasPermission used to do implicitly -- unknown role
  * strings get treated as secretary so a misconfigured admin_users row
- * doesn't accidentally lock a real church owner out of their own church.
+ * doesn't accidentally lock a real mosque owner out of their own mosque.
  */
 export function getRolePermissions(role: string | null | undefined): AdminPermission[] {
   const normalized = (role ?? "secretary") as AdminRole;
@@ -105,14 +105,14 @@ export function roleHasPermission(
   return permissions.includes("admin:all") || permissions.includes(permission);
 }
 
-export async function getCurrentAdminContext(churchId?: string | null) {
+export async function getCurrentAdminContext(mosqueId?: string | null) {
   const hasSession = await hasDummySession();
   if (!hasSession) return null;
 
-  const email = process.env.ADMIN_EMAIL ?? "admin@covenantchurch.org.uk";
+  const email = process.env.ADMIN_EMAIL ?? "admin@covenantmosque.org.uk";
   const fallbackRole = (process.env.ADMIN_ROLE ?? "super_admin") as AdminRole;
   try {
-    const admin = await db.getAdminUserByEmail(email, churchId);
+    const admin = await db.getAdminUserByEmail(email, mosqueId);
     return {
       email,
       role: admin?.role ?? fallbackRole,
@@ -123,7 +123,7 @@ export async function getCurrentAdminContext(churchId?: string | null) {
   }
 }
 
-export async function getCurrentStaffAdminContext(churchId?: string | null) {
+export async function getCurrentStaffAdminContext(mosqueId?: string | null) {
   // Prefer the signed staff session cookie as the authoritative identity:
   // it is issued by /api/auth/login only after a successful Supabase auth
   // and matched admin_users row, so its email is trustworthy. Using it as
@@ -149,7 +149,7 @@ export async function getCurrentStaffAdminContext(churchId?: string | null) {
 
   if (cookieEmail && isSupabaseConfigured()) {
     try {
-      const admin = await db.getAdminUserByEmail(cookieEmail, churchId);
+      const admin = await db.getAdminUserByEmail(cookieEmail, mosqueId);
       if (admin) {
         return {
           email: admin.email,
@@ -164,34 +164,34 @@ export async function getCurrentStaffAdminContext(churchId?: string | null) {
       // isn't locked out by a transient cookie-path failure.
       console.error(
         "[permissions] getAdminUserByEmail failed for staff cookie",
-        { email: cookieEmail, churchId, error }
+        { email: cookieEmail, mosqueId, error }
       );
     }
 
     // Fallback: ask the DB for every active admin_users row matching this
     // email and pick the one that proves access for the requested scope.
     // listAdminUsersByEmail uses the simpler email + active query without
-    // the ordered-by-church_id-desc-limit-1 shape that getAdminUserByEmail
+    // the ordered-by-mosque_id-desc-limit-1 shape that getAdminUserByEmail
     // uses, so it's the safer source of truth for "does this email have
     // admin access here?".
     //
-    // Tenant safety: when a churchId is supplied we ONLY accept a membership
-    // that either matches that church or is a platform-wide row. We never
-    // silently swap in a different-church membership -- doing so would let a
-    // church-scoped admin pass a permission check against a church they don't
+    // Tenant safety: when a mosqueId is supplied we ONLY accept a membership
+    // that either matches that mosque or is a platform-wide row. We never
+    // silently swap in a different-mosque membership -- doing so would let a
+    // mosque-scoped admin pass a permission check against a mosque they don't
     // administer, even though downstream queries would still target the
-    // mismatched church. When no churchId is supplied we just need to confirm
+    // mismatched mosque. When no mosqueId is supplied we just need to confirm
     // they're an admin somewhere (callers like requireAdminApiAuth use this
     // for the "is the user an admin at all?" question).
     try {
       const memberships = await db.listAdminUsersByEmail(cookieEmail);
       if (memberships.length > 0) {
-        const preferred = churchId
-          ? memberships.find((m) => m.church_id === churchId) ??
+        const preferred = mosqueId
+          ? memberships.find((m) => m.mosque_id === mosqueId) ??
             memberships.find(
-              (m) => m.church_id == null && isPlatformRole(m.role)
+              (m) => m.mosque_id == null && isPlatformRole(m.role)
             )
-          : memberships.find((m) => m.church_id == null) ?? memberships[0];
+          : memberships.find((m) => m.mosque_id == null) ?? memberships[0];
         if (preferred) {
           return {
             email: preferred.email,
@@ -203,7 +203,7 @@ export async function getCurrentStaffAdminContext(churchId?: string | null) {
     } catch (error) {
       console.error(
         "[permissions] listAdminUsersByEmail fallback failed",
-        { email: cookieEmail, churchId, error }
+        { email: cookieEmail, mosqueId, error }
       );
     }
   }
@@ -226,7 +226,7 @@ export async function getCurrentStaffAdminContext(churchId?: string | null) {
         // pair after a member-side logout.
         console.warn(
           "[permissions] staff cookie present but unresolvable to an admin",
-          { email: cookieEmail, churchId, supabaseError: error?.message }
+          { email: cookieEmail, mosqueId, supabaseError: error?.message }
         );
       }
       return null;
@@ -240,7 +240,7 @@ export async function getCurrentStaffAdminContext(churchId?: string | null) {
       };
     }
 
-    const admin = await db.getAdminUserByEmail(user.email, churchId);
+    const admin = await db.getAdminUserByEmail(user.email, mosqueId);
     if (admin) {
       return {
         email: admin.email,
@@ -250,16 +250,16 @@ export async function getCurrentStaffAdminContext(churchId?: string | null) {
     }
 
     // Same list-based fallback for the Supabase-session path. Tenant
-    // safety mirrors the staff-cookie path above: with a churchId we only
-    // accept a row that matches that church or is a platform-wide row.
+    // safety mirrors the staff-cookie path above: with a mosqueId we only
+    // accept a row that matches that mosque or is a platform-wide row.
     const memberships = await db.listAdminUsersByEmail(user.email);
     if (memberships.length === 0) return null;
-    const preferred = churchId
-      ? memberships.find((m) => m.church_id === churchId) ??
+    const preferred = mosqueId
+      ? memberships.find((m) => m.mosque_id === mosqueId) ??
         memberships.find(
-          (m) => m.church_id == null && isPlatformRole(m.role)
+          (m) => m.mosque_id == null && isPlatformRole(m.role)
         )
-      : memberships.find((m) => m.church_id == null) ?? memberships[0];
+      : memberships.find((m) => m.mosque_id == null) ?? memberships[0];
     if (!preferred) return null;
     return {
       email: preferred.email,
@@ -269,31 +269,31 @@ export async function getCurrentStaffAdminContext(churchId?: string | null) {
   } catch (error) {
     console.error(
       "[permissions] supabase-session admin lookup failed",
-      { churchId, error }
+      { mosqueId, error }
     );
     return null;
   }
 }
 
-export async function getCurrentAdminContextAny(churchId?: string | null) {
+export async function getCurrentAdminContextAny(mosqueId?: string | null) {
   return (
-    (await getCurrentAdminContext(churchId)) ??
-    (await getCurrentStaffAdminContext(churchId))
+    (await getCurrentAdminContext(mosqueId)) ??
+    (await getCurrentStaffAdminContext(mosqueId))
   );
 }
 
 /**
- * Authorize an admin API action against (optionally) a specific church.
+ * Authorize an admin API action against (optionally) a specific mosque.
  *
  * Authority model:
  *   1. Identity comes from getCurrentAdminScope() -- the same resolver the
  *      page side uses. As long as a user can render /admin/* the API agrees
  *      they are an admin. This closes the class of bugs where the page
  *      rendered but the API returned 401 because a single-row admin lookup
- *      (getAdminUserByEmail) couldn't reconcile the requested churchId.
- *   2. Tenant isolation is enforced against scope.churchIds. A church-scoped
- *      admin can never act on a church they don't administer, no matter what
- *      churchId the request resolved to.
+ *      (getAdminUserByEmail) couldn't reconcile the requested mosqueId.
+ *   2. Tenant isolation is enforced against scope.mosqueIds. A mosque-scoped
+ *      admin can never act on a mosque they don't administer, no matter what
+ *      mosqueId the request resolved to.
  *   3. Permission is checked against the role first, then against per-row
  *      admin_users.permissions overrides loaded best-effort.
  *
@@ -303,7 +303,7 @@ export async function getCurrentAdminContextAny(churchId?: string | null) {
  */
 export async function requireAdminPermission(
   permission: AdminPermission,
-  churchId?: string | null
+  mosqueId?: string | null
 ) {
   const scope = await getCurrentAdminScope();
 
@@ -311,40 +311,40 @@ export async function requireAdminPermission(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (scope.kind === "church" && churchId != null && !scope.churchIds.includes(churchId)) {
-    // The request resolved a churchId the admin doesn't administer. This is
-    // almost always caused by a stale ADMIN_CHURCH_COOKIE -- the page-side
+  if (scope.kind === "mosque" && mosqueId != null && !scope.mosqueIds.includes(mosqueId)) {
+    // The request resolved a mosqueId the admin doesn't administer. This is
+    // almost always caused by a stale ADMIN_MOSQUE_COOKIE -- the page-side
     // scope resolver ignores stale cookies and uses the admin's actual
-    // church, but the API side resolves the church via getChurchSlugFromRequest
+    // mosque, but the API side resolves the mosque via getMosqueSlugFromRequest
     // which reads the cookie verbatim. Self-heal the cookie on the way out
     // and tell the client to retry; their next attempt will resolve to the
-    // correct church.
+    // correct mosque.
     console.warn(
-      "[permissions] healing stale church cookie on out-of-scope request",
+      "[permissions] healing stale mosque cookie on out-of-scope request",
       {
         email: scope.email,
         role: scope.role,
         permission,
-        requestedChurchId: churchId,
-        scopeChurchId: scope.churchId,
-        scopeChurchIds: scope.churchIds,
+        requestedMosqueId: mosqueId,
+        scopeMosqueId: scope.mosqueId,
+        scopeMosqueIds: scope.mosqueIds,
       }
     );
 
     const response = NextResponse.json(
       {
         error:
-          "Your church selection was out of date. We've refreshed it -- please retry.",
-        code: "church_cookie_healed",
+          "Your mosque selection was out of date. We've refreshed it -- please retry.",
+        code: "mosque_cookie_healed",
         retry: true,
       },
       { status: 409 }
     );
 
     try {
-      const adminChurch = await db.getChurchById(scope.churchId);
-      if (adminChurch?.slug) {
-        response.cookies.set(ADMIN_CHURCH_COOKIE, adminChurch.slug, {
+      const adminMosque = await db.getMosqueById(scope.mosqueId);
+      if (adminMosque?.slug) {
+        response.cookies.set(ADMIN_MOSQUE_COOKIE, adminMosque.slug, {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
           sameSite: "lax",
@@ -354,8 +354,8 @@ export async function requireAdminPermission(
       }
     } catch (error) {
       console.error(
-        "[permissions] failed to heal ADMIN_CHURCH_COOKIE on out-of-scope request",
-        { email: scope.email, scopeChurchId: scope.churchId, error }
+        "[permissions] failed to heal ADMIN_MOSQUE_COOKIE on out-of-scope request",
+        { email: scope.email, scopeMosqueId: scope.mosqueId, error }
       );
     }
 
@@ -370,7 +370,7 @@ export async function requireAdminPermission(
   // per-row overrides in the permissions[] column. Honor those before
   // returning 403.
   try {
-    const overrides = await db.getAdminUserByEmail(scope.email, churchId);
+    const overrides = await db.getAdminUserByEmail(scope.email, mosqueId);
     if (overrides?.permissions?.includes(permission)) {
       return null;
     }
@@ -380,7 +380,7 @@ export async function requireAdminPermission(
     // per-row overrides couldn't be loaded.
     console.error(
       "[permissions] per-row permission override lookup failed",
-      { email: scope.email, churchId, permission, error }
+      { email: scope.email, mosqueId, permission, error }
     );
   }
 
@@ -392,11 +392,11 @@ export type AdminScope =
   | { kind: "dummy"; email: string; role: AdminRole }
   | { kind: "platform"; email: string; role: AdminRole }
   | {
-      kind: "church";
+      kind: "mosque";
       email: string;
       role: AdminRole;
-      churchId: string;
-      churchIds: string[];
+      mosqueId: string;
+      mosqueIds: string[];
     };
 
 function isPlatformRole(role: string | null | undefined): role is AdminRole {
@@ -405,13 +405,16 @@ function isPlatformRole(role: string | null | undefined): role is AdminRole {
 
 /**
  * Resolves the current admin actor into a scope describing whether they are
- * the dev dummy admin, a platform-wide admin (church_id null with a platform
- * role), or a church-scoped admin. Used to gate cross-church actions like the
- * church switcher.
+ * the dev dummy admin, a platform-wide admin (mosque_id null with a platform
+ * role), or a mosque-scoped admin. Used to gate cross-mosque actions like the
+ * mosque switcher.
  */
 export async function getCurrentAdminScope(): Promise<AdminScope> {
   if (await hasDummySession()) {
-    const email = process.env.ADMIN_EMAIL ?? "admin@covenantchurch.org.uk";
+    const configuredEmail = process.env.ADMIN_EMAIL ?? "admin@covenantmosque.org.uk";
+    const email = isPlatformOwnerEmail(configuredEmail)
+      ? configuredEmail.trim().toLowerCase()
+      : configuredEmail;
     const role = (process.env.ADMIN_ROLE ?? "super_admin") as AdminRole;
     return { kind: "dummy", email, role };
   }
@@ -461,7 +464,7 @@ export async function getCurrentAdminScope(): Promise<AdminScope> {
     if (memberships.length === 0) return { kind: "none" };
 
     const platformAdmin = memberships.find(
-      (admin) => admin.church_id == null && isPlatformRole(admin.role)
+      (admin) => admin.mosque_id == null && isPlatformRole(admin.role)
     );
 
     if (platformAdmin) {
@@ -472,16 +475,16 @@ export async function getCurrentAdminScope(): Promise<AdminScope> {
       };
     }
 
-    const churchMemberships = memberships.filter((admin) => admin.church_id);
-    const primary = churchMemberships[0];
-    if (primary?.church_id) {
+    const mosqueMemberships = memberships.filter((admin) => admin.mosque_id);
+    const primary = mosqueMemberships[0];
+    if (primary?.mosque_id) {
       return {
-        kind: "church",
+        kind: "mosque",
         email: primary.email,
         role: primary.role as AdminRole,
-        churchId: primary.church_id,
-        churchIds: Array.from(
-          new Set(churchMemberships.flatMap((admin) => admin.church_id ?? []))
+        mosqueId: primary.mosque_id,
+        mosqueIds: Array.from(
+          new Set(mosqueMemberships.flatMap((admin) => admin.mosque_id ?? []))
         ),
       };
     }

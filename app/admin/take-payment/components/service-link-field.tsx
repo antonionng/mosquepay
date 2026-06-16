@@ -28,7 +28,7 @@ export function ServiceLinkField({
   events: EventOption[];
   eventId: string | null;
   setEventId: (v: string | null) => void;
-  /** True when we pre-selected today's service (vs the operator choosing). */
+  /** True when we pre-selected today's Jumu'ah (vs the operator choosing). */
   autoSelected?: boolean;
 }) {
   if (events.length === 0) return null;

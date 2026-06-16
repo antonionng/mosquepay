@@ -8,11 +8,11 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-type ChurchOption = {
+type MosqueOption = {
   id: string;
   name: string;
   slug: string;
-  church_number: string | null;
+  mosque_number: string | null;
   network_id: string | null;
 };
 
@@ -23,14 +23,14 @@ type NetworkOption = {
 
 type AdminUser = {
   id: string;
-  church_id: string | null;
+  mosque_id: string | null;
   email: string;
   full_name: string;
   role: string;
   active: boolean;
 };
 
-type ScopeType = "church" | "network" | "platform";
+type ScopeType = "mosque" | "network" | "platform";
 
 const TENANT_ROLES = [
   ["super_admin", "Tenant owner"],
@@ -48,13 +48,13 @@ const PLATFORM_ROLES = [
 ];
 
 export function PlatformConsoleManager({
-  churches,
+  mosques,
   networks,
   tenantAdmins,
   platformAdmins,
   isOwner,
 }: {
-  churches: ChurchOption[];
+  mosques: MosqueOption[];
   networks: NetworkOption[];
   tenantAdmins: AdminUser[];
   platformAdmins: AdminUser[];
@@ -63,19 +63,19 @@ export function PlatformConsoleManager({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [scopeType, setScopeType] = useState<ScopeType>("church");
+  const [scopeType, setScopeType] = useState<ScopeType>("mosque");
   const [form, setForm] = useState({
     full_name: "",
     email: "",
     role: "super_admin",
-    church_id: churches[0]?.id ?? "",
+    mosque_id: mosques[0]?.id ?? "",
     network_id: networks[0]?.id ?? "",
     send_invite: false,
   });
 
-  const churchById = useMemo(
-    () => new Map(churches.map((church) => [church.id, church])),
-    [churches]
+  const mosqueById = useMemo(
+    () => new Map(mosques.map((mosque) => [mosque.id, mosque])),
+    [mosques]
   );
 
   function setField<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
@@ -96,7 +96,7 @@ export function PlatformConsoleManager({
           full_name: form.full_name,
           email: form.email,
           role: form.role,
-          church_id: form.church_id || null,
+          mosque_id: form.mosque_id || null,
           network_id: form.network_id || null,
           send_invite: form.send_invite,
         }),
@@ -165,15 +165,15 @@ export function PlatformConsoleManager({
               Invite an admin owner
             </h2>
             <p className="mt-1 text-sm leading-relaxed text-dash-muted">
-              Add an owner to one church, every church in a network, or the
-              ChurchPay platform team. Platform team invites are owner-only.
+              Add an owner to one mosque, every mosque in a network, or the
+              MosquePay platform team. Platform team invites are owner-only.
             </p>
           </div>
         </div>
 
         <form onSubmit={submit} className="mt-5 space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
-            {(["church", "network", "platform"] as const).map((value) => (
+            {(["mosque", "network", "platform"] as const).map((value) => (
               <button
                 key={value}
                 type="button"
@@ -191,8 +191,8 @@ export function PlatformConsoleManager({
                     : "border-dash-border bg-dash-surface text-dash-muted"
                 } disabled:cursor-not-allowed disabled:opacity-50`}
               >
-                {value === "church"
-                  ? "Church"
+                {value === "mosque"
+                  ? "Mosque"
                   : value === "network"
                     ? "Network"
                     : "Platform team"}
@@ -224,17 +224,17 @@ export function PlatformConsoleManager({
             </div>
           </div>
 
-          {scopeType === "church" ? (
+          {scopeType === "mosque" ? (
             <SelectField
-              id="platform-admin-church"
-              label="Tenant church"
-              value={form.church_id}
-              onChange={(value) => setField("church_id", value)}
+              id="platform-admin-mosque"
+              label="Tenant mosque"
+              value={form.mosque_id}
+              onChange={(value) => setField("mosque_id", value)}
             >
-              {churches.map((church) => (
-                <option key={church.id} value={church.id}>
-                  {church.name}
-                  {church.church_number ? ` No ${church.church_number}` : ""}
+              {mosques.map((mosque) => (
+                <option key={mosque.id} value={mosque.id}>
+                  {mosque.name}
+                  {mosque.mosque_number ? ` No ${mosque.mosque_number}` : ""}
                 </option>
               ))}
             </SelectField>
@@ -310,7 +310,7 @@ export function PlatformConsoleManager({
           </div>
           <p className="mt-1 text-sm text-dash-muted">
             Platform team members can manage tenants. Tenant owners are scoped
-            to their church memberships.
+            to their mosque memberships.
           </p>
         </div>
         <div className="max-h-[32rem] overflow-auto p-5">
@@ -324,7 +324,7 @@ export function PlatformConsoleManager({
           <AdminList
             title="Tenant admins"
             rows={tenantAdmins}
-            getScope={(admin) => churchById.get(admin.church_id ?? "")?.name ?? "Unknown church"}
+            getScope={(admin) => mosqueById.get(admin.mosque_id ?? "")?.name ?? "Unknown mosque"}
             onResetPassword={sendPasswordReset}
             busy={busy}
           />

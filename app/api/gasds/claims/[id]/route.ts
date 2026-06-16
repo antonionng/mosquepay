@@ -3,7 +3,7 @@ import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
 import * as db from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 
 const STATUS_DATES = {
   exported: "exported_at",
@@ -22,12 +22,12 @@ export async function PATCH(
     return NextResponse.json({ error: "Database not configured." }, { status: 503 });
   }
 
-  const churchId = await resolveChurch(request);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueId = await resolveMosque(request);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
 
-  const forbidden = await requireAdminApiPermission("charity:write", churchId);
+  const forbidden = await requireAdminApiPermission("charity:write", mosqueId);
   if (forbidden) return forbidden;
 
   const { id } = await params;
@@ -37,7 +37,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Valid status is required." }, { status: 400 });
   }
 
-  const existing = (await db.getGasdsClaims(churchId)).find((claim) => claim.id === id);
+  const existing = (await db.getGasdsClaims(mosqueId)).find((claim) => claim.id === id);
   if (!existing) {
     return NextResponse.json({ error: "GASDS claim not found." }, { status: 404 });
   }
@@ -52,7 +52,7 @@ export async function PATCH(
     updates[STATUS_DATES[status as keyof typeof STATUS_DATES]] = now;
   }
 
-  const claim = await db.upsertGasdsClaim(churchId, {
+  const claim = await db.upsertGasdsClaim(mosqueId, {
     tax_year: updates.tax_year,
     eligible_cash_amount: updates.eligible_cash_amount,
     claimed_cash_amount: updates.claimed_cash_amount,
@@ -65,7 +65,7 @@ export async function PATCH(
   });
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "gasds_claim_updated",
     entityType: "gasds_claim",
     entityId: claim.id,
@@ -76,7 +76,7 @@ export async function PATCH(
   return NextResponse.json({ claim });
 }
 
-async function resolveChurch(request: NextRequest) {
-  const churchSlug = getChurchSlugFromRequest(request);
-  return db.resolveChurchId(churchSlug);
+async function resolveMosque(request: NextRequest) {
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  return db.resolveMosqueId(mosqueSlug);
 }

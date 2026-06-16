@@ -24,9 +24,9 @@ export type TakePaymentReceiptArgs = {
   paymentMethod: "cash" | "card_qr";
   recordedByEmail: string | null;
   giftAidEligible: boolean;
-  // Pass the church id so we can pull the display name into the receipt
-  // header. Falls back to "your church" if the lookup fails.
-  churchId?: string | null;
+  // Pass the mosque id so we can pull the display name into the receipt
+  // header. Falls back to "your mosque" if the lookup fails.
+  mosqueId?: string | null;
   /** Optional dedupe key (payment_id) so re-fires don't duplicate. */
   paymentId?: string | null;
   /** Itemised breakdown for a split payment (raffle + charity + dining on one
@@ -41,7 +41,7 @@ function methodLabel(method: TakePaymentReceiptArgs["paymentMethod"]) {
 
 function categoryLabel(category: string | null) {
   if (!category) return null;
-  if (category === "general") return "General church funds";
+  if (category === "general") return "General mosque funds";
   if (category === "charity") return "Charity";
   if (category === "dining") return "Dining";
   if (category === "raffle") return "Raffle";
@@ -51,11 +51,11 @@ function categoryLabel(category: string | null) {
 export async function sendTakePaymentReceipt(args: TakePaymentReceiptArgs) {
   if (!args.toEmail) return { sent: false };
 
-  let churchName = "your church";
-  if (args.churchId) {
+  let mosqueName = "your mosque";
+  if (args.mosqueId) {
     try {
-      const church = await db.getChurchById(args.churchId);
-      if (church?.name) churchName = church.name;
+      const mosque = await db.getMosqueById(args.mosqueId);
+      if (mosque?.name) mosqueName = mosque.name;
     } catch {
       // Non-fatal — fall back to generic copy.
     }
@@ -80,7 +80,7 @@ export async function sendTakePaymentReceipt(args: TakePaymentReceiptArgs) {
   if (args.recordedByEmail) facts.push(`Recorded by: ${args.recordedByEmail}`);
 
   const paragraphs: string[] = [
-    `We've recorded your payment to ${churchName}. This email confirms the entry; please keep it for your records.`,
+    `We've recorded your payment to ${mosqueName}. This email confirms the entry; please keep it for your records.`,
     facts.join(" · "),
   ];
   if (hasLineItems) {
@@ -98,29 +98,29 @@ export async function sendTakePaymentReceipt(args: TakePaymentReceiptArgs) {
     : args.category === "charity";
   if (args.giftAidEligible && hasCharity) {
     paragraphs.push(
-      "Because you have an active Gift Aid declaration with this church, we've logged this donation against your reclaim batch automatically.",
+      "Because you have an active Gift Aid declaration with this mosque, we've logged this donation against your reclaim batch automatically.",
     );
   }
 
   const html = renderSimpleMessageEmail({
     eyebrow: "Payment received",
     title: `Receipt: ${amountString}`,
-    preview: `Receipt for ${amountString} to ${churchName}.`,
+    preview: `Receipt for ${amountString} to ${mosqueName}.`,
     greeting: `Dear ${args.toName},`,
     paragraphs,
     note:
-      "If anything looks wrong on this receipt, please reply to this email or contact your church treasurer.",
+      "If anything looks wrong on this receipt, please reply to this email or contact your mosque treasurer.",
   });
 
   const result = await sendWithLog({
-    churchId: args.churchId ?? null,
+    mosqueId: args.mosqueId ?? null,
     toEmail: args.toEmail,
     toName: args.toName,
     emailType: "payment_receipt_take_payment",
     entityType: "payment",
     entityId: args.paymentId ?? null,
     dedupeKey: args.paymentId,
-    subject: `Receipt: ${amountString} to ${churchName}`,
+    subject: `Receipt: ${amountString} to ${mosqueName}`,
     html,
     text: `${paragraphs.join("\n\n")}\n`,
     metadata: {

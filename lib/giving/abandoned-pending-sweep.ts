@@ -48,14 +48,14 @@ import * as db from "@/lib/db";
 const DEFAULT_STALE_AFTER_MS = 26 * 60 * 60 * 1000; // 26 hours
 
 /**
- * Cancel `pending` schedules for a church that are older than
+ * Cancel `pending` schedules for a mosque that are older than
  * `staleAfterMs` and have no payment method id or successful charge.
  *
  * Returns the number of rows cancelled. Best-effort: any per-row
  * failure is logged and the sweep continues with the next row.
  */
 export async function sweepAbandonedPendingSchedules(
-  churchId: string,
+  mosqueId: string,
   opts: { staleAfterMs?: number } = {},
 ): Promise<number> {
   const staleAfterMs = opts.staleAfterMs ?? DEFAULT_STALE_AFTER_MS;
@@ -63,10 +63,10 @@ export async function sweepAbandonedPendingSchedules(
 
   let pending: Awaited<ReturnType<typeof db.listGivingSchedules>>;
   try {
-    pending = await db.listGivingSchedules(churchId, { status: "pending" });
+    pending = await db.listGivingSchedules(mosqueId, { status: "pending" });
   } catch (err) {
     console.error("sweepAbandonedPendingSchedules: list failed", {
-      church_id: churchId,
+      mosque_id: mosqueId,
       message: err instanceof Error ? err.message : String(err),
     });
     return 0;
@@ -84,7 +84,7 @@ export async function sweepAbandonedPendingSchedules(
   let cancelled = 0;
   for (const row of stale) {
     try {
-      await db.updateGivingSchedule(row.id, churchId, {
+      await db.updateGivingSchedule(row.id, mosqueId, {
         status: "cancelled",
         cancelled_at: new Date().toISOString(),
         cancelled_by_actor: "system_abandoned_checkout",
@@ -106,7 +106,7 @@ export async function sweepAbandonedPendingSchedules(
 
   if (cancelled > 0) {
     console.log("sweepAbandonedPendingSchedules: cancelled stale rows", {
-      church_id: churchId,
+      mosque_id: mosqueId,
       count: cancelled,
       stale_after_ms: staleAfterMs,
     });

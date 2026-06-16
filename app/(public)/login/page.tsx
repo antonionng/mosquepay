@@ -9,11 +9,11 @@ import {
 import { marketingMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = marketingMetadata({
-  title: "Log in to ChurchPay | Member and Admin Access",
+  title: "Log in to MosquePay | Member and Admin Access",
   description:
-    "Choose the right ChurchPay login: the member portal for giving and services, or the admin dashboard for church staff, treasurers, and leadership teams.",
+    "Choose the right MosquePay login: the member portal for giving and services, or the admin dashboard for mosque staff, treasurers, and leadership teams.",
   path: "/login",
-  keywords: ["ChurchPay login", "church member portal login", "church admin login"],
+  keywords: ["MosquePay login", "mosque member portal login", "mosque admin login"],
 });
 
 const routes = [
@@ -28,7 +28,7 @@ const routes = [
   {
     title: "Staff and admin login",
     description:
-      "For pastors, administrators, treasurers, welcome teams, pastoral care leads, network users, and platform admins.",
+      "For imams, administrators, treasurers, welcome teams, welfare leads, network users, and platform admins.",
     href: "/admin/login",
     cta: "Open admin dashboard",
     Icon: ShieldCheck,
@@ -41,12 +41,12 @@ export default function LoginChooserPage() {
       <section className="px-5 pb-4 pt-16 lg:px-8 lg:pt-24">
         <div className="mx-auto max-w-7xl">
           <div className="max-w-3xl">
-            <MarketingKicker>ChurchPay access</MarketingKicker>
+            <MarketingKicker>MosquePay access</MarketingKicker>
             <h1 className="mt-4 font-heading text-4xl font-bold leading-tight tracking-tight text-slate-900 sm:text-5xl">
               Choose the right login for your role.
             </h1>
             <p className="mt-6 text-lg leading-8 text-slate-600">
-              Members and church teams use different doors into ChurchPay. Pick the one that
+              Members and mosque teams use different doors into MosquePay. Pick the one that
               matches how you serve.
             </p>
           </div>

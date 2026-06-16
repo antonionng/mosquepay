@@ -13,9 +13,9 @@ import { CheckCircle } from "lucide-react";
 const schema = z.object({
   full_name: z.string().min(1, "Full name is required"),
   work_email: z.string().email("Valid work email is required"),
-  church_name: z.string().min(1, "Church name is required"),
+  mosque_name: z.string().min(1, "Mosque name is required"),
   role: z.string().min(1, "Role is required"),
-  church_count: z.coerce.number().min(1).max(500).default(1),
+  mosque_count: z.coerce.number().min(1).max(500).default(1),
   priorities: z.string().optional(),
 });
 
@@ -31,7 +31,7 @@ export function BookDemoForm() {
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      church_count: 1,
+      mosque_count: 1,
     },
   });
 
@@ -59,7 +59,7 @@ export function BookDemoForm() {
         <CheckCircle className="mx-auto mb-3 h-10 w-10 text-green-600" />
         <p className="font-semibold text-slate-900">Demo request received</p>
         <p className="mt-2 text-sm text-slate-600">
-          Thanks. We will reach out shortly to schedule your ChurchPay walkthrough, and a confirmation email is on its way.
+          Thanks. We will reach out shortly to schedule your MosquePay walkthrough, and a confirmation email is on its way.
         </p>
       </div>
     );
@@ -106,10 +106,10 @@ export function BookDemoForm() {
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="church_name">Church or group name *</Label>
-          <Input id="church_name" {...register("church_name")} />
-          {errors.church_name ? (
-            <p className="text-sm text-red-600">{errors.church_name.message}</p>
+          <Label htmlFor="mosque_name">Mosque or group name *</Label>
+          <Input id="mosque_name" {...register("mosque_name")} />
+          {errors.mosque_name ? (
+            <p className="text-sm text-red-600">{errors.mosque_name.message}</p>
           ) : null}
         </div>
         <div className="space-y-2">
@@ -119,15 +119,15 @@ export function BookDemoForm() {
         </div>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="church_count">How many churches do you manage?</Label>
+        <Label htmlFor="mosque_count">How many mosques do you manage?</Label>
         <Input
-          id="church_count"
+          id="mosque_count"
           type="number"
           min={1}
           max={500}
           inputMode="numeric"
           enterKeyHint="next"
-          {...register("church_count")}
+          {...register("mosque_count")}
         />
       </div>
       <div className="space-y-2">

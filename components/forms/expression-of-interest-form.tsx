@@ -30,13 +30,13 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-export function ExpressionOfInterestForm({ churchSlug }: { churchSlug?: string }) {
+export function ExpressionOfInterestForm({ mosqueSlug }: { mosqueSlug?: string }) {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const searchParams = useSearchParams();
-  const churchFromQuery = searchParams.get("church");
-  const effectiveChurch = churchSlug ?? churchFromQuery ?? undefined;
-  const churchQuery = effectiveChurch ? `?church=${encodeURIComponent(effectiveChurch)}` : "";
+  const mosqueFromQuery = searchParams.get("mosque");
+  const effectiveMosque = mosqueSlug ?? mosqueFromQuery ?? undefined;
+  const mosqueQuery = effectiveMosque ? `?mosque=${encodeURIComponent(effectiveMosque)}` : "";
 
   const {
     register,
@@ -56,7 +56,7 @@ export function ExpressionOfInterestForm({ churchSlug }: { churchSlug?: string }
   async function onSubmit(data: FormData) {
     setError(null);
     try {
-      const res = await fetch(`/api/newcomers${churchQuery}`, {
+      const res = await fetch(`/api/newcomers${mosqueQuery}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),

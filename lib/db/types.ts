@@ -1,4 +1,4 @@
-export type Church = {
+export type Mosque = {
   id: string;
   slug: string;
   name: string;
@@ -10,7 +10,7 @@ export type Church = {
   secondary_color: string | null;
   support_email: string | null;
   support_phone: string | null;
-  church_number: string | null;
+  mosque_number: string | null;
   consecrated_at: string | null;
   governing_body: string | null;
   service_schedule: string | null;
@@ -44,7 +44,7 @@ export type Church = {
    */
   accessibility_notes: string | null;
   /**
-   * Default church dress code shown on the public site Service Details
+   * Default mosque dress code shown on the public site Service Details
    * card and used as a fallback when an individual event has no
    * `dress_code` set.
    */
@@ -57,7 +57,7 @@ export type Church = {
   accepts_self_registration: boolean;
   current_charity_campaign_id: string | null;
   /**
-   * Gift Aid capture mode for this church (migration 059).
+   * Gift Aid capture mode for this mosque (migration 059).
    *   - `digital`: member portal self-serve only.
    *   - `paper`:   admin captures paper declarations, members are pointed at
    *                the printable form.
@@ -73,7 +73,7 @@ export type Church = {
 };
 
 /** Optional visual overrides per section (stored in JSONB). */
-export type ChurchSiteSectionStyle = {
+export type MosqueSiteSectionStyle = {
   primary_color?: string | null;
   background_image_url?: string | null;
   overlay_opacity?: number | null;
@@ -103,7 +103,7 @@ export type ChurchSiteSectionStyle = {
   faq_entries?: { question: string; answer: string }[] | null;
 };
 
-export type ChurchSiteSection = {
+export type MosqueSiteSection = {
   id: string;
   type:
     | "hero"
@@ -121,24 +121,24 @@ export type ChurchSiteSection = {
   cta_href: string | null;
   visible: boolean;
   order: number;
-  style?: ChurchSiteSectionStyle | null;
+  style?: MosqueSiteSectionStyle | null;
 };
 
-export type ChurchSitePage = {
+export type MosqueSitePage = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   page_key: string;
   page_title: string;
   page_description: string | null;
-  sections: ChurchSiteSection[];
-  custom_pages?: ChurchSiteCustomPage[] | null;
-  header_settings?: ChurchSiteHeaderSettings | null;
-  footer_settings?: ChurchSiteFooterSettings | null;
+  sections: MosqueSiteSection[];
+  custom_pages?: MosqueSiteCustomPage[] | null;
+  header_settings?: MosqueSiteHeaderSettings | null;
+  footer_settings?: MosqueSiteFooterSettings | null;
   published: boolean;
   updated_at: string;
 };
 
-export type ChurchSiteHeaderNavItem = {
+export type MosqueSiteHeaderNavItem = {
   id: string;
   label: string;
   href: string;
@@ -146,16 +146,16 @@ export type ChurchSiteHeaderNavItem = {
   order: number;
 };
 
-export type ChurchSiteHeaderSettings = {
+export type MosqueSiteHeaderSettings = {
   show_logo: boolean;
-  show_church_name: boolean;
-  show_church_number: boolean;
-  nav_items: ChurchSiteHeaderNavItem[];
+  show_mosque_name: boolean;
+  show_mosque_number: boolean;
+  nav_items: MosqueSiteHeaderNavItem[];
   cta_label: string | null;
   cta_href: string | null;
 };
 
-export type ChurchSiteFooterLink = {
+export type MosqueSiteFooterLink = {
   id: string;
   label: string;
   href: string;
@@ -163,32 +163,32 @@ export type ChurchSiteFooterLink = {
   order: number;
 };
 
-export type ChurchSiteFooterLinkGroup = {
+export type MosqueSiteFooterLinkGroup = {
   id: string;
   title: string;
-  links: ChurchSiteFooterLink[];
+  links: MosqueSiteFooterLink[];
   order: number;
 };
 
-export type ChurchSiteFooterSettings = {
+export type MosqueSiteFooterSettings = {
   show_logo: boolean;
-  show_church_name: boolean;
-  show_church_number: boolean;
+  show_mosque_name: boolean;
+  show_mosque_number: boolean;
   show_contact_details: boolean;
   tagline: string | null;
   badge_text: string | null;
   powered_by_text: string | null;
   /**
-   * Whether to render the "Powered by ChurchPay" chip in the public site
+   * Whether to render the "Powered by MosquePay" chip in the public site
    * hero meta strip and the footer powered-by text. Defaults to true. Set
    * to false from the admin footer settings panel on paid plans that want
    * an unbranded public surface.
    */
   show_powered_by: boolean;
-  link_groups: ChurchSiteFooterLinkGroup[];
+  link_groups: MosqueSiteFooterLinkGroup[];
 };
 
-export type ChurchSiteCustomPage = {
+export type MosqueSiteCustomPage = {
   id: string;
   slug: string;
   title: string;
@@ -196,7 +196,7 @@ export type ChurchSiteCustomPage = {
   seo_title?: string | null;
   seo_description?: string | null;
   social_image_url?: string | null;
-  sections: ChurchSiteSection[];
+  sections: MosqueSiteSection[];
   published: boolean;
   show_in_nav: boolean;
   nav_label: string | null;
@@ -205,7 +205,7 @@ export type ChurchSiteCustomPage = {
 
 export type AdminUser = {
   id: string;
-  church_id: string | null;
+  mosque_id: string | null;
   auth_user_id: string | null;
   email: string;
   full_name: string;
@@ -223,7 +223,7 @@ export type AdminUser = {
 
 export type AuditLog = {
   id: string;
-  church_id: string | null;
+  mosque_id: string | null;
   actor_email: string | null;
   actor_role: string | null;
   action: string;
@@ -246,7 +246,7 @@ export type AuditLog = {
  */
 export type EmailLog = {
   id: string;
-  church_id: string | null;
+  mosque_id: string | null;
   to_email: string;
   member_id: string | null;
   admin_user_id: string | null;
@@ -262,9 +262,9 @@ export type EmailLog = {
   created_at: string;
 };
 
-export type ChurchNotificationSetting = {
-  church_id: string;
-  /** admin_users.role or the sentinel '__all__' for a church-wide rule. */
+export type MosqueNotificationSetting = {
+  mosque_id: string;
+  /** admin_users.role or the sentinel '__all__' for a mosque-wide rule. */
   role: string;
   event_type: string;
   enabled: boolean;
@@ -273,7 +273,7 @@ export type ChurchNotificationSetting = {
 
 export type Newcomer = {
   id: string;
-  church_id: string | null;
+  mosque_id: string | null;
   first_name: string;
   last_name: string;
   email: string;
@@ -304,7 +304,7 @@ export type Newcomer = {
 
 export type NewcomerActivity = {
   id: string;
-  church_id: string | null;
+  mosque_id: string | null;
   newcomer_id: string;
   activity_type: string;
   title: string | null;
@@ -319,7 +319,7 @@ export type NewcomerActivity = {
 
 export type Event = {
   id: string;
-  church_id: string | null;
+  mosque_id: string | null;
   title: string;
   slug: string;
   description: string | null;
@@ -347,7 +347,7 @@ export type Event = {
   raffle_allow_custom: boolean;
   /**
    * Non-cash "bring a bottle for the raffle" pledge. Independent of
-   * enable_raffle_donation: a church can run a cash raffle, a wine raffle,
+   * enable_raffle_donation: a mosque can run a cash raffle, a wine raffle,
    * both, or neither. See migration 057.
    */
   enable_raffle_wine_pledge: boolean;
@@ -364,7 +364,7 @@ export type Event = {
   created_by: string | null;
   published: boolean;
   /**
-   * Opt-in flag that promotes this event onto the public church website even
+   * Opt-in flag that promotes this event onto the public mosque website even
    * when its `event_type` is not naturally public. See
    * `lib/events/public-visibility.ts` for the full visibility rule.
    */
@@ -397,11 +397,11 @@ export type NoticeStatus = "none" | "draft" | "approved" | "sent";
  * profile-level levy_waived/dining_waived flags.
  *
  * Resolution order is: event_fee_overrides -> event.dining_waived_for_all
- * -> profile waivers -> profile custom amount -> event price -> church default.
+ * -> profile waivers -> profile custom amount -> event price -> mosque default.
  */
 export type EventFeeOverride = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   event_id: string;
   subject_type: "member" | "guest";
   subject_id: string;
@@ -416,7 +416,7 @@ export type EventFeeOverride = {
 };
 
 /**
- * A recurring service recipe for a church. The sequence captures the
+ * A recurring service recipe for a mosque. The sequence captures the
  * standard "third Saturday in Jan/Mar/Jun/Sep/Nov" rhythm so the
  * secretary can generate a year of regular services in one go and have
  * draft notice auto-created within the configured newcomer window.
@@ -427,7 +427,7 @@ export type EventFeeOverride = {
  */
 export type ServiceSequence = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   name: string;
   description: string | null;
   event_type: string;
@@ -440,7 +440,7 @@ export type ServiceSequence = {
   /**
    * Per-month overrides keyed by month number as a string ("1".."12"). Each
    * entry may override week_of_month and/or day_of_week. Anything unset
-   * falls back to the sequence default. Lets churches express patterns like
+   * falls back to the sequence default. Lets mosques express patterns like
    * "3rd Saturday most months but 2nd Saturday in June".
    */
   month_overrides: Record<
@@ -474,7 +474,7 @@ export type ServiceSequence = {
 
 export type Rsvp = {
   id: string;
-  church_id: string | null;
+  mosque_id: string | null;
   event_id: string;
   user_name: string;
   user_email: string;
@@ -503,7 +503,7 @@ export type Rsvp = {
 
 export type Payment = {
   id: string;
-  church_id: string | null;
+  mosque_id: string | null;
   rsvp_id: string | null;
   event_id: string | null;
   user_email: string;
@@ -511,7 +511,7 @@ export type Payment = {
   stripe_payment_intent_id: string | null;
   stripe_charge_id: string | null;
   stripe_customer_id: string | null;
-  // Mooov-side caller-generated payment id (e.g. don_<church>_<rand>). Set on
+  // Mooov-side caller-generated payment id (e.g. don_<mosque>_<rand>). Set on
   // payments projected from Mooov webhook events. Mutually exclusive in
   // practice with stripe_payment_intent_id during the Stripe -> Mooov cutover.
   mooov_payment_id?: string | null;
@@ -545,7 +545,7 @@ export type Payment = {
 
 export type Donation = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   event_id: string | null;
   payment_id: string | null;
   campaign_id: string | null;
@@ -568,7 +568,7 @@ export type Donation = {
 
 export type GiftAidDeclaration = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   donor_name: string;
   donor_email: string;
   donor_address_line_1: string | null;
@@ -614,7 +614,7 @@ export type GiftAidDeclaration = {
  */
 export type GiftAidDeclarationEvent = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   declaration_id: string;
   event_type:
     | "created_digital"
@@ -638,9 +638,9 @@ export type GiftAidDeclarationEvent = {
   created_at: string;
 };
 
-export type ChurchSubscription = {
+export type MosqueSubscription = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
   plan_code: string;
@@ -653,14 +653,14 @@ export type ChurchSubscription = {
   current_period_end: string | null;
   requested_plan_code: string | null;
   last_upgrade_requested_at: string | null;
-  church_limit: number | null;
+  mosque_limit: number | null;
   created_at: string;
   updated_at: string;
 };
 
 export type BlogPost = {
   id: string;
-  church_id: string | null;
+  mosque_id: string | null;
   title: string;
   slug: string;
   excerpt: string | null;
@@ -680,7 +680,7 @@ export type BlogPost = {
 
 export type ContentPage = {
   id: string;
-  church_id: string | null;
+  mosque_id: string | null;
   page_key: string;
   title: string | null;
   content: string | null;
@@ -690,7 +690,7 @@ export type ContentPage = {
 
 export type CharityCampaign = {
   id: string;
-  church_id: string | null;
+  mosque_id: string | null;
   name: string;
   description: string | null;
   target_amount: number;
@@ -702,8 +702,8 @@ export type CharityCampaign = {
   updated_at: string;
 };
 
-export type ChurchFeeDefaults = {
-  church_id: string;
+export type MosqueFeeDefaults = {
+  mosque_id: string;
   default_member_levy_amount: number | null;
   default_member_dining_amount: number | null;
   default_guest_dining_amount: number | null;
@@ -711,9 +711,9 @@ export type ChurchFeeDefaults = {
   updated_at: string;
 };
 
-export type ChurchGivingYear = {
+export type MosqueGivingYear = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   label: string;
   start_date: string;
   end_date: string;
@@ -725,9 +725,9 @@ export type ChurchGivingYear = {
 
 export type GuestCategory = "guest" | "honorary_guest";
 
-export type ChurchGiving = {
+export type MosqueGiving = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   name: string;
   amount: number;
   currency: string;
@@ -752,7 +752,7 @@ export type ChurchGiving = {
 
 export type MemberGiving = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   member_email: string;
   member_name: string | null;
   member_id: string | null;
@@ -802,7 +802,7 @@ export type GivingPaymentMethod =
 
 export type MemberGivingInstalment = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   member_giving_id: string;
   sequence: number;
   due_date: string;
@@ -837,7 +837,7 @@ export type GivingScheduleStatus =
 
 export type GivingSchedule = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   member_id: string | null;
   member_giving_id: string;
   member_email: string;
@@ -867,7 +867,7 @@ export type GivingSchedule = {
 
 export type ServiceCollection = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   event_id: string | null;
   campaign_id: string | null;
   collection_date: string;
@@ -896,7 +896,7 @@ export type ServiceCollection = {
 
 export type GasdsClaim = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   tax_year: string;
   eligible_cash_amount: number;
   claimed_cash_amount: number;
@@ -912,7 +912,7 @@ export type GasdsClaim = {
 
 export type GiftAidClaimBatch = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   claim_reference: string | null;
   period_start: string;
   period_end: string;
@@ -942,7 +942,7 @@ export type GiftAidClaimBatch = {
 /** Per-batch linkage of a declaration that was included in the claim pack. */
 export type GiftAidClaimDeclaration = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   claim_batch_id: string;
   gift_aid_declaration_id: string;
   inclusion_reason: "new_in_window" | "donor_in_batch" | "manual";
@@ -951,7 +951,7 @@ export type GiftAidClaimDeclaration = {
 
 export type GiftAidClaimItem = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   claim_batch_id: string;
   donation_id: string | null;
   gift_aid_declaration_id: string | null;
@@ -966,7 +966,7 @@ export type GiftAidClaimItem = {
 
 export type BankStatementImport = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   filename: string;
   account_label: string | null;
   total_rows: number;
@@ -978,7 +978,7 @@ export type BankStatementImport = {
 
 export type BankTransaction = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   import_id: string;
   posted_date: string;
   description: string;
@@ -999,7 +999,7 @@ export type BankTransaction = {
 
 export type ProgressionSignoff = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   member_id: string;
   degree: 'membership' | 'passing' | 'raising';
   signed_off: boolean;
@@ -1011,7 +1011,7 @@ export type ProgressionSignoff = {
 
 export type MentorAssignment = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   mentor_member_id: string;
   mentee_member_id: string;
   started_at: string;
@@ -1023,7 +1023,7 @@ export type MentorAssignment = {
 
 export type MentorContact = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   assignment_id: string | null;
   mentor_member_id: string | null;
   mentee_member_id: string | null;
@@ -1036,7 +1036,7 @@ export type MentorContact = {
 
 export type EventRitualRole = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   event_id: string;
   role_title: string;
   member_id: string | null;
@@ -1048,7 +1048,7 @@ export type EventRitualRole = {
 
 export type OfficerLadderRung = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   rung_label: string;
   sort_order: number;
   current_member_id: string | null;
@@ -1075,9 +1075,9 @@ export type Network = {
 
 export type MemberRank = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   member_id: string;
-  scope: 'church' | 'network' | 'grand' | 'other';
+  scope: 'mosque' | 'network' | 'grand' | 'other';
   rank_label: string;
   conferred_on: string | null;
   conferred_by: string | null;
@@ -1086,11 +1086,11 @@ export type MemberRank = {
   updated_at: string;
 };
 
-export type ChurchVisit = {
+export type MosqueVisit = {
   id: string;
-  newcomer_church_id: string;
-  host_church_id: string | null;
-  host_church_name: string | null;
+  newcomer_mosque_id: string;
+  host_mosque_id: string | null;
+  host_mosque_name: string | null;
   member_id: string | null;
   member_name: string | null;
   visit_date: string;
@@ -1102,9 +1102,9 @@ export type ChurchVisit = {
 
 export type NetworkOfficerDirectoryEntry = {
   network_id: string | null;
-  church_id: string;
-  church_name: string;
-  church_number: string | null;
+  mosque_id: string;
+  mosque_name: string;
+  mosque_number: string | null;
   member_id: string;
   full_name: string;
   office_title: string;
@@ -1113,11 +1113,11 @@ export type NetworkOfficerDirectoryEntry = {
   rank: string | null;
 };
 
-export type ChurchAnnualReturn = {
-  church_id: string;
+export type MosqueAnnualReturn = {
+  mosque_id: string;
   network_id: string | null;
-  church_name: string;
-  church_number: string | null;
+  mosque_name: string;
+  mosque_number: string | null;
   active_members: number;
   resigned_members: number;
   excluded_members: number;
@@ -1128,7 +1128,7 @@ export type ChurchAnnualReturn = {
 
 export type MemberConsent = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   member_id: string;
   consent_key: string;
   granted: boolean;
@@ -1144,7 +1144,7 @@ export type MemberConsent = {
 
 export type DataRetentionSettings = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   resigned_member_retention_months: number;
   deceased_member_retention_months: number;
   newcomer_inactive_retention_months: number;
@@ -1158,7 +1158,7 @@ export type DataRetentionSettings = {
 
 export type SubjectAccessRequest = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   member_id: string | null;
   requester_email: string;
   requester_name: string | null;
@@ -1180,7 +1180,7 @@ export type JobStatus =
 
 export type Job = {
   id: string;
-  church_id: string | null;
+  mosque_id: string | null;
   job_type: string;
   payload: Record<string, unknown>;
   status: JobStatus;
@@ -1205,7 +1205,7 @@ export type IntegrationProvider =
 
 export type IntegrationCredentials = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   provider: IntegrationProvider;
   access_token: string | null;
   refresh_token: string | null;
@@ -1218,7 +1218,7 @@ export type IntegrationCredentials = {
 
 export type MessageTemplate = {
   id: string;
-  church_id: string | null;
+  mosque_id: string | null;
   template_key: string;
   name: string;
   subject: string;
@@ -1232,7 +1232,7 @@ export type MessageTemplate = {
 
 export type Message = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   channel: 'email' | 'sms';
   template_key: string | null;
   subject: string | null;
@@ -1252,7 +1252,7 @@ export type Message = {
 
 export type AutomationSetting = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   automation_key: string;
   enabled: boolean;
   last_run_at: string | null;
@@ -1262,7 +1262,7 @@ export type AutomationSetting = {
 
 export type PastoralCareCase = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   member_id: string | null;
   contact_name: string;
   contact_email: string | null;
@@ -1282,7 +1282,7 @@ export type PastoralCareCase = {
 
 export type PastoralCareVisit = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   case_id: string;
   visited_at: string;
   contact_method: 'visit' | 'phone' | 'video' | 'email' | 'letter';
@@ -1295,7 +1295,7 @@ export type PastoralCareVisit = {
 
 export type PastoralCareRegisterEntry = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   member_id: string | null;
   register_type: 'bereavement' | 'widow' | 'family';
   full_name: string;
@@ -1312,7 +1312,7 @@ export type PastoralCareRegisterEntry = {
 
 export type PastoralCareAlert = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   member_id: string | null;
   alert_type: 'missed_services' | 'overdue_giving' | 'silent' | 'manual';
   severity: 'low' | 'standard' | 'high' | 'urgent';
@@ -1329,7 +1329,7 @@ export type PastoralCareAlert = {
 export type LedgerEntry = {
   source_id: string;
   source_type: 'payment' | 'giving' | 'donation';
-  church_id: string;
+  mosque_id: string;
   occurred_at: string;
   contact_email: string | null;
   contact_name: string | null;
@@ -1343,7 +1343,7 @@ export type LedgerEntry = {
 
 export type Settings = {
   id: string;
-  church_id: string | null;
+  mosque_id: string | null;
   setting_key: string;
   setting_value: string | null;
   setting_type: string;
@@ -1353,7 +1353,7 @@ export type Settings = {
 
 export type EventGuest = {
   id: string;
-  church_id: string | null;
+  mosque_id: string | null;
   rsvp_id: string | null;
   event_id: string;
   guest_name: string;
@@ -1369,12 +1369,12 @@ export type EventGuest = {
 
 export type Guest = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   full_name: string;
   email: string | null;
   phone: string | null;
-  mother_church_name: string | null;
-  mother_church_number: string | null;
+  mother_mosque_name: string | null;
+  mother_mosque_number: string | null;
   constitution: string | null;
   rank: string | null;
   dietary_requirements: string | null;
@@ -1397,7 +1397,7 @@ export type Guest = {
 
 export type GuestInvitation = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   event_id: string;
   inviter_member_id: string | null;
   inviter_admin_user_id: string | null;
@@ -1416,7 +1416,7 @@ export type GuestInvitation = {
 
 export type Member = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   auth_user_id: string | null;
   email: string;
   full_name: string;
@@ -1454,7 +1454,7 @@ export type Member = {
   stripe_customer_id: string | null;
   portal_token: string;
   /**
-   * Per-member opt-in for the public church website. Defaults to false.
+   * Per-member opt-in for the public mosque website. Defaults to false.
    * Even when this member holds an officer rung in `officer_ladder`,
    * their name, photo, and bio stay private until they explicitly opt
    * in via the admin member detail page. Revocable at any time.
@@ -1489,7 +1489,7 @@ export type Member = {
 
 export type ServiceNotice = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   event_id: string;
   issue_date: string;
   opening_text: string | null;
@@ -1520,7 +1520,7 @@ export type NewcomerOfficer = {
 
 export type ServiceNoticeSend = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   event_id: string;
   notice_id: string | null;
   sent_by: string | null;
@@ -1533,7 +1533,7 @@ export type ServiceNoticeSend = {
 
 export type ServiceNoticeAccessLink = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   event_id: string;
   notice_id: string | null;
   send_id: string | null;
@@ -1546,9 +1546,9 @@ export type ServiceNoticeAccessLink = {
   created_at: string;
 };
 
-export type ChurchFeatureFlag = {
+export type MosqueFeatureFlag = {
   id: string;
-  church_id: string;
+  mosque_id: string;
   flag_key: string;
   enabled: boolean;
   notes: string | null;

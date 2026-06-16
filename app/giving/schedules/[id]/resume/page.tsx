@@ -178,7 +178,7 @@ export default function ScaResumePage({
           </p>
           <p className="text-amber-800">
             {errorMessage ??
-              "Please try again, or contact your church secretary if the problem persists."}
+              "Please try again, or contact your mosque secretary if the problem persists."}
           </p>
           <Button
             variant="outline"

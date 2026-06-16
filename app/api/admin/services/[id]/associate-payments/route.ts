@@ -42,12 +42,12 @@ export async function POST(
 
   const { id: eventId } = await params;
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
-    return NextResponse.json({ error: "Church not selected." }, { status: 404 });
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
+    return NextResponse.json({ error: "Mosque not selected." }, { status: 404 });
   }
-  const churchId = ctx.churchId;
+  const mosqueId = ctx.mosqueId;
 
-  const forbidden = await requireAdminApiPermission("payments:write", churchId);
+  const forbidden = await requireAdminApiPermission("payments:write", mosqueId);
   if (forbidden) return forbidden;
 
   let body: { payment_ids?: unknown; detach?: unknown };
@@ -78,7 +78,7 @@ export async function POST(
   // every payment to this service.
   const detach = body.detach === true;
   if (!detach) {
-    const event = await db.getEventById(eventId, churchId);
+    const event = await db.getEventById(eventId, mosqueId);
     if (!event) {
       return NextResponse.json(
         { error: "Service not found." },
@@ -91,12 +91,12 @@ export async function POST(
   const skipped: { id: string; reason: string }[] = [];
 
   for (const paymentId of ids) {
-    const payment = await db.getPaymentById(paymentId, churchId).catch(() => null);
+    const payment = await db.getPaymentById(paymentId, mosqueId).catch(() => null);
     if (!payment) {
       skipped.push({ id: paymentId, reason: "not_found" });
       continue;
     }
-    const result = await applyPaymentEdit(churchId, payment, {
+    const result = await applyPaymentEdit(mosqueId, payment, {
       changeEvent: true,
       eventId: detach ? null : eventId,
     });
@@ -111,7 +111,7 @@ export async function POST(
   }
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: detach ? "payments_detached_bulk" : "payments_associated_bulk",
     entityType: "event",
     entityId: eventId,

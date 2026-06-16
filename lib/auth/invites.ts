@@ -9,7 +9,7 @@ import {
 } from "@/lib/email/templates";
 import { sendWithLog } from "@/lib/email/send-with-log";
 
-const PRODUCTION_SITE_URL = "https://churchpay.co.uk";
+const PRODUCTION_SITE_URL = "https://mosque-pay.com";
 
 function withScheme(value: string) {
   const trimmed = value.replace(/\/$/, "");
@@ -22,7 +22,7 @@ function withScheme(value: string) {
  * Priority:
  *   1. Explicit NEXT_PUBLIC_SITE_URL override (any environment).
  *   2. Production deploys (`VERCEL_ENV === "production"`) always use
- *      https://churchpay.co.uk so emails never link to the
+ *      https://mosque-pay.com so emails never link to the
  *      auto-generated `*.vercel.app` host.
  *   3. Vercel preview / inferred production URL when available.
  *   4. Fallback to the request origin (covers local dev → http://localhost:3000).
@@ -110,11 +110,11 @@ async function ensureAuthUser({
 export async function sendStaffInvite({
   request,
   staff,
-  churchName,
+  mosqueName,
 }: {
   request: NextRequest;
   staff: db.AdminUser;
-  churchName: string;
+  mosqueName: string;
 }): Promise<{ sent: boolean; error: string | null }> {
   const baseUrl = getBaseUrl(request);
   const redirectTo = `${baseUrl}/admin/accept-invite`;
@@ -154,7 +154,7 @@ export async function sendStaffInvite({
   const roleLabel = staff.role.replaceAll("_", " ");
   const actionLabel = isFirstInvite ? "Accept invite" : "Reset password";
   const result = await sendWithLog({
-    churchId: staff.church_id ?? null,
+    mosqueId: staff.mosque_id ?? null,
     toEmail: staff.email,
     toName: staff.full_name,
     adminUserId: staff.id,
@@ -162,15 +162,15 @@ export async function sendStaffInvite({
     entityType: "admin_user",
     entityId: staff.id,
     dedupeKey: null,
-    subject: "You have been invited to ChurchPay",
+    subject: "You have been invited to MosquePay",
     html: renderStaffInviteEmail({
       name: staff.full_name,
       roleLabel,
-      churchName,
+      mosqueName,
       actionUrl: data.properties.action_link,
       actionLabel,
     }),
-    text: `Hello ${staff.full_name},\n\nYou have been invited to ChurchPay with ${roleLabel} access for ${churchName}.\n\nSet your password here: ${data.properties.action_link}\n`,
+    text: `Hello ${staff.full_name},\n\nYou have been invited to MosquePay with ${roleLabel} access for ${mosqueName}.\n\nSet your password here: ${data.properties.action_link}\n`,
     metadata: { is_first_invite: isFirstInvite, role: staff.role },
   });
 
@@ -196,13 +196,13 @@ async function sendPasswordResetEmail({
   recipientName,
   audience,
   redirectTo,
-  churchName,
+  mosqueName,
 }: {
   email: string;
   recipientName: string;
   audience: "admin" | "member";
   redirectTo: string;
-  churchName: string | null;
+  mosqueName: string | null;
 }): Promise<{ sent: boolean; error: string | null }> {
   const supabase = createServiceClient();
   const { data, error } = await supabase.auth.admin.generateLink({
@@ -219,10 +219,10 @@ async function sendPasswordResetEmail({
 
   const subject =
     audience === "admin"
-      ? "Reset your ChurchPay admin password"
-      : "Reset your ChurchPay member portal password";
+      ? "Reset your MosquePay admin password"
+      : "Reset your MosquePay member portal password";
   const result = await sendWithLog({
-    churchId: null,
+    mosqueId: null,
     toEmail: email,
     toName: recipientName,
     emailType:
@@ -235,10 +235,10 @@ async function sendPasswordResetEmail({
       name: recipientName,
       actionUrl: data.properties.action_link,
       audience,
-      churchName,
+      mosqueName,
     }),
-    text: `Hello ${recipientName},\n\nReset your ChurchPay ${audience === "admin" ? "admin" : "member portal"} password here: ${data.properties.action_link}\n\nIf you did not request this, you can ignore this email.\n`,
-    metadata: { audience, church_name: churchName },
+    text: `Hello ${recipientName},\n\nReset your MosquePay ${audience === "admin" ? "admin" : "member portal"} password here: ${data.properties.action_link}\n\nIf you did not request this, you can ignore this email.\n`,
+    metadata: { audience, mosque_name: mosqueName },
   });
 
   if (!result.ok) {
@@ -258,13 +258,13 @@ export async function sendPasswordResetByEmail({
   email,
   recipientName,
   audience,
-  churchName,
+  mosqueName,
 }: {
   request: NextRequest;
   email: string;
   recipientName: string;
   audience: "admin" | "member";
-  churchName: string | null;
+  mosqueName: string | null;
 }): Promise<{ sent: boolean; error: string | null }> {
   const baseUrl = getBaseUrl(request);
   const redirectTo =
@@ -276,7 +276,7 @@ export async function sendPasswordResetByEmail({
     recipientName,
     audience,
     redirectTo,
-    churchName,
+    mosqueName,
   });
 }
 
@@ -296,11 +296,11 @@ export async function sendPasswordResetByEmail({
 export async function sendStaffPasswordReset({
   request,
   staff,
-  churchName,
+  mosqueName,
 }: {
   request: NextRequest;
   staff: db.AdminUser;
-  churchName: string;
+  mosqueName: string;
 }): Promise<{ sent: boolean; error: string | null }> {
   if (!staff.auth_user_id) {
     const supabase = createServiceClient();
@@ -324,22 +324,22 @@ export async function sendStaffPasswordReset({
     email: staff.email,
     recipientName: staff.full_name,
     audience: "admin",
-    churchName,
+    mosqueName,
   });
 }
 
 /**
- * Sends a password reset email to a church member. Same shape as
+ * Sends a password reset email to a mosque member. Same shape as
  * sendStaffPasswordReset but lands on the member reset-password page.
  */
 export async function sendMemberPasswordReset({
   request,
   member,
-  churchName,
+  mosqueName,
 }: {
   request: NextRequest;
   member: db.Member;
-  churchName: string;
+  mosqueName: string;
 }): Promise<{ sent: boolean; error: string | null }> {
   if (!member.email) {
     return { sent: false, error: "Member has no email on file." };
@@ -359,7 +359,7 @@ export async function sendMemberPasswordReset({
         error: ensured.error ?? "Could not create the member auth user.",
       };
     }
-    await db.updateMember(member.id, member.church_id, {
+    await db.updateMember(member.id, member.mosque_id, {
       auth_user_id: ensured.id,
     });
   }
@@ -369,22 +369,22 @@ export async function sendMemberPasswordReset({
     email: member.email,
     recipientName: member.full_name,
     audience: "member",
-    churchName,
+    mosqueName,
   });
 }
 
 /**
- * Sends a Resend-powered invite to an existing church member. Existing portal
+ * Sends a Resend-powered invite to an existing mosque member. Existing portal
  * users receive a recovery link; brand new users receive an invite link.
  */
 export async function sendMemberInvite({
   request,
   member,
-  churchName,
+  mosqueName,
 }: {
   request: NextRequest;
   member: db.Member;
-  churchName: string;
+  mosqueName: string;
 }): Promise<{ sent: boolean; error: string | null }> {
   const baseUrl = getBaseUrl(request);
   const redirectTo = `${baseUrl}/member/accept-invite`;
@@ -406,7 +406,7 @@ export async function sendMemberInvite({
       };
     }
     authUserId = ensured.id;
-    await db.updateMember(member.id, member.church_id, {
+    await db.updateMember(member.id, member.mosque_id, {
       auth_user_id: authUserId,
     });
   }
@@ -427,7 +427,7 @@ export async function sendMemberInvite({
     ? "Activate member portal"
     : "Reset portal access";
   const result = await sendWithLog({
-    churchId: member.church_id,
+    mosqueId: member.mosque_id,
     toEmail: member.email,
     toName: member.full_name,
     memberId: member.id,
@@ -435,14 +435,14 @@ export async function sendMemberInvite({
     entityType: "member",
     entityId: member.id,
     dedupeKey: null,
-    subject: "Your ChurchPay member portal invite",
+    subject: "Your MosquePay member portal invite",
     html: renderMemberInviteEmail({
       name: member.full_name,
-      churchName,
+      mosqueName,
       actionUrl: data.properties.action_link,
       actionLabel,
     }),
-    text: `Hello ${member.full_name},\n\nYou have been invited to access the ChurchPay member portal for ${churchName}.\n\nSet your password here: ${data.properties.action_link}\n`,
+    text: `Hello ${member.full_name},\n\nYou have been invited to access the MosquePay member portal for ${mosqueName}.\n\nSet your password here: ${data.properties.action_link}\n`,
     metadata: { is_first_invite: isFirstInvite },
   });
 

@@ -10,7 +10,7 @@ import { formatDate } from "@/lib/utils";
 import { defaultAgendaItems, renderDefaultNoticeOpening } from "@/lib/notices/defaults";
 import { NoticePrintButton } from "./print-button";
 import type { Member } from "@/lib/db/types";
-import { churchTitleFor } from "@/lib/members/rank";
+import { mosqueTitleFor } from "@/lib/members/rank";
 
 type DirectoryMember = Pick<
   Member,
@@ -62,42 +62,42 @@ export default async function ServiceNoticePage({
   const { id } = await params;
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
-  const churchId = ctx.mode === "database" ? ctx.churchId : null;
+  const mosqueId = ctx.mode === "database" ? ctx.mosqueId : null;
 
   const event = useMock
     ? mockDb.getEventById(id)
-    : churchId
-      ? await db.getEventById(id, churchId)
+    : mosqueId
+      ? await db.getEventById(id, mosqueId)
       : null;
 
   if (!event) notFound();
 
-  const church = useMock
-    ? mockDb.listChurches()[0] ?? null
-    : churchId
-      ? await db.getChurchById(churchId)
+  const mosque = useMock
+    ? mockDb.listMosques()[0] ?? null
+    : mosqueId
+      ? await db.getMosqueById(mosqueId)
       : null;
   const rsvps = useMock
     ? mockDb.getRsvpsByEventId(id)
-    : churchId
-      ? await db.getRsvpsByEventId(id, churchId)
+    : mosqueId
+      ? await db.getRsvpsByEventId(id, mosqueId)
       : [];
   const members = useMock
     ? mockDb.getMembers({ status: "active" })
-    : churchId
-      ? await db.getMembers(churchId, { status: "active" })
+    : mosqueId
+      ? await db.getMembers(mosqueId, { status: "active" })
       : [];
-  const notice = !useMock && churchId ? await db.getServiceNotice(id, churchId) : null;
+  const notice = !useMock && mosqueId ? await db.getServiceNotice(id, mosqueId) : null;
 
   const noticeItems = notice?.agenda_items?.length ? notice.agenda_items : defaultAgendaItems();
   const menuItems = notice?.menu_items?.length ? notice.menu_items : [];
   const notices = notice?.notices?.length
     ? notice.notices
     : [
-        church?.service_schedule,
-        church?.data_protection_notice,
-        church?.newcomer_notice,
-        church?.loi_contact,
+        mosque?.service_schedule,
+        mosque?.data_protection_notice,
+        mosque?.newcomer_notice,
+        mosque?.loi_contact,
       ].filter((notice): notice is string => Boolean(notice));
   const officers = members
     .filter((member) => member.office_title)
@@ -117,8 +117,8 @@ export default async function ServiceNoticePage({
     .filter((member) => member.honorary)
     .sort((a, b) => a.full_name.localeCompare(b.full_name));
   const issueDate = notice?.issue_date ?? new Date().toISOString();
-  const secretaryName = church?.secretary_name ?? "Secretary";
-  const openingText = notice?.opening_text ?? renderDefaultNoticeOpening(event, church);
+  const secretaryName = mosque?.secretary_name ?? "Secretary";
+  const openingText = notice?.opening_text ?? renderDefaultNoticeOpening(event, mosque);
   const newcomerContacts = notice?.newcomer_contacts?.length
     ? notice.newcomer_contacts
     : notice?.newcomer_contact_name
@@ -153,11 +153,11 @@ export default async function ServiceNoticePage({
 
       <article className="rounded-2xl border border-dash-border bg-white p-8 text-slate-950 shadow-sm print:border-0 print:p-0 print:shadow-none">
         <header className="border-b border-slate-300 pb-6 text-center">
-          {church?.logo_url ? (
+          {mosque?.logo_url ? (
             <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm print:h-16 print:w-16">
               <Image
-                src={church.logo_url}
-                alt={`${church.name} logo`}
+                src={mosque.logo_url}
+                alt={`${mosque.name} logo`}
                 width={96}
                 height={96}
                 className="h-full w-full object-contain p-2"
@@ -168,17 +168,17 @@ export default async function ServiceNoticePage({
             Notice
           </p>
           <h1 className="mt-3 text-3xl font-bold tracking-tight uppercase">
-            {church?.name ?? "Church Service"}
+            {mosque?.name ?? "Jumu'ah Prayer"}
           </h1>
           <p className="mt-1 text-sm text-slate-600">
-            {church?.church_number ? `No. ${church.church_number}` : null}
-            {church?.church_number && (church?.consecrated_at || church?.governing_body)
+            {mosque?.mosque_number ? `No. ${mosque.mosque_number}` : null}
+            {mosque?.mosque_number && (mosque?.consecrated_at || mosque?.governing_body)
               ? " · "
               : null}
-            {church?.consecrated_at
-              ? `Consecrated ${formatDate(church.consecrated_at)}`
+            {mosque?.consecrated_at
+              ? `Established ${formatDate(mosque.consecrated_at)}`
               : null}
-            {church?.governing_body ? ` · ${church.governing_body}` : null}
+            {mosque?.governing_body ? ` · ${mosque.governing_body}` : null}
           </p>
           <p className="mt-4 text-lg font-semibold">{event.title}</p>
         </header>
@@ -193,13 +193,13 @@ export default async function ServiceNoticePage({
           </p>
           <p className="mt-4 font-semibold">{secretaryName}</p>
           <p>Secretary</p>
-          {church?.secretary_address && (
+          {mosque?.secretary_address && (
             <p className="mt-2 whitespace-pre-line text-slate-700">
-              {church.secretary_address}
+              {mosque.secretary_address}
             </p>
           )}
-          {church?.secretary_phone && (
-            <p className="text-slate-700">Telephone: {church.secretary_phone}</p>
+          {mosque?.secretary_phone && (
+            <p className="text-slate-700">Telephone: {mosque.secretary_phone}</p>
           )}
         </section>
 
@@ -218,8 +218,8 @@ export default async function ServiceNoticePage({
                     {member.office_title}
                   </span>
                   <span className="text-right text-slate-700">
-                    {churchTitleFor(member.rank)
-                      ? `${churchTitleFor(member.rank)} `
+                    {mosqueTitleFor(member.rank)
+                      ? `${mosqueTitleFor(member.rank)} `
                       : ""}
                     {member.full_name}
                     {memberSuffix(member) ? ` ${memberSuffix(member)}` : ""}
@@ -231,7 +231,7 @@ export default async function ServiceNoticePage({
         )}
 
         <section className="break-inside-avoid border-b border-slate-300 py-6">
-          <h2 className="text-lg font-semibold uppercase">Church Business</h2>
+          <h2 className="text-lg font-semibold uppercase">Mosque Business</h2>
           {event.description && (
             <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-700">
               {event.description}
@@ -328,14 +328,14 @@ export default async function ServiceNoticePage({
               {rsvps.length} RSVP{rsvps.length === 1 ? "" : "s"} received
             </div>
             <p className="mt-2 text-sm text-slate-600">
-              {members.length} active member{members.length === 1 ? "" : "s"} on church records.
+              {members.length} active member{members.length === 1 ? "" : "s"} on mosque records.
             </p>
             {event.dress_code && (
               <p className="mt-4 text-sm font-medium">Dress: {event.dress_code}</p>
             )}
-            {church?.charity_donation_url && (
+            {mosque?.charity_donation_url && (
               <p className="mt-4 text-sm text-slate-700">
-                Charity donations: {church.charity_donation_url}
+                Charity donations: {mosque.charity_donation_url}
               </p>
             )}
             {newcomerContacts.length > 0 && (
@@ -371,13 +371,13 @@ export default async function ServiceNoticePage({
         {notices.length > 0 && (
           <section className="break-inside-avoid border-b border-slate-300 py-6">
             <h2 className="text-lg font-semibold uppercase">
-              {church?.name ?? "Church"} Members
+              {mosque?.name ?? "Mosque"} Members
             </h2>
             <div className="mt-3 space-y-2 text-sm leading-6 text-slate-700">
               {notices.map((notice) => (
                 <p key={notice}>{notice}</p>
               ))}
-              {church?.wifi_details && <p>WiFi: {church.wifi_details}</p>}
+              {mosque?.wifi_details && <p>WiFi: {mosque.wifi_details}</p>}
             </div>
           </section>
         )}
@@ -385,7 +385,7 @@ export default async function ServiceNoticePage({
         {notice?.include_member_directory !== false && (
           <section className="py-6">
             <h2 className="text-center text-lg font-bold uppercase">
-              {church?.name ?? "Church"} Members
+              {mosque?.name ?? "Mosque"} Members
             </h2>
             <div className="mt-4 space-y-1 text-xs leading-5">
               {directoryMembers.map((member) => {
@@ -394,8 +394,8 @@ export default async function ServiceNoticePage({
                 return (
                   <div key={member.id} className="grid gap-2 sm:grid-cols-[1fr_2fr_auto]">
                     <span className="font-medium">
-                      {churchTitleFor(member.rank)
-                        ? `${churchTitleFor(member.rank)} `
+                      {mosqueTitleFor(member.rank)
+                        ? `${mosqueTitleFor(member.rank)} `
                         : ""}
                       {member.full_name}
                       {suffix ? ` ${suffix}` : ""}

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -34,20 +34,20 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   try {
     const { eventId } = await params;
-    const churchSlug = getChurchSlugFromRequest(request);
-    const churchId = await db.resolveChurchId(churchSlug);
-    if (!churchId) {
-      return NextResponse.json({ error: "Church not found." }, { status: 404 });
+    const mosqueSlug = getMosqueSlugFromRequest(request);
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("notice:write", churchId);
+    const forbidden = await requireAdminApiPermission("notice:write", mosqueId);
     if (forbidden) return forbidden;
 
-    const event = await db.getEventById(eventId, churchId);
+    const event = await db.getEventById(eventId, mosqueId);
     if (!event) {
       return NextResponse.json({ error: "Service not found." }, { status: 404 });
     }
 
-    const notice = await db.getServiceNotice(eventId, churchId);
+    const notice = await db.getServiceNotice(eventId, mosqueId);
     if (!notice) {
       return NextResponse.json(
         {
@@ -58,13 +58,13 @@ export async function POST(request: NextRequest, { params }: Params) {
       );
     }
 
-    const admin = await getCurrentAdminContextAny(churchId);
+    const admin = await getCurrentAdminContextAny(mosqueId);
 
     const [members, honoraryGuests, feeDefaults, overrides] = await Promise.all([
-      db.getMembers(churchId, { status: "active" }),
-      db.listHonoraryGuests(churchId),
-      db.getChurchFeeDefaults(churchId),
-      db.listEventFeeOverrides(churchId, eventId),
+      db.getMembers(mosqueId, { status: "active" }),
+      db.listHonoraryGuests(mosqueId),
+      db.getMosqueFeeDefaults(mosqueId),
+      db.listEventFeeOverrides(mosqueId, eventId),
     ]);
     const preview = buildRecipientsPreview({
       members,
@@ -76,17 +76,17 @@ export async function POST(request: NextRequest, { params }: Params) {
       overrides,
     });
 
-    await db.upsertServiceNotice(churchId, eventId, {
+    await db.upsertServiceNotice(mosqueId, eventId, {
       recipient_snapshot: preview as unknown as Record<string, unknown>,
     });
 
-    const updated = await db.setServiceNoticeStatus(eventId, churchId, "approved", {
+    const updated = await db.setServiceNoticeStatus(eventId, mosqueId, "approved", {
       notice_approved_at: new Date().toISOString(),
       notice_approved_by_email: admin?.email ?? null,
     });
 
     await writeAuditLog({
-      churchId,
+      mosqueId,
       action: "approved",
       entityType: "notice",
       entityId: notice.id,
@@ -121,26 +121,26 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   }
 
   const { eventId } = await params;
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("notice:write", churchId);
+  const forbidden = await requireAdminApiPermission("notice:write", mosqueId);
   if (forbidden) return forbidden;
 
-  const event = await db.getEventById(eventId, churchId);
+  const event = await db.getEventById(eventId, mosqueId);
   if (!event) {
     return NextResponse.json({ error: "Service not found." }, { status: 404 });
   }
 
-  const updated = await db.setServiceNoticeStatus(eventId, churchId, "draft", {
+  const updated = await db.setServiceNoticeStatus(eventId, mosqueId, "draft", {
     notice_approved_at: null,
     notice_approved_by_email: null,
   });
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "unapproved",
     entityType: "notice",
     entityId: event.id,

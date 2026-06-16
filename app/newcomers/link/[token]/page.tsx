@@ -22,13 +22,13 @@ export const metadata: Metadata = {
 
 type GuestLike = {
   id: string;
-  church_id: string | null;
-  church_slug: string;
+  mosque_id: string | null;
+  mosque_slug: string;
   full_name: string;
   email: string | null;
   phone: string | null;
-  mother_church_name: string | null;
-  mother_church_number: string | null;
+  mother_mosque_name: string | null;
+  mother_mosque_number: string | null;
   constitution: string | null;
   rank: string | null;
   dietary_requirements: string | null;
@@ -36,7 +36,7 @@ type GuestLike = {
   visit_count: number;
 };
 
-type ChurchLike = {
+type MosqueLike = {
   id: string | null;
   name: string;
   logo_url: string | null;
@@ -64,47 +64,47 @@ const PAGE_LOADED_AT_MS = Date.now();
 
 export default async function NewcomerPortalPage({
   params,
-  expectedChurchSlug,
+  expectedMosqueSlug,
 }: {
   params: Promise<{ token: string }>;
-  expectedChurchSlug?: string;
+  expectedMosqueSlug?: string;
 }) {
   const { token } = await params;
   const tokenHash = hashNewcomerToken(token);
 
   let guest: GuestLike | null = null;
-  let church: ChurchLike | null = null;
+  let mosque: MosqueLike | null = null;
   let upcomingEvents: EventLike[] = [];
   let pastVisits: PastVisit[] = [];
 
   if (isSupabaseConfigured()) {
     const found = await db.getGuestByNewcomerTokenHash(tokenHash);
     if (found) {
-      const churchRow = await db.getChurchById(found.church_id);
+      const mosqueRow = await db.getMosqueById(found.mosque_id);
       guest = {
         id: found.id,
-        church_id: found.church_id,
-        church_slug: churchRow?.slug ?? expectedChurchSlug ?? "",
+        mosque_id: found.mosque_id,
+        mosque_slug: mosqueRow?.slug ?? expectedMosqueSlug ?? "",
         full_name: found.full_name,
         email: found.email,
         phone: found.phone,
-        mother_church_name: found.mother_church_name,
-        mother_church_number: found.mother_church_number,
+        mother_mosque_name: found.mother_mosque_name,
+        mother_mosque_number: found.mother_mosque_number,
         constitution: found.constitution,
         rank: found.rank,
         dietary_requirements: found.dietary_requirements,
         is_member: found.is_member,
         visit_count: found.visit_count,
       };
-      church = churchRow
-        ? { id: churchRow.id, name: churchRow.name, logo_url: churchRow.logo_url }
+      mosque = mosqueRow
+        ? { id: mosqueRow.id, name: mosqueRow.name, logo_url: mosqueRow.logo_url }
         : {
-            id: found.church_id,
-            name: "the church",
+            id: found.mosque_id,
+            name: "the mosque",
             logo_url: null,
           };
       {
-        const events = await db.getEvents(found.church_id, {
+        const events = await db.getEvents(found.mosque_id, {
           published: true,
           upcoming: true,
         });
@@ -120,7 +120,7 @@ export default async function NewcomerPortalPage({
             description: e.description,
             guest_policy: e.guest_policy,
           }));
-        const eventGuestRows = await db.listEventGuestsForChurch(found.church_id, {
+        const eventGuestRows = await db.listEventGuestsForMosque(found.mosque_id, {
           guestId: found.id,
         });
         const ids = Array.from(new Set(eventGuestRows.map((g) => g.event_id)));
@@ -130,7 +130,7 @@ export default async function NewcomerPortalPage({
         >();
         await Promise.all(
           ids.map(async (id) => {
-            const ev = await db.getEventById(id, found.church_id);
+            const ev = await db.getEventById(id, found.mosque_id);
             if (ev) {
               eventMap.set(id, {
                 title: ev.title,
@@ -161,27 +161,27 @@ export default async function NewcomerPortalPage({
   } else if (shouldUseInMemoryMock()) {
     const found = mockDb.getGuestByNewcomerTokenHash(tokenHash);
     if (found) {
-      const churchRow = mockDb.getChurchBySlug(found.church_slug);
+      const mosqueRow = mockDb.getMosqueBySlug(found.mosque_slug);
       guest = {
         id: found.id,
-        church_id: null,
-        church_slug: found.church_slug,
+        mosque_id: null,
+        mosque_slug: found.mosque_slug,
         full_name: found.full_name,
         email: found.email,
         phone: found.phone,
-        mother_church_name: found.mother_church_name,
-        mother_church_number: found.mother_church_number,
+        mother_mosque_name: found.mother_mosque_name,
+        mother_mosque_number: found.mother_mosque_number,
         constitution: found.constitution,
         rank: found.rank,
         dietary_requirements: found.dietary_requirements,
         is_member: found.is_member,
         visit_count: found.visit_count,
       };
-      church = churchRow
-        ? { id: null, name: churchRow.name, logo_url: churchRow.logo_url }
+      mosque = mosqueRow
+        ? { id: null, name: mosqueRow.name, logo_url: mosqueRow.logo_url }
         : null;
       const events = mockDb.getEvents({
-        church_slug: found.church_slug,
+        mosque_slug: found.mosque_slug,
         published: true,
         upcoming: true,
       });
@@ -197,14 +197,14 @@ export default async function NewcomerPortalPage({
           description: e.description,
           guest_policy: e.guest_policy,
         }));
-      const eventGuestRows = mockDb.listEventGuestsForChurch({
-        church_slug: found.church_slug,
+      const eventGuestRows = mockDb.listEventGuestsForMosque({
+        mosque_slug: found.mosque_slug,
         guestId: found.id,
       });
       pastVisits = eventGuestRows
         .map((eg) => {
           const ev = mockDb.getEventById(eg.event_id, {
-            church_slug: found.church_slug,
+            mosque_slug: found.mosque_slug,
           });
           if (!ev) return null;
           return {
@@ -223,8 +223,8 @@ export default async function NewcomerPortalPage({
     }
   }
 
-  if (!guest || !church) notFound();
-  if (expectedChurchSlug && guest.church_slug !== expectedChurchSlug) {
+  if (!guest || !mosque) notFound();
+  if (expectedMosqueSlug && guest.mosque_slug !== expectedMosqueSlug) {
     notFound();
   }
 
@@ -233,11 +233,11 @@ export default async function NewcomerPortalPage({
       <article className="mx-auto max-w-3xl space-y-8">
         <header className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
           <div className="flex items-center gap-4">
-            {church.logo_url ? (
+            {mosque.logo_url ? (
               <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
                 <Image
-                  src={church.logo_url}
-                  alt={`${church.name} logo`}
+                  src={mosque.logo_url}
+                  alt={`${mosque.name} logo`}
                   width={56}
                   height={56}
                   className="h-full w-full object-contain p-1.5"
@@ -248,7 +248,7 @@ export default async function NewcomerPortalPage({
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">
                 Your newcomer profile
               </p>
-              <p className="text-sm text-slate-500">{church.name}</p>
+              <p className="text-sm text-slate-500">{mosque.name}</p>
             </div>
           </div>
           <h1 className="mt-6 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
@@ -283,12 +283,12 @@ export default async function NewcomerPortalPage({
               }}
             />
           </div>
-          {guest.mother_church_name ? (
+          {guest.mother_mosque_name ? (
             <dl className="mt-6 grid gap-3 text-sm sm:grid-cols-2">
-              <Detail label="Mother church">
-                {guest.mother_church_name}
-                {guest.mother_church_number
-                  ? ` No. ${guest.mother_church_number}`
+              <Detail label="Mother mosque">
+                {guest.mother_mosque_name}
+                {guest.mother_mosque_number
+                  ? ` No. ${guest.mother_mosque_number}`
                   : ""}
               </Detail>
               {guest.constitution ? (

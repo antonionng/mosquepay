@@ -1,6 +1,6 @@
 // lib/giving/year-position.ts
 //
-// Where is a given member, on a given day, relative to their church's
+// Where is a given member, on a given day, relative to their mosque's
 // giving year? The four-quadrant model that drives the giving UX:
 //
 //                      | Pre-year / at-start    | Mid-year
@@ -128,7 +128,7 @@ export function computeYearPosition(input: YearPositionInput): YearPosition {
 /**
  * Compute the next giving year's start/end given the current one. Used by
  * the pay-in-advance flow when the next year's row has not yet been
- * configured by the church admin.
+ * configured by the mosque admin.
  */
 export function nextYearBounds(currentStart: string, currentEnd: string): {
   startDate: string;

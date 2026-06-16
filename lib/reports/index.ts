@@ -8,7 +8,7 @@ import type {
   GiftAidDeclaration,
   CharityCampaign,
   MemberGiving,
-  Church,
+  Mosque,
   ServiceNoticeSend,
   ServiceCollection,
 } from "@/lib/db/types";
@@ -140,10 +140,10 @@ export type RecruitmentReport = {
 };
 
 export type OperatorReport = {
-  totalChurches: number;
-  activeChurches: number;
-  inactiveChurches: number;
-  churchRows: Array<{
+  totalMosques: number;
+  activeMosques: number;
+  inactiveMosques: number;
+  mosqueRows: Array<{
     id: string;
     name: string;
     slug: string;
@@ -488,20 +488,20 @@ export function buildRecruitmentReport({
 }
 
 export function buildOperatorReport({
-  churches,
-  membersByChurch,
-  upcomingByChurch,
-  paymentsLast30ByChurch,
+  mosques,
+  membersByMosque,
+  upcomingByMosque,
+  paymentsLast30ByMosque,
 }: {
-  churches: Church[];
-  membersByChurch: Map<string, number>;
-  upcomingByChurch: Map<string, number>;
-  paymentsLast30ByChurch: Map<string, number>;
+  mosques: Mosque[];
+  membersByMosque: Map<string, number>;
+  upcomingByMosque: Map<string, number>;
+  paymentsLast30ByMosque: Map<string, number>;
 }): OperatorReport {
-  const churchRows = churches.map((l) => {
-    const members = membersByChurch.get(l.id) ?? 0;
-    const upcoming = upcomingByChurch.get(l.id) ?? 0;
-    const payments = paymentsLast30ByChurch.get(l.id) ?? 0;
+  const mosqueRows = mosques.map((l) => {
+    const members = membersByMosque.get(l.id) ?? 0;
+    const upcoming = upcomingByMosque.get(l.id) ?? 0;
+    const payments = paymentsLast30ByMosque.get(l.id) ?? 0;
     let healthScore = 0;
     if (l.is_active) healthScore += 30;
     if (members >= 10) healthScore += 25;
@@ -524,10 +524,10 @@ export function buildOperatorReport({
     };
   });
   return {
-    totalChurches: churches.length,
-    activeChurches: churches.filter((l) => l.is_active).length,
-    inactiveChurches: churches.filter((l) => !l.is_active).length,
-    churchRows: churchRows.sort((a, b) => b.healthScore - a.healthScore),
+    totalMosques: mosques.length,
+    activeMosques: mosques.filter((l) => l.is_active).length,
+    inactiveMosques: mosques.filter((l) => !l.is_active).length,
+    mosqueRows: mosqueRows.sort((a, b) => b.healthScore - a.healthScore),
   };
 }
 
@@ -535,14 +535,14 @@ export function buildOperatorReport({
 // Membership Annual Return
 // ---------------------------------------------------------------------------
 //
-// A church-level membership return in the shape a Secretary needs for the
+// A mosque-level membership return in the shape a Secretary needs for the
 // UGLE / Network annual return: a roll of every member with their craft
 // discipleship dates and current standing, plus the movements (memberships,
 // passings, raisings, resignations, exclusions) inside the reporting year.
 //
-// The reporting year is the church/return year, configurable via
+// The reporting year is the mosque/return year, configurable via
 // `yearStartMonth` (1-12, default September = 9), so figures align with the
-// church's return cadence rather than the calendar year.
+// mosque's return cadence rather than the calendar year.
 
 export type AnnualReturnMemberRow = {
   id: string;

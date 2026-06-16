@@ -3,7 +3,7 @@ import { isSupabaseConfigured, shouldUseInMemoryMock } from "@/lib/db/with-fallb
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -21,25 +21,25 @@ export async function DELETE(
   if (unauthorized) return unauthorized;
 
   const { invitationId } = await params;
-  const churchSlug = getChurchSlugFromRequest(request);
+  const mosqueSlug = getMosqueSlugFromRequest(request);
 
   try {
     if (isSupabaseConfigured()) {
-      const churchId = await db.resolveChurchId(churchSlug);
-      if (!churchId) {
-        return NextResponse.json({ error: "Church not found." }, { status: 404 });
+      const mosqueId = await db.resolveMosqueId(mosqueSlug);
+      if (!mosqueId) {
+        return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
       }
-      const forbidden = await requireAdminApiPermission("services:write", churchId);
+      const forbidden = await requireAdminApiPermission("services:write", mosqueId);
       if (forbidden) return forbidden;
 
-      const invitation = await db.getGuestInvitationById(invitationId, churchId);
+      const invitation = await db.getGuestInvitationById(invitationId, mosqueId);
       if (!invitation) {
         return NextResponse.json({ error: "Invitation not found." }, { status: 404 });
       }
-      await db.revokeGuestInvitation(invitationId, churchId);
+      await db.revokeGuestInvitation(invitationId, mosqueId);
 
       await writeAuditLog({
-        churchId,
+        mosqueId,
         action: "revoked",
         entityType: "guest_invitation",
         entityId: invitationId,
@@ -56,7 +56,7 @@ export async function DELETE(
       );
     }
 
-    mockDb.revokeGuestInvitation(invitationId, { church_slug: churchSlug });
+    mockDb.revokeGuestInvitation(invitationId, { mosque_slug: mosqueSlug });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Guest invitation DELETE error:", error);

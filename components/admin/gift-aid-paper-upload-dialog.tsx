@@ -10,7 +10,7 @@
 //      row against the just-logged payment (`paymentId` provided).
 //
 //   2. admin member profile (post-service tidy-up): the Charity Steward
-//      sits down with the stack of forms collected at the fellowship meal,
+//      sits down with the stack of forms collected at the community meal,
 //      opens each Member's profile and uploads the slip. No payment to
 //      attach to (`paymentId` omitted) -- the declaration just gets filed
 //      against the member and will cover all future donations.
@@ -154,7 +154,7 @@ export function GiftAidPaperUploadDialog({
 
       if (paymentId) {
         // Backfill the donation row for the just-logged payment so the next
-        // claim batch picks it up. Server enforces church + amount sanity.
+        // claim batch picks it up. Server enforces mosque + amount sanity.
         const attachRes = await fetch(
           `/api/admin/take-payment/${encodeURIComponent(paymentId)}/gift-aid-attach`,
           {
@@ -187,7 +187,7 @@ export function GiftAidPaperUploadDialog({
           <DialogTitle>{title ?? "Add paper Gift Aid declaration"}</DialogTitle>
           <DialogDescription>
             {description ??
-              "Photograph the signed slip and capture the donor address so the church can reclaim 25 percent."}
+              "Photograph the signed slip and capture the donor address so the mosque can reclaim 25 percent."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
@@ -298,7 +298,7 @@ export function GiftAidPaperUploadDialog({
             />
             <span>
               I confirm I am holding the original signed paper declaration
-              and will file it with the church records.
+              and will file it with the mosque records.
             </span>
           </label>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

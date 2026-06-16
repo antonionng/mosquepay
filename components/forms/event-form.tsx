@@ -22,7 +22,7 @@ const schema = z.object({
   title: z.string().min(1, "Title is required"),
   slug: z.string().min(1, "Slug is required").regex(/^[a-z0-9-]+$/, "Slug: lowercase letters, numbers, hyphens only"),
   description: z.string().optional(),
-  event_type: z.enum(["church_service", "church_of_instruction", "social", "charity"]),
+  event_type: z.enum(["mosque_service", "mosque_of_instruction", "social", "charity"]),
   event_date: z.string().min(1, "Date is required"),
   event_time: z.string().optional(),
   location: z.string().optional(),
@@ -69,7 +69,7 @@ export function EventForm({ eventId, defaultValues }: { eventId?: string; defaul
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      event_type: "church_service",
+      event_type: "mosque_service",
       location: "Mark members' Hall",
       enable_rsvp: true,
       enable_payments: false,
@@ -149,10 +149,10 @@ export function EventForm({ eventId, defaultValues }: { eventId?: string; defaul
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="church_service">Church service</SelectItem>
-                  <SelectItem value="church_of_instruction">Church of instruction</SelectItem>
-                  <SelectItem value="social">Social</SelectItem>
-                  <SelectItem value="charity">Charity</SelectItem>
+                  <SelectItem value="mosque_service">Jumu'ah / Prayer</SelectItem>
+                  <SelectItem value="mosque_of_instruction">Study circle / Halaqah</SelectItem>
+                  <SelectItem value="social">Community / Social</SelectItem>
+                  <SelectItem value="charity">Charity / Fundraising</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -193,11 +193,11 @@ export function EventForm({ eventId, defaultValues }: { eventId?: string; defaul
                 className="mt-1 h-4 w-4 rounded border-input text-blue-600 focus:ring-blue-500"
               />
               <span>
-                <span className="font-medium">Show on the public church website</span>
+                <span className="font-medium">Show on the public mosque website</span>
                 <span className="mt-1 block text-xs text-slate-500">
                   Socials and charity events are public by default. Tick this only for services
-                  that genuinely welcome newcomers (e.g. an open special_service). Regular church
-                  services and churches of instruction stay private even when published.
+                  that genuinely welcome newcomers (e.g. an open special_service). Regular mosque
+                  services and mosques of instruction stay private even when published.
                 </span>
               </span>
             </label>

@@ -213,7 +213,7 @@ export function ReconciliationClient({
             type="text"
             value={accountLabel}
             onChange={(e) => setAccountLabel(e.target.value)}
-            placeholder="Account label (e.g. Church Current Account)"
+            placeholder="Account label (e.g. Mosque Current Account)"
             className="h-10 flex-1 min-w-[240px] rounded-xl border border-slate-200 bg-white px-3 text-sm"
           />
           <Button onClick={() => fileRef.current?.click()} disabled={busy}>

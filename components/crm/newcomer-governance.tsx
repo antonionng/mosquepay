@@ -73,7 +73,7 @@ export function NewcomerGovernancePanel({
       const proposerIsMember = proposer && proposer !== "__custom";
       const seconderIsMember = seconder && seconder !== "__custom";
 
-      const res = await fetch(`/api/newcomers/church/${newcomerId}`, {
+      const res = await fetch(`/api/newcomers/mosque/${newcomerId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -205,7 +205,7 @@ export function NewcomerGovernancePanel({
           <span>
             <span className="font-medium">Data protection consent recorded</span>
             <span className="block text-xs text-dash-muted">
-              Confirm the newcomer has agreed to the church holding their data.
+              Confirm the newcomer has agreed to the mosque holding their data.
             </span>
           </span>
         </label>
@@ -216,7 +216,7 @@ export function NewcomerGovernancePanel({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={4}
-            placeholder="Background, references, previous churches, anything relevant for the sponsor or pastoral contact"
+            placeholder="Background, references, previous mosques, anything relevant for the sponsor or pastoral contact"
           />
         </div>
 

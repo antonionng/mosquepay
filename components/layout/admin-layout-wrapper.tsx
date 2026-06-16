@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { AdminSidebar } from "@/components/layout/admin-sidebar";
-import { AdminChurchSwitcher } from "@/components/layout/admin-church-switcher";
+import { AdminMosqueSwitcher } from "@/components/layout/admin-mosque-switcher";
 import { ImpersonationBanner } from "@/components/layout/impersonation-banner";
 import { RoleTour } from "@/components/onboarding/role-tour";
 import { cn } from "@/lib/utils";
@@ -203,7 +203,7 @@ export function AdminLayoutWrapper({ children }: { children: React.ReactNode }) 
                   </nav>
                 ) : (
                   <p className="mb-0.5 hidden text-xs font-medium uppercase tracking-[0.14em] text-dash-faint sm:block">
-                    Church admin
+                    Mosque admin
                   </p>
                 )}
                 <h1 className="truncate text-base font-semibold tracking-tight text-dash-text sm:text-lg lg:text-xl">
@@ -212,7 +212,7 @@ export function AdminLayoutWrapper({ children }: { children: React.ReactNode }) 
               </div>
             </div>
             <div className="hidden shrink-0 items-center gap-2 sm:flex">
-              <AdminChurchSwitcher />
+              <AdminMosqueSwitcher />
             </div>
           </div>
         </header>
@@ -225,7 +225,7 @@ export function AdminLayoutWrapper({ children }: { children: React.ReactNode }) 
             "flex-1 overflow-auto bg-dash-surface p-4 outline-none sm:p-6 lg:p-8",
             // On kiosk routes the inner main is the only scrollable region.
             // overscroll-behavior:contain stops iOS rubber-banding past the
-            // edges from dragging the church header chrome on or off-screen.
+            // edges from dragging the mosque header chrome on or off-screen.
             isKioskRoute && "overscroll-contain",
           )}
         >

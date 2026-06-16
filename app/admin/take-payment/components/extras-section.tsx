@@ -180,7 +180,7 @@ export function ExtrasSection({
             <Input
               id="tp-description"
               type="text"
-              placeholder="Fellowship Meal top-up — 5 June"
+              placeholder="Community Meal top-up — 5 June"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               maxLength={140}

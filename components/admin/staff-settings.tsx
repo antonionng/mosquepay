@@ -29,7 +29,7 @@ type StaffRole =
 
 type StaffUser = {
   id: string;
-  church_id: string | null;
+  mosque_id: string | null;
   email: string;
   full_name: string;
   role: StaffRole;
@@ -46,7 +46,7 @@ const ROLE_OPTIONS: Array<{
     value: "secretary",
     label: "Secretary",
     description:
-      "Full access to this church: members, services, payments, charity, pastoral, website, and settings.",
+      "Full access to this mosque: members, services, payments, charity, pastoral, website, and settings.",
   },
   {
     value: "treasurer",
@@ -76,7 +76,7 @@ const ROLE_OPTIONS: Array<{
   {
     value: "operator",
     label: "Operator",
-    description: "Platform-wide access across churches.",
+    description: "Platform-wide access across mosques.",
   },
 ];
 
@@ -277,7 +277,7 @@ export function StaffSettings() {
             Staff and Roles
           </h2>
           <p className="dash-panel-header-description">
-            Invite church staff, assign responsibilities, and control who can change sensitive records.
+            Invite mosque staff, assign responsibilities, and control who can change sensitive records.
           </p>
         </div>
         <Badge variant="secondary" className="border-dash-border">
@@ -379,7 +379,7 @@ export function StaffSettings() {
               </span>
             </label>
             <p className="text-xs leading-5 text-dash-muted">
-              Operators are platform-wide. Other roles are scoped to the selected church.
+              Operators are platform-wide. Other roles are scoped to the selected mosque.
             </p>
           </div>
         </form>
@@ -507,7 +507,7 @@ export function StaffSettings() {
                     <p className="text-xs text-dash-faint lg:col-span-5">
                       {draft.role === "operator"
                         ? "Platform-wide operator access."
-                        : `${ROLE_LABELS[draft.role]} for the selected church.`}
+                        : `${ROLE_LABELS[draft.role]} for the selected mosque.`}
                     </p>
                   </div>
                 );

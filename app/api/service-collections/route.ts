@@ -4,7 +4,7 @@ import { getCurrentAdminScope } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit";
 import * as db from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 
 const GASDS_ANNUAL_LIMIT = 8000;
 
@@ -16,17 +16,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ collections: [], gasds: summary([], null) });
   }
 
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
 
-  const forbidden = await requireAdminApiPermission("charity:write", churchId);
+  const forbidden = await requireAdminApiPermission("charity:write", mosqueId);
   if (forbidden) return forbidden;
 
   const taxYear = request.nextUrl.searchParams.get("tax_year") ?? undefined;
-  const collections = await db.getServiceCollections(churchId, { taxYear });
+  const collections = await db.getServiceCollections(mosqueId, { taxYear });
   return NextResponse.json({ collections, gasds: summary(collections, taxYear ?? null) });
 }
 
@@ -38,13 +38,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Database not configured." }, { status: 503 });
   }
 
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
 
-  const forbidden = await requireAdminApiPermission("charity:write", churchId);
+  const forbidden = await requireAdminApiPermission("charity:write", mosqueId);
   if (forbidden) return forbidden;
 
   const body = await request.json().catch(() => ({}));
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     ? body.gasds_tax_year
     : taxYearForDate(collectionDate);
   const anonymousCashAmount = money(body.anonymous_cash_amount ?? body.cash_amount);
-  const existingCollections = await db.getServiceCollections(churchId, { taxYear });
+  const existingCollections = await db.getServiceCollections(mosqueId, { taxYear });
   const usedAllowance = existingCollections.reduce(
     (sum, collection) => sum + Number(collection.gasds_eligible_amount ?? 0),
     0
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
   );
   const scope = await getCurrentAdminScope();
 
-  const collection = await db.createServiceCollection(churchId, {
+  const collection = await db.createServiceCollection(mosqueId, {
     event_id: typeof body.event_id === "string" ? body.event_id : null,
     campaign_id: typeof body.campaign_id === "string" ? body.campaign_id : null,
     collection_date: collectionDate,
@@ -81,13 +81,13 @@ export async function POST(request: NextRequest) {
     gasds_tax_year: taxYear,
     notes: typeof body.notes === "string" ? body.notes.trim() || null : null,
     recorded_by_email:
-      scope.kind === "dummy" || scope.kind === "platform" || scope.kind === "church"
+      scope.kind === "dummy" || scope.kind === "platform" || scope.kind === "mosque"
         ? scope.email
         : null,
   });
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "service_collection_created",
     entityType: "service_collection",
     entityId: collection.id,

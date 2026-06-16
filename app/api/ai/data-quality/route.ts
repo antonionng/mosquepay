@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -17,15 +17,15 @@ export async function GET(request: NextRequest) {
   const unauthorized = await requireAdminApiAuth();
   if (unauthorized) return unauthorized;
   if (!isSupabaseConfigured()) return NextResponse.json({ issues: [] });
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("members:read", churchId);
+  const forbidden = await requireAdminApiPermission("members:read", mosqueId);
   if (forbidden) return forbidden;
 
-  const members = await db.getMembers(churchId, { status: "active" });
+  const members = await db.getMembers(mosqueId, { status: "active" });
   const issues: Issue[] = [];
   for (const m of members) {
     const fields: string[] = [];

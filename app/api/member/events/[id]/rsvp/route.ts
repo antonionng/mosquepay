@@ -26,7 +26,7 @@ export async function POST(
 
   const member =
     (await db.getMemberByAuthUserId(user.id)) ??
-    (await db.getMemberByEmailAcrossChurches(user.email));
+    (await db.getMemberByEmailAcrossMosques(user.email));
   if (!member) {
     return NextResponse.json({ error: "Member profile not found." }, { status: 404 });
   }
@@ -47,7 +47,7 @@ export async function POST(
     ? String(body.dietary_requirements).trim().slice(0, 280) || null
     : member.dietary_requirements ?? null;
 
-  const event = await db.getEventById(eventId, member.church_id);
+  const event = await db.getEventById(eventId, member.mosque_id);
   if (!event) {
     return NextResponse.json({ error: "Event not found." }, { status: 404 });
   }
@@ -61,12 +61,12 @@ export async function POST(
   const existing = await db.getRsvpByEventAndEmail(
     eventId,
     member.email,
-    member.church_id
+    member.mosque_id
   );
 
   let rsvp = null;
   if (existing) {
-    rsvp = await db.updateRsvp(existing.id, member.church_id, {
+    rsvp = await db.updateRsvp(existing.id, member.mosque_id, {
       attending_ceremony: attendingCeremony,
       attending_dining: attendingCeremony ? attendingDining : false,
       number_of_guests: attendingCeremony ? guests : 0,
@@ -75,7 +75,7 @@ export async function POST(
       status: attendingCeremony ? "confirmed" : "apologies",
     });
   } else {
-    rsvp = await db.addRsvp(member.church_id, {
+    rsvp = await db.addRsvp(member.mosque_id, {
       event_id: eventId,
       user_name: member.full_name,
       user_email: member.email,

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -48,7 +48,7 @@ const CATEGORY_AUDIENCES: Record<CommunicationCategory, CommunicationAudience> =
 
 const CATEGORY_GUIDANCE: Record<CommunicationCategory, string> = {
   members_newsletter:
-    "A concise monthly church update with recent highlights, upcoming dates, charity notes, and a warm closing.",
+    "A concise monthly mosque update with recent highlights, upcoming dates, charity notes, and a warm closing.",
   post_service_recap:
     "A warm thank-you after a service with a short recap and next steps.",
   event_reminder:
@@ -60,7 +60,7 @@ const CATEGORY_GUIDANCE: Record<CommunicationCategory, string> = {
   pastoral_check_in:
     "A sensitive PastoralCare-style check-in. Keep it personal, gentle, and never speculative.",
   charity_appeal:
-    "A positive charity update or appeal with a clear reason to support the church campaign.",
+    "A positive charity update or appeal with a clear reason to support the mosque campaign.",
 };
 
 const ALLOWED_CATEGORIES = new Set<CommunicationCategory>(
@@ -95,9 +95,9 @@ function cleanAudience(value: unknown, fallback: CommunicationAudience) {
 function normalizeDraft(
   draft: Partial<CommunicationDraft>,
   category: CommunicationCategory,
-  churchName: string
+  mosqueName: string
 ): CommunicationDraft {
-  const fallback = fallbackDraft(category, churchName, "");
+  const fallback = fallbackDraft(category, mosqueName, "");
   const notes = Array.isArray(draft.admin_notes)
     ? draft.admin_notes.filter((note): note is string => typeof note === "string")
     : fallback.admin_notes;
@@ -115,24 +115,24 @@ function normalizeDraft(
 
 function fallbackDraft(
   category: CommunicationCategory,
-  churchName: string,
+  mosqueName: string,
   notes: string
 ): CommunicationDraft {
   const label = CATEGORY_LABELS[category];
   const noteParagraph = notes
     ? `<p>${escapeHtml(notes)}</p>`
-    : "<p>Please add the latest church details before sending.</p>";
+    : "<p>Please add the latest mosque details before sending.</p>";
 
   return {
     subject:
       category === "giving_reminder"
-        ? "Reminder: church giving"
+        ? "Reminder: mosque giving"
         : category === "newcomer_follow_up"
-          ? `An update from ${churchName}`
-          : `${churchName}: ${label}`,
+          ? `An update from ${mosqueName}`
+          : `${mosqueName}: ${label}`,
     html_body: [
       "<p>Dear {{first_name}},</p>",
-      `<p>Here is a short ${label.toLowerCase()} from ${churchName}.</p>`,
+      `<p>Here is a short ${label.toLowerCase()} from ${mosqueName}.</p>`,
       noteParagraph,
       "<p>With every blessing,<br/>The Secretary</p>",
     ].join("\n"),
@@ -155,28 +155,28 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("members:write", churchId);
+  const forbidden = await requireAdminApiPermission("members:write", mosqueId);
   if (forbidden) return forbidden;
 
-  const [body, church] = await Promise.all([
+  const [body, mosque] = await Promise.all([
     request.json().catch(() => ({})),
-    db.getChurchById(churchId),
+    db.getMosqueById(mosqueId),
   ]);
   const category = cleanCategory(body.category);
   const notes = cleanText(body.notes);
   const eventId = cleanText(body.event_id);
-  const event = eventId ? await db.getEventById(eventId, churchId) : null;
-  const churchName = church?.name ?? "the church";
+  const event = eventId ? await db.getEventById(eventId, mosqueId) : null;
+  const mosqueName = mosque?.name ?? "the mosque";
 
   const aiDraft = await completeJSON<CommunicationDraft>({
     system:
-      "You draft church communications for admins. Reply with strict JSON: { subject: string, html_body: string, recommended_audience: 'active_members'|'all_members'|'newcomers', admin_notes: string[] }. html_body must be safe email HTML using paragraphs, headings, lists, and merge tag {{first_name}}. Do not include private ritual details, sensitive speculation, or claims of secrecy.",
-    user: `Church: ${churchName}
+      "You draft mosque communications for admins. Reply with strict JSON: { subject: string, html_body: string, recommended_audience: 'active_members'|'all_members'|'newcomers', admin_notes: string[] }. html_body must be safe email HTML using paragraphs, headings, lists, and merge tag {{first_name}}. Do not include private ritual details, sensitive speculation, or claims of secrecy.",
+    user: `Mosque: ${mosqueName}
 Category: ${CATEGORY_LABELS[category]}
 Audience guidance: ${CATEGORY_AUDIENCES[category]}
 Content guidance: ${CATEGORY_GUIDANCE[category]}
@@ -188,8 +188,8 @@ Draft a ready-to-review email with a useful subject, concise body, and 2-4 admin
   });
 
   const draft = aiDraft
-    ? normalizeDraft(aiDraft, category, churchName)
-    : fallbackDraft(category, churchName, notes);
+    ? normalizeDraft(aiDraft, category, mosqueName)
+    : fallbackDraft(category, mosqueName, notes);
 
   return NextResponse.json({
     draft,

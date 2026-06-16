@@ -1,11 +1,11 @@
-import type { Church } from "@/lib/db/types";
+import type { Mosque } from "@/lib/db/types";
 import { renderNotificationEmail } from "@/lib/email/templates";
 import { sendWithLog } from "@/lib/email/send-with-log";
 
 const CONTACT_NOTIFICATION_EMAIL = "ag@experrt.com";
 
 type WebsiteNotificationInput = {
-  church: Pick<Church, "name" | "support_email" | "secretary_name"> | null;
+  mosque: Pick<Mosque, "name" | "support_email" | "secretary_name"> | null;
   replyTo?: string | null;
   subject: string;
   eyebrow: string;
@@ -18,11 +18,11 @@ type WebsiteNotificationInput = {
 };
 
 function notificationRecipients(
-  church: WebsiteNotificationInput["church"],
+  mosque: WebsiteNotificationInput["mosque"],
   recipients?: string[] | null
 ) {
   if (recipients?.length) return recipients;
-  return church?.support_email ? [church.support_email] : [CONTACT_NOTIFICATION_EMAIL];
+  return mosque?.support_email ? [mosque.support_email] : [CONTACT_NOTIFICATION_EMAIL];
 }
 
 function plainRows(rows: WebsiteNotificationInput["rows"]) {
@@ -33,7 +33,7 @@ function plainRows(rows: WebsiteNotificationInput["rows"]) {
 }
 
 export async function sendWebsiteNotification({
-  church,
+  mosque,
   replyTo,
   subject,
   eyebrow,
@@ -44,7 +44,7 @@ export async function sendWebsiteNotification({
   message,
   recipients,
 }: WebsiteNotificationInput) {
-  const to = notificationRecipients(church, recipients);
+  const to = notificationRecipients(mosque, recipients);
   const safeRows = rows
     .filter((row) => row.value)
     .map((row) => ({ label: row.label, value: String(row.value) }));
@@ -55,12 +55,12 @@ export async function sendWebsiteNotification({
     preview,
     intro,
     rows: [
-      { label: "Church", value: church?.name ?? "Selected church" },
+      { label: "Mosque", value: mosque?.name ?? "Selected mosque" },
       ...safeRows,
     ],
     message: message?.trim() || undefined,
   });
-  const text = `${title}\n\nChurch: ${church?.name ?? "Selected church"}\n${plainRows(rows)}${
+  const text = `${title}\n\nMosque: ${mosque?.name ?? "Selected mosque"}\n${plainRows(rows)}${
     message ? `\n\n${message}` : ""
   }`;
 
@@ -70,17 +70,17 @@ export async function sendWebsiteNotification({
   const results = await Promise.all(
     to.map((addr) =>
       sendWithLog({
-        churchId: null,
+        mosqueId: null,
         toEmail: addr,
         emailType: "website_notification",
-        entityType: "church",
+        entityType: "mosque",
         entityId: null,
         dedupeKey: null,
         subject,
         html,
         text,
         replyTo: replyTo?.trim() || null,
-        metadata: { church_name: church?.name ?? null, eyebrow },
+        metadata: { mosque_name: mosque?.name ?? null, eyebrow },
       }),
     ),
   );

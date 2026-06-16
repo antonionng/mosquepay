@@ -30,20 +30,20 @@ type Network = {
   is_active: boolean;
 };
 
-type ChurchMini = {
+type MosqueMini = {
   id: string;
   name: string;
   slug: string;
-  church_number: string | null;
+  mosque_number: string | null;
   network_id: string | null;
 };
 
 export function NetworksClient({
   networks,
-  churches,
+  mosques,
 }: {
   networks: Network[];
-  churches: ChurchMini[];
+  mosques: MosqueMini[];
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -56,16 +56,16 @@ export function NetworksClient({
   });
   const [assignFor, setAssignFor] = useState<string | null>(null);
 
-  const churchesByNetwork = useMemo(() => {
-    const map = new Map<string, ChurchMini[]>();
-    for (const church of churches) {
-      const key = church.network_id ?? "_unassigned";
+  const mosquesByNetwork = useMemo(() => {
+    const map = new Map<string, MosqueMini[]>();
+    for (const mosque of mosques) {
+      const key = mosque.network_id ?? "_unassigned";
       const arr = map.get(key) ?? [];
-      arr.push(church);
+      arr.push(mosque);
       map.set(key, arr);
     }
     return map;
-  }, [churches]);
+  }, [mosques]);
 
   async function createNetwork(e: React.FormEvent) {
     e.preventDefault();
@@ -89,15 +89,15 @@ export function NetworksClient({
     }
   }
 
-  async function assignChurch(networkId: string, churchId: string) {
+  async function assignMosque(networkId: string, mosqueId: string) {
     setBusy(true);
     try {
-      const res = await fetch(`/api/networks/${networkId}/churches`, {
+      const res = await fetch(`/api/networks/${networkId}/mosques`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ church_id: churchId }),
+        body: JSON.stringify({ mosque_id: mosqueId }),
       });
-      if (!res.ok) throw new Error("Could not assign church.");
+      if (!res.ok) throw new Error("Could not assign mosque.");
       setAssignFor(null);
       router.refresh();
     } catch (error) {
@@ -107,14 +107,14 @@ export function NetworksClient({
     }
   }
 
-  async function unassignChurch(networkId: string, churchId: string) {
+  async function unassignMosque(networkId: string, mosqueId: string) {
     setBusy(true);
     try {
       const res = await fetch(
-        `/api/networks/${networkId}/churches?church_id=${churchId}`,
+        `/api/networks/${networkId}/mosques?mosque_id=${mosqueId}`,
         { method: "DELETE" }
       );
-      if (!res.ok) throw new Error("Could not unassign church.");
+      if (!res.ok) throw new Error("Could not unassign mosque.");
       router.refresh();
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "Unassign failed.");
@@ -123,15 +123,15 @@ export function NetworksClient({
     }
   }
 
-  const unassigned = churchesByNetwork.get("_unassigned") ?? [];
+  const unassigned = mosquesByNetwork.get("_unassigned") ?? [];
 
   return (
     <div className="space-y-4 sm:space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Networks &amp; districts</h1>
         <p className="mt-1 text-sm text-slate-500">
-          The network layer aggregates churches, supports cross-church officer
-          directories, and produces grand church annual returns.
+          The network layer aggregates mosques, supports cross-mosque officer
+          directories, and produces grand mosque annual returns.
         </p>
       </div>
 
@@ -215,11 +215,11 @@ export function NetworksClient({
         {networks.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
             <MapPin className="mx-auto mb-2 h-6 w-6 text-slate-300" />
-            No networks yet. Create one above to start grouping churches.
+            No networks yet. Create one above to start grouping mosques.
           </div>
         ) : (
           networks.map((network) => {
-            const networkChurches = churchesByNetwork.get(network.id) ?? [];
+            const networkMosques = mosquesByNetwork.get(network.id) ?? [];
             return (
               <div
                 key={network.id}
@@ -255,7 +255,7 @@ export function NetworksClient({
                         setAssignFor(assignFor === network.id ? null : network.id)
                       }
                     >
-                      <Plus className="mr-1 h-3 w-3" /> Add church
+                      <Plus className="mr-1 h-3 w-3" /> Add mosque
                     </Button>
                   </div>
                 </div>
@@ -263,21 +263,21 @@ export function NetworksClient({
                   <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
                     {unassigned.length === 0 ? (
                       <p className="text-xs text-slate-500">
-                        All churches already belong to a network.
+                        All mosques already belong to a network.
                       </p>
                     ) : (
                       <div className="flex flex-wrap gap-2">
-                        {unassigned.map((church) => (
+                        {unassigned.map((mosque) => (
                           <button
-                            key={church.id}
+                            key={mosque.id}
                             disabled={busy}
-                            onClick={() => assignChurch(network.id, church.id)}
+                            onClick={() => assignMosque(network.id, mosque.id)}
                             className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700 hover:border-blue-300 hover:bg-blue-50"
                           >
-                            {church.name}
-                            {church.church_number && (
+                            {mosque.name}
+                            {mosque.mosque_number && (
                               <span className="ml-1 text-slate-400">
-                                #{church.church_number}
+                                #{mosque.mosque_number}
                               </span>
                             )}
                           </button>
@@ -289,36 +289,36 @@ export function NetworksClient({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Church</TableHead>
+                      <TableHead>Mosque</TableHead>
                       <TableHead>Number</TableHead>
                       <TableHead className="w-32 text-right" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {networkChurches.length === 0 ? (
+                    {networkMosques.length === 0 ? (
                       <TableRow>
                         <TableCell
                           colSpan={3}
                           className="py-6 text-center text-sm text-slate-500"
                         >
                           <Building2 className="mx-auto mb-1 h-5 w-5 text-slate-300" />
-                          No churches yet.
+                          No mosques yet.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      networkChurches.map((church) => (
-                        <TableRow key={church.id}>
+                      networkMosques.map((mosque) => (
+                        <TableRow key={mosque.id}>
                           <TableCell className="text-sm font-medium text-slate-900">
-                            {church.name}
+                            {mosque.name}
                           </TableCell>
                           <TableCell className="text-sm text-slate-500">
-                            {church.church_number ?? "—"}
+                            {mosque.mosque_number ?? "—"}
                           </TableCell>
                           <TableCell className="text-right">
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => unassignChurch(network.id, church.id)}
+                              onClick={() => unassignMosque(network.id, mosque.id)}
                               disabled={busy}
                             >
                               Remove

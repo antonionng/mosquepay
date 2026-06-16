@@ -28,23 +28,23 @@ export async function GET(
 
   const { id } = await params;
 
-  // Resolve church from the schedule row, not URL/host/cookie. See note
+  // Resolve mosque from the schedule row, not URL/host/cookie. See note
   // in /api/giving/schedules/[id]/cancel for rationale.
   const supa = createServiceClient();
   const { data: scheduleRow } = await supa
     .from("giving_schedules")
-    .select("church_id")
+    .select("mosque_id")
     .eq("id", id)
-    .maybeSingle<{ church_id: string }>();
+    .maybeSingle<{ mosque_id: string }>();
   if (!scheduleRow) {
     return NextResponse.json(
       { error: "Schedule not found." },
       { status: 404 }
     );
   }
-  const churchId = scheduleRow.church_id;
+  const mosqueId = scheduleRow.mosque_id;
 
-  const schedule = await db.getGivingSchedule(id, churchId);
+  const schedule = await db.getGivingSchedule(id, mosqueId);
   if (!schedule) {
     return NextResponse.json(
       { error: "Schedule not found." },
@@ -71,7 +71,7 @@ export async function GET(
     return NextResponse.json(
       {
         error:
-          "Verification details are missing. Please contact your church secretary.",
+          "Verification details are missing. Please contact your mosque secretary.",
         code: "next_action_missing",
       },
       { status: 500 }
@@ -98,7 +98,7 @@ export async function GET(
     return NextResponse.json(
       {
         error:
-          "Verification details are missing. Please contact your church secretary.",
+          "Verification details are missing. Please contact your mosque secretary.",
         code: "publishable_key_missing",
       },
       { status: 500 }

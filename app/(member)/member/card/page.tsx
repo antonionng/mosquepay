@@ -22,12 +22,12 @@ export default async function MemberCardPage() {
 
   const member =
     (await db.getMemberByAuthUserId(user.id)) ??
-    (await db.getMemberByEmailAcrossChurches(user.email));
+    (await db.getMemberByEmailAcrossMosques(user.email));
   if (!member) {
     redirect("/member");
   }
 
-  const church = await db.getChurchById(member.church_id);
+  const mosque = await db.getMosqueById(member.mosque_id);
 
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
@@ -52,14 +52,14 @@ export default async function MemberCardPage() {
         membership_status: member.membership_status,
         date_of_membership: member.date_of_membership,
       }}
-      church={
-        church
+      mosque={
+        mosque
           ? {
-              name: church.name,
-              church_number: church.church_number,
-              city: church.city,
-              primary_color: church.primary_color,
-              logo_url: church.logo_url,
+              name: mosque.name,
+              mosque_number: mosque.mosque_number,
+              city: mosque.city,
+              primary_color: mosque.primary_color,
+              logo_url: mosque.logo_url,
             }
           : null
       }

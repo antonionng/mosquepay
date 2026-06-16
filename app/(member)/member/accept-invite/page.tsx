@@ -122,8 +122,8 @@ function MemberAcceptInviteForm() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8 flex flex-col items-center">
           <Image
-            src="/brand/churchpay-admin-signin.png"
-            alt="ChurchPay"
+            src="/brand/mosquepay-admin-signin.png"
+            alt="MosquePay"
             width={1200}
             height={800}
             priority

@@ -43,13 +43,13 @@ export async function POST(request: NextRequest) {
       // Prefer the platform-scoped row when present, so a person who is both
       // a platform admin and a tenant admin gets the platform-flavoured copy.
       const target =
-        memberships.find((row) => row.church_id == null) ?? memberships[0];
+        memberships.find((row) => row.mosque_id == null) ?? memberships[0];
 
-      let churchName = "ChurchPay";
-      if (target.church_id) {
+      let mosqueName = "MosquePay";
+      if (target.mosque_id) {
         try {
-          const church = await db.getChurchById(target.church_id);
-          if (church?.name) churchName = church.name;
+          const mosque = await db.getMosqueById(target.mosque_id);
+          if (mosque?.name) mosqueName = mosque.name;
         } catch {
           // Non-fatal: keep the platform-level fallback name.
         }
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       const result = await sendStaffPasswordReset({
         request,
         staff: target,
-        churchName,
+        mosqueName,
       });
       if (!result.sent) {
         console.warn("[forgot-password] staff reset send failed", {
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
         email,
         recipientName: email,
         audience: "admin",
-        churchName: "ChurchPay platform",
+        mosqueName: "MosquePay platform",
       });
       if (!result.sent) {
         console.warn("[forgot-password] owner reset send failed", {

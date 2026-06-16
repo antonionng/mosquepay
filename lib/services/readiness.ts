@@ -4,7 +4,7 @@
  */
 
 import { resolveEffectiveAmount } from "@/lib/fees/resolve";
-import type { ChurchFeeDefaults } from "@/lib/fees/resolve";
+import type { MosqueFeeDefaults } from "@/lib/fees/resolve";
 
 export type ServiceReadinessInput = {
   event_date: string;
@@ -23,11 +23,11 @@ export type ServiceReadinessInput = {
   noticeSentCount: number;
   noticeStatus?: "none" | "draft" | "approved" | "sent";
   /**
-   * Optional church-level fee defaults. When supplied, readiness treats a
+   * Optional mosque-level fee defaults. When supplied, readiness treats a
    * `null` event amount as "inherits from default" rather than missing,
    * matching the behaviour of `lib/fees/resolve.ts`.
    */
-  churchDefaults?: ChurchFeeDefaults | null;
+  mosqueDefaults?: MosqueFeeDefaults | null;
 };
 
 export type ReadinessIssue = {
@@ -91,7 +91,7 @@ export function getServiceReadiness(
 
   const effectiveDining = resolveEffectiveAmount(
     input.dining_price,
-    input.churchDefaults?.default_member_dining_amount
+    input.mosqueDefaults?.default_member_dining_amount
   );
   if (
     isFuture &&
@@ -101,7 +101,7 @@ export function getServiceReadiness(
     issues.push({
       key: "dining_no_price",
       message:
-        "Dining enabled but no price set (and no church default to fall back on)",
+        "Dining enabled but no price set (and no mosque default to fall back on)",
       severity: "warn",
     });
   }
@@ -120,7 +120,7 @@ export function getServiceReadiness(
 
   const effectiveLevy = resolveEffectiveAmount(
     input.service_fee_amount,
-    input.churchDefaults?.default_member_levy_amount
+    input.mosqueDefaults?.default_member_levy_amount
   );
   if (
     isFuture &&
@@ -130,14 +130,14 @@ export function getServiceReadiness(
     issues.push({
       key: "service_fee_no_amount",
       message:
-        "Member levy enabled but no amount set (and no church default to fall back on)",
+        "Member levy enabled but no amount set (and no mosque default to fall back on)",
       severity: "warn",
     });
   }
 
   const effectiveGuestDining = resolveEffectiveAmount(
     input.guest_ticket_price,
-    input.churchDefaults?.default_guest_dining_amount
+    input.mosqueDefaults?.default_guest_dining_amount
   );
   if (
     isFuture &&
@@ -147,7 +147,7 @@ export function getServiceReadiness(
     issues.push({
       key: "guest_no_price",
       message:
-        "Guests enabled but no dining price (and no church default to fall back on)",
+        "Guests enabled but no dining price (and no mosque default to fall back on)",
       severity: "warn",
     });
   }

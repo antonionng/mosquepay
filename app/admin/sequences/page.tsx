@@ -7,11 +7,11 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminSequencesPage() {
   const ctx = await getAdminReadContext();
-  const churchId = ctx.mode === "database" ? ctx.churchId : null;
+  const mosqueId = ctx.mode === "database" ? ctx.mosqueId : null;
 
   const sequences =
-    isSupabaseConfigured() && churchId
-      ? await db.listServiceSequences(churchId)
+    isSupabaseConfigured() && mosqueId
+      ? await db.listServiceSequences(mosqueId)
       : [];
 
   const eventsBySequence: Record<
@@ -29,9 +29,9 @@ export default async function AdminSequencesPage() {
     }>
   > = {};
 
-  if (churchId) {
+  if (mosqueId) {
     for (const sequence of sequences) {
-      const events = await db.getEventsBySequenceId(sequence.id, churchId);
+      const events = await db.getEventsBySequenceId(sequence.id, mosqueId);
       eventsBySequence[sequence.id] = events.map((event) => ({
         id: event.id,
         title: event.title,

@@ -1,24 +1,24 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { ChurchHomepage } from "@/components/church-site/church-homepage";
+import { MosqueHomepage } from "@/components/mosque-site/mosque-homepage";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getChurchSlugFromHost, resolveChurchSlug } from "@/lib/tenant";
+import { getMosqueSlugFromHost, resolveMosqueSlug } from "@/lib/tenant";
 
 async function getPublicTenantSlug(querySlug?: string) {
-  if (querySlug) return resolveChurchSlug(querySlug);
+  if (querySlug) return resolveMosqueSlug(querySlug);
 
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host");
   const hostname = host?.split(":")[0]?.toLowerCase() ?? "";
-  const subdomainSlug = getChurchSlugFromHost(hostname);
+  const subdomainSlug = getMosqueSlugFromHost(hostname);
   if (subdomainSlug) return subdomainSlug;
 
   if (!hostname || !isSupabaseConfigured()) return null;
-  const church = await db.getChurchByCustomDomain(hostname);
-  return church?.slug ?? null;
+  const mosque = await db.getMosqueByCustomDomain(hostname);
+  return mosque?.slug ?? null;
 }
 
 export async function generateMetadata({
@@ -26,22 +26,22 @@ export async function generateMetadata({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ church?: string }>;
+  searchParams: Promise<{ mosque?: string }>;
 }): Promise<Metadata> {
-  const [{ slug }, { church }] = await Promise.all([params, searchParams]);
-  const churchSlug = (await getPublicTenantSlug(church)) ?? resolveChurchSlug(church);
-  const siteChurch = isSupabaseConfigured()
-    ? await db.getChurchBySlug(churchSlug)
-    : mockDb.getChurchBySlug(churchSlug);
-  const site = siteChurch
+  const [{ slug }, { mosque }] = await Promise.all([params, searchParams]);
+  const mosqueSlug = (await getPublicTenantSlug(mosque)) ?? resolveMosqueSlug(mosque);
+  const siteMosque = isSupabaseConfigured()
+    ? await db.getMosqueBySlug(mosqueSlug)
+    : mockDb.getMosqueBySlug(mosqueSlug);
+  const site = siteMosque
     ? isSupabaseConfigured()
-      ? await db.getChurchSite(siteChurch.id)
-      : mockDb.getChurchSite(churchSlug)
+      ? await db.getMosqueSite(siteMosque.id)
+      : mockDb.getMosqueSite(mosqueSlug)
     : null;
   const page = site?.custom_pages?.find((item) => item.slug === slug && item.published);
-  const title = page?.seo_title || page?.title || "Church page";
+  const title = page?.seo_title || page?.title || "Mosque page";
   const description = page?.seo_description || page?.description || undefined;
-  const absoluteTitle = siteChurch ? `${title} | ${siteChurch.name}` : title;
+  const absoluteTitle = siteMosque ? `${title} | ${siteMosque.name}` : title;
 
   return {
     title: {
@@ -56,15 +56,15 @@ export async function generateMetadata({
   };
 }
 
-export default async function ChurchCustomPage({
+export default async function MosqueCustomPage({
   params,
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ church?: string }>;
+  searchParams: Promise<{ mosque?: string }>;
 }) {
-  const [{ slug }, { church }] = await Promise.all([params, searchParams]);
-  const churchSlug = await getPublicTenantSlug(church);
+  const [{ slug }, { mosque }] = await Promise.all([params, searchParams]);
+  const mosqueSlug = await getPublicTenantSlug(mosque);
   return (
     <Suspense
       fallback={
@@ -73,7 +73,7 @@ export default async function ChurchCustomPage({
         </div>
       }
     >
-      <ChurchHomepage pageSlug={slug} initialChurchSlug={churchSlug} />
+      <MosqueHomepage pageSlug={slug} initialMosqueSlug={mosqueSlug} />
     </Suspense>
   );
 }

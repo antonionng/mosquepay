@@ -10,7 +10,7 @@ import { FeeBreakdown } from "@/components/fees/fee-breakdown";
 import {
   buildMemberFeeBreakdown,
   type MemberFeeProfile,
-  type ChurchFeeDefaults,
+  type MosqueFeeDefaults,
 } from "@/lib/fees/resolve";
 
 type GuestEntry = {
@@ -21,7 +21,7 @@ type GuestEntry = {
 type Props = {
   token: string;
   eventId: string;
-  churchSlug: string;
+  mosqueSlug: string;
   recipientName: string;
   recipientEmail: string;
   enableDining: boolean;
@@ -46,7 +46,7 @@ type Props = {
   enableRaffleWinePledge: boolean;
   raffleWineDescription: string | null;
   memberProfile?: MemberFeeProfile | null;
-  feeDefaults?: ChurchFeeDefaults | null;
+  feeDefaults?: MosqueFeeDefaults | null;
   initial: {
     attending_ceremony: boolean;
     attending_dining: boolean;
@@ -65,7 +65,7 @@ function formatGbp(value: number): string {
 export function NoticeRsvpForm({
   token,
   eventId,
-  churchSlug,
+  mosqueSlug,
   recipientName,
   recipientEmail,
   enableDining,
@@ -268,11 +268,11 @@ export function NoticeRsvpForm({
 
     try {
       if (attending && requiresPayment) {
-        const churchQuery = churchSlug
-          ? `?church=${encodeURIComponent(churchSlug)}`
+        const mosqueQuery = mosqueSlug
+          ? `?mosque=${encodeURIComponent(mosqueSlug)}`
           : "";
         const res = await fetch(
-          `/api/payments/create-checkout-session${churchQuery}`,
+          `/api/payments/create-checkout-session${mosqueQuery}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },

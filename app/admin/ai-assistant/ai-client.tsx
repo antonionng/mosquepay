@@ -259,11 +259,11 @@ export function AiAssistantClient({
       `Draft a careful follow-up for ${row.full_name}. Reasons flagged: ${row.reasons.join(", ")}. Keep it sensitive and suitable for secretary or PastoralCare review.`
     );
     setCommunicationDraft({
-      subject: `A note from the church`,
+      subject: `A note from the mosque`,
       html_body: [
         "<p>Dear {{first_name}},</p>",
-        "<p>I hope you are keeping well. We wanted to check in and let you know the church is thinking of you.</p>",
-        "<p>If there is anything practical the church can do, or if you would simply welcome a conversation, please do let us know.</p>",
+        "<p>I hope you are keeping well. We wanted to check in and let you know the mosque is thinking of you.</p>",
+        "<p>If there is anything practical the mosque can do, or if you would simply welcome a conversation, please do let us know.</p>",
         "<p>With every blessing,<br/>The PastoralCare</p>",
       ].join("\n"),
       recommended_audience: "active_members",

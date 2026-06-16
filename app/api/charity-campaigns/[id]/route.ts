@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import { writeAuditLog } from "@/lib/audit";
 
 const VALID_STATUSES = new Set(["active", "completed", "paused"]);
@@ -16,7 +16,7 @@ export async function PATCH(
 
   const { id } = await params;
   try {
-    const churchSlug = getChurchSlugFromRequest(request);
+    const mosqueSlug = getMosqueSlugFromRequest(request);
     const body = await request.json();
     const updates: Record<string, unknown> = {};
     if (typeof body.name === "string") updates.name = body.name.trim();
@@ -48,19 +48,19 @@ export async function PATCH(
         { status: 503 }
       );
     }
-    const churchId = await db.resolveChurchId(churchSlug);
-    if (!churchId) {
-      return NextResponse.json({ error: "Church not found." }, { status: 404 });
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("charity:write", churchId);
+    const forbidden = await requireAdminApiPermission("charity:write", mosqueId);
     if (forbidden) return forbidden;
 
-    const campaign = await db.updateCharityCampaign(id, churchId, updates);
+    const campaign = await db.updateCharityCampaign(id, mosqueId, updates);
     if (!campaign) {
       return NextResponse.json({ error: "Campaign not found." }, { status: 404 });
     }
     await writeAuditLog({
-      churchId,
+      mosqueId,
       action: "updated",
       entityType: "charity_campaign",
       entityId: campaign.id,
@@ -93,15 +93,15 @@ export async function DELETE(
       );
     }
 
-    const churchSlug = getChurchSlugFromRequest(request);
-    const churchId = await db.resolveChurchId(churchSlug);
-    if (!churchId) {
-      return NextResponse.json({ error: "Church not found." }, { status: 404 });
+    const mosqueSlug = getMosqueSlugFromRequest(request);
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("charity:write", churchId);
+    const forbidden = await requireAdminApiPermission("charity:write", mosqueId);
     if (forbidden) return forbidden;
 
-    const campaign = await db.updateCharityCampaign(id, churchId, {
+    const campaign = await db.updateCharityCampaign(id, mosqueId, {
       status: "paused",
       end_date: new Date().toISOString(),
     });
@@ -109,7 +109,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Campaign not found." }, { status: 404 });
     }
     await writeAuditLog({
-      churchId,
+      mosqueId,
       action: "archived",
       entityType: "charity_campaign",
       entityId: campaign.id,

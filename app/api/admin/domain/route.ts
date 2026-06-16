@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -10,7 +10,7 @@ import {
 import { writeAuditLog } from "@/lib/audit";
 
 const DOMAIN_PATTERN = /^(?!:\/\/)([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/;
-const PRODUCTION_PLATFORM_HOSTNAME = "churchpay.co.uk";
+const PRODUCTION_PLATFORM_HOSTNAME = "mosque-pay.com";
 
 function normalizeHostname(value?: string | null): string | null {
   if (!value) return null;
@@ -49,7 +49,7 @@ function platformHostname(): string {
 }
 
 function freshToken(): string {
-  return `churchpay-domain-verify-${crypto.randomBytes(12).toString("hex")}`;
+  return `mosquepay-domain-verify-${crypto.randomBytes(12).toString("hex")}`;
 }
 
 export async function GET(request: NextRequest) {
@@ -58,18 +58,18 @@ export async function GET(request: NextRequest) {
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ error: "Database not configured." }, { status: 503 });
   }
-  const churchSlug = getChurchSlugFromRequest(request);
-  const church = await db.getChurchBySlug(churchSlug);
-  if (!church) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosque = await db.getMosqueBySlug(mosqueSlug);
+  if (!mosque) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("admin:all", church.id);
+  const forbidden = await requireAdminApiPermission("admin:all", mosque.id);
   if (forbidden) return forbidden;
 
   return NextResponse.json({
-    custom_domain: church.custom_domain,
-    custom_domain_verified_at: church.custom_domain_verified_at,
-    custom_domain_verification_token: church.custom_domain_verification_token,
+    custom_domain: mosque.custom_domain,
+    custom_domain_verified_at: mosque.custom_domain_verified_at,
+    custom_domain_verification_token: mosque.custom_domain_verification_token,
     cname_target: platformHostname(),
   });
 }
@@ -80,12 +80,12 @@ export async function PATCH(request: NextRequest) {
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ error: "Database not configured." }, { status: 503 });
   }
-  const churchSlug = getChurchSlugFromRequest(request);
-  const church = await db.getChurchBySlug(churchSlug);
-  if (!church) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosque = await db.getMosqueBySlug(mosqueSlug);
+  if (!mosque) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("admin:all", church.id);
+  const forbidden = await requireAdminApiPermission("admin:all", mosque.id);
   if (forbidden) return forbidden;
 
   const body = await request.json().catch(() => ({}));
@@ -93,29 +93,29 @@ export async function PATCH(request: NextRequest) {
   const domainRaw = typeof body.domain === "string" ? body.domain.trim().toLowerCase() : "";
 
   if (action === "remove") {
-    const updated = await db.updateChurch(church.id, {
+    const updated = await db.updateMosque(mosque.id, {
       custom_domain: null,
       custom_domain_verified_at: null,
       custom_domain_verification_token: null,
     });
     await writeAuditLog({
-      churchId: church.id,
+      mosqueId: mosque.id,
       action: "custom_domain_removed",
-      entityType: "church",
-      entityId: church.id,
+      entityType: "mosque",
+      entityId: mosque.id,
       summary: "Custom domain removed",
     });
-    return NextResponse.json({ ok: true, church: updated });
+    return NextResponse.json({ ok: true, mosque: updated });
   }
 
   if (action === "verify") {
-    if (!church.custom_domain) {
+    if (!mosque.custom_domain) {
       return NextResponse.json({ error: "No domain to verify." }, { status: 400 });
     }
     let target = "";
     try {
       const dns = await import("node:dns/promises");
-      const records = await dns.resolveCname(church.custom_domain);
+      const records = await dns.resolveCname(mosque.custom_domain);
       target = records[0] ?? "";
     } catch {
       target = "";
@@ -126,49 +126,49 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json(
         {
           ok: false,
-          error: `CNAME for ${church.custom_domain} should point to ${expected}. Resolved to: ${target || "(no record)"}`,
+          error: `CNAME for ${mosque.custom_domain} should point to ${expected}. Resolved to: ${target || "(no record)"}`,
         },
         { status: 400 }
       );
     }
-    const updated = await db.updateChurch(church.id, {
+    const updated = await db.updateMosque(mosque.id, {
       custom_domain_verified_at: new Date().toISOString(),
     });
     await writeAuditLog({
-      churchId: church.id,
+      mosqueId: mosque.id,
       action: "custom_domain_verified",
-      entityType: "church",
-      entityId: church.id,
-      summary: `Custom domain ${church.custom_domain} verified`,
+      entityType: "mosque",
+      entityId: mosque.id,
+      summary: `Custom domain ${mosque.custom_domain} verified`,
     });
-    return NextResponse.json({ ok: true, church: updated });
+    return NextResponse.json({ ok: true, mosque: updated });
   }
 
   // Default action: set domain
   if (!domainRaw || !DOMAIN_PATTERN.test(domainRaw)) {
     return NextResponse.json(
-      { error: "Enter a valid domain like church.example.com." },
+      { error: "Enter a valid domain like mosque.example.com." },
       { status: 400 }
     );
   }
 
-  const updated = await db.updateChurch(church.id, {
+  const updated = await db.updateMosque(mosque.id, {
     custom_domain: domainRaw,
     custom_domain_verification_token: freshToken(),
     custom_domain_verified_at: null,
   });
 
   await writeAuditLog({
-    churchId: church.id,
+    mosqueId: mosque.id,
     action: "custom_domain_added",
-    entityType: "church",
-    entityId: church.id,
+    entityType: "mosque",
+    entityId: mosque.id,
     summary: `Custom domain set to ${domainRaw}`,
   });
 
   return NextResponse.json({
     ok: true,
-    church: updated,
+    mosque: updated,
     cname_target: platformHostname(),
   });
 }

@@ -1,14 +1,15 @@
-# St Mary's Church – Website & Application
+# MosquePay
 
-Next.js 14+ (App Router) website for St Mary's Church: public site, recruitment CRM (7-stage pipeline), event management with RSVP, and Stripe payments (dining, charity, raffle). **No database required** – all features run against an in-memory mock store so you can iterate on the experience. Plug in Supabase (or another DB) later when ready.
+All-in-one platform for UK mosques and Islamic centres: membership, donations (Zakat & Sadaqah), Jumu'ah and events, Gift Aid, newcomer CRM, community welfare, treasurer reporting, and mosque websites.
+
+**Production site:** [https://www.mosque-pay.com](https://www.mosque-pay.com)
 
 ## Stack
 
-- **Frontend:** Next.js 14 (App Router), TypeScript, Tailwind CSS, Shadcn-style UI (Radix), React Hook Form + Zod, Framer Motion, @dnd-kit (Kanban)
-- **Data:** In-memory mock DB (`lib/mock-db.ts`) – no Supabase/DB needed for development
-- **Auth:** Dummy admin login (env credentials)
-- **Payments:** Stripe Checkout (optional; set env to enable)
-- **Email:** Resend (optional)
+- **Frontend:** Next.js 16 (App Router), TypeScript, Tailwind CSS, Radix UI, React Hook Form + Zod
+- **Data:** Supabase Postgres (project `scinykybyelaqzlxcjjo`) with in-memory mock fallback for local dev
+- **Payments:** Mooov Connect (primary); Stripe legacy paths remain for older flows
+- **Email:** Resend (`mosque-pay.com` domain)
 - **Hosting:** Vercel
 
 ## Setup
@@ -17,19 +18,19 @@ Next.js 14+ (App Router) website for St Mary's Church: public site, recruitment 
 
 ```bash
 npm install
-# or pnpm install / yarn
 ```
 
-### 2. Environment variables (optional for basic run)
+### 2. Environment
 
-Copy `.env.example` to `.env.local` if you want to override defaults:
+Copy `.env.example` to `.env.local` and set at minimum:
 
-- **Admin (dummy):** `ADMIN_EMAIL`, `ADMIN_PASSWORD` (default: admin@covenantchurch.org.uk / admin). `SESSION_SECRET` for cookie signing (default works for local dev).
-- **Stripe (optional):** Only needed for real payments. Set `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, and `STRIPE_WEBHOOK_SECRET` for webhook.
-- **Resend (optional):** For welcome/contact emails. No env = forms still work; data is stored in mock DB.
-- **AI draft generation (optional):** Set `OPENAI_API_KEY` to enable LLM-generated church one-pager drafts in admin settings. Without it, the app uses a structured fallback draft generator.
+- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (MosquePay project)
+- `SUPABASE_SERVICE_ROLE_KEY` (from Supabase dashboard → Project Settings → API keys)
+- `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SESSION_SECRET`
 
-**You do not need Supabase or any database to run the app.** All data (newcomers, events, RSVPs, payments, blog) is kept in memory and resets on server restart.
+Without the service role key, the app falls back to the in-memory demo store (`ALLOW_IN_MEMORY_MOCK=true`).
+
+Mooov merchant keys (`MOOOV_PLATFORM_*`, `MOOOV_DEMO_MOSQUE_ID`) can be added when the MosquePay merchant account is ready.
 
 ### 3. Run locally
 
@@ -37,72 +38,52 @@ Copy `.env.example` to `.env.local` if you want to override defaults:
 npm run dev
 ```
 
-- Public site: [http://localhost:3000](http://localhost:3000)
-- Admin: [http://localhost:3000/admin](http://localhost:3000/admin) (log in with default admin@covenantchurch.org.uk / admin)
+- Marketing site: [http://localhost:3000](http://localhost:3000)
+- Admin: [http://localhost:3000/admin/login](http://localhost:3000/admin/login)
+- Member portal: [http://localhost:3000/member/login](http://localhost:3000/member/login)
 
-## Front-end iteration (no DB)
+Default demo mosque: **Central Jamia Masjid** (`central-jamia-demo`).
 
-- **Newcomers:** Expression of Interest form on Join Us creates a newcomer in the mock store. Admin CRM (list + Kanban + detail + activities) reads/writes the same store.
-- **Events:** Admin creates/edits events in mock store. Public events list and event detail/RSVP read from it.
-- **RSVPs:** Stored in mock store. With Stripe configured, checkout creates RSVP + session; webhook records payment and updates RSVP.
-- **Blog:** Admin creates/edits posts in mock store. Public news list and post pages read from it.
-- **Payments:** Listed in admin from mock store (and from Stripe webhook when enabled).
+### 4. Seed Supabase demo data (optional)
 
-Data resets when you restart the dev server. Use this mode to iterate on UX and flows; when ready, swap `lib/mock-db` usage for Supabase (schemas in `supabase/migrations/001_initial_schema.sql` and `supabase/migrations/002_multi_tenant_saas_and_gift_aid.sql`).
+With `SUPABASE_SERVICE_ROLE_KEY` set:
 
-## Multi-church tenant scoping (new)
+```bash
+npm run seed:platform-demo
+# or wipe and re-seed:
+npm run seed:platform-demo -- --reset
+```
 
-API routes now support church scoping with a fallback to `st-marys-demo`.
-
-- Preferred for local/testing: query string, e.g. `/api/events?church=my-church`
-- Alternative: `x-church-slug` request header
-- Future-ready: subdomain inference via request host
-
-The following route families are now church-aware:
-
-- `app/api/events/*`
-- `app/api/rsvps/route.ts`
-- `app/api/payments/*`
-- `app/api/newcomers/*`
-- `app/api/newcomer-activities/route.ts`
-- `app/api/blog/*`
-
-New church management endpoints:
-
-- `GET /api/churches` list churches
-- `POST /api/churches` create or update church settings
-- `GET /api/churches/:slug/site` get a church one-pager configuration
-- `PATCH /api/churches/:slug/site` update one-pager title, description, and sections
-- `POST /api/churches/:slug/ai-draft` generate an unsaved one-pager draft (AI when configured, fallback otherwise)
-  - Supports full-page draft generation and section-only regeneration via `section_type`
-  - Applies content guardrails (safe claims, clean CTA routes, length limits)
+Seeds 10 UK demo mosques from `lib/platform-demo-mosques.ts` plus a platform owner via `scripts/bootstrap-platform-owner.mjs`.
 
 ## Project structure
 
-- `app/(public)/` – Public pages (Home, About, Venue, Join, Charity, Events, News, Contact, FAQ)
-- `app/admin/` – Admin dashboard (dummy auth), newcomers CRM, events, blog, payments, settings
-- `app/api/` – API routes (newcomers, newcomer-activities, events, rsvps, payments, blog, contact, auth)
-- `components/` – UI components, layout, forms, CRM Kanban
-- `lib/` – **mock-db** (in-memory store), auth (dummy), utils; Supabase client kept for future DB plug-in
-- `supabase/migrations/` – SQL schema for when you connect a real DB
+- `app/(public)/` – Marketing site (features, pricing, FAQ, book demo)
+- `app/admin/` – Mosque admin dashboard
+- `app/(member)/member/` – Member portal
+- `app/(operator)/operator/` – Platform operator console
+- `app/[mosqueSlug]/` – Per-mosque public routes (events, newcomers, guest links)
+- `app/api/` – API routes
+- `components/` – UI, layout, marketing, site builder
+- `lib/` – DB access, auth, payments (Mooov), giving, Gift Aid, SEO
+- `supabase/migrations/` – Baseline schema (`001_mosquepay_baseline.sql`)
+- `public/brand/` – MosquePay logos and favicon assets
 
-## Admin (dummy auth)
+## Multi-mosque scoping
 
-- Login: `/admin/login`. Credentials from `ADMIN_EMAIL` and `ADMIN_PASSWORD` (default admin@covenantchurch.org.uk / admin).
-- Session is cookie-based. Replace with Supabase Auth later if needed.
+API routes resolve the active mosque via:
+
+- Query string: `/api/events?mosque=central-jamia-demo`
+- Header: `x-mosque-slug`
+- Admin cookie / subdomain (production)
 
 ## Deploy (Vercel)
 
-1. Push to GitHub and connect the repo in Vercel.
-2. Set env vars: `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SESSION_SECRET`, `NEXT_PUBLIC_SITE_URL`. Add Stripe/Resend if you use them.
-3. Deploy. Note: with mock DB only, data still resets on each serverless cold start; add Supabase (or another DB) for persistent data.
-
-## Design
-
-- Colours: Navy (#1e3a5f), cream (#f8f6f3), gold (#d4af37)
-- Typography: Playfair Display (headings), Inter (body)
-- UGLE-compliant: no ritual/sensitive content; inclusive language; links to UGLE and women’s church life (OWF, HFAF)
+1. Connect this repo to a new Vercel project for MosquePay.
+2. Set env vars from `.env.example` (Supabase, Mooov, Resend, `NEXT_PUBLIC_SITE_URL=https://www.mosque-pay.com`).
+3. Point `mosque-pay.com` DNS to Vercel.
+4. Verify `mosque-pay.com` in Resend for transactional email.
 
 ## License
 
-Private – St Mary's Church.
+Private – MosquePay.

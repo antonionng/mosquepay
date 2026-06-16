@@ -51,7 +51,7 @@ import {
   type ServiceForm,
   type ServiceFormService,
 } from "../service-form";
-import type { ChurchFeeDefaults } from "@/lib/fees/resolve";
+import type { MosqueFeeDefaults } from "@/lib/fees/resolve";
 import { ServiceClosePanel } from "./service-close-panel";
 import {
   reconcileService,
@@ -177,9 +177,9 @@ function typeLabel(t: string) {
 
 const TYPE_BADGE: Record<string, string> = {
   regular_service: "border-blue-200 bg-blue-50 text-blue-900",
-  church_service: "border-blue-200 bg-blue-50 text-blue-900",
+  mosque_service: "border-blue-200 bg-blue-50 text-blue-900",
   special_service: "border-violet-200 bg-violet-50 text-violet-900",
-  church_of_instruction: "border-cyan-200 bg-cyan-50 text-cyan-900",
+  mosque_of_instruction: "border-cyan-200 bg-cyan-50 text-cyan-900",
   committee: "border-amber-200 bg-amber-50 text-amber-900",
   emergency: "border-rose-200 bg-rose-50 text-rose-900",
 };
@@ -202,7 +202,7 @@ export type ServiceFinance = {
     guestTicket: number;
     refunded: number;
   };
-  churchAllTime: number;
+  mosqueAllTime: number;
   currency: string;
 };
 
@@ -220,7 +220,7 @@ export function ServiceDetailClient({
   visibility,
   visibilityReason,
   canFeatureOnWebsite,
-  churchDefaults,
+  mosqueDefaults,
   finance,
   closeState,
   unattributed,
@@ -245,7 +245,7 @@ export function ServiceDetailClient({
    * for naturally-public types (social/charity) and closed services.
    */
   canFeatureOnWebsite: boolean;
-  churchDefaults: ChurchFeeDefaults | null;
+  mosqueDefaults: MosqueFeeDefaults | null;
   finance?: ServiceFinance;
   /**
    * Per-service Gift Aid close state (migration 059 + 060). Populated by
@@ -269,7 +269,7 @@ export function ServiceDetailClient({
   /** Collected, untagged payments taken within a day of this service — the
    *  newcomers for the "associate to this service" reconciliation panel. */
   sameDayUntagged?: PaymentEntry[];
-  /** Church services for the associate / recategorise pickers. */
+  /** Mosque services for the associate / recategorise pickers. */
   events?: EventOption[];
 }) {
   const router = useRouter();
@@ -913,7 +913,7 @@ export function ServiceDetailClient({
                       {publicUrl}
                     </p>
                     <p className="mt-1 text-xs text-emerald-900/80">
-                      Live and visible on the church website. Share this with
+                      Live and visible on the mosque website. Share this with
                       members and guests for RSVPs.
                     </p>
                   </>
@@ -1537,7 +1537,7 @@ export function ServiceDetailClient({
               ) : (
                 <p className="text-dash-muted">
                   No notice drafted yet. Use &ldquo;Edit notice&rdquo; to
-                  create one from the church defaults.
+                  create one from the mosque defaults.
                 </p>
               )}
               <div className="pt-2">
@@ -1570,7 +1570,7 @@ export function ServiceDetailClient({
               {visibility === "public" && (
                 <div className="flex items-center gap-2 text-emerald-900">
                   <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  <span>Live on the public church site</span>
+                  <span>Live on the public mosque site</span>
                 </div>
               )}
               {visibility === "members_only" && (
@@ -1623,7 +1623,7 @@ export function ServiceDetailClient({
                     />
                     <span className="min-w-0">
                       <span className="block font-medium text-dash-text">
-                        Show on the public church website
+                        Show on the public mosque website
                       </span>
                       <span className="mt-0.5 block text-dash-muted">
                         Off by default for this service type. Turn on for
@@ -1673,7 +1673,7 @@ export function ServiceDetailClient({
         updateForm={updateServiceForm}
         onClose={() => setFormOpen(false)}
         onSubmit={handleServiceSubmit}
-        churchDefaults={churchDefaults}
+        mosqueDefaults={mosqueDefaults}
       />
     </div>
   );
@@ -1745,7 +1745,7 @@ function ReconcileCard({
       ? countedNum - recon.byMethod.cash.amount
       : null;
 
-  const methodOrder: PaymentMethodGroup[] = ["cash", "churchpay", "other"];
+  const methodOrder: PaymentMethodGroup[] = ["cash", "mosquepay", "other"];
   const activeMethods = methodOrder.filter(
     (m) => recon.byMethod[m].amount > 0 || recon.byMethod[m].count > 0,
   );
@@ -1765,7 +1765,7 @@ function ReconcileCard({
       <CardContent className="space-y-4 border-t border-dash-border bg-dash-surface p-5">
         {recon.collectedCount === 0 ? (
           <p className="rounded-md border border-dashed border-dash-border bg-dash-surface-subtle/40 px-3 py-2 text-xs text-dash-text-muted">
-            No settled payments yet. Once cash and ChurchPay takings are in,
+            No settled payments yet. Once cash and MosquePay takings are in,
             you&rsquo;ll see the cash-vs-card split and a variance check here.
           </p>
         ) : (
@@ -1968,7 +1968,7 @@ function derivePaymentCategory(p: PaymentEntry): PaymentsTabCategory {
 
 const METHOD_ICON: Record<PaymentMethodGroup, typeof CreditCard> = {
   cash: PoundSterling,
-  churchpay: CreditCard,
+  mosquepay: CreditCard,
   other: Receipt,
 };
 
@@ -2009,7 +2009,7 @@ function ServicePaymentsTab({
     [payments, rafflePrice],
   );
 
-  const methodOrder: PaymentMethodGroup[] = ["churchpay", "cash", "other"];
+  const methodOrder: PaymentMethodGroup[] = ["mosquepay", "cash", "other"];
   const activeMethods = methodOrder.filter(
     (m) => recon.byMethod[m].count > 0 || recon.byMethod[m].amount > 0,
   );
@@ -2259,7 +2259,7 @@ function SameDayAssociatePanel({
           {rows.map((r) => {
             const net = Math.max(0, r.total_amount - (r.refund_amount ?? 0));
             const cat = derivePaymentCategory(r);
-            const method = r.payment_method === "cash" ? "Cash" : "ChurchPay";
+            const method = r.payment_method === "cash" ? "Cash" : "MosquePay";
             const checked = selected.has(r.id);
             return (
               <label
@@ -2506,7 +2506,7 @@ function LedgerRow({
  *   - A "take a payment for this service" CTA that deep-links to the
  *     take-payment app with the event pre-selected on the picker, so
  *     the duty officer doesn't have to remember to attach.
- *   - The church-wide all-time total, so anybody glancing at the service
+ *   - The mosque-wide all-time total, so anybody glancing at the service
  *     page sees a real-time picture of fundraising momentum.
  */
 function MoneyRaisedCard({
@@ -2534,7 +2534,7 @@ function MoneyRaisedCard({
     raffle: boolean;
   };
 }) {
-  const { service, churchAllTime, currency } = finance;
+  const { service, mosqueAllTime, currency } = finance;
   const hasServiceActivity =
     service.succeededCount > 0 || service.pendingCount > 0;
   // Money taken against this service that wasn't tagged to a specific
@@ -2639,10 +2639,10 @@ function MoneyRaisedCard({
 
         <div className="border-t border-dash-border pt-3">
           <p className="text-xs uppercase tracking-wide text-dash-muted">
-            All-time church total
+            All-time mosque total
           </p>
           <p className="mt-1 text-base font-semibold text-dash-text">
-            {formatMoney(churchAllTime, currency)}
+            {formatMoney(mosqueAllTime, currency)}
           </p>
           <p className="mt-0.5 text-xs text-dash-text-muted">
             Across every settled or in-flight payment, all services.

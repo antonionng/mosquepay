@@ -31,7 +31,7 @@ const PIPELINE_STAGES = [
   "expression_of_interest",
   "initial_contact",
   "service_scheduled",
-  "proposal_church",
+  "proposal_mosque",
   "approved",
   "welcomed",
 ] as const;
@@ -42,7 +42,7 @@ const STAGE_LABELS: Record<string, string> = {
   expression_of_interest: "Expression of Interest",
   initial_contact: "Initial Contact",
   service_scheduled: "Service Scheduled",
-  proposal_church: "Proposal to Church",
+  proposal_mosque: "Proposal to Mosque",
   approved: "Approved",
   welcomed: "Initiated",
   declined: "Declined",
@@ -53,7 +53,7 @@ const STAGE_BADGE_LIGHT: Record<string, string> = {
   expression_of_interest: "border-blue-200 bg-blue-50 text-blue-900",
   initial_contact: "border-cyan-200 bg-cyan-50 text-cyan-900",
   service_scheduled: "border-amber-200 bg-amber-50 text-amber-900",
-  proposal_church: "border-violet-200 bg-violet-50 text-violet-900",
+  proposal_mosque: "border-violet-200 bg-violet-50 text-violet-900",
   approved: "border-emerald-200 bg-emerald-50 text-emerald-900",
   welcomed: "border-green-200 bg-green-50 text-green-900",
   declined: "border-red-200 bg-red-50 text-red-900",
@@ -64,7 +64,7 @@ const STAGE_DOT_COLORS: Record<string, string> = {
   expression_of_interest: "bg-blue-500",
   initial_contact: "bg-cyan-500",
   service_scheduled: "bg-amber-500",
-  proposal_church: "bg-violet-500",
+  proposal_mosque: "bg-violet-500",
   approved: "bg-emerald-500",
   welcomed: "bg-green-500",
   declined: "bg-red-500",
@@ -80,24 +80,24 @@ export default async function NewcomerDetailPage({
   const { id } = await params;
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
-  const churchId = ctx.mode === "database" ? ctx.churchId : null;
+  const mosqueId = ctx.mode === "database" ? ctx.mosqueId : null;
   const newcomer = useMock
     ? mockDb.getNewcomerById(id)
-    : churchId
-      ? await db.getNewcomerById(id, churchId)
+    : mosqueId
+      ? await db.getNewcomerById(id, mosqueId)
       : null;
   const activities = newcomer
     ? useMock
       ? mockDb.getNewcomerActivities(id)
-      : churchId
-        ? await db.getNewcomerActivities(id, churchId)
+      : mosqueId
+        ? await db.getNewcomerActivities(id, mosqueId)
         : []
     : [];
   const members = newcomer
     ? useMock
       ? mockDb.getMembers({ status: "active" })
-      : churchId
-        ? await db.getMembers(churchId, { status: "active" })
+      : mosqueId
+        ? await db.getMembers(mosqueId, { status: "active" })
         : []
     : [];
 

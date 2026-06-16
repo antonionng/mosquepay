@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -16,14 +16,14 @@ export async function GET(request: NextRequest) {
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ imports: [] });
   }
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("payments:write", churchId);
+  const forbidden = await requireAdminApiPermission("payments:write", mosqueId);
   if (forbidden) return forbidden;
-  const imports = await db.listBankImports(churchId);
+  const imports = await db.listBankImports(mosqueId);
   return NextResponse.json({ imports });
 }
 
@@ -38,14 +38,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const churchSlug = getChurchSlugFromRequest(request);
-    const churchId = await db.resolveChurchId(churchSlug);
-    if (!churchId) {
-      return NextResponse.json({ error: "Church not found." }, { status: 404 });
+    const mosqueSlug = getMosqueSlugFromRequest(request);
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
     }
     const forbidden = await requireAdminApiPermission(
       "payments:write",
-      churchId
+      mosqueId
     );
     if (forbidden) return forbidden;
 
@@ -75,11 +75,11 @@ export async function POST(request: NextRequest) {
     );
     const since = new Date(earliest);
     since.setDate(since.getDate() - 30);
-    const ledger = await db.getTreasurerLedger(churchId, {
+    const ledger = await db.getTreasurerLedger(mosqueId, {
       from: since.toISOString(),
     });
 
-    const importRecord = await db.createBankImport(churchId, {
+    const importRecord = await db.createBankImport(mosqueId, {
       filename,
       account_label: accountLabel,
       imported_by_admin_user_id: null,
@@ -106,15 +106,15 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    await db.insertBankTransactions(churchId, txRows);
+    await db.insertBankTransactions(mosqueId, txRows);
 
     const matchedCount = txRows.filter((r) => r.status === "matched").length;
-    await db.updateBankImport(importRecord.id, churchId, {
+    await db.updateBankImport(importRecord.id, mosqueId, {
       matched_rows: matchedCount,
     });
 
     await writeAuditLog({
-      churchId,
+      mosqueId,
       action: "bank_statement_imported",
       entityType: "bank_import",
       entityId: importRecord.id,

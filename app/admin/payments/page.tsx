@@ -8,35 +8,35 @@ export const dynamic = "force-dynamic";
 export default async function AdminPaymentsPage() {
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
-  const churchId = ctx.mode === "database" ? ctx.churchId : null;
+  const mosqueId = ctx.mode === "database" ? ctx.mosqueId : null;
 
   const payments = useMock
     ? mockDb.getPayments()
-    : churchId
-      ? await db.getPayments(churchId)
+    : mosqueId
+      ? await db.getPayments(mosqueId)
       : [];
   const donations = useMock
     ? mockDb.getDonations()
-    : churchId
-      ? await db.getDonations(churchId)
+    : mosqueId
+      ? await db.getDonations(mosqueId)
       : [];
   const giftAidDeclarations = useMock
     ? mockDb.getGiftAidDeclarations()
-    : churchId
-      ? await db.getGiftAidDeclarations(churchId)
+    : mosqueId
+      ? await db.getGiftAidDeclarations(mosqueId)
       : [];
   const givingRecords = useMock
     ? []
-    : churchId
-      ? await db.getMemberGiving(churchId)
+    : mosqueId
+      ? await db.getMemberGiving(mosqueId)
       : [];
 
   // Services list for the inline "associate to service" picker on each
   // payment row. Slimmed to what the dropdown needs.
   const events = useMock
     ? []
-    : churchId
-      ? await db.getEvents(churchId)
+    : mosqueId
+      ? await db.getEvents(mosqueId)
       : [];
   const eventOptions = events
     .map((e) => ({ id: e.id, title: e.title, event_date: e.event_date }))

@@ -1,7 +1,7 @@
 // POST /api/admin/members/[id]/giving-method
 // GET  /api/admin/members/[id]/giving-method
 //
-// Lets a church admin (treasurer / secretary) tag *how* a member is
+// Lets a mosque admin (treasurer / secretary) tag *how* a member is
 // paying this year's giving:
 //
 //   * online_subscription - they're set up on a Mooov subscription;
@@ -12,7 +12,7 @@
 //   * paid_in_full        - paid offline in one shot (cash on the
 //                           night, cheque, transfer). Flips
 //                           member_giving.status -> 'paid'.
-//   * fee_waived          - church has waived giving for the year. Flips
+//   * fee_waived          - mosque has waived giving for the year. Flips
 //                           status -> 'waived' + writes waiver_reason.
 //   * null                - clears the tag (back to 'outstanding /
 //                           unset').
@@ -24,14 +24,14 @@
 // flow is identical whether the admin sends them the link or they
 // reach it organically.
 //
-// Auth: requireAdminApiPermission("payments:write", churchId).
-// Tenant: derived from request host (getChurchSlugFromRequest), then
+// Auth: requireAdminApiPermission("payments:write", mosqueId).
+// Tenant: derived from request host (getMosqueSlugFromRequest), then
 // re-checked against the member row.
 
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -64,14 +64,14 @@ const VALID_METHODS = new Set<GivingPaymentMethod>([
  * panel never blanks out.
  */
 async function resolveCurrentYearGiving(
-  churchId: string,
+  mosqueId: string,
   memberEmail: string,
 ): Promise<MemberGiving | null> {
-  const allGiving = await db.getMemberGiving(churchId, { memberEmail });
+  const allGiving = await db.getMemberGiving(mosqueId, { memberEmail });
   const nonAdvance = allGiving.filter((d) => !d.is_advance);
   if (nonAdvance.length === 0) return null;
 
-  const currentYear = await db.getCurrentChurchYear(churchId).catch(() => null);
+  const currentYear = await db.getCurrentMosqueYear(mosqueId).catch(() => null);
   if (currentYear) {
     const yearStart = currentYear.start_date.slice(0, 10);
     const yearEnd = currentYear.end_date.slice(0, 10);
@@ -92,14 +92,14 @@ function buildSubscriptionLink(
   request: NextRequest,
   givingId: string,
   memberEmail: string,
-  churchSlug: string,
+  mosqueSlug: string,
 ): string {
   const siteUrl =
     process.env.NEXT_PUBLIC_SITE_URL ??
     `${request.nextUrl.protocol}//${request.nextUrl.host}`;
   const u = new URL(`/giving/${givingId}`, siteUrl);
   u.searchParams.set("email", memberEmail);
-  if (churchSlug) u.searchParams.set("church", churchSlug);
+  if (mosqueSlug) u.searchParams.set("mosque", mosqueSlug);
   return u.toString();
 }
 
@@ -114,23 +114,23 @@ export async function GET(request: NextRequest, { params }: Ctx) {
     );
   }
 
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
 
-  const forbidden = await requireAdminApiPermission("payments:write", churchId);
+  const forbidden = await requireAdminApiPermission("payments:write", mosqueId);
   if (forbidden) return forbidden;
 
   const { id: memberId } = await params;
-  const member = await db.getMemberById(memberId, churchId);
+  const member = await db.getMemberById(memberId, mosqueId);
   if (!member) {
     return NextResponse.json({ error: "Member not found." }, { status: 404 });
   }
 
-  const givingRow = await resolveCurrentYearGiving(churchId, member.email);
-  const schedules = await db.getGivingSchedulesForMember(churchId, member.email);
+  const givingRow = await resolveCurrentYearGiving(mosqueId, member.email);
+  const schedules = await db.getGivingSchedulesForMember(mosqueId, member.email);
   const activeSchedule = schedules.find(
     (s) =>
       s.cancelled_at == null &&
@@ -168,7 +168,7 @@ export async function GET(request: NextRequest, { params }: Ctx) {
         }
       : null,
     subscription_link: givingRow
-      ? buildSubscriptionLink(request, givingRow.id, member.email, churchSlug)
+      ? buildSubscriptionLink(request, givingRow.id, member.email, mosqueSlug)
       : null,
   });
 }
@@ -184,17 +184,17 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     );
   }
 
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
 
-  const forbidden = await requireAdminApiPermission("payments:write", churchId);
+  const forbidden = await requireAdminApiPermission("payments:write", mosqueId);
   if (forbidden) return forbidden;
 
   const { id: memberId } = await params;
-  const member = await db.getMemberById(memberId, churchId);
+  const member = await db.getMemberById(memberId, mosqueId);
   if (!member) {
     return NextResponse.json({ error: "Member not found." }, { status: 404 });
   }
@@ -255,9 +255,9 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     }
   }
 
-  // Resolve which member_giving row to mutate. Prefer current church
+  // Resolve which member_giving row to mutate. Prefer current mosque
   // year; fall back to most-recent non-advance.
-  const givingRow = await resolveCurrentYearGiving(churchId, member.email);
+  const givingRow = await resolveCurrentYearGiving(mosqueId, member.email);
   if (!givingRow) {
     return NextResponse.json(
       {
@@ -269,23 +269,23 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     );
   }
 
-  const adminCtx = await getCurrentAdminContextAny(churchId);
+  const adminCtx = await getCurrentAdminContextAny(mosqueId);
   const setBy = adminCtx?.email ?? "system_admin";
 
   let updated: MemberGiving | null = null;
   try {
     if (method === null) {
-      updated = await db.setMemberGivingPaymentMethod(givingRow.id, churchId, {
+      updated = await db.setMemberGivingPaymentMethod(givingRow.id, mosqueId, {
         method: null,
         setBy,
       });
     } else if (method === "online_subscription") {
-      updated = await db.setMemberGivingPaymentMethod(givingRow.id, churchId, {
+      updated = await db.setMemberGivingPaymentMethod(givingRow.id, mosqueId, {
         method: "online_subscription",
         setBy,
       });
     } else if (method === "bacs") {
-      updated = await db.setMemberGivingPaymentMethod(givingRow.id, churchId, {
+      updated = await db.setMemberGivingPaymentMethod(givingRow.id, mosqueId, {
         method: "bacs",
         setBy,
         bacsMonthlyAmount: bacsAmount,
@@ -295,7 +295,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
             : null,
       });
     } else if (method === "paid_in_full") {
-      updated = await db.setMemberGivingPaymentMethod(givingRow.id, churchId, {
+      updated = await db.setMemberGivingPaymentMethod(givingRow.id, mosqueId, {
         method: "paid_in_full",
         setBy,
         note:
@@ -309,7 +309,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
         .toString()
         .trim()
         .slice(0, 500);
-      updated = await db.setMemberGivingPaymentMethod(givingRow.id, churchId, {
+      updated = await db.setMemberGivingPaymentMethod(givingRow.id, mosqueId, {
         method: "fee_waived",
         setBy,
         waiverReason: reason,
@@ -335,7 +335,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
   }
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: `giving_method_${method ?? "cleared"}`,
     entityType: "giving",
     entityId: updated.id,
@@ -355,16 +355,16 @@ export async function POST(request: NextRequest, { params }: Ctx) {
   // (the subscription.activated webhook already covers that case).
   if (method === "bacs" || method === "paid_in_full" || method === "fee_waived") {
     try {
-      const church = await db.getChurchById(churchId).catch(() => null);
+      const mosque = await db.getMosqueById(mosqueId).catch(() => null);
       const currentYear = await db
-        .getCurrentChurchYear(churchId)
+        .getCurrentMosqueYear(mosqueId)
         .catch(() => null);
       const { notifyGivingMethodChanged } = await import(
         "@/lib/email/giving-notifications"
       );
       await notifyGivingMethodChanged({
-        churchId,
-        church,
+        mosqueId,
+        mosque,
         member: {
           id: member.id,
           email: member.email,
@@ -407,7 +407,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
       request,
       updated.id,
       member.email,
-      churchSlug,
+      mosqueSlug,
     ),
   });
 }

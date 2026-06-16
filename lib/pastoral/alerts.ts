@@ -9,15 +9,15 @@ export type GeneratedAlert = Pick<
   "member_id" | "alert_type" | "severity" | "message" | "metadata" | "status"
 >;
 
-export async function generatePastoralCareAlerts(churchId: string): Promise<{
+export async function generatePastoralCareAlerts(mosqueId: string): Promise<{
   newcomers: GeneratedAlert[];
   upserted: PastoralCareAlert[];
 }> {
   const [members, events, rsvps, giving] = await Promise.all([
-    db.getMembers(churchId, { status: "active" }),
-    db.getEvents(churchId, { published: true }),
-    listAllRsvps(churchId),
-    db.getMemberGiving(churchId, { status: "outstanding" }),
+    db.getMembers(mosqueId, { status: "active" }),
+    db.getEvents(mosqueId, { published: true }),
+    listAllRsvps(mosqueId),
+    db.getMemberGiving(mosqueId, { status: "outstanding" }),
   ]);
 
   const today = new Date();
@@ -93,7 +93,7 @@ export async function generatePastoralCareAlerts(churchId: string): Promise<{
 
   const upserted: PastoralCareAlert[] = [];
   for (const newcomer of newcomers) {
-    const alert = await db.upsertPastoralCareAlert(churchId, {
+    const alert = await db.upsertPastoralCareAlert(mosqueId, {
       ...newcomer,
       case_id: null,
       acknowledged_by_admin_user_id: null,
@@ -105,11 +105,11 @@ export async function generatePastoralCareAlerts(churchId: string): Promise<{
   return { newcomers, upserted };
 }
 
-async function listAllRsvps(churchId: string) {
-  // Reuse a per-event query; we want all RSVPs for the church.
-  const events = await db.getEvents(churchId);
+async function listAllRsvps(mosqueId: string) {
+  // Reuse a per-event query; we want all RSVPs for the mosque.
+  const events = await db.getEvents(mosqueId);
   const all = await Promise.all(
-    events.map((e) => db.getRsvpsByEventId(e.id, churchId))
+    events.map((e) => db.getRsvpsByEventId(e.id, mosqueId))
   );
   return all.flat();
 }

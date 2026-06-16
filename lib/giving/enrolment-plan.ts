@@ -2,7 +2,7 @@
 //
 // Pure orchestrator that resolves everything needed to show OR start a
 // saved-charge giving subscription enrolment for a single member-giving row:
-// merchant, member, church giving template, current giving year, year
+// merchant, member, mosque giving template, current giving year, year
 // position, default strategy, and the per-cycle instalment plan.
 //
 // Same code path used by:
@@ -29,29 +29,29 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { computeYearPosition, type YearPosition } from "@/lib/giving/year-position";
 import {
   buildSchedule,
-  isStrategyEnabledForChurch,
+  isStrategyEnabledForMosque,
   type GivingCadence,
 } from "@/lib/giving/strategies";
 import type {
   GivingSplitStrategy,
-  ChurchGiving,
-  ChurchGivingYear,
+  MosqueGiving,
+  MosqueGivingYear,
   Member,
   MemberGiving,
 } from "@/lib/db/types";
 
 export type EnrolmentPlanArgs = {
-  churchId: string;
+  mosqueId: string;
   givingRecord: MemberGiving;
   memberEmail: string;
   /** Caller-chosen strategy. Falls back to the year-position default. */
   strategy?: GivingSplitStrategy;
-  /** Caller-chosen auto-renew. Falls back to the church default. */
+  /** Caller-chosen auto-renew. Falls back to the mosque default. */
   autoRenew?: boolean;
   /**
    * Caller-chosen cadence (monthly / quarterly). Falls back to the
-   * church giving template's instalment_frequency. The giving page surfaces
-   * any cadence options the church has enabled so the member can pick.
+   * mosque giving template's instalment_frequency. The giving page surfaces
+   * any cadence options the mosque has enabled so the member can pick.
    */
   cadence?: GivingCadence;
 };
@@ -79,15 +79,15 @@ export type GivingMooovFlow =
 export type EnrolmentPlan = {
   merchantId: string;
   member: Member;
-  churchGiving: ChurchGiving;
-  churchYear: ChurchGivingYear;
+  mosqueGiving: MosqueGiving;
+  mosqueYear: MosqueGivingYear;
   yearPosition: YearPosition;
-  /** Strategy actually used (after church enable + cap checks). */
+  /** Strategy actually used (after mosque enable + cap checks). */
   strategy: GivingSplitStrategy;
   autoRenew: boolean;
   cadence: GivingCadence;
   /**
-   * All cadences enabled by the church for this giving template, in the
+   * All cadences enabled by the mosque for this giving template, in the
    * order we want to surface them in the UI. Drives the cadence picker
    * on /member/giving. If the template only allows one cadence, this is
    * a single-element array.
@@ -123,7 +123,7 @@ export type EnrolmentPlan = {
 
 export type EnrolmentPlanError = {
   code:
-    | "church_not_connected"
+    | "mosque_not_connected"
     | "member_not_found"
     | "instalments_not_enabled"
     | "no_giving_year"
@@ -144,7 +144,7 @@ export type EnrolmentPlanResult =
 export async function computeEnrolmentPlan(
   args: EnrolmentPlanArgs,
 ): Promise<EnrolmentPlanResult> {
-  const { churchId, givingRecord, memberEmail } = args;
+  const { mosqueId, givingRecord, memberEmail } = args;
 
   let supa: ReturnType<typeof createServiceClient>;
   try {
@@ -163,9 +163,9 @@ export async function computeEnrolmentPlan(
   // 1. Resolve merchant.
   const { data: merchantRow } = await supa
     .schema("mooov")
-    .from("churches")
+    .from("mosques")
     .select("merchant_id, status")
-    .eq("id", churchId)
+    .eq("id", mosqueId)
     .maybeSingle<{ merchant_id: string; status: string }>();
 
   if (
@@ -176,22 +176,22 @@ export async function computeEnrolmentPlan(
     return {
       ok: false,
       error: {
-        code: "church_not_connected",
+        code: "mosque_not_connected",
         message:
-          "This church has not finished setting up online payments yet. Please contact the church directly.",
+          "This mosque has not finished setting up online payments yet. Please contact the mosque directly.",
         status: 503,
       },
     };
   }
   const merchantId = merchantRow.merchant_id;
 
-  // 2. Resolve member. Prefer FK on the giving row, fall back to (email, churchId).
+  // 2. Resolve member. Prefer FK on the giving row, fall back to (email, mosqueId).
   const member =
     givingRecord.member_id != null
       ? await db
-          .getMemberById(givingRecord.member_id, churchId)
+          .getMemberById(givingRecord.member_id, mosqueId)
           .catch(() => null)
-      : await db.getMemberByEmail(memberEmail, churchId).catch(() => null);
+      : await db.getMemberByEmail(memberEmail, mosqueId).catch(() => null);
 
   if (!member) {
     return {
@@ -199,51 +199,51 @@ export async function computeEnrolmentPlan(
       error: {
         code: "member_not_found",
         message:
-          "Could not resolve your member profile. Please contact your church secretary.",
+          "Could not resolve your member profile. Please contact your mosque secretary.",
         status: 404,
       },
     };
   }
   const customerRef = `mbr_${member.id}`;
 
-  // 3. Resolve the church giving template that this member_giving row was
-  // created from. A church can have several active templates (e.g.
+  // 3. Resolve the mosque giving template that this member_giving row was
+  // created from. A mosque can have several active templates (e.g.
   // "Annual Subscription" + "Festival Contribution"); givingRecord.giving_id
-  // points at the specific template to use. Picking churchGivingList[0]
+  // points at the specific template to use. Picking mosqueGivingList[0]
   // would silently apply the wrong template's cadence + amount, which
   // is exactly the bug that drove the "60 quarterly vs 24 monthly"
-  // discrepancy on St Mary's Church.
-  const churchGivingList = await db.getChurchGiving(churchId);
+  // discrepancy on Central Jamia Masjid demo mosque.
+  const mosqueGivingList = await db.getMosqueGiving(mosqueId);
   const givingTemplate =
-    churchGivingList.find((row) => row.id === givingRecord.giving_id) ??
-    churchGivingList[0] ??
+    mosqueGivingList.find((row) => row.id === givingRecord.giving_id) ??
+    mosqueGivingList[0] ??
     null;
   if (!givingTemplate || givingTemplate.allow_instalments !== true) {
     return {
       ok: false,
       error: {
         code: "instalments_not_enabled",
-        message: "Monthly subscriptions are not enabled for this church.",
+        message: "Monthly subscriptions are not enabled for this mosque.",
         status: 409,
       },
     };
   }
 
   // 4. Resolve giving year + year position.
-  const currentYear = await db.getCurrentChurchYear(churchId);
+  const currentYear = await db.getCurrentMosqueYear(mosqueId);
   if (!currentYear) {
     return {
       ok: false,
       error: {
         code: "no_giving_year",
         message:
-          "Your church has not configured a giving year yet. Please contact your church secretary.",
+          "Your mosque has not configured a giving year yet. Please contact your mosque secretary.",
         status: 409,
       },
     };
   }
 
-  const memberGivingList = await db.getMemberGiving(churchId, { memberEmail });
+  const memberGivingList = await db.getMemberGiving(mosqueId, { memberEmail });
   const paidThisYear = memberGivingList.some(
     (d) =>
       !d.is_advance &&
@@ -260,7 +260,7 @@ export async function computeEnrolmentPlan(
     hasOutstandingCurrentYear: !paidThisYear,
   });
 
-  // 5. Pick the strategy. Caller > default, but always honour church config.
+  // 5. Pick the strategy. Caller > default, but always honour mosque config.
   const defaultStrategy: GivingSplitStrategy =
     yearPosition.quadrant === "pre_year" ||
     yearPosition.quadrant === "at_year_start"
@@ -270,7 +270,7 @@ export async function computeEnrolmentPlan(
         : "reslice_remaining";
 
   let strategy: GivingSplitStrategy = args.strategy ?? defaultStrategy;
-  if (!isStrategyEnabledForChurch(strategy, givingTemplate)) {
+  if (!isStrategyEnabledForMosque(strategy, givingTemplate)) {
     strategy = defaultStrategy;
   }
   if (
@@ -288,9 +288,9 @@ export async function computeEnrolmentPlan(
     };
   }
 
-  // 5b. Pick cadence. The church template's instalment_frequency is the
+  // 5b. Pick cadence. The mosque template's instalment_frequency is the
   // default; the member can override via the giving page picker, but only
-  // among cadences the church has enabled. v1 keeps the option set simple
+  // among cadences the mosque has enabled. v1 keeps the option set simple
   // (monthly + quarterly) — the only two values instalment_frequency
   // takes today.
   const templateCadence: GivingCadence =
@@ -326,7 +326,7 @@ export async function computeEnrolmentPlan(
       error: {
         code: "schedule_build_failed",
         message:
-          "Could not work out a payment schedule for the current year. Please contact your church secretary.",
+          "Could not work out a payment schedule for the current year. Please contact your mosque secretary.",
         status: 500,
       },
     };
@@ -355,8 +355,8 @@ export async function computeEnrolmentPlan(
     plan: {
       merchantId,
       member,
-      churchGiving: givingTemplate,
-      churchYear: currentYear,
+      mosqueGiving: givingTemplate,
+      mosqueYear: currentYear,
       yearPosition,
       strategy,
       autoRenew,

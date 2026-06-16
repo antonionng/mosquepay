@@ -8,45 +8,45 @@ import {
   Shield,
 } from "lucide-react";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import { listChurches, getPayments, getNewcomers } from "@/lib/db";
-import type { Church, Payment, Newcomer } from "@/lib/db/types";
+import { listMosques, getPayments, getNewcomers } from "@/lib/db";
+import type { Mosque, Payment, Newcomer } from "@/lib/db/types";
 import { formatDateTime } from "@/lib/utils";
 import { requireOperatorPageAccess } from "@/lib/auth/operator-page";
 
 type AuditEntry = {
   id: string;
-  type: "payment" | "newcomer" | "church";
-  church_name: string;
-  church_slug: string;
+  type: "payment" | "newcomer" | "mosque";
+  mosque_name: string;
+  mosque_slug: string;
   description: string;
   timestamp: string;
 };
 
 async function getSupportData() {
   if (!isSupabaseConfigured()) {
-    return { churches: [] as Church[], recentPayments: [] as Payment[], recentNewcomers: [] as Newcomer[], audit: [] as AuditEntry[] };
+    return { mosques: [] as Mosque[], recentPayments: [] as Payment[], recentNewcomers: [] as Newcomer[], audit: [] as AuditEntry[] };
   }
 
   try {
-    const churches = await listChurches();
-    const paymentsByChurch = await Promise.all(
-      churches.map(async (l) => {
+    const mosques = await listMosques();
+    const paymentsByMosque = await Promise.all(
+      mosques.map(async (l) => {
         const payments = await getPayments(l.id).catch(() => []);
-        return payments.map((p) => ({ ...p, church_name: l.name, church_slug: l.slug }));
+        return payments.map((p) => ({ ...p, mosque_name: l.name, mosque_slug: l.slug }));
       })
     );
-    const allPayments = paymentsByChurch
+    const allPayments = paymentsByMosque
       .flat()
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 10);
 
-    const newcomersByChurch = await Promise.all(
-      churches.map(async (l) => {
+    const newcomersByMosque = await Promise.all(
+      mosques.map(async (l) => {
         const newcomers = await getNewcomers(l.id).catch(() => []);
-        return newcomers.map((ld) => ({ ...ld, church_name: l.name, church_slug: l.slug }));
+        return newcomers.map((ld) => ({ ...ld, mosque_name: l.name, mosque_slug: l.slug }));
       })
     );
-    const allNewcomers = newcomersByChurch
+    const allNewcomers = newcomersByMosque
       .flat()
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 10);
@@ -55,24 +55,24 @@ async function getSupportData() {
       ...allPayments.map((p) => ({
         id: p.id,
         type: "payment" as const,
-        church_name: (p as Payment & { church_name: string }).church_name,
-        church_slug: (p as Payment & { church_slug: string }).church_slug,
+        mosque_name: (p as Payment & { mosque_name: string }).mosque_name,
+        mosque_slug: (p as Payment & { mosque_slug: string }).mosque_slug,
         description: `Payment of £${(p.total_amount / 100).toFixed(2)}: ${p.status}`,
         timestamp: p.created_at,
       })),
       ...allNewcomers.map((l) => ({
         id: l.id,
         type: "newcomer" as const,
-        church_name: (l as Newcomer & { church_name: string }).church_name,
-        church_slug: (l as Newcomer & { church_slug: string }).church_slug,
+        mosque_name: (l as Newcomer & { mosque_name: string }).mosque_name,
+        mosque_slug: (l as Newcomer & { mosque_slug: string }).mosque_slug,
         description: `New newcomer: ${l.first_name} ${l.last_name}: ${l.stage}`,
         timestamp: l.created_at,
       })),
     ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-    return { churches, recentPayments: allPayments, recentNewcomers: allNewcomers, audit };
+    return { mosques, recentPayments: allPayments, recentNewcomers: allNewcomers, audit };
   } catch {
-    return { churches: [] as Church[], recentPayments: [] as Payment[], recentNewcomers: [] as Newcomer[], audit: [] as AuditEntry[] };
+    return { mosques: [] as Mosque[], recentPayments: [] as Payment[], recentNewcomers: [] as Newcomer[], audit: [] as AuditEntry[] };
   }
 }
 
@@ -90,7 +90,7 @@ function auditIcon(type: string) {
 export default async function SupportPage() {
   await requireOperatorPageAccess();
 
-  const { churches, audit } = await getSupportData();
+  const { mosques, audit } = await getSupportData();
 
   return (
     <div className="space-y-8">
@@ -98,7 +98,7 @@ export default async function SupportPage() {
         <div>
           <h1 className="admin-page-title">Support & Audit</h1>
           <p className="admin-page-copy">
-            Cross-church activity log and support tools
+            Cross-mosque activity log and support tools
           </p>
         </div>
       </div>
@@ -111,9 +111,9 @@ export default async function SupportPage() {
             </div>
             <div>
               <p className="text-xl font-semibold text-white">
-                {churches.length}
+                {mosques.length}
               </p>
-              <p className="text-xs text-slate-400">Total Churches</p>
+              <p className="text-xs text-slate-400">Total Mosques</p>
             </div>
           </div>
         </div>
@@ -155,7 +155,7 @@ export default async function SupportPage() {
             <div className="p-10 text-center">
               <FileText className="mx-auto h-10 w-10 text-slate-600" />
               <p className="mt-3 text-sm text-slate-500">
-                No recent activity across churches
+                No recent activity across mosques
               </p>
             </div>
           ) : (
@@ -174,7 +174,7 @@ export default async function SupportPage() {
                     </p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-xs text-blue-400">
-                        {entry.church_name}
+                        {entry.mosque_name}
                       </span>
                       <span className="text-xs text-slate-600">·</span>
                       <span className="text-xs text-slate-500">
@@ -199,7 +199,7 @@ export default async function SupportPage() {
                 Support ticket system coming soon
               </p>
               <p className="mt-1 text-xs text-slate-600">
-                Church admins will be able to submit requests from their
+                Mosque admins will be able to submit requests from their
                 dashboards
               </p>
             </div>
@@ -207,34 +207,34 @@ export default async function SupportPage() {
 
           <div className="admin-surface p-6">
             <h2 className="text-lg font-semibold text-white border-b border-white/10 pb-4">
-              Quick Church Selector
+              Quick Mosque Selector
             </h2>
-            {churches.length === 0 ? (
+            {mosques.length === 0 ? (
               <p className="mt-4 text-sm text-slate-500 text-center py-4">
-                No churches available
+                No mosques available
               </p>
             ) : (
               <div className="mt-4 space-y-1">
-                {churches.slice(0, 8).map((church) => (
+                {mosques.slice(0, 8).map((mosque) => (
                   <a
-                    key={church.id}
-                    href={`/operator/churches/${church.slug}`}
+                    key={mosque.id}
+                    href={`/operator/mosques/${mosque.slug}`}
                     className="flex items-center gap-3 rounded-xl px-3 py-2 transition-colors hover:bg-white/5"
                   >
                     <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/5 text-[10px] font-semibold text-white">
-                      {church.name.slice(0, 2).toUpperCase()}
+                      {mosque.name.slice(0, 2).toUpperCase()}
                     </div>
                     <span className="text-sm text-slate-300 truncate">
-                      {church.name}
+                      {mosque.name}
                     </span>
                     <span
                       className={`ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
-                        church.is_active
+                        mosque.is_active
                           ? "bg-emerald-500/10 text-emerald-400"
                           : "bg-red-500/10 text-red-400"
                       }`}
                     >
-                      {church.is_active ? "active" : "inactive"}
+                      {mosque.is_active ? "active" : "inactive"}
                     </span>
                   </a>
                 ))}

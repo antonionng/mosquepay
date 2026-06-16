@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as db from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -29,22 +29,22 @@ export async function GET(
     return NextResponse.json({ declaration: null });
   }
   const { id: memberId } = await params;
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
   // Read-only against members -- members:read is the right scope. Charity
   // scope is required only for write surfaces (upload / revoke).
-  const forbidden = await requireAdminApiPermission("members:read", churchId);
+  const forbidden = await requireAdminApiPermission("members:read", mosqueId);
   if (forbidden) return forbidden;
 
-  const member = await db.getMemberById(memberId, churchId);
+  const member = await db.getMemberById(memberId, mosqueId);
   if (!member) {
     return NextResponse.json({ error: "Member not found." }, { status: 404 });
   }
 
-  const declaration = await db.getActiveGiftAidDeclarationByMember(churchId, {
+  const declaration = await db.getActiveGiftAidDeclarationByMember(mosqueId, {
     id: member.id,
     email: member.email,
   });
@@ -74,15 +74,15 @@ export async function PATCH(
   }
 
   const { id: memberId } = await params;
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("charity:write", churchId);
+  const forbidden = await requireAdminApiPermission("charity:write", mosqueId);
   if (forbidden) return forbidden;
 
-  const member = await db.getMemberById(memberId, churchId);
+  const member = await db.getMemberById(memberId, mosqueId);
   if (!member) {
     return NextResponse.json({ error: "Member not found." }, { status: 404 });
   }
@@ -106,17 +106,17 @@ export async function PATCH(
   const actorEmail =
     scope.kind === "dummy" ||
     scope.kind === "platform" ||
-    scope.kind === "church"
+    scope.kind === "mosque"
       ? scope.email
       : null;
 
   if (action === "clear") {
-    await db.updateMemberGiftAidPosture(member.id, churchId, {
+    await db.updateMemberGiftAidPosture(member.id, mosqueId, {
       gift_aid_consent_status: "unknown",
       gift_aid_prompted_at: null,
     });
     await writeAuditLog({
-      churchId,
+      mosqueId,
       action: "gift_aid_member_refusal_cleared",
       entityType: "member",
       entityId: member.id,
@@ -125,7 +125,7 @@ export async function PATCH(
     });
     return NextResponse.json({
       consent_status: "unknown" as const,
-      declaration: await db.getActiveGiftAidDeclarationByMember(churchId, {
+      declaration: await db.getActiveGiftAidDeclarationByMember(mosqueId, {
         id: member.id,
         email: member.email,
       }),
@@ -137,17 +137,17 @@ export async function PATCH(
       ? body.reason.trim()
       : "Gift Aid refused by donor.";
   const nowIso = new Date().toISOString();
-  const declaration = await db.getActiveGiftAidDeclarationByMember(churchId, {
+  const declaration = await db.getActiveGiftAidDeclarationByMember(mosqueId, {
     id: member.id,
     email: member.email,
   });
 
   if (declaration) {
-    const revoked = await db.revokeGiftAidDeclaration(declaration.id, churchId, {
+    const revoked = await db.revokeGiftAidDeclaration(declaration.id, mosqueId, {
       reason,
     });
     try {
-      await db.insertGiftAidDeclarationEvent(churchId, {
+      await db.insertGiftAidDeclarationEvent(mosqueId, {
         declaration_id: declaration.id,
         event_type: "revoked",
         actor_kind: "admin",
@@ -167,12 +167,12 @@ export async function PATCH(
     }
   }
 
-  await db.updateMemberGiftAidPosture(member.id, churchId, {
+  await db.updateMemberGiftAidPosture(member.id, mosqueId, {
     gift_aid_consent_status: "declined",
     gift_aid_prompted_at: nowIso,
   });
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "gift_aid_member_refused",
     entityType: "member",
     entityId: member.id,

@@ -28,26 +28,26 @@ export default async function EditEventPage({
   const { id } = await params;
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
-  const churchId = ctx.mode === "database" ? ctx.churchId : null;
-  const churchSlug = ctx.mode === "database" ? ctx.churchSlug : "st-marys-demo";
+  const mosqueId = ctx.mode === "database" ? ctx.mosqueId : null;
+  const mosqueSlug = ctx.mode === "database" ? ctx.mosqueSlug : "central-jamia-demo";
   const event = useMock
     ? mockDb.getEventById(id)
-    : churchId
-      ? await db.getEventById(id, churchId)
+    : mosqueId
+      ? await db.getEventById(id, mosqueId)
       : null;
 
   if (!event) notFound();
 
   const rsvps = useMock
     ? mockDb.getRsvpsByEventId(id)
-    : churchId
-      ? await db.getRsvpsByEventId(id, churchId)
+    : mosqueId
+      ? await db.getRsvpsByEventId(id, mosqueId)
       : [];
 
   const payments = useMock
     ? mockDb.getPayments()
-    : churchId
-      ? await db.getPayments(churchId)
+    : mosqueId
+      ? await db.getPayments(mosqueId)
       : [];
 
   const eventPayments = payments.filter((p) => p.event_id === id);
@@ -80,7 +80,7 @@ export default async function EditEventPage({
     title: event.title as string,
     slug: event.slug as string,
     description: (event.description as string) ?? "",
-    event_type: event.event_type as "church_service" | "church_of_instruction" | "social" | "charity",
+    event_type: event.event_type as "mosque_service" | "mosque_of_instruction" | "social" | "charity",
     event_date: eventDate ? new Date(eventDate).toISOString().slice(0, 16) : "",
     event_time: (event.event_time as string) ?? "",
     location: (event.location as string) ?? "",
@@ -115,7 +115,7 @@ export default async function EditEventPage({
           </Link>
         </Button>
         {event.enable_payments && (
-          <CopyPaymentLink churchSlug={churchSlug} slug={event.slug} />
+          <CopyPaymentLink mosqueSlug={mosqueSlug} slug={event.slug} />
         )}
       </div>
 

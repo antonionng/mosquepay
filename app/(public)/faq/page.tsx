@@ -16,30 +16,30 @@ import {
   MarketingCtaBand,
 } from "@/components/marketing/marketing-shell";
 import { Button } from "@/components/ui/button";
-import { getDefaultChurchSlug, resolveChurchSlug } from "@/lib/tenant";
+import { getDefaultMosqueSlug, resolveMosqueSlug } from "@/lib/tenant";
 import { marketingMetadata } from "@/lib/seo";
 
 export const metadata = marketingMetadata({
-  title: "ChurchPay FAQ | Church Software Questions Answered",
+  title: "MosquePay FAQ | Mosque Software Questions Answered",
   description:
-    "Answers about ChurchPay for churches: giving and Gift Aid, GASDS, church websites, member records, data migration, security, multi-church support, and getting started.",
+    "Answers about MosquePay for mosques: giving and Gift Aid, GASDS, mosque websites, member records, data migration, security, multi-mosque support, and getting started.",
   path: "/faq",
   keywords: [
-    "ChurchPay FAQ",
-    "church software questions",
+    "MosquePay FAQ",
+    "mosque software questions",
     "Gift Aid software FAQ",
-    "church giving platform questions",
+    "mosque giving platform questions",
   ],
 });
 
 const SAAS_FAQS = [
   {
-    q: "What is ChurchPay?",
-    a: "ChurchPay is an all-in-one platform for UK churches covering online giving, Gift Aid and GASDS, congregation records, services and notices, newcomer follow-up, pastoral care, church websites, and treasurer reporting.",
+    q: "What is MosquePay?",
+    a: "MosquePay is an all-in-one platform for UK mosques covering online giving, Gift Aid and GASDS, congregation records, services and notices, newcomer follow-up, welfare, mosque websites, and treasurer reporting.",
   },
   {
-    q: "How does Gift Aid work in ChurchPay?",
-    a: "Gift Aid declarations are captured when someone gives, whether online or recorded by your team, and attach to every eligible gift automatically. GASDS cash collections are logged per service. When it's time to claim, ChurchPay produces HMRC-ready exports with the evidence behind every line.",
+    q: "How does Gift Aid work in MosquePay?",
+    a: "Gift Aid declarations are captured when someone gives, whether online or recorded by your team, and attach to every eligible gift automatically. GASDS cash collections are logged per service. When it's time to claim, MosquePay produces HMRC-ready exports with the evidence behind every line.",
   },
   {
     q: "Can we migrate from spreadsheets or another system?",
@@ -47,22 +47,22 @@ const SAAS_FAQS = [
   },
   {
     q: "Who can see sensitive information like pastoral notes?",
-    a: "Access is role-based. Pastoral care cases are visible only to your pastoral team, financial data to your treasurer roles, and safeguarding contacts can be restricted further. Every sensitive action is recorded in the audit trail.",
+    a: "Access is role-based. Welfare cases are visible only to your pastoral team, financial data to your treasurer roles, and safeguarding contacts can be restricted further. Every sensitive action is recorded in the audit trail.",
   },
   {
     q: "Do members need to download an app?",
     a: "No. The member portal works in any browser and can be installed as an app on a phone's home screen. Members can give, RSVP to services, update details, and see their giving history.",
   },
   {
-    q: "Can we run multiple churches or a network?",
-    a: "Yes. The Group plan covers 2 to 6 connected churches with shared oversight and central billing, and the Network plan supports full network rollouts with cross-church dashboards and migration planning.",
+    q: "Can we run multiple mosques or a network?",
+    a: "Yes. The Group plan covers 2 to 6 connected mosques with shared oversight and central billing, and the Network plan supports full network rollouts with cross-mosque dashboards and migration planning.",
   },
   {
     q: "How do payments work and what are the fees?",
-    a: "Payments run through our payment partner with standard card processing fees per transaction. ChurchPay does not add a markup. Settlement goes directly to your church's bank account.",
+    a: "Payments run through our payment partner with standard card processing fees per transaction. MosquePay does not add a markup. Settlement goes directly to your mosque's bank account.",
   },
   {
-    q: "Can we edit our church website ourselves?",
+    q: "Can we edit our mosque website ourselves?",
     a: "Yes. The section-based editor is designed for non-technical volunteers, with optional AI drafting to get pages started. Your branding, your domain, no separate website subscription.",
   },
   {
@@ -71,7 +71,7 @@ const SAAS_FAQS = [
   },
   {
     q: "How long does setup take?",
-    a: "Most churches are live within days. Import your records, connect payments, brand your site, and invite your team. We guide each step.",
+    a: "Most mosques are live within days. Import your records, connect payments, brand your site, and invite your team. We guide each step.",
   },
 ];
 
@@ -89,7 +89,7 @@ const TENANT_FAQS = [
     a: "Yes. Groups run during the main service for most ages. Speak to the welcome team when you arrive and they'll get your family settled.",
   },
   {
-    q: "How can I give to the church?",
+    q: "How can I give to the mosque?",
     a: "You can give online through our giving page, by standing order, or in the offering during a service. If you're a UK taxpayer, adding a Gift Aid declaration increases your gift by 25% at no cost to you.",
   },
   {
@@ -97,7 +97,7 @@ const TENANT_FAQS = [
     a: "Start with a conversation. Express interest through the join page or speak to someone on a Sunday. We'll invite you to our next newcomers' gathering and explain how membership works here.",
   },
   {
-    q: "Can the church help me in a difficult season?",
+    q: "Can the mosque help me in a difficult season?",
     a: "Yes. Our pastoral team offers confidential support, practical help, and prayer. Reach out through the contact page or speak to any of the leadership team.",
   },
 ];
@@ -105,14 +105,14 @@ const TENANT_FAQS = [
 export default async function FAQPage({
   searchParams,
 }: {
-  searchParams: Promise<{ church?: string }>;
+  searchParams: Promise<{ mosque?: string }>;
 }) {
-  const { church } = await searchParams;
-  const isTenantMode = Boolean(church);
-  const churchSlug = resolveChurchSlug(church);
-  const defaultSlug = getDefaultChurchSlug();
-  const withChurchQuery = (href: string) =>
-    churchSlug === defaultSlug ? href : `${href}?church=${encodeURIComponent(churchSlug)}`;
+  const { mosque } = await searchParams;
+  const isTenantMode = Boolean(mosque);
+  const mosqueSlug = resolveMosqueSlug(mosque);
+  const defaultSlug = getDefaultMosqueSlug();
+  const withMosqueQuery = (href: string) =>
+    mosqueSlug === defaultSlug ? href : `${href}?mosque=${encodeURIComponent(mosqueSlug)}`;
 
   if (!isTenantMode) {
     return (
@@ -122,7 +122,7 @@ export default async function FAQPage({
             <div className="max-w-3xl">
               <MarketingKicker>FAQ</MarketingKicker>
               <h1 className="mt-4 font-heading text-4xl font-bold leading-tight tracking-tight text-slate-900 sm:text-5xl">
-                Questions churches ask before switching.
+                Questions mosques ask before switching.
               </h1>
               <p className="mt-6 text-lg leading-8 text-slate-600">
                 Straight answers about giving, Gift Aid, data, security, and getting started. If
@@ -155,7 +155,7 @@ export default async function FAQPage({
 
         <MarketingCtaBand
           title="Still have a question?"
-          body="Tell us about your church and what you're trying to solve. We'll give you an honest answer, even if that answer is 'we're not the right fit yet'."
+          body="Tell us about your mosque and what you're trying to solve. We'll give you an honest answer, even if that answer is 'we're not the right fit yet'."
           ctaLabel="Contact us"
           ctaHref="/contact"
           secondaryLabel="Book a demo"
@@ -181,7 +181,7 @@ export default async function FAQPage({
                 </h1>
                 <p className="public-hero-body">
                   Whether you&apos;re visiting for the first time or thinking about making this
-                  church your home, this is a good place to start.
+                  mosque your home, this is a good place to start.
                 </p>
               </div>
               <div className="public-hero-panel">
@@ -223,7 +223,7 @@ export default async function FAQPage({
                   We&apos;d love to hear from you. No question is too small.
                 </p>
                 <Button asChild variant="primary">
-                  <Link href={withChurchQuery("/contact")}>
+                  <Link href={withMosqueQuery("/contact")}>
                     Contact Us
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>

@@ -9,25 +9,25 @@ export const dynamic = "force-dynamic";
 export default async function AdminMembersPage() {
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
-  const churchId = ctx.mode === "database" ? ctx.churchId : null;
+  const mosqueId = ctx.mode === "database" ? ctx.mosqueId : null;
 
   const members = useMock
     ? mockDb.getMembers()
-    : churchId
-      ? await db.getMembers(churchId)
+    : mosqueId
+      ? await db.getMembers(mosqueId)
       : [];
 
-  const offices = churchId ? await db.listOfficerLadder(churchId) : [];
+  const offices = mosqueId ? await db.listOfficerLadder(mosqueId) : [];
 
   // Drive the "missing Gift Aid" / "has declaration" quick filters.
-  // One query for the church's declarations, then we build a member-side
+  // One query for the mosque's declarations, then we build a member-side
   // lookup from member_id + lowercased email so we hit both linkage
   // paths (member_id is the primary, email is the historical fallback
   // for pre-link rows). Cheap relative to looping per-member.
   let giftAidDeclaredIds: string[] = [];
-  if (churchId) {
+  if (mosqueId) {
     try {
-      const declarations = await db.getGiftAidDeclarations(churchId);
+      const declarations = await db.getGiftAidDeclarations(mosqueId);
       const activeByMember = new Map<string, true>();
       const activeByEmail = new Map<string, true>();
       for (const d of declarations) {
@@ -51,7 +51,7 @@ export default async function AdminMembersPage() {
 
   // Build a member-id -> giving payment method map so the list can
   // surface a per-row "Giving" pill. We pull the active giving year and
-  // every member_giving row for the church once, match by member_id (or
+  // every member_giving row for the mosque once, match by member_id (or
   // by email as fallback), and emit the most recent in-year row's
   // giving_payment_method. Live subscription rows take precedence even
   // when the giving_payment_method tag hasn't been set yet, so the
@@ -69,18 +69,18 @@ export default async function AdminMembersPage() {
       bacsMonthlyAmount: number | null;
     }
   > = {};
-  if (churchId && members.length > 0) {
+  if (mosqueId && members.length > 0) {
     try {
       // Self-heal: cancel any `pending` schedules left over from
       // abandoned Mooov checkouts before we read. This guarantees the
       // members-list view never shows a phantom "Online" pill from a
       // stale pending row even if the per-checkout abandon path didn't
       // fire (e.g. the member never came back to retry).
-      await sweepAbandonedPendingSchedules(churchId).catch(() => 0);
+      await sweepAbandonedPendingSchedules(mosqueId).catch(() => 0);
       const [allGiving, currentYear, schedules] = await Promise.all([
-        db.getMemberGiving(churchId),
-        db.getCurrentChurchYear(churchId).catch(() => null),
-        db.listGivingSchedules(churchId).catch(() => []),
+        db.getMemberGiving(mosqueId),
+        db.getCurrentMosqueYear(mosqueId).catch(() => null),
+        db.listGivingSchedules(mosqueId).catch(() => []),
       ]);
       const ys = currentYear?.start_date.slice(0, 10) ?? null;
       const ye = currentYear?.end_date.slice(0, 10) ?? null;

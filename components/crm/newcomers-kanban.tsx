@@ -38,7 +38,7 @@ const STAGE_ACCENT: Record<string, string> = {
   expression_of_interest: "border-t-blue-500",
   initial_contact: "border-t-cyan-500",
   service_scheduled: "border-t-amber-500",
-  proposal_church: "border-t-violet-500",
+  proposal_mosque: "border-t-violet-500",
   approved: "border-t-emerald-500",
   welcomed: "border-t-green-500",
   declined: "border-t-red-500",
@@ -49,7 +49,7 @@ const STAGE_COUNT_BADGE: Record<string, string> = {
   expression_of_interest: "border-blue-200 bg-blue-50 text-blue-900",
   initial_contact: "border-cyan-200 bg-cyan-50 text-cyan-900",
   service_scheduled: "border-amber-200 bg-amber-50 text-amber-900",
-  proposal_church: "border-violet-200 bg-violet-50 text-violet-900",
+  proposal_mosque: "border-violet-200 bg-violet-50 text-violet-900",
   approved: "border-emerald-200 bg-emerald-50 text-emerald-900",
   welcomed: "border-green-200 bg-green-50 text-green-900",
   declined: "border-red-200 bg-red-50 text-red-900",
@@ -125,7 +125,7 @@ export function NewcomersKanban({
     );
 
     try {
-      const res = await fetch(`/api/newcomers/church/${newcomerId}`, {
+      const res = await fetch(`/api/newcomers/mosque/${newcomerId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stage: newStage }),
@@ -301,7 +301,7 @@ function KanbanCard({
         </div>
         <div className="min-w-0 flex-1">
           <Link
-            href={`/admin/newcomers/church/${newcomer.id}`}
+            href={`/admin/newcomers/mosque/${newcomer.id}`}
             className="block truncate font-medium text-dash-text transition-colors hover:text-blue-700"
             onClick={(e) => e.stopPropagation()}
           >

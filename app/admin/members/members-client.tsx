@@ -95,7 +95,7 @@ export function AdminMembersClient({
   members: MemberRow[];
   offices?: OfficeRung[];
   /** Member ids that have an active (non-revoked, confirmed) Gift Aid
-   *  declaration on file in this church. Drives the "missing Gift Aid"
+   *  declaration on file in this mosque. Drives the "missing Gift Aid"
    *  and "has declaration" quick filters; computed server-side once so
    *  we avoid an N+1 against gift_aid_declarations. */
   giftAidDeclaredMemberIds?: string[];
@@ -235,7 +235,7 @@ export function AdminMembersClient({
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "church-members.csv";
+    link.download = "mosque-members.csv";
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -359,7 +359,7 @@ export function AdminMembersClient({
         <div>
           <h1 className="admin-page-title">Members</h1>
           <p className="admin-page-copy">
-            Manage church membership, view history and dietary requirements.
+            Manage mosque membership, view history and dietary requirements.
           </p>
         </div>
         <div className="admin-action-row">

@@ -8,9 +8,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { ImageUploadField } from "@/components/site-builder/image-upload-field";
 import { SimpleSiteBuilder } from "@/components/site-builder/simple-site-builder";
 import type {
-  ChurchSiteCustomPage,
-  ChurchSitePage,
-  ChurchSiteSection,
+  MosqueSiteCustomPage,
+  MosqueSitePage,
+  MosqueSiteSection,
 } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +25,7 @@ function slugify(value: string) {
   );
 }
 
-function uniqueSlug(base: string, pages: ChurchSiteCustomPage[], currentId?: string) {
+function uniqueSlug(base: string, pages: MosqueSiteCustomPage[], currentId?: string) {
   const stem = slugify(base);
   let next = stem;
   let count = 2;
@@ -36,7 +36,7 @@ function uniqueSlug(base: string, pages: ChurchSiteCustomPage[], currentId?: str
   return next;
 }
 
-function createBlankPage(pages: ChurchSiteCustomPage[]): ChurchSiteCustomPage {
+function createBlankPage(pages: MosqueSiteCustomPage[]): MosqueSiteCustomPage {
   const id = crypto.randomUUID();
   const title = "New page";
   return {
@@ -56,15 +56,15 @@ function createBlankPage(pages: ChurchSiteCustomPage[]): ChurchSiteCustomPage {
 }
 
 export function SitePagesManager({
-  churchSlug,
+  mosqueSlug,
   site,
   primaryColor,
 }: {
-  churchSlug: string;
-  site: ChurchSitePage;
+  mosqueSlug: string;
+  site: MosqueSitePage;
   primaryColor: string;
 }) {
-  const [pages, setPages] = useState<ChurchSiteCustomPage[]>(site.custom_pages ?? []);
+  const [pages, setPages] = useState<MosqueSiteCustomPage[]>(site.custom_pages ?? []);
   const [selectedId, setSelectedId] = useState<string | null>(pages[0]?.id ?? null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -83,7 +83,7 @@ export function SitePagesManager({
     setSaving(true);
     setMessage(null);
     try {
-      const response = await fetch(`/api/churches/${churchSlug}/site`, {
+      const response = await fetch(`/api/mosques/${mosqueSlug}/site`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ custom_pages: nextPages }),
@@ -98,7 +98,7 @@ export function SitePagesManager({
     }
   }
 
-  function updatePage(id: string, patch: Partial<ChurchSiteCustomPage>) {
+  function updatePage(id: string, patch: Partial<MosqueSiteCustomPage>) {
     setPages((current) =>
       current.map((page) => (page.id === id ? { ...page, ...patch } : page))
     );
@@ -110,8 +110,8 @@ export function SitePagesManager({
     setSelectedId(page.id);
   }
 
-  function duplicatePage(page: ChurchSiteCustomPage) {
-    const copyPage: ChurchSiteCustomPage = {
+  function duplicatePage(page: MosqueSiteCustomPage) {
+    const copyPage: MosqueSiteCustomPage = {
       ...page,
       id: crypto.randomUUID(),
       title: `${page.title} copy`,
@@ -132,7 +132,7 @@ export function SitePagesManager({
   async function saveBuilderPage(payload: {
     page_title: string;
     page_description: string | null;
-    sections: ChurchSiteSection[];
+    sections: MosqueSiteSection[];
     published?: boolean;
   }) {
     if (!selectedPage) return;
@@ -158,7 +158,7 @@ export function SitePagesManager({
           <div>
             <h2 className="text-lg font-semibold text-dash-text">Pages</h2>
             <p className="mt-1 text-sm text-dash-muted">
-              Create extra public pages and control the church navigation.
+              Create extra public pages and control the mosque navigation.
             </p>
           </div>
           <Button type="button" size="sm" variant="primary" onClick={addPage}>
@@ -357,13 +357,13 @@ export function SitePagesManager({
             <section className="admin-surface overflow-hidden p-6">
               <SimpleSiteBuilder
                 key={selectedPage.id}
-                churchSlug={churchSlug}
+                mosqueSlug={mosqueSlug}
                 initialSections={selectedPage.sections}
                 pageTitle={selectedPage.title}
                 pageDescription={selectedPage.description}
                 primaryColor={primaryColor}
                 initiallyPublished={selectedPage.published}
-                publicHref={`/site/${selectedPage.slug}?church=${encodeURIComponent(churchSlug)}`}
+                publicHref={`/site/${selectedPage.slug}?mosque=${encodeURIComponent(mosqueSlug)}`}
                 title={`${selectedPage.title} builder`}
                 description="Build this custom page with the same templates, media, forms, and section controls."
                 onPersist={saveBuilderPage}
@@ -374,7 +374,7 @@ export function SitePagesManager({
           <section className="admin-surface p-10 text-center">
             <h2 className="text-xl font-semibold text-dash-text">No custom pages yet</h2>
             <p className="mx-auto mt-2 max-w-md text-sm text-dash-muted">
-              Add pages for About, Join, Visit, campaigns, or anything the church wants in its public navigation.
+              Add pages for About, Join, Visit, campaigns, or anything the mosque wants in its public navigation.
             </p>
             <Button type="button" className="mt-5" variant="primary" onClick={addPage}>
               <Plus className="mr-2 h-4 w-4" />

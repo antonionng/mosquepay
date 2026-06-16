@@ -3,7 +3,7 @@
 // Self-service giving kiosk client.
 //
 // Step flow: welcome -> amount -> details -> gift aid -> QR -> thank you.
-// Designed for a tablet stood in landscape or portrait at the church door:
+// Designed for a tablet stood in landscape or portrait at the mosque door:
 // big tap targets, no scrolling on the happy path, automatic reset back to
 // the welcome screen after inactivity, and a screen wake lock so the tablet
 // stays awake until someone deliberately puts it to sleep.
@@ -36,12 +36,12 @@ type Step =
   | "success"
   | "failed";
 
-type Purpose = "tithe" | "offering" | "charity" | "general";
+type Purpose = "zakat" | "offering" | "charity" | "general";
 
 const PURPOSES: { id: Purpose; label: string; hint: string }[] = [
-  { id: "tithe", label: "Tithe", hint: "Regular tithe to the church" },
+  { id: "zakat", label: "Zakat", hint: "Regular zakat to the mosque" },
   { id: "offering", label: "Offering", hint: "A freewill offering" },
-  { id: "charity", label: "Charity gift", hint: "The church's charity collection" },
+  { id: "charity", label: "Charity gift", hint: "The mosque's charity collection" },
   { id: "general", label: "General", hint: "Wherever it's needed most" },
 ];
 
@@ -68,10 +68,10 @@ type StatusResponse = {
 
 export function KioskClient({
   slug,
-  churchName,
+  mosqueName,
 }: {
   slug: string;
-  churchName: string;
+  mosqueName: string;
 }) {
   const [step, setStep] = useState<Step>("welcome");
   const [amount, setAmount] = useState<number | null>(null);
@@ -152,7 +152,7 @@ export function KioskClient({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          church: slug,
+          mosque: slug,
           amount: effectiveAmount,
           purpose,
           donor: isAnonymous
@@ -272,7 +272,7 @@ export function KioskClient({
             <HandHeart className="h-5 w-5" />
           </span>
           <div>
-            <p className="text-sm font-semibold leading-tight">{churchName}</p>
+            <p className="text-sm font-semibold leading-tight">{mosqueName}</p>
             <p className="text-xs text-slate-500">Giving kiosk</p>
           </div>
         </div>
@@ -289,7 +289,7 @@ export function KioskClient({
 
       <div className="flex flex-1 items-center justify-center px-6 pb-10 sm:px-10">
         {step === "welcome" && (
-          <WelcomeScreen churchName={churchName} onStart={() => setStep("amount")} />
+          <WelcomeScreen mosqueName={mosqueName} onStart={() => setStep("amount")} />
         )}
 
         {step === "amount" && (
@@ -430,7 +430,7 @@ export function KioskClient({
         {step === "giftaid" && (
           <StepCard
             title="Boost your gift by 25% with Gift Aid"
-            subtitle={`If you're a UK taxpayer, ${churchName} can reclaim 25p for every £1 you give, at no extra cost to you.`}
+            subtitle={`If you're a UK taxpayer, ${mosqueName} can reclaim 25p for every £1 you give, at no extra cost to you.`}
             onBack={() => setStep("details")}
           >
             {effectiveAmount ? (
@@ -474,7 +474,7 @@ export function KioskClient({
                   label="Home address line 1"
                   value={address1}
                   onChange={setAddress1}
-                  placeholder="1 Church Lane"
+                  placeholder="1 Mosque Lane"
                   autoComplete="address-line1"
                 />
                 <KioskInput
@@ -599,7 +599,7 @@ export function KioskClient({
               Thank you for your generosity
             </h1>
             <p className="mt-3 text-lg text-slate-600">
-              Your gift of £{effectiveAmount?.toFixed(2)} to {churchName} has
+              Your gift of £{effectiveAmount?.toFixed(2)} to {mosqueName} has
               been received.
               {giftAidWanted
                 ? " We've recorded your Gift Aid declaration alongside it."
@@ -627,7 +627,7 @@ export function KioskClient({
             </h1>
             <p className="mt-3 text-lg text-slate-600">
               No money has been taken. You can try again, or speak to a member
-              of the church team.
+              of the mosque team.
             </p>
             <PrimaryButton
               className="mx-auto mt-10 max-w-xs"
@@ -667,10 +667,10 @@ export function KioskClient({
 // ---- Screens + shared bits ----
 
 function WelcomeScreen({
-  churchName,
+  mosqueName,
   onStart,
 }: {
-  churchName: string;
+  mosqueName: string;
   onStart: () => void;
 }) {
   return (
@@ -683,10 +683,10 @@ function WelcomeScreen({
         <HandHeart className="h-10 w-10 text-brand" />
       </span>
       <h1 className="mt-8 text-3xl font-semibold sm:text-5xl">
-        Give to {churchName}
+        Give to {mosqueName}
       </h1>
       <p className="mt-4 max-w-md text-lg text-slate-600">
-        Tithes, offerings, and gifts. Pay securely on your own phone with
+        Zakat, offerings, and gifts. Pay securely on your own phone with
         Apple Pay, Google Pay, or card.
       </p>
       <span className="mt-10 inline-flex items-center rounded-full bg-brand px-8 py-4 text-lg font-semibold text-white shadow">
@@ -811,7 +811,7 @@ function useWakeLock(enabled: boolean) {
         }
         lock = acquired;
       } catch {
-        // Not supported / denied (e.g. low battery). Non-fatal: the church
+        // Not supported / denied (e.g. low battery). Non-fatal: the mosque
         // can still disable auto-lock in the tablet settings.
       }
     };

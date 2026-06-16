@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
 } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
 
-async function resolveChurch(request: NextRequest) {
-  const churchSlug = getChurchSlugFromRequest(request);
-  return db.resolveChurchId(churchSlug);
+async function resolveMosque(request: NextRequest) {
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  return db.resolveMosqueId(mosqueSlug);
 }
 
 export async function GET(
@@ -26,14 +26,14 @@ export async function GET(
     );
   }
   const { id } = await params;
-  const churchId = await resolveChurch(request);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueId = await resolveMosque(request);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("charity:write", churchId);
+  const forbidden = await requireAdminApiPermission("charity:write", mosqueId);
   if (forbidden) return forbidden;
 
-  const declaration = await db.getGiftAidDeclarationById(id, churchId);
+  const declaration = await db.getGiftAidDeclarationById(id, mosqueId);
   if (!declaration) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
@@ -53,11 +53,11 @@ export async function PATCH(
     );
   }
   const { id } = await params;
-  const churchId = await resolveChurch(request);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueId = await resolveMosque(request);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("charity:write", churchId);
+  const forbidden = await requireAdminApiPermission("charity:write", mosqueId);
   if (forbidden) return forbidden;
 
   const body = await request.json();
@@ -83,13 +83,13 @@ export async function PATCH(
     updates.revoked_at = null;
   }
 
-  const updated = await db.updateGiftAidDeclaration(id, churchId, updates);
+  const updated = await db.updateGiftAidDeclaration(id, mosqueId, updates);
   if (!updated) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "gift_aid_declaration_updated",
     entityType: "gift_aid_declaration",
     entityId: id,
@@ -113,20 +113,20 @@ export async function DELETE(
     );
   }
   const { id } = await params;
-  const churchId = await resolveChurch(request);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueId = await resolveMosque(request);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("charity:write", churchId);
+  const forbidden = await requireAdminApiPermission("charity:write", mosqueId);
   if (forbidden) return forbidden;
 
-  const updated = await db.revokeGiftAidDeclaration(id, churchId);
+  const updated = await db.revokeGiftAidDeclaration(id, mosqueId);
   if (!updated) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "gift_aid_declaration_revoked",
     entityType: "gift_aid_declaration",
     entityId: id,

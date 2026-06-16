@@ -6,7 +6,7 @@
 //   * app/notice/[token]/rsvp-form.tsx        (notice-link RSVP)
 //
 // Payment surface: 100% Mooov (Mooov Connect -> hosted Stripe Checkout on
-// the church's connected PSP). No direct Stripe SDK calls and no fallback,
+// the mosque's connected PSP). No direct Stripe SDK calls and no fallback,
 // matching /api/donations (Phase 1) and /api/g/[token]/checkout (Phase 2).
 //
 // Mock-payment branch (mock_payment === true || ALLOW_MOCK_PAYMENTS) is
@@ -20,7 +20,7 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getDefaultChurchSlug, getChurchSlugFromRequest } from "@/lib/tenant";
+import { getDefaultMosqueSlug, getMosqueSlugFromRequest } from "@/lib/tenant";
 import { resolveCheckoutFeesForMember } from "@/lib/fees/server-resolve";
 import { createServiceClient } from "@/lib/supabase/server";
 import { callMooovConnect, MooovApiError } from "@/lib/mooov";
@@ -31,13 +31,13 @@ export const dynamic = "force-dynamic";
 
 async function loadMooovMerchant(
   supa: ReturnType<typeof createServiceClient>,
-  churchId: string,
+  mosqueId: string,
 ): Promise<string | null> {
   const { data, error } = await supa
     .schema("mooov")
-    .from("churches")
+    .from("mosques")
     .select("merchant_id, status")
-    .eq("id", churchId)
+    .eq("id", mosqueId)
     .maybeSingle<{ merchant_id: string; status: string }>();
   if (error) throw error;
   if (!data) return null;
@@ -97,9 +97,9 @@ export async function POST(request: NextRequest) {
     (mock_payment === true || process.env.ALLOW_MOCK_PAYMENTS === "true");
 
   try {
-    const churchSlug = getChurchSlugFromRequest(request);
-    const churchQuery =
-      churchSlug === getDefaultChurchSlug() ? "" : `?church=${encodeURIComponent(churchSlug)}`;
+    const mosqueSlug = getMosqueSlugFromRequest(request);
+    const mosqueQuery =
+      mosqueSlug === getDefaultMosqueSlug() ? "" : `?mosque=${encodeURIComponent(mosqueSlug)}`;
 
     const guestList = Array.isArray(guests)
       ? guests.filter(
@@ -113,12 +113,12 @@ export async function POST(request: NextRequest) {
     let diningTotalVal = dining_total ?? 0;
 
     if (isSupabaseConfigured()) {
-      const churchId = await db.resolveChurchId(churchSlug);
-      if (churchId) {
-        const event = await db.getEventById(event_id, churchId);
+      const mosqueId = await db.resolveMosqueId(mosqueSlug);
+      if (mosqueId) {
+        const event = await db.getEventById(event_id, mosqueId);
         if (event) {
           const resolved = await resolveCheckoutFeesForMember({
-            churchId,
+            mosqueId,
             event,
             memberEmail: String(user_email).trim().toLowerCase(),
             attendingCeremony: attending_ceremony !== false,
@@ -168,16 +168,16 @@ export async function POST(request: NextRequest) {
       };
 
       if (isSupabaseConfigured()) {
-        const churchId = await db.resolveChurchId(churchSlug);
-        if (!churchId) {
-          return NextResponse.json({ error: "Church not found." }, { status: 404 });
+        const mosqueId = await db.resolveMosqueId(mosqueSlug);
+        if (!mosqueId) {
+          return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
         }
-        const rsvp = await db.addRsvp(churchId, rsvpData);
+        const rsvp = await db.addRsvp(mosqueId, rsvpData);
         rsvpId = rsvp.id;
 
         if (Array.isArray(guests) && guests.length > 0) {
           await db.addEventGuests(
-            churchId,
+            mosqueId,
             guests.map((g: { guest_name: string; dietary_requirements?: string }) => ({
               rsvp_id: rsvpId,
               event_id,
@@ -196,15 +196,15 @@ export async function POST(request: NextRequest) {
         // Fire-and-forget wine pledge confirmation. Don't block checkout.
         if (winePledged && wineBottles > 0) {
           try {
-            const [eventRow, church] = await Promise.all([
-              db.getEventById(event_id, churchId),
-              db.getChurchById(churchId),
+            const [eventRow, mosque] = await Promise.all([
+              db.getEventById(event_id, mosqueId),
+              db.getMosqueById(mosqueId),
             ]);
             if (eventRow) {
               await sendWinePledgeConfirmationEmail({
                 toEmail: user_email,
                 toName: user_name ?? user_email,
-                churchName: church?.name ?? "your church",
+                mosqueName: mosque?.name ?? "your mosque",
                 eventTitle: eventRow.title,
                 eventDate: eventRow.event_date,
                 eventTime: eventRow.event_time,
@@ -218,7 +218,7 @@ export async function POST(request: NextRequest) {
           }
         }
       } else {
-        const rsvp = mockDb.addRsvp({ ...rsvpData, church_slug: churchSlug });
+        const rsvp = mockDb.addRsvp({ ...rsvpData, mosque_slug: mosqueSlug });
         rsvpId = rsvp.id;
 
         if (Array.isArray(guests) && guests.length > 0) {
@@ -229,7 +229,7 @@ export async function POST(request: NextRequest) {
               guest_name: g.guest_name,
               dietary_requirements: g.dietary_requirements?.trim() || null,
             })),
-            churchSlug
+            mosqueSlug
           );
         }
       }
@@ -260,36 +260,36 @@ export async function POST(request: NextRequest) {
       };
 
       if (isSupabaseConfigured()) {
-        const churchId = await db.resolveChurchId(churchSlug);
-        if (!churchId) {
-          return NextResponse.json({ error: "Church not found." }, { status: 404 });
+        const mosqueId = await db.resolveMosqueId(mosqueSlug);
+        if (!mosqueId) {
+          return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
         }
-        const payment = await db.addPayment(churchId, paymentData);
+        const payment = await db.addPayment(mosqueId, paymentData);
         if (rsvpId) {
-          await db.updateRsvp(rsvpId, churchId, {
+          await db.updateRsvp(rsvpId, mosqueId, {
             payment_id: payment.id,
             payment_completed: true,
             status: "confirmed",
           });
         }
         return NextResponse.json({
-          url: `${siteUrl}/events/rsvp/success?mock=1${churchQuery ? `&church=${encodeURIComponent(churchSlug)}` : ""}`,
+          url: `${siteUrl}/events/rsvp/success?mock=1${mosqueQuery ? `&mosque=${encodeURIComponent(mosqueSlug)}` : ""}`,
           mock: true,
           rsvp_id: rsvpId,
           payment_id: payment.id,
         });
       }
 
-      const payment = mockDb.addPayment({ ...paymentData, church_slug: churchSlug });
+      const payment = mockDb.addPayment({ ...paymentData, mosque_slug: mosqueSlug });
       if (rsvpId) {
         mockDb.updateRsvp(
           rsvpId,
           { payment_id: payment.id, payment_completed: true, status: "confirmed" },
-          { church_slug: churchSlug }
+          { mosque_slug: mosqueSlug }
         );
       }
       return NextResponse.json({
-        url: `${siteUrl}/events/rsvp/success?mock=1${churchQuery ? `&church=${encodeURIComponent(churchSlug)}` : ""}`,
+        url: `${siteUrl}/events/rsvp/success?mock=1${mosqueQuery ? `&mosque=${encodeURIComponent(mosqueSlug)}` : ""}`,
         mock: true,
         rsvp_id: rsvpId,
         payment_id: payment.id,
@@ -307,9 +307,9 @@ export async function POST(request: NextRequest) {
         { status: 503 }
       );
     }
-    const churchId = await db.resolveChurchId(churchSlug);
-    if (!churchId) {
-      return NextResponse.json({ error: "Church not found." }, { status: 404 });
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
     }
 
     let supa: ReturnType<typeof createServiceClient>;
@@ -327,14 +327,14 @@ export async function POST(request: NextRequest) {
 
     let merchantId: string | null;
     try {
-      merchantId = await loadMooovMerchant(supa, churchId);
+      merchantId = await loadMooovMerchant(supa, mosqueId);
     } catch (err) {
       console.error("checkout-session: mooov merchant lookup failed", {
-        church_id: churchId,
+        mosque_id: mosqueId,
         message: err instanceof Error ? err.message : String(err),
       });
       return NextResponse.json(
-        { error: "Could not look up payment processor for this church." },
+        { error: "Could not look up payment processor for this mosque." },
         { status: 500 }
       );
     }
@@ -342,8 +342,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "This church has not finished setting up online payments yet. Please contact the church directly.",
-          code: "church_not_connected",
+            "This mosque has not finished setting up online payments yet. Please contact the mosque directly.",
+          code: "mosque_not_connected",
         },
         { status: 503 }
       );
@@ -351,13 +351,13 @@ export async function POST(request: NextRequest) {
 
     const totalMinor = Math.round(total * 100);
     const currency = "GBP";
-    const paymentId = `evt_${churchId}_${rsvpId ?? "standalone"}_${Date.now().toString(36)}`;
+    const paymentId = `evt_${mosqueId}_${rsvpId ?? "standalone"}_${Date.now().toString(36)}`;
     const idempotencyKey = `evt_csk_${rsvpId ?? "standalone"}_${Date.now().toString(36)}`;
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
     const successUrl = `${siteUrl}/events/rsvp/success?payment_id=${encodeURIComponent(
       paymentId
-    )}${churchQuery ? `&church=${encodeURIComponent(churchSlug)}` : ""}`;
-    const cancelUrl = `${siteUrl}/events${churchQuery}`;
+    )}${mosqueQuery ? `&mosque=${encodeURIComponent(mosqueSlug)}` : ""}`;
+    const cancelUrl = `${siteUrl}/events${mosqueQuery}`;
     const description = standalone
       ? `Standalone payment${user_name ? ` -- ${user_name}` : ""}`
       : `Event RSVP${user_name ? ` -- ${user_name}` : ""}`;
@@ -366,7 +366,7 @@ export async function POST(request: NextRequest) {
       source: standalone ? "event_standalone" : "event_rsvp",
       rsvp_id: rsvpId,
       event_id,
-      church_slug: churchSlug,
+      mosque_slug: mosqueSlug,
       donor_email: user_email,
       donor_name: user_name ?? null,
       dining_total: diningTotalVal,
@@ -388,9 +388,9 @@ export async function POST(request: NextRequest) {
         : {}),
     };
     const initialMetadata: Record<string, unknown> = {
-      source: "churchpay_event_checkout_session",
-      church_slug: churchSlug,
-      church_id: churchId,
+      source: "mosquepay_event_checkout_session",
+      mosque_slug: mosqueSlug,
+      mosque_id: mosqueId,
       intent: "event",
       rsvp_id: rsvpId,
       event_id,
@@ -401,7 +401,7 @@ export async function POST(request: NextRequest) {
       .from("payment_attempts")
       .insert({
         payment_id: paymentId,
-        church_id: churchId,
+        mosque_id: mosqueId,
         member_id: null,
         amount: totalMinor,
         currency,
@@ -413,7 +413,7 @@ export async function POST(request: NextRequest) {
       });
     if (insertError) {
       console.error("checkout-session: preflight insert failed", {
-        church_id: churchId,
+        mosque_id: mosqueId,
         payment_id: paymentId,
         code: insertError.code,
         message: insertError.message,
@@ -456,8 +456,8 @@ export async function POST(request: NextRequest) {
           customer_email: user_email,
           metadata: {
             intent: "event",
-            church_id: churchId,
-            church_slug: churchSlug,
+            mosque_id: mosqueId,
+            mosque_slug: mosqueSlug,
             rsvp_id: rsvpId ?? "",
             event_id,
             standalone: standalone ? "true" : "false",
@@ -512,8 +512,8 @@ export async function POST(request: NextRequest) {
           return NextResponse.json(
             {
               error:
-                "This church has not finished setting up online payments yet. Please contact the church directly.",
-              code: "church_setup_incomplete",
+                "This mosque has not finished setting up online payments yet. Please contact the mosque directly.",
+              code: "mosque_setup_incomplete",
               setup_url: err.setupHint.setupUrl,
             },
             { status: 503 }

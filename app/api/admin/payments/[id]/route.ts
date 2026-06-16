@@ -46,12 +46,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   const { id } = await params;
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
-    return NextResponse.json({ error: "Church not selected." }, { status: 404 });
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
+    return NextResponse.json({ error: "Mosque not selected." }, { status: 404 });
   }
-  const churchId = ctx.churchId;
+  const mosqueId = ctx.mosqueId;
 
-  const forbidden = await requireAdminApiPermission("payments:write", churchId);
+  const forbidden = await requireAdminApiPermission("payments:write", mosqueId);
   if (forbidden) return forbidden;
 
   let body: Record<string, unknown>;
@@ -61,13 +61,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
   }
 
-  const payment = await db.getPaymentById(id, churchId);
+  const payment = await db.getPaymentById(id, mosqueId);
   if (!payment) {
     return NextResponse.json({ error: "Payment not found." }, { status: 404 });
   }
 
   // Resolve the event change (if any). `null`/empty detaches; a uuid attaches
-  // after we confirm the event belongs to this church.
+  // after we confirm the event belongs to this mosque.
   let changeEvent = false;
   let eventId: string | null = null;
   if ("event_id" in body) {
@@ -76,10 +76,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (raw === null || (typeof raw === "string" && raw.trim() === "")) {
       eventId = null;
     } else if (typeof raw === "string") {
-      const eventRow = await db.getEventById(raw.trim(), churchId);
+      const eventRow = await db.getEventById(raw.trim(), mosqueId);
       if (!eventRow) {
         return NextResponse.json(
-          { error: "Selected service not found in this church." },
+          { error: "Selected service not found in this mosque." },
           { status: 400 },
         );
       }
@@ -94,7 +94,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   const category = typeof body.category === "string" ? body.category : undefined;
 
-  const result = await applyPaymentEdit(churchId, payment, {
+  const result = await applyPaymentEdit(mosqueId, payment, {
     category,
     changeEvent,
     eventId,
@@ -104,7 +104,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "updated",
     entityType: "payment",
     entityId: id,

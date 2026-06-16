@@ -7,18 +7,18 @@
 //      so it's printable-sticker safe and survives every mobile browser.
 //
 //   2. With `amount`: mint a Mooov payment_intent via flow:"embedded" with
-//      the right metadata (event_id, campaign_id, intent, church_slug),
+//      the right metadata (event_id, campaign_id, intent, mosque_slug),
 //      then 302 the donor straight to pay.mooov.money/c/<id> for them to
 //      pay with Apple Pay / Google Pay / card.
 //
 // Supported contexts:
-//   - charity: defaults to the church's current_charity_campaign_id; falls
+//   - charity: defaults to the mosque's current_charity_campaign_id; falls
 //     back to a generic donation if no campaign is designated. If an event
 //     id is provided and has enable_charity_donation=true, presets come
 //     from the event's charity_suggested_amounts.
 //   - raffle: requires event_id; presets come from raffle_suggested_amounts.
 //   - dining: requires event_id; single preset = dining_price.
-//   - general: generic church payment (no campaign/event linkage).
+//   - general: generic mosque payment (no campaign/event linkage).
 
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
@@ -77,15 +77,15 @@ export default async function GivePage({
   }
   const ctx = context as Context;
 
-  const church = await loadChurch(slug);
-  if (!church) {
-    return <NotFoundPage reason="We couldn't find a church at this address." />;
+  const mosque = await loadMosque(slug);
+  if (!mosque) {
+    return <NotFoundPage reason="We couldn't find a mosque at this address." />;
   }
 
-  const merchantId = await loadMerchantId(church.id);
+  const merchantId = await loadMerchantId(mosque.id);
   if (!merchantId) {
     return (
-      <NotFoundPage reason="This church has not connected its payment processor yet. Please ask the church secretary to complete setup." />
+      <NotFoundPage reason="This mosque has not connected its payment processor yet. Please ask the mosque secretary to complete setup." />
     );
   }
 
@@ -93,9 +93,9 @@ export default async function GivePage({
     typeof search.event === "string" ? search.event : null;
   const resolved = await resolveContext({
     context: ctx,
-    churchId: church.id,
+    mosqueId: mosque.id,
     eventId,
-    currentCharityCampaignId: church.current_charity_campaign_id ?? null,
+    currentCharityCampaignId: mosque.current_charity_campaign_id ?? null,
   });
 
   const amountParam = firstParam(search.amount);
@@ -108,13 +108,13 @@ export default async function GivePage({
   if (hasAmount) {
     if (amountNumber > 5000) {
       return (
-        <NotFoundPage reason="Amounts above £5,000 cannot be taken on the standing-QR flow. Please contact the church directly." />
+        <NotFoundPage reason="Amounts above £5,000 cannot be taken on the standing-QR flow. Please contact the mosque directly." />
       );
     }
 
     const hostedUrl = await mintAndGetHostedUrl({
-      churchId: church.id,
-      churchSlug: slug,
+      mosqueId: mosque.id,
+      mosqueSlug: slug,
       merchantId,
       amountPounds: amountNumber,
       resolved,
@@ -136,13 +136,13 @@ export default async function GivePage({
       <GiveFormClient
         slug={slug}
         context={ctx}
-        churchName={church.name}
+        mosqueName={mosque.name}
         eventId={eventId}
         heading={resolved.heading}
         subheading={resolved.subheading}
         presetAmounts={resolved.presetAmounts}
         customAllowed={resolved.customAllowed}
-        charityHeader={church.name}
+        charityHeader={mosque.name}
         // The charity context goes through /api/donations (rich form +
         // gift aid + receipt by email). Dining / raffle / general all
         // skip donor capture and let the server resolver mint + 302.
@@ -158,11 +158,11 @@ function firstParam(v: string | string[] | undefined): string | null {
   return v;
 }
 
-async function loadChurch(slug: string) {
+async function loadMosque(slug: string) {
   const normalized = slug.trim().toLowerCase();
   try {
     const { data, error } = await createServiceClient()
-      .from("churches")
+      .from("mosques")
       .select("id, slug, name, current_charity_campaign_id")
       .eq("slug", normalized)
       .eq("is_active", true)
@@ -174,10 +174,10 @@ async function loadChurch(slug: string) {
       }>();
     if (error) {
       // Log loudly: a schema-drift or RLS misconfiguration here turns a
-      // perfectly valid sticker URL into a generic "church not found" page,
+      // perfectly valid sticker URL into a generic "mosque not found" page,
       // which is the least debuggable failure mode for the donor (the
       // sticker LOOKS broken even though the column is just missing).
-      console.error("give resolver: church lookup failed", {
+      console.error("give resolver: mosque lookup failed", {
         slug: normalized,
         code: error.code,
         message: error.message,
@@ -188,7 +188,7 @@ async function loadChurch(slug: string) {
     }
     return data ?? null;
   } catch (err) {
-    console.error("give resolver: church lookup threw", {
+    console.error("give resolver: mosque lookup threw", {
       slug: normalized,
       message: err instanceof Error ? err.message : String(err),
     });
@@ -198,17 +198,17 @@ async function loadChurch(slug: string) {
   }
 }
 
-async function loadMerchantId(churchId: string): Promise<string | null> {
+async function loadMerchantId(mosqueId: string): Promise<string | null> {
   try {
     const { data, error } = await createServiceClient()
       .schema("mooov")
-      .from("churches")
+      .from("mosques")
       .select("merchant_id, status")
-      .eq("id", churchId)
+      .eq("id", mosqueId)
       .maybeSingle<{ merchant_id: string; status: string }>();
     if (error) {
       console.error("give resolver: mooov merchant lookup failed", {
-        church_id: churchId,
+        mosque_id: mosqueId,
         code: error.code,
         message: error.message,
       });
@@ -219,7 +219,7 @@ async function loadMerchantId(churchId: string): Promise<string | null> {
     return data.merchant_id ?? null;
   } catch (err) {
     console.error("give resolver: mooov merchant lookup threw", {
-      church_id: churchId,
+      mosque_id: mosqueId,
       message: err instanceof Error ? err.message : String(err),
     });
     return null;
@@ -228,12 +228,12 @@ async function loadMerchantId(churchId: string): Promise<string | null> {
 
 async function resolveContext({
   context,
-  churchId,
+  mosqueId,
   eventId,
   currentCharityCampaignId,
 }: {
   context: Context;
-  churchId: string;
+  mosqueId: string;
   eventId: string | null;
   currentCharityCampaignId: string | null;
 }): Promise<ResolvedContext> {
@@ -254,10 +254,10 @@ async function resolveContext({
       const { data } = await supa
         .from("events")
         .select(
-          "id, title, dining_price, charity_suggested_amounts, charity_allow_custom, raffle_suggested_amounts, raffle_allow_custom, charity_name, church_id",
+          "id, title, dining_price, charity_suggested_amounts, charity_allow_custom, raffle_suggested_amounts, raffle_allow_custom, charity_name, mosque_id",
         )
         .eq("id", eventId)
-        .eq("church_id", churchId)
+        .eq("mosque_id", mosqueId)
         .maybeSingle<{
           id: string;
           title: string;
@@ -267,7 +267,7 @@ async function resolveContext({
           raffle_suggested_amounts: number[] | null;
           raffle_allow_custom: boolean | null;
           charity_name: string | null;
-          church_id: string;
+          mosque_id: string;
         }>();
       if (data) event = data;
     } catch {
@@ -280,14 +280,14 @@ async function resolveContext({
     try {
       const { data } = await supa
         .from("charity_campaigns")
-        .select("id, name, status, church_id")
+        .select("id, name, status, mosque_id")
         .eq("id", currentCharityCampaignId)
-        .eq("church_id", churchId)
+        .eq("mosque_id", mosqueId)
         .maybeSingle<{
           id: string;
           name: string;
           status: string;
-          church_id: string;
+          mosque_id: string;
         }>();
       if (data && data.status === "active") {
         campaign = { id: data.id, name: data.name };
@@ -352,19 +352,19 @@ async function resolveContext({
           : "Donate",
         subheading: campaign?.name
           ? "Tap any amount to give. Pay with Apple Pay, Google Pay, or card."
-          : "Tap an amount to give to the church's charity collection.",
+          : "Tap an amount to give to the mosque's charity collection.",
         customAllowed: event?.charity_allow_custom !== false,
       };
     }
     case "general":
     default:
       return {
-        intent: "church_generic_standing_qr",
+        intent: "mosque_generic_standing_qr",
         presetAmounts: DEFAULT_PRESETS.general,
         campaignId: null,
         eventId: null,
-        description: "Church payment",
-        heading: "Pay the church",
+        description: "Mosque payment",
+        heading: "Pay the mosque",
         subheading: "Pick a preset amount or enter a custom one.",
         customAllowed: true,
       };
@@ -372,14 +372,14 @@ async function resolveContext({
 }
 
 async function mintAndGetHostedUrl({
-  churchId,
-  churchSlug,
+  mosqueId,
+  mosqueSlug,
   merchantId,
   amountPounds,
   resolved,
 }: {
-  churchId: string;
-  churchSlug: string;
+  mosqueId: string;
+  mosqueSlug: string;
   merchantId: string;
   amountPounds: number;
   resolved: ResolvedContext;
@@ -387,19 +387,19 @@ async function mintAndGetHostedUrl({
   const supa = createServiceClient();
   const amountMinor = Math.round(amountPounds * 100);
   const currency = "GBP";
-  const paymentId = `giv_${churchId}_${Date.now().toString(36)}_${Math.random()
+  const paymentId = `giv_${mosqueId}_${Date.now().toString(36)}_${Math.random()
     .toString(36)
     .slice(2, 10)}`;
   const idempotencyKey = `giv_${paymentId}`;
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const successUrl = `${siteUrl}/give/${encodeURIComponent(churchSlug)}/done?payment_id=${encodeURIComponent(paymentId)}`;
-  const cancelUrl = `${siteUrl}/give/${encodeURIComponent(churchSlug)}/cancelled`;
+  const successUrl = `${siteUrl}/give/${encodeURIComponent(mosqueSlug)}/done?payment_id=${encodeURIComponent(paymentId)}`;
+  const cancelUrl = `${siteUrl}/give/${encodeURIComponent(mosqueSlug)}/cancelled`;
 
   const initialMetadata: Record<string, unknown> = {
-    source: "churchpay_standing_qr",
-    church_slug: churchSlug,
-    church_id: churchId,
+    source: "mosquepay_standing_qr",
+    mosque_slug: mosqueSlug,
+    mosque_id: mosqueId,
     intent: resolved.intent,
     event_id: resolved.eventId,
     campaign_id: resolved.campaignId,
@@ -411,7 +411,7 @@ async function mintAndGetHostedUrl({
       .from("payment_attempts")
       .insert({
         payment_id: paymentId,
-        church_id: churchId,
+        mosque_id: mosqueId,
         member_id: null,
         amount: amountMinor,
         currency,
@@ -421,7 +421,7 @@ async function mintAndGetHostedUrl({
         metadata: initialMetadata,
         guest_descriptor: {
           source: "standing_qr",
-          church_slug: churchSlug,
+          mosque_slug: mosqueSlug,
           intent: resolved.intent,
           event_id: resolved.eventId,
           campaign_id: resolved.campaignId,
@@ -429,7 +429,7 @@ async function mintAndGetHostedUrl({
       });
   } catch (err) {
     console.error("give resolver: preflight insert failed", {
-      church_id: churchId,
+      mosque_id: mosqueId,
       payment_id: paymentId,
       message: err instanceof Error ? err.message : String(err),
     });
@@ -453,8 +453,8 @@ async function mintAndGetHostedUrl({
           description: resolved.description,
           metadata: {
             intent: resolved.intent,
-            church_id: churchId,
-            church_slug: churchSlug,
+            mosque_id: mosqueId,
+            mosque_slug: mosqueSlug,
             event_id: resolved.eventId ?? undefined,
             campaign_id: resolved.campaignId ?? undefined,
           },

@@ -20,7 +20,7 @@ const PIPELINE_STAGES = [
   "expression_of_interest",
   "initial_contact",
   "service_scheduled",
-  "proposal_church",
+  "proposal_mosque",
   "approved",
   "welcomed",
   "declined",
@@ -31,7 +31,7 @@ const STAGE_LABELS: Record<string, string> = {
   expression_of_interest: "Expression of Interest",
   initial_contact: "Initial Contact",
   service_scheduled: "Service Scheduled",
-  proposal_church: "Proposal to Church",
+  proposal_mosque: "Proposal to Mosque",
   approved: "Approved",
   welcomed: "Initiated",
   declined: "Declined",
@@ -54,18 +54,18 @@ const NOW_TS = Date.now();
 export default async function AdminNewcomersPage() {
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
-  const churchId = ctx.mode === "database" ? ctx.churchId : null;
+  const mosqueId = ctx.mode === "database" ? ctx.mosqueId : null;
   const allNewcomers = useMock
     ? mockDb.getNewcomers()
-    : churchId
-      ? await db.getNewcomers(churchId)
+    : mosqueId
+      ? await db.getNewcomers(mosqueId)
       : [];
 
   const newcomers = await Promise.all(allNewcomers.map(async (l) => {
     const activities = useMock
       ? mockDb.getNewcomerActivities(l.id)
-      : churchId
-        ? await db.getNewcomerActivities(l.id, churchId)
+      : mosqueId
+        ? await db.getNewcomerActivities(l.id, mosqueId)
         : [];
     const lastActivity = activities[0] ?? null;
     const daysInStage = Math.floor((NOW_TS - new Date(l.stage_changed_at).getTime()) / 86400000);

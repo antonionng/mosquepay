@@ -13,14 +13,14 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { ChurchFeeDefaults } from "@/lib/fees/resolve";
+import type { MosqueFeeDefaults } from "@/lib/fees/resolve";
 import { resolveEffectiveAmount } from "@/lib/fees/resolve";
 
 export const MEETING_TYPES = [
   "regular_service",
-  "church_service",
+  "mosque_service",
   "special_service",
-  "church_of_instruction",
+  "mosque_of_instruction",
   "committee",
   "emergency",
 ];
@@ -205,7 +205,7 @@ export function emptyServiceForm(): ServiceForm {
     title: "",
     slug: "",
     description: "",
-    event_type: "church_service",
+    event_type: "mosque_service",
     event_date: "",
     event_time: "",
     location: "Mark members' Hall",
@@ -304,8 +304,8 @@ function formatGbp(value: number | null | undefined): string {
 
 /**
  * Helper used by the Fees step. Given the current event-level form value and
- * a church default, returns a single string describing what will actually be
- * charged (e.g. "Using church default of £10.00", or "Custom: £15.00").
+ * a mosque default, returns a single string describing what will actually be
+ * charged (e.g. "Using mosque default of £10.00", or "Custom: £15.00").
  */
 function describeFeeOrigin(
   formValue: string,
@@ -330,7 +330,7 @@ function describeFeeOrigin(
   if (defaultValue != null) {
     return {
       resolved,
-      hint: `Using church default of ${formatGbp(defaultValue)}`,
+      hint: `Using mosque default of ${formatGbp(defaultValue)}`,
       tone: "muted",
     };
   }
@@ -338,14 +338,14 @@ function describeFeeOrigin(
   if (options.required) {
     return {
       resolved: null,
-      hint: "No church default — set a price for this service.",
+      hint: "No mosque default — set a price for this service.",
       tone: "warn",
     };
   }
 
   return {
     resolved: null,
-    hint: "No price set and no church default. Treated as £0.00.",
+    hint: "No price set and no mosque default. Treated as £0.00.",
     tone: "muted",
   };
 }
@@ -395,7 +395,7 @@ export function ServiceFormDrawer({
   updateForm,
   onClose,
   onSubmit,
-  churchDefaults,
+  mosqueDefaults,
 }: {
   open: boolean;
   editing: boolean;
@@ -406,7 +406,7 @@ export function ServiceFormDrawer({
   updateForm: (updates: Partial<ServiceForm>) => void;
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  churchDefaults: ChurchFeeDefaults | null;
+  mosqueDefaults: MosqueFeeDefaults | null;
 }) {
   const [step, setStep] = useState<WizardStepId>("basics");
 
@@ -414,26 +414,26 @@ export function ServiceFormDrawer({
     () =>
       describeFeeOrigin(
         form.service_fee_amount,
-        churchDefaults?.default_member_levy_amount
+        mosqueDefaults?.default_member_levy_amount
       ),
-    [form.service_fee_amount, churchDefaults]
+    [form.service_fee_amount, mosqueDefaults]
   );
   const memberDiningOrigin = useMemo(
     () =>
       describeFeeOrigin(
         form.dining_price,
-        churchDefaults?.default_member_dining_amount,
+        mosqueDefaults?.default_member_dining_amount,
         { required: true }
       ),
-    [form.dining_price, churchDefaults]
+    [form.dining_price, mosqueDefaults]
   );
   const guestDiningOrigin = useMemo(
     () =>
       describeFeeOrigin(
         form.guest_ticket_price,
-        churchDefaults?.default_guest_dining_amount
+        mosqueDefaults?.default_guest_dining_amount
       ),
-    [form.guest_ticket_price, churchDefaults]
+    [form.guest_ticket_price, mosqueDefaults]
   );
 
   if (!open) return null;
@@ -752,7 +752,7 @@ export function ServiceFormDrawer({
                   Fees
                 </h3>
                 <p className="mt-1 text-xs text-dash-muted">
-                  Leave a price blank to use the church default. Set a number
+                  Leave a price blank to use the mosque default. Set a number
                   here only when this service needs to differ.
                 </p>
               </div>
@@ -761,7 +761,7 @@ export function ServiceFormDrawer({
                 target="_blank"
                 className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
               >
-                Church defaults <ExternalLink className="h-3 w-3" />
+                Mosque defaults <ExternalLink className="h-3 w-3" />
               </Link>
             </div>
 
@@ -786,7 +786,7 @@ export function ServiceFormDrawer({
 
             <FeeRow
               title="Member dining"
-              description="Charged when a member opts in to the fellowship meal."
+              description="Charged when a member opts in to the community meal."
               enabled={form.enable_dining_rsvp}
               onToggle={(value) => updateForm({ enable_dining_rsvp: value })}
               gateNote={
@@ -818,7 +818,7 @@ export function ServiceFormDrawer({
                     Waive dining for everyone at this service
                   </p>
                   <p className="text-xs text-amber-800">
-                    Use for special_services or socials where the church is
+                    Use for special_services or socials where the mosque is
                     covering dining. Members and guests are shown as
                     complimentary on the recipients panel and dining will
                     not be charged at checkout.
@@ -829,7 +829,7 @@ export function ServiceFormDrawer({
 
             <FeeRow
               title="Guest dining"
-              description="Charged for each guest a member brings to the fellowship meal."
+              description="Charged for each guest a member brings to the community meal."
               enabled={form.enable_guest_tickets}
               onToggle={(value) => updateForm({ enable_guest_tickets: value })}
               gateNote={
@@ -1159,9 +1159,9 @@ export function ServiceFormDrawer({
                   disabled={!form.published}
                 />
                 <span>
-                  <span className="font-medium">Also show on the public church website</span>
+                  <span className="font-medium">Also show on the public mosque website</span>
                   <span className="mt-1 block text-xs text-dash-muted">
-                    Regular services and churches of instruction stay private by default. Tick this
+                    Regular services and mosques of instruction stay private by default. Tick this
                     only for services that genuinely welcome newcomers or the wider public (e.g. an
                     special_service open to newcomer members, or a public charity event). Socials and
                     charity events are shown on the public site automatically.
@@ -1225,7 +1225,7 @@ export function ServiceFormDrawer({
  * One fee block on the Fees step. Always renders the toggle + amount field
  * (disabled when not enabled) so the height stays stable as the user opts in
  * and out. The hint line below the amount tells the user where the resolved
- * value will come from (church default vs custom).
+ * value will come from (mosque default vs custom).
  */
 function FeeRow({
   title,
@@ -1340,7 +1340,7 @@ function FeeRow({
 
 /**
  * The "What members will be charged" block on the Review step. Uses the same
- * resolved amounts the resolver will use, so the user sees the church-default
+ * resolved amounts the resolver will use, so the user sees the mosque-default
  * fallback applied before they hit Save.
  */
 function FeeSummary({

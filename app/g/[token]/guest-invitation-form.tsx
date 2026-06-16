@@ -46,8 +46,8 @@ const baseSchema = z.object({
 });
 
 const memberExtras = z.object({
-  mother_church_name: z.string().min(1, "Your church name is required"),
-  mother_church_number: z.string().optional(),
+  mother_mosque_name: z.string().min(1, "Your mosque name is required"),
+  mother_mosque_number: z.string().optional(),
   constitution: z.string().optional(),
   rank: z.string().optional(),
 });
@@ -193,26 +193,26 @@ export function GuestInvitationForm({
       {guestPolicy === "blue_table" ? (
         <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-5">
           <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
-            Your church details
+            Your mosque details
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="mother_church_name">Your church *</Label>
+              <Label htmlFor="mother_mosque_name">Your mosque *</Label>
               <Input
-                id="mother_church_name"
-                {...register("mother_church_name" as never)}
+                id="mother_mosque_name"
+                {...register("mother_mosque_name" as never)}
               />
-              {(errors as Record<string, { message?: string }>).mother_church_name ? (
+              {(errors as Record<string, { message?: string }>).mother_mosque_name ? (
                 <p className="text-sm text-destructive">
-                  {(errors as Record<string, { message?: string }>).mother_church_name?.message}
+                  {(errors as Record<string, { message?: string }>).mother_mosque_name?.message}
                 </p>
               ) : null}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="mother_church_number">Church number</Label>
+              <Label htmlFor="mother_mosque_number">Mosque number</Label>
               <Input
-                id="mother_church_number"
-                {...register("mother_church_number" as never)}
+                id="mother_mosque_number"
+                {...register("mother_mosque_number" as never)}
               />
             </div>
             <div className="space-y-2">
@@ -354,13 +354,13 @@ export function GuestInvitationForm({
             As is custom in memberry, your place is confirmed at the point of
             payment and is{" "}
             <span className="font-semibold text-slate-700">non-refundable</span>.
-            If you can no longer attend, please notify the church as soon as
+            If you can no longer attend, please notify the mosque as soon as
             possible.
           </p>
         ) : (
           <p className="text-xs text-slate-500">
             Your place is confirmed as soon as you press the button above. If
-            you can no longer attend, please notify the church as soon as
+            you can no longer attend, please notify the mosque as soon as
             possible.
           </p>
         )}

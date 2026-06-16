@@ -19,20 +19,20 @@ export async function GET() {
   }
   const member =
     (await db.getMemberByAuthUserId(user.id)) ??
-    (await db.getMemberByEmailAcrossChurches(user.email));
+    (await db.getMemberByEmailAcrossMosques(user.email));
   if (!member) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const invitations = await db.listGuestInvitationsForMember(
     member.id,
-    member.church_id
+    member.mosque_id
   );
 
   const eventIds = Array.from(new Set(invitations.map((i) => i.event_id)));
   const events = (
     await Promise.all(
-      eventIds.map((id) => db.getEventById(id, member.church_id))
+      eventIds.map((id) => db.getEventById(id, member.mosque_id))
     )
   ).filter((event): event is NonNullable<typeof event> => Boolean(event));
 

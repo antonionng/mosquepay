@@ -1,7 +1,7 @@
 export const PLAN_CODES = [
-  "church_essentials",
-  "church_complete",
-  "church_group",
+  "mosque_essentials",
+  "mosque_complete",
+  "mosque_group",
   "network",
 ] as const;
 
@@ -10,7 +10,7 @@ export type PlanCode = (typeof PLAN_CODES)[number];
 export const ENTITLEMENT_KEYS = [
   "site_builder",
   "member_portal",
-  "digital_church_card",
+  "digital_mosque_card",
   "payments",
   "giving",
   "gift_aid",
@@ -29,8 +29,8 @@ export const ENTITLEMENT_KEYS = [
   "audit",
   "bulk_import",
   "advanced_members",
-  "multi_church",
-  "cross_church_reporting",
+  "multi_mosque",
+  "cross_mosque_reporting",
   "central_billing",
   "network_dashboards",
   "migration_planning",
@@ -63,7 +63,7 @@ export type PlanDefinition = {
 const ESSENTIALS_ENTITLEMENTS: EntitlementKey[] = [
   "site_builder",
   "member_portal",
-  "digital_church_card",
+  "digital_mosque_card",
   "payments",
   "giving",
   "gift_aid",
@@ -79,7 +79,7 @@ const ESSENTIALS_ENTITLEMENTS: EntitlementKey[] = [
   // Mooov Connect (connect, reconnect, disconnect, repair). Mooov is the
   // payments rail and `payments` is already an Essentials entitlement, so
   // gating its setup UI to Network made it impossible for any paying
-  // Essentials/Complete/Group church to actually administer their own
+  // Essentials/Complete/Group mosque to actually administer their own
   // Mooov merchant. Calendar / email / accounting connectors on this
   // page are non-destructive (each one is its own toggle), so promoting
   // the page itself doesn't auto-enable a paid integration.
@@ -100,8 +100,8 @@ const COMPLETE_EXTRA_ENTITLEMENTS: EntitlementKey[] = [
 ];
 
 const GROUP_EXTRA_ENTITLEMENTS: EntitlementKey[] = [
-  "multi_church",
-  "cross_church_reporting",
+  "multi_mosque",
+  "cross_mosque_reporting",
   "central_billing",
 ];
 
@@ -112,20 +112,20 @@ const PROVINCE_EXTRA_ENTITLEMENTS: EntitlementKey[] = [
 ];
 
 export const PLAN_DEFINITIONS: Record<PlanCode, PlanDefinition> = {
-  church_essentials: {
-    code: "church_essentials",
+  mosque_essentials: {
+    code: "mosque_essentials",
     name: "Essentials",
-    tag: "Single Church",
+    tag: "Single Mosque",
     price: "From £149/mo",
     subPrice: "billed annually, or £169 monthly",
     description:
-      "Everything a church team needs to run the church, take payments, and reclaim every penny of Gift Aid the church is owed.",
+      "Everything a mosque team needs to run the mosque, take payments, and reclaim every penny of Gift Aid the mosque is owed.",
     cta: "Get a walkthrough",
-    upgradeTo: "church_complete",
+    upgradeTo: "mosque_complete",
     featureGroups: [
       {
-        title: "The church, online",
-        items: ["Public church website", "Member portal & PWA", "Digital church card"],
+        title: "The mosque, online",
+        items: ["Public mosque website", "Member portal & PWA", "Digital mosque card"],
       },
       {
         title: "The money, handled",
@@ -154,17 +154,17 @@ export const PLAN_DEFINITIONS: Record<PlanCode, PlanDefinition> = {
     ],
     entitlements: ESSENTIALS_ENTITLEMENTS,
   },
-  church_complete: {
-    code: "church_complete",
+  mosque_complete: {
+    code: "mosque_complete",
     name: "Complete",
-    tag: "Most Churches Choose This",
+    tag: "Most Mosques Choose This",
     price: "From £229/mo",
     subPrice: "billed annually, or £259 monthly",
     description:
-      "Everything in Essentials, plus the AI assistant, newcomer pipeline, pastoral care, and full reporting suite.",
+      "Everything in Essentials, plus the AI assistant, newcomer pipeline, welfare, and full reporting suite.",
     cta: "Get a walkthrough",
     recommended: true,
-    upgradeTo: "church_group",
+    upgradeTo: "mosque_group",
     featureGroups: [
       {
         title: "Everything in Essentials, plus:",
@@ -179,7 +179,7 @@ export const PLAN_DEFINITIONS: Record<PlanCode, PlanDefinition> = {
         title: "Membership & care",
         items: [
           "Newcomer CRM & pipeline",
-          "Pastoral care cases",
+          "Welfare cases",
           "Discipleship mentoring",
           "Charity campaigns",
         ],
@@ -198,26 +198,26 @@ export const PLAN_DEFINITIONS: Record<PlanCode, PlanDefinition> = {
       ...COMPLETE_EXTRA_ENTITLEMENTS,
     ],
   },
-  church_group: {
-    code: "church_group",
+  mosque_group: {
+    code: "mosque_group",
     name: "Group",
-    tag: "2 to 6 churches",
+    tag: "2 to 6 mosques",
     price: "From £349/mo",
-    subPrice: "2 churches, then £119 per extra",
+    subPrice: "2 mosques, then £119 per extra",
     description:
-      "Everything in Complete for halls, groups, or connected churches with shared oversight and central billing.",
+      "Everything in Complete for halls, groups, or connected mosques with shared oversight and central billing.",
     cta: "Get a walkthrough",
     upgradeTo: "network",
     featureGroups: [
       {
         title: "Everything in Complete, plus:",
         items: [
-          "Separate church records",
-          "Per-church branding & site",
-          "Cross-church reporting",
+          "Separate mosque records",
+          "Per-mosque branding & site",
+          "Cross-mosque reporting",
           "Central billing, one invoice",
-          "Church context switching",
-          "Multi-church member visibility",
+          "Mosque context switching",
+          "Multi-mosque member visibility",
           "Shared rollout support",
         ],
       },
@@ -233,7 +233,7 @@ export const PLAN_DEFINITIONS: Record<PlanCode, PlanDefinition> = {
     name: "Network",
     tag: "Network Rollout",
     price: "From £2k/mo",
-    subPrice: "+ £35 per church, typically £4,500/mo",
+    subPrice: "+ £35 per mosque, typically £4,500/mo",
     description:
       "Network-wide rollout, central oversight, migration planning, and ongoing support.",
     cta: "Talk to us",
@@ -244,7 +244,7 @@ export const PLAN_DEFINITIONS: Record<PlanCode, PlanDefinition> = {
           "Operator console",
           "Network-wide dashboards",
           "Annual returns CSV (one click)",
-          "Bulk church operations",
+          "Bulk mosque operations",
           "Health-style portfolio signals",
           "Migration planning included",
           "Named network contact",
@@ -266,12 +266,12 @@ export function isPlanCode(value: string | null | undefined): value is PlanCode 
 
 export function normalizePlanCode(value: string | null | undefined): PlanCode {
   if (isPlanCode(value)) return value;
-  if (value === "starter" || value === "single_church" || value === "single") {
-    return "church_essentials";
+  if (value === "starter" || value === "single_mosque" || value === "single") {
+    return "mosque_essentials";
   }
-  if (value === "complete") return "church_complete";
-  if (value === "group") return "church_group";
-  return "church_essentials";
+  if (value === "complete") return "mosque_complete";
+  if (value === "group") return "mosque_group";
+  return "mosque_essentials";
 }
 
 export function getPlanDefinition(value: string | null | undefined) {

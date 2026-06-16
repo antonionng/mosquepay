@@ -13,7 +13,7 @@ import {
   Mail,
   ArrowRight,
 } from "lucide-react";
-import type { ChurchSiteSection } from "@/lib/db/types";
+import type { MosqueSiteSection } from "@/lib/db/types";
 import {
   heroBackgroundLayers,
   mergeHeroPrimaryColor,
@@ -24,7 +24,7 @@ import {
 } from "@/lib/site-section-style";
 import { cn } from "@/lib/utils";
 
-type SiteSection = ChurchSiteSection;
+type SiteSection = MosqueSiteSection;
 
 const sectionIcons: Record<SiteSection["type"], React.ComponentType<{ className?: string }>> = {
   hero: Sparkles,

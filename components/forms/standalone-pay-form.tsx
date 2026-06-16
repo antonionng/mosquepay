@@ -11,7 +11,7 @@ type GuestEntry = { guest_name: string; dietary_requirements: string };
 
 type Props = {
   eventId: string;
-  churchSlug?: string;
+  mosqueSlug?: string;
   enableDining: boolean;
   diningPrice: number | null;
   diningDescription: string | null;
@@ -32,7 +32,7 @@ type Props = {
 
 export function StandalonePayForm({
   eventId,
-  churchSlug,
+  mosqueSlug,
   enableDining,
   diningPrice,
   diningDescription,
@@ -51,9 +51,9 @@ export function StandalonePayForm({
   guestTicketDescription,
 }: Props) {
   const searchParams = useSearchParams();
-  const churchFromQuery = searchParams.get("church");
-  const effectiveChurch = churchSlug ?? churchFromQuery ?? undefined;
-  const churchQuery = effectiveChurch ? `?church=${encodeURIComponent(effectiveChurch)}` : "";
+  const mosqueFromQuery = searchParams.get("mosque");
+  const effectiveMosque = mosqueSlug ?? mosqueFromQuery ?? undefined;
+  const mosqueQuery = effectiveMosque ? `?mosque=${encodeURIComponent(effectiveMosque)}` : "";
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -103,7 +103,7 @@ export function StandalonePayForm({
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/payments/create-checkout-session${churchQuery}`, {
+      const res = await fetch(`/api/payments/create-checkout-session${mosqueQuery}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

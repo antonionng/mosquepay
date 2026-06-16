@@ -47,7 +47,7 @@ import { cn } from "@/lib/utils";
 import {
   RANK_CODES,
   RANK_LABELS,
-  churchTitleFor,
+  mosqueTitleFor,
   rankLabel,
 } from "@/lib/members/rank";
 
@@ -602,7 +602,7 @@ export function MemberDetailClient({
         },
         waive: {
           title: "Waive giving?",
-          description: "This marks the giving as waived. Use this only when the church has agreed the member does not need to pay this period.",
+          description: "This marks the giving as waived. Use this only when the mosque has agreed the member does not need to pay this period.",
           confirmLabel: "Waive giving",
           tone: "danger" as const,
         },
@@ -817,11 +817,11 @@ export function MemberDetailClient({
                     </option>
                   ))}
                 </select>
-                {editForm.rank && churchTitleFor(editForm.rank) && (
+                {editForm.rank && mosqueTitleFor(editForm.rank) && (
                   <p className="text-xs text-dash-muted">
-                    Church title:{" "}
+                    Mosque title:{" "}
                     <span className="font-medium text-dash-text">
-                      {churchTitleFor(editForm.rank)}
+                      {mosqueTitleFor(editForm.rank)}
                     </span>{" "}
                     (derived automatically from rank)
                   </p>
@@ -939,7 +939,7 @@ export function MemberDetailClient({
                   </p>
                   <p className="mt-1 text-xs text-dash-muted">
                     Per-member opt-in. When on, this member can be rendered on
-                    the public Officers section of the church website if they
+                    the public Officers section of the mosque website if they
                     hold an office. Off by default; revocable at any time.
                   </p>
                 </div>
@@ -956,7 +956,7 @@ export function MemberDetailClient({
                     className="mt-1 h-4 w-4 rounded border-dash-border"
                   />
                   <span>
-                    Show this member on the public church website
+                    Show this member on the public mosque website
                     <span className="block text-xs font-normal text-dash-muted">
                       Requires the member&apos;s explicit consent. Their name,
                       rank, and bio below appear on the Officers section only
@@ -990,7 +990,7 @@ export function MemberDetailClient({
                     checked={!editForm.fee_use_custom}
                     onChange={() => setEditForm({ ...editForm, fee_use_custom: false })}
                   />
-                  Use church defaults
+                  Use mosque defaults
                 </label>
                 <label className="flex items-center gap-2 text-sm">
                   <input
@@ -1066,14 +1066,14 @@ export function MemberDetailClient({
                     Annual giving waived
                   </label>
                   <p className="text-xs text-amber-800">
-                    Treats this member as exempt from the church&apos;s annual
+                    Treats this member as exempt from the mosque&apos;s annual
                     giving bill. The next giving panel and bulk giving run will
                     skip them until this is turned off.
                   </p>
                   {editForm.annual_giving_waived && (
                     <Textarea
                       rows={2}
-                      placeholder="Reason for the waiver (e.g. long service, ill health, church resolution)"
+                      placeholder="Reason for the waiver (e.g. long service, ill health, mosque resolution)"
                       value={editForm.annual_giving_waiver_reason}
                       onChange={(e) =>
                         setEditForm({
@@ -1149,9 +1149,9 @@ export function MemberDetailClient({
                   <p className="text-sm font-medium text-dash-text">
                     {rankLabel(member.rank) ?? "Not recorded"}
                   </p>
-                  {churchTitleFor(member.rank) && (
+                  {mosqueTitleFor(member.rank) && (
                     <p className="text-xs text-dash-muted">
-                      Church title: {churchTitleFor(member.rank)}
+                      Mosque title: {mosqueTitleFor(member.rank)}
                     </p>
                   )}
                 </div>
@@ -1203,8 +1203,8 @@ export function MemberDetailClient({
                     {member.dining_waived
                       ? "Dines complimentary"
                       : member.fee_use_custom
-                        ? `Custom levy${member.member_levy_amount != null ? ` £${member.member_levy_amount}` : ""}, dining${member.member_dining_amount != null ? ` £${member.member_dining_amount}` : " per church default"}`
-                        : "Church defaults"}
+                        ? `Custom levy${member.member_levy_amount != null ? ` £${member.member_levy_amount}` : ""}, dining${member.member_dining_amount != null ? ` £${member.member_dining_amount}` : " per mosque default"}`
+                        : "Mosque defaults"}
                     {member.levy_waived ? " · Levy waived" : ""}
                   </p>
                   {member.annual_giving_waived && (
@@ -1684,7 +1684,7 @@ export function MemberDetailClient({
           if (!teamSending) setConfirmTeamOpen(open);
         }}
         title={`Let ${member.full_name} take payments?`}
-        description={`This gives ${member.full_name} treasurer-level admin access (payments, giving, and the in-person Take payment screen) for this church and emails ${member.email} a link to set their password and sign in. They can take payments once they accept.`}
+        description={`This gives ${member.full_name} treasurer-level admin access (payments, giving, and the in-person Take payment screen) for this mosque and emails ${member.email} a link to set their password and sign in. They can take payments once they accept.`}
         confirmLabel="Grant access & email"
         loading={teamSending}
         onConfirm={handleMakeTeamMember}

@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
-import { getDefaultChurchSlug } from "@/lib/tenant";
+import { getDefaultMosqueSlug } from "@/lib/tenant";
 import { cn } from "@/lib/utils";
 import {
   Users,
@@ -31,8 +31,8 @@ function toRow(guest: {
   id: string;
   full_name: string;
   email: string | null;
-  mother_church_name: string | null;
-  mother_church_number: string | null;
+  mother_mosque_name: string | null;
+  mother_mosque_number: string | null;
   is_member: boolean;
   visit_count: number;
   archived_at: string | null;
@@ -43,8 +43,8 @@ function toRow(guest: {
     id: guest.id,
     full_name: guest.full_name,
     email: guest.email,
-    mother_church_name: guest.mother_church_name,
-    mother_church_number: guest.mother_church_number,
+    mother_mosque_name: guest.mother_mosque_name,
+    mother_mosque_number: guest.mother_mosque_number,
     is_member: guest.is_member,
     visit_count: guest.visit_count,
     archived_at: guest.archived_at,
@@ -83,27 +83,27 @@ export default async function AdminGuestsDirectoryPage({
   let guests: GuestRow[] = [];
   let schemaMissing = false;
   let acceptsSelfRegistration = false;
-  let churchSlug = getDefaultChurchSlug();
+  let mosqueSlug = getDefaultMosqueSlug();
 
   if (ctx.mode === "mock") {
     guests = mockDb
       .listGuests({ search, includeArchived: showArchived })
       .map(toRow);
-    const church = mockDb.getChurchBySlug(getDefaultChurchSlug());
-    if (church) {
-      acceptsSelfRegistration = church.accepts_self_registration ?? false;
-      churchSlug = church.slug;
+    const mosque = mockDb.getMosqueBySlug(getDefaultMosqueSlug());
+    if (mosque) {
+      acceptsSelfRegistration = mosque.accepts_self_registration ?? false;
+      mosqueSlug = mosque.slug;
     }
-  } else if (ctx.churchId) {
-    churchSlug = ctx.churchSlug;
+  } else if (ctx.mosqueId) {
+    mosqueSlug = ctx.mosqueSlug;
     try {
-      const rows = await db.listGuests(ctx.churchId, {
+      const rows = await db.listGuests(ctx.mosqueId, {
         search,
         includeArchived: showArchived,
       });
       guests = rows.map(toRow);
-      const church = await db.getChurchById(ctx.churchId);
-      acceptsSelfRegistration = church?.accepts_self_registration ?? false;
+      const mosque = await db.getMosqueById(ctx.mosqueId);
+      acceptsSelfRegistration = mosque?.accepts_self_registration ?? false;
     } catch (error) {
       if (detectSchemaMissing(error)) {
         schemaMissing = true;
@@ -170,14 +170,14 @@ export default async function AdminGuestsDirectoryPage({
           <h1 className="admin-page-title">Guests directory</h1>
           <p className="admin-page-copy">
             Newcomer members and other guests who have ever booked into a
-            church event.
+            mosque event.
           </p>
         </div>
       </div>
 
       {!schemaMissing ? (
         <GuestSelfRegistrationCard
-          churchSlug={churchSlug}
+          mosqueSlug={mosqueSlug}
           initialEnabled={acceptsSelfRegistration}
         />
       ) : null}

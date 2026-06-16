@@ -3,7 +3,7 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
 
@@ -19,7 +19,7 @@ export async function PATCH(
     const unauthorized = await requireAdminApiAuth();
     if (unauthorized) return unauthorized;
 
-    const churchSlug = getChurchSlugFromRequest(request);
+    const mosqueSlug = getMosqueSlugFromRequest(request);
     const body = await request.json();
 
     const updates: Record<string, unknown> = {};
@@ -33,18 +33,18 @@ export async function PATCH(
     }
 
     if (isSupabaseConfigured()) {
-      const churchId = await db.resolveChurchId(churchSlug);
-      if (!churchId) {
-        return NextResponse.json({ error: "Church not found." }, { status: 404 });
+      const mosqueId = await db.resolveMosqueId(mosqueSlug);
+      if (!mosqueId) {
+        return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
       }
-      const forbidden = await requireAdminApiPermission("website:write", churchId);
+      const forbidden = await requireAdminApiPermission("website:write", mosqueId);
       if (forbidden) return forbidden;
-      const updated = await db.updateBlogPost(id, churchId, updates as Parameters<typeof db.updateBlogPost>[2]);
+      const updated = await db.updateBlogPost(id, mosqueId, updates as Parameters<typeof db.updateBlogPost>[2]);
       if (!updated) {
         return NextResponse.json({ error: "Post not found." }, { status: 404 });
       }
       await writeAuditLog({
-        churchId,
+        mosqueId,
         action: "updated",
         entityType: "blog_post",
         entityId: updated.id,
@@ -55,7 +55,7 @@ export async function PATCH(
     }
 
     const updated = mockDb.updateBlogPost(id, updates as Parameters<typeof mockDb.updateBlogPost>[1], {
-      church_slug: churchSlug,
+      mosque_slug: mosqueSlug,
     });
 
     if (!updated) {
@@ -84,7 +84,7 @@ export async function DELETE(
     const unauthorized = await requireAdminApiAuth();
     if (unauthorized) return unauthorized;
 
-    const churchSlug = getChurchSlugFromRequest(request);
+    const mosqueSlug = getMosqueSlugFromRequest(request);
     const updates = {
       published: false,
       published_at: null,
@@ -92,19 +92,19 @@ export async function DELETE(
     };
 
     if (isSupabaseConfigured()) {
-      const churchId = await db.resolveChurchId(churchSlug);
-      if (!churchId) {
-        return NextResponse.json({ error: "Church not found." }, { status: 404 });
+      const mosqueId = await db.resolveMosqueId(mosqueSlug);
+      if (!mosqueId) {
+        return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
       }
-      const forbidden = await requireAdminApiPermission("website:write", churchId);
+      const forbidden = await requireAdminApiPermission("website:write", mosqueId);
       if (forbidden) return forbidden;
 
-      const updated = await db.updateBlogPost(id, churchId, updates);
+      const updated = await db.updateBlogPost(id, mosqueId, updates);
       if (!updated) {
         return NextResponse.json({ error: "Post not found." }, { status: 404 });
       }
       await writeAuditLog({
-        churchId,
+        mosqueId,
         action: "unpublished",
         entityType: "blog_post",
         entityId: updated.id,
@@ -113,7 +113,7 @@ export async function DELETE(
       return NextResponse.json({ id, success: true });
     }
 
-    const updated = mockDb.updateBlogPost(id, updates, { church_slug: churchSlug });
+    const updated = mockDb.updateBlogPost(id, updates, { mosque_slug: mosqueSlug });
     if (!updated) {
       return NextResponse.json({ error: "Post not found." }, { status: 404 });
     }

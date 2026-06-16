@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function BankReconciliationPage() {
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
     return (
       <div className="space-y-4 sm:space-y-6">
         <div className="admin-page-head">
@@ -22,17 +22,17 @@ export default async function BankReconciliationPage() {
         <EmptyState
           icon={Banknote}
           title="Reconciliation needs a database"
-          description="Connect Supabase and choose a church to import statements and reconcile bank lines."
+          description="Connect Supabase and choose a mosque to import statements and reconcile bank lines."
         />
       </div>
     );
   }
-  const churchId = ctx.churchId;
+  const mosqueId = ctx.mosqueId;
 
   const [imports, transactions, ledger] = await Promise.all([
-    db.listBankImports(churchId),
-    db.listBankTransactions(churchId),
-    db.getTreasurerLedger(churchId),
+    db.listBankImports(mosqueId),
+    db.listBankTransactions(mosqueId),
+    db.getTreasurerLedger(mosqueId),
   ]);
 
   return (

@@ -8,25 +8,25 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import { listChurches } from "@/lib/db";
-import type { Church } from "@/lib/db/types";
+import { listMosques } from "@/lib/db";
+import type { Mosque } from "@/lib/db/types";
 import { requireOperatorPageAccess } from "@/lib/auth/operator-page";
 
 async function getOperatorStats() {
-  let churches: Church[] = [];
+  let mosques: Mosque[] = [];
   if (isSupabaseConfigured()) {
     try {
-      churches = await listChurches();
+      mosques = await listMosques();
     } catch {
-      churches = [];
+      mosques = [];
     }
   }
 
-  const activeChurches = churches.filter((l) => l.is_active);
+  const activeMosques = mosques.filter((l) => l.is_active);
   return {
-    totalChurches: churches.length,
-    activeChurches: activeChurches.length,
-    churches,
+    totalMosques: mosques.length,
+    activeMosques: activeMosques.length,
+    mosques,
   };
 }
 
@@ -37,15 +37,15 @@ export default async function OperatorDashboard() {
 
   const kpis = [
     {
-      label: "Total Churches",
-      value: stats.totalChurches,
+      label: "Total Mosques",
+      value: stats.totalMosques,
       icon: Building2,
       color: "text-blue-400",
       bg: "bg-blue-500/10",
     },
     {
       label: "Active Subscriptions",
-      value: stats.activeChurches,
+      value: stats.activeMosques,
       icon: CreditCard,
       color: "text-emerald-400",
       bg: "bg-emerald-500/10",
@@ -59,7 +59,7 @@ export default async function OperatorDashboard() {
     },
     {
       label: "Recent Activity",
-      value: stats.totalChurches > 0 ? "Active" : "None",
+      value: stats.totalMosques > 0 ? "Active" : "None",
       icon: Activity,
       color: "text-purple-400",
       bg: "bg-purple-500/10",
@@ -72,15 +72,15 @@ export default async function OperatorDashboard() {
         <div>
           <h1 className="admin-page-title">Operator Dashboard</h1>
           <p className="admin-page-copy">
-            Cross-church overview of your platform
+            Cross-mosque overview of your platform
           </p>
         </div>
         <Link
-          href="/operator/churches/new"
+          href="/operator/mosques/new"
           className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-500"
         >
           <Building2 className="h-4 w-4" />
-          Onboard New Church
+          Onboard New Mosque
         </Link>
       </div>
 
@@ -126,60 +126,60 @@ export default async function OperatorDashboard() {
         <div className="admin-surface p-6">
           <div className="flex items-center justify-between border-b border-white/10 pb-4">
             <h2 className="text-lg font-semibold text-white">
-              Recent Church Activity
+              Recent Mosque Activity
             </h2>
             <Link
-              href="/operator/churches"
+              href="/operator/mosques"
               className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300"
             >
               View all <ArrowUpRight className="h-3.5 w-3.5" />
             </Link>
           </div>
-          {stats.churches.length === 0 ? (
+          {stats.mosques.length === 0 ? (
             <div className="flex h-52 items-center justify-center text-slate-500">
               <div className="text-center">
                 <Building2 className="mx-auto h-10 w-10 text-slate-600" />
                 <p className="mt-3 text-sm">
-                  No churches onboarded yet
+                  No mosques onboarded yet
                 </p>
                 <Link
-                  href="/operator/churches/new"
+                  href="/operator/mosques/new"
                   className="mt-3 inline-block text-sm text-blue-400 hover:text-blue-300"
                 >
-                  Onboard your first church →
+                  Onboard your first mosque →
                 </Link>
               </div>
             </div>
           ) : (
             <div className="divide-y divide-white/10">
-              {stats.churches.slice(0, 5).map((church) => (
+              {stats.mosques.slice(0, 5).map((mosque) => (
                 <Link
-                  key={church.id}
-                  href={`/operator/churches/${church.slug}`}
+                  key={mosque.id}
+                  href={`/operator/mosques/${mosque.slug}`}
                   className="flex items-center justify-between py-3 transition-colors hover:bg-white/[0.02] -mx-2 px-2 rounded-lg"
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-xs font-semibold text-white">
-                      {church.name.slice(0, 2).toUpperCase()}
+                      {mosque.name.slice(0, 2).toUpperCase()}
                     </div>
                     <div>
                       <p className="text-sm font-medium text-white">
-                        {church.name}
+                        {mosque.name}
                       </p>
                       <p className="text-xs text-slate-500">
-                        {church.city ?? "Not recorded"}{" "}
-                        {church.country ? `· ${church.country}` : ""}
+                        {mosque.city ?? "Not recorded"}{" "}
+                        {mosque.country ? `· ${mosque.country}` : ""}
                       </p>
                     </div>
                   </div>
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      church.is_active
+                      mosque.is_active
                         ? "bg-emerald-500/10 text-emerald-400"
                         : "bg-red-500/10 text-red-400"
                     }`}
                   >
-                    {church.is_active ? "Active" : "Inactive"}
+                    {mosque.is_active ? "Active" : "Inactive"}
                   </span>
                 </Link>
               ))}

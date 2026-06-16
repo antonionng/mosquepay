@@ -6,19 +6,19 @@ import { writeAuditLog } from "@/lib/audit";
 import * as db from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 
 type Params = { params: Promise<{ id: string }> };
 
 // POST /api/members/[id]/make-team-member
 //
-// Promotes a church member into a "payment team member" so they can use the
+// Promotes a mosque member into a "payment team member" so they can use the
 // in-person Take payment flow. Members and staff live in separate tables, and
 // payments:write only comes from an admin_users row -- so this creates (or
 // reuses) an admin_users row for the member's email and sends the standard
 // staff invite email with a set-password link.
 //
-// Auth: admin with admin:all on the active church (same gate as Staff settings).
+// Auth: admin with admin:all on the active mosque (same gate as Staff settings).
 export async function POST(request: NextRequest, { params }: Params) {
   const _rejectMock = rejectIfMockDisabled();
   if (_rejectMock) return _rejectMock;
@@ -32,18 +32,18 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     const { id } = await params;
-    const churchSlug = getChurchSlugFromRequest(request);
-    const churchId = await db.resolveChurchId(churchSlug);
-    if (!churchId) {
-      return NextResponse.json({ error: "Church not found." }, { status: 404 });
+    const mosqueSlug = getMosqueSlugFromRequest(request);
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
     }
 
-    const forbidden = await requireAdminApiPermission("admin:all", churchId);
+    const forbidden = await requireAdminApiPermission("admin:all", mosqueId);
     if (forbidden) return forbidden;
 
-    const [member, church] = await Promise.all([
-      db.getMemberById(id, churchId),
-      db.getChurchById(churchId),
+    const [member, mosque] = await Promise.all([
+      db.getMemberById(id, mosqueId),
+      db.getMosqueById(mosqueId),
     ]);
     if (!member) {
       return NextResponse.json({ error: "Member not found." }, { status: 404 });
@@ -52,20 +52,20 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Member email is required." }, { status: 400 });
     }
 
-    const churchName = church?.name ?? churchSlug;
+    const mosqueName = mosque?.name ?? mosqueSlug;
 
-    // Find any existing church-scoped staff row for this email so we don't
+    // Find any existing mosque-scoped staff row for this email so we don't
     // clobber an existing officer (e.g. a Secretary who is also a member).
-    const existing = (await db.listAdminUsersForChurch(churchId)).find(
+    const existing = (await db.listAdminUsersForMosque(mosqueId)).find(
       (admin) =>
-        admin.church_id === churchId &&
+        admin.mosque_id === mosqueId &&
         admin.email.trim().toLowerCase() === member.email.trim().toLowerCase()
     );
 
     let staff: db.AdminUser;
     if (!existing) {
       staff = await db.createAdminUser({
-        church_id: churchId,
+        mosque_id: mosqueId,
         email: member.email,
         full_name: member.full_name,
         role: "treasurer",
@@ -73,14 +73,14 @@ export async function POST(request: NextRequest, { params }: Params) {
         permissions: [],
       });
       await writeAuditLog({
-        churchId,
+        mosqueId,
         action: "created",
         entityType: "admin_user",
         entityId: staff.id,
         summary: `Promoted member ${staff.email} to payment team member`,
         metadata: {
           role: staff.role,
-          scoped_church_id: staff.church_id,
+          scoped_mosque_id: staff.mosque_id,
           via: "member_make_team_member",
           member_id: member.id,
         },
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest, { params }: Params) {
           active: true,
         })) ?? existing;
       await writeAuditLog({
-        churchId,
+        mosqueId,
         action: "updated",
         entityType: "admin_user",
         entityId: staff.id,
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       staff = existing;
     }
 
-    const invite = await sendStaffInvite({ request, staff, churchName });
+    const invite = await sendStaffInvite({ request, staff, mosqueName });
     if (!invite.sent) {
       return NextResponse.json(
         { error: invite.error ?? "Could not send the payment access email." },
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     await writeAuditLog({
-      churchId,
+      mosqueId,
       action: "invited",
       entityType: "admin_user",
       entityId: staff.id,

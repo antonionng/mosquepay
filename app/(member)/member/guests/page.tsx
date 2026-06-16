@@ -174,7 +174,7 @@ export default function MemberGuestsPage() {
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">My guests</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Invite a member or newcomer to a church event. Choose whether your
+          Invite a member or newcomer to a mosque event. Choose whether your
           guest pays for their own dining and service fees or you cover them,
           and keep an audit trail of every link you have shared.
         </p>

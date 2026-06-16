@@ -5,14 +5,14 @@ import { sendWithLog } from "@/lib/email/send-with-log";
 type WinePledgeConfirmationArgs = {
   toEmail: string;
   toName: string;
-  churchName: string;
+  mosqueName: string;
   eventTitle: string;
   eventDate: string;
   eventTime: string | null;
   location: string | null;
   bottles: number;
   note: string | null;
-  churchId?: string | null;
+  mosqueId?: string | null;
   eventId?: string | null;
   memberId?: string | null;
 };
@@ -62,7 +62,7 @@ export async function sendWinePledgeConfirmationEmail(
   const text = `${paragraphs.join("\n\n")}\n`;
 
   const result = await sendWithLog({
-    churchId: args.churchId ?? null,
+    mosqueId: args.mosqueId ?? null,
     toEmail: args.toEmail,
     toName: args.toName,
     memberId: args.memberId ?? null,
@@ -76,7 +76,7 @@ export async function sendWinePledgeConfirmationEmail(
     html,
     text,
     metadata: {
-      church_name: args.churchName,
+      mosque_name: args.mosqueName,
       event_title: args.eventTitle,
       bottles: args.bottles,
     },

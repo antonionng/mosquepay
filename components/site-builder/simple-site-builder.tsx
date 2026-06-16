@@ -24,12 +24,13 @@ import {
   Send,
   X,
 } from "lucide-react";
+import { DEMO_MOSQUE_NAME } from "@/lib/demo-mosque";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { ChurchSiteSection } from "@/lib/db/types";
+import type { MosqueSiteSection } from "@/lib/db/types";
 import { SitePreview } from "./site-preview";
 import { PuckEditor } from "./puck-editor";
 import { ImageUploadField } from "./image-upload-field";
@@ -39,9 +40,9 @@ import {
   TEMPLATES,
 } from "@/lib/site-builder/templates";
 import type {
-  ChurchSiteCustomPage,
-  ChurchSiteFooterSettings,
-  ChurchSiteHeaderSettings,
+  MosqueSiteCustomPage,
+  MosqueSiteFooterSettings,
+  MosqueSiteHeaderSettings,
 } from "@/lib/db/types";
 
 type Step = "template" | "edit" | "preview" | "publish";
@@ -49,10 +50,10 @@ type WebsiteAiMode = "full" | "improve" | "add";
 type WebsiteAiDraft = {
   page_title: string;
   page_description: string | null;
-  sections: ChurchSiteSection[];
+  sections: MosqueSiteSection[];
 };
 
-const SECTION_LABELS: Record<ChurchSiteSection["type"], string> = {
+const SECTION_LABELS: Record<MosqueSiteSection["type"], string> = {
   hero: "Hero",
   about: "About",
   service_details: "Service times",
@@ -76,7 +77,7 @@ const LAUNCH_GUIDE = [
     id: "template" as const,
     icon: LayoutTemplate,
     title: "Pick a complete site",
-    body: "Start from a polished church website with pages, header, footer, images, and forms already wired.",
+    body: "Start from a polished mosque website with pages, header, footer, images, and forms already wired.",
   },
   {
     id: "edit" as const,
@@ -94,7 +95,7 @@ const LAUNCH_GUIDE = [
     id: "publish" as const,
     icon: Rocket,
     title: "Go live",
-    body: "Save, publish, and then connect the church domain from the launch checklist.",
+    body: "Save, publish, and then connect the mosque domain from the launch checklist.",
   },
 ];
 
@@ -108,19 +109,19 @@ const FORM_FIELD_OPTIONS = [
 ] as const;
 
 export function SimpleSiteBuilder({
-  churchSlug,
+  mosqueSlug,
   initialSections,
   pageTitle: initialPageTitle,
   pageDescription: initialPageDescription,
   primaryColor = "#3b82f6",
   initiallyPublished,
   publicHref,
-  title = "Church website builder",
+  title = "Mosque website builder",
   description = "Pick a template, edit sections in friendly forms, preview, and publish when ready.",
   onPersist,
 }: {
-  churchSlug: string;
-  initialSections: ChurchSiteSection[];
+  mosqueSlug: string;
+  initialSections: MosqueSiteSection[];
   pageTitle: string;
   pageDescription: string | null;
   primaryColor?: string;
@@ -131,10 +132,10 @@ export function SimpleSiteBuilder({
   onPersist?: (payload: {
     page_title: string;
     page_description: string | null;
-    sections: ChurchSiteSection[];
-    custom_pages?: ChurchSiteCustomPage[];
-    header_settings?: ChurchSiteHeaderSettings;
-    footer_settings?: ChurchSiteFooterSettings;
+    sections: MosqueSiteSection[];
+    custom_pages?: MosqueSiteCustomPage[];
+    header_settings?: MosqueSiteHeaderSettings;
+    footer_settings?: MosqueSiteFooterSettings;
     published?: boolean;
   }) => Promise<void>;
 }) {
@@ -147,14 +148,14 @@ export function SimpleSiteBuilder({
   const [pageDescription, setPageDescription] = useState(
     initialPageDescription ?? ""
   );
-  const [sections, setSections] = useState<ChurchSiteSection[]>(initialSections);
+  const [sections, setSections] = useState<MosqueSiteSection[]>(initialSections);
   const [published, setPublished] = useState(initiallyPublished);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddPanel, setShowAddPanel] = useState(false);
   const [websiteAiMode, setWebsiteAiMode] = useState<WebsiteAiMode>("full");
   const [websiteAiSectionId, setWebsiteAiSectionId] = useState("");
   const [websiteAiSectionType, setWebsiteAiSectionType] =
-    useState<ChurchSiteSection["type"]>("about");
+    useState<MosqueSiteSection["type"]>("about");
   const [websiteAiTone, setWebsiteAiTone] = useState("welcoming");
   const [websiteAiAudience, setWebsiteAiAudience] = useState("prospective members");
   const [websiteAiBrief, setWebsiteAiBrief] = useState("");
@@ -185,10 +186,10 @@ export function SimpleSiteBuilder({
     payload: {
       page_title: string;
       page_description: string | null;
-      sections: ChurchSiteSection[];
-      custom_pages?: ChurchSiteCustomPage[];
-      header_settings?: ChurchSiteHeaderSettings;
-      footer_settings?: ChurchSiteFooterSettings;
+      sections: MosqueSiteSection[];
+      custom_pages?: MosqueSiteCustomPage[];
+      header_settings?: MosqueSiteHeaderSettings;
+      footer_settings?: MosqueSiteFooterSettings;
       published?: boolean;
     },
     message = "Saved."
@@ -198,7 +199,7 @@ export function SimpleSiteBuilder({
       if (onPersist) {
         await onPersist(payload);
       } else {
-        const res = await fetch(`/api/churches/${churchSlug}/site`, {
+        const res = await fetch(`/api/mosques/${mosqueSlug}/site`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -239,7 +240,7 @@ export function SimpleSiteBuilder({
     );
   }
 
-  function updateSection(id: string, patch: Partial<ChurchSiteSection>) {
+  function updateSection(id: string, patch: Partial<MosqueSiteSection>) {
     setSections((prev) =>
       prev.map((s) => (s.id === id ? { ...s, ...patch } : s))
     );
@@ -247,7 +248,7 @@ export function SimpleSiteBuilder({
 
   function updateSectionStyle(
     id: string,
-    patch: NonNullable<ChurchSiteSection["style"]>
+    patch: NonNullable<MosqueSiteSection["style"]>
   ) {
     setSections((prev) =>
       prev.map((s) => {
@@ -365,7 +366,7 @@ export function SimpleSiteBuilder({
           : websiteAiMode === "improve"
             ? selectedSection?.type
             : websiteAiSectionType;
-      const res = await fetch(`/api/churches/${churchSlug}/ai-draft`, {
+      const res = await fetch(`/api/mosques/${mosqueSlug}/ai-draft`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -471,7 +472,7 @@ export function SimpleSiteBuilder({
 
   function updateWebsiteAiDraftSection(
     index: number,
-    patch: Partial<ChurchSiteSection>
+    patch: Partial<MosqueSiteSection>
   ) {
     setWebsiteAiDraft((draft) =>
       draft
@@ -525,7 +526,7 @@ export function SimpleSiteBuilder({
                 Website launch assistant
               </span>
               <h3 className="mt-4 max-w-2xl text-2xl font-semibold tracking-tight md:text-3xl">
-                Build a church website in minutes, then only tweak what matters.
+                Build a mosque website in minutes, then only tweak what matters.
               </h3>
               <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-300">
                 The builder now starts from complete site packs. Non-technical admins can choose a design, replace a few words and images, preview it, and publish with confidence.
@@ -639,7 +640,7 @@ export function SimpleSiteBuilder({
                   value={websiteAiSectionType}
                   onChange={(event) =>
                     setWebsiteAiSectionType(
-                      event.target.value as ChurchSiteSection["type"]
+                      event.target.value as MosqueSiteSection["type"]
                     )
                   }
                   className="h-10 w-full rounded-lg border border-dash-border bg-dash-surface px-3 text-sm text-dash-text"
@@ -717,7 +718,7 @@ export function SimpleSiteBuilder({
               rows={3}
               value={websiteAiBrief}
               onChange={(event) => setWebsiteAiBrief(event.target.value)}
-              placeholder="Tell AI what the church wants to say publicly."
+              placeholder="Tell AI what the mosque wants to say publicly."
             />
           </div>
           <div className="flex flex-wrap gap-2">
@@ -970,7 +971,7 @@ export function SimpleSiteBuilder({
                         <div className="grid gap-2 rounded-xl border border-dash-border bg-white/80 p-3 text-xs text-dash-muted sm:grid-cols-2">
                           <span>Includes homepage and 4 pages</span>
                           <span>Pre-built header and footer</span>
-                          <span>Contact form to church admins</span>
+                          <span>Contact form to mosque admins</span>
                           <span>Join form to newcomer pipeline</span>
                         </div>
                       ) : null}
@@ -1064,7 +1065,7 @@ export function SimpleSiteBuilder({
                 <Input
                   value={pageTitle}
                   onChange={(e) => setPageTitle(e.target.value)}
-                  placeholder="e.g. St Mary's Church"
+                  placeholder={`e.g. ${DEMO_MOSQUE_NAME}`}
                 />
               </div>
               <div className="space-y-1.5">
@@ -1091,7 +1092,7 @@ export function SimpleSiteBuilder({
                 </div>
               </div>
               <PuckEditor
-                churchSlug={churchSlug}
+                mosqueSlug={mosqueSlug}
                 initialSections={orderedSections}
                 pageTitle={pageTitle}
                 pageDescription={pageDescription}
@@ -1324,7 +1325,7 @@ export function SimpleSiteBuilder({
                                       onChange={(e) =>
                                         updateSectionStyle(s.id, {
                                           image_position: e.target.value as NonNullable<
-                                            ChurchSiteSection["style"]
+                                            MosqueSiteSection["style"]
                                           >["image_position"],
                                         })
                                       }
@@ -1346,7 +1347,7 @@ export function SimpleSiteBuilder({
                                       onChange={(e) =>
                                         updateSectionStyle(s.id, {
                                           image_shape: e.target.value as NonNullable<
-                                            ChurchSiteSection["style"]
+                                            MosqueSiteSection["style"]
                                           >["image_shape"],
                                         })
                                       }
@@ -1369,7 +1370,7 @@ export function SimpleSiteBuilder({
                                       onChange={(e) =>
                                         updateSectionStyle(s.id, {
                                           background_tone: e.target.value as NonNullable<
-                                            ChurchSiteSection["style"]
+                                            MosqueSiteSection["style"]
                                           >["background_tone"],
                                         })
                                       }
@@ -1390,7 +1391,7 @@ export function SimpleSiteBuilder({
                                       onChange={(e) =>
                                         updateSectionStyle(s.id, {
                                           content_width: e.target.value as NonNullable<
-                                            ChurchSiteSection["style"]
+                                            MosqueSiteSection["style"]
                                           >["content_width"],
                                         })
                                       }
@@ -1411,7 +1412,7 @@ export function SimpleSiteBuilder({
                                       onChange={(e) =>
                                         updateSectionStyle(s.id, {
                                           spacing: e.target.value as NonNullable<
-                                            ChurchSiteSection["style"]
+                                            MosqueSiteSection["style"]
                                           >["spacing"],
                                         })
                                       }
@@ -1431,7 +1432,7 @@ export function SimpleSiteBuilder({
                                       onChange={(e) =>
                                         updateSectionStyle(s.id, {
                                           button_variant: e.target.value as NonNullable<
-                                            ChurchSiteSection["style"]
+                                            MosqueSiteSection["style"]
                                           >["button_variant"],
                                         })
                                       }
@@ -1547,7 +1548,7 @@ export function SimpleSiteBuilder({
                                     onChange={(e) =>
                                       updateSectionStyle(s.id, {
                                         form_mode: e.target.value as NonNullable<
-                                          ChurchSiteSection["style"]
+                                          MosqueSiteSection["style"]
                                         >["form_mode"],
                                       })
                                     }
@@ -1555,14 +1556,14 @@ export function SimpleSiteBuilder({
                                   >
                                     <option value="none">No embedded form</option>
                                     <option value="contact">
-                                      Contact form to church secretary
+                                      Contact form to mosque secretary
                                     </option>
                                     <option value="newcomer">
                                       Newcomer intake form and CRM newcomer
                                     </option>
                                   </select>
                                   <p className="text-xs text-dash-muted">
-                                    Contact submissions email the church secretary. Newcomer intake also creates a CRM newcomer.
+                                    Contact submissions email the mosque secretary. Newcomer intake also creates a CRM newcomer.
                                   </p>
                                 </div>
                                 {s.type === "faq" ? (
@@ -1764,7 +1765,7 @@ export function SimpleSiteBuilder({
                                               form_thank_you: e.target.value || null,
                                             })
                                           }
-                                          placeholder="Thanks. The church secretary will be in touch."
+                                          placeholder="Thanks. The mosque secretary will be in touch."
                                         />
                                       </div>
                                     </div>

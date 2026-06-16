@@ -23,7 +23,7 @@ import type {
   GiftAidClaimBatch,
   GiftAidClaimItem,
   GiftAidDeclaration,
-  Church,
+  Mosque,
 } from "@/lib/db/types";
 
 function csvEscape(value: string | number | null | undefined): string {
@@ -211,7 +211,7 @@ async function addDeclarationsFolder(opts: {
 }
 
 export type ClaimPackInput = {
-  church: Church;
+  mosque: Mosque;
   batch: GiftAidClaimBatch;
   items: GiftAidClaimItem[];
   /**
@@ -265,7 +265,7 @@ export async function buildClaimPack(
   input: ClaimPackInput,
 ): Promise<ClaimPackResult> {
   const {
-    church,
+    mosque,
     batch,
     items,
     newDeclarations,
@@ -327,7 +327,7 @@ export async function buildClaimPack(
   zip.file("claim-pack.csv", donationLines.join("\n") + "\n");
 
   // ---- 1b. GASDS small-donations summary (only when present) -----------
-  // GASDS (Gift Aid Small Donations Scheme) lets the church reclaim the
+  // GASDS (Gift Aid Small Donations Scheme) lets the mosque reclaim the
   // basic-rate top-up on small anonymous cash donations without a
   // declaration. It's a separate HMRC claim, but the Gift Aid pack likes
   // the figure bundled so it can be reconciled with the same service.
@@ -373,19 +373,19 @@ export async function buildClaimPack(
       ? `Previously-supplied declarations: ${prevResult.count}  (folder: previously-supplied-declarations/)`
       : `Previously-supplied declarations: 0  (none -- folder omitted)`;
   const manifest = [
-    `ChurchPay Gift Aid claim pack`,
+    `MosquePay Gift Aid claim pack`,
     `============================`,
     ``,
     `WHAT THIS IS`,
     `Everything the UGLE Gift Aid pack needs for one Gift Aid claim from`,
-    `this church: a ChR1-shaped list of donations, plus copies of the`,
+    `this mosque: a ChR1-shaped list of donations, plus copies of the`,
     `signed declarations that back them. Forward the whole ZIP to the`,
     `Gift Aid pack -- nothing else needs assembling by hand.`,
     ``,
     `Generated: ${new Date().toISOString()}`,
-    `Church: ${church.name}${church.church_number ? ` No. ${church.church_number}` : ""}`,
-    `HMRC reference: ${church.hmrc_charity_reference ?? "(not set)"}`,
-    `Gift Aid pack: ${church.gift_aid_pack_name ?? "(not set)"}`,
+    `Mosque: ${mosque.name}${mosque.mosque_number ? ` No. ${mosque.mosque_number}` : ""}`,
+    `HMRC reference: ${mosque.hmrc_charity_reference ?? "(not set)"}`,
+    `Gift Aid pack: ${mosque.gift_aid_pack_name ?? "(not set)"}`,
     ``,
     `Batch reference: ${batch.claim_reference ?? batch.id}`,
     `Period: ${batch.period_start} -- ${batch.period_end}`,
@@ -426,7 +426,7 @@ export async function buildClaimPack(
     `    shasum -a 256 new-declarations/<filename>`,
     `The result must match the "Evidence SHA-256" column. If a file is`,
     `named *.HASH-MISMATCH.* the stored bytes no longer match the hash`,
-    `recorded when the declaration was filed -- contact the church`,
+    `recorded when the declaration was filed -- contact the mosque`,
     `treasurer before relying on it.`,
     ``,
     `HMRC DECLARATION WORDING`,

@@ -1,10 +1,10 @@
-// Surfaces Mooov's `account_invalid` payment.failed signal to the church admin:
-// the church's underlying PSP connection got severed (typically the church
+// Surfaces Mooov's `account_invalid` payment.failed signal to the mosque admin:
+// the mosque's underlying PSP connection got severed (typically the mosque
 // clicked Disconnect from inside their Stripe Connect dashboard, or Stripe's
 // risk team paused the connection). Mooov can't fix this server-side -- the
-// church admin has to walk through Mooov's portal repair flow.
+// mosque admin has to walk through Mooov's portal repair flow.
 //
-// Persisted into mooov.churches.status='needs_repair' by
+// Persisted into mooov.mosques.status='needs_repair' by
 // app/api/mooov-webhooks/connect/route.ts when payment.failed arrives with
 // failure_code:"account_invalid".
 //
@@ -19,8 +19,8 @@ export interface MooovRepairRequiredHint {
   // Hostname for Mooov's repair deep-link. Overridable for staging.
   portalBaseUrl?: string;
   // Full https URL the admin should land on after Mooov auto-bounces them
-  // back. Must be on Mooov's return_url allowlist (today: churchpay.co.uk,
-  // www.churchpay.co.uk, *.vercel.app).
+  // back. Must be on Mooov's return_url allowlist (today: mosque-pay.com,
+  // www.mosque-pay.com, *.vercel.app).
   returnUrl: string;
   // Human-readable timestamp of the latest payment.failed:account_invalid
   // event we received, so the admin can correlate with what they saw.
@@ -47,7 +47,7 @@ export function MooovRepairRequiredBanner({
 }) {
   const portalBase = hint.portalBaseUrl ?? "https://mooov3.mooov.money";
   const repairUrl = new URL(`${portalBase}/connections`);
-  repairUrl.searchParams.set("from", "churchpay");
+  repairUrl.searchParams.set("from", "mosquepay");
   // action=stripe_reconnect is Mooov's URL contract for the PSP-repair flow.
   // The admin sees Mooov branding on landing; we never expose this param
   // value in user-facing copy.
@@ -64,7 +64,7 @@ export function MooovRepairRequiredBanner({
             Mooov payment connection needs repair
           </h3>
           <p className="text-sm leading-relaxed text-amber-800">
-            We tried to take a payment through this church&rsquo;s Mooov merchant
+            We tried to take a payment through this mosque&rsquo;s Mooov merchant
             and the underlying payment account rejected the request. New giving,
             donations, and event payments will continue to fail until the
             connection is repaired.

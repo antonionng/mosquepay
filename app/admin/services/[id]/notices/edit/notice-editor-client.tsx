@@ -402,7 +402,7 @@ export function NoticeEditorClient({
           <h1 className="admin-page-title">Notice Editor</h1>
           <p className="admin-page-copy">
             {eventTitle}. The formal opening is generated from the service venue,
-            date, time, and church details, and can be edited before sending.
+            date, time, and mosque details, and can be edited before sending.
           </p>
         </div>
       </div>
@@ -415,7 +415,7 @@ export function NoticeEditorClient({
               AI notice draft
             </h2>
             <p className="mt-1 text-sm text-dash-muted">
-              Draft the opening, church business, and notices into this editable notice
+              Draft the opening, mosque business, and notices into this editable notice
               form. Nothing sends until you save and confirm send.
             </p>
           </div>
@@ -486,7 +486,7 @@ export function NoticeEditorClient({
         open={sendConfirmOpen}
         onOpenChange={setSendConfirmOpen}
         title="Send notice to active members?"
-        description="Creates secure access links and emails every active member for this church. The send is recorded in the audit trail. Drafts cannot be sent until they have been approved."
+        description="Creates secure access links and emails every active member for this mosque. The send is recorded in the audit trail. Drafts cannot be sent until they have been approved."
         confirmLabel="Send notice"
         loading={sending}
         onConfirm={async () => {
@@ -519,14 +519,14 @@ export function NoticeEditorClient({
               id="opening-text"
               value={form.opening_text}
               rows={7}
-              placeholder="By Command of the Lead Pastor..."
+              placeholder="By Command of the Lead Imam..."
               onChange={(event) =>
                 setForm((current) => ({ ...current, opening_text: event.target.value }))
               }
             />
             <p className="text-xs leading-5 text-dash-muted">
               This wording is stored with this event&apos;s notice, so you can adjust it
-              for a specific service without changing the church defaults.
+              for a specific service without changing the mosque defaults.
             </p>
           </div>
         </div>
@@ -534,10 +534,10 @@ export function NoticeEditorClient({
 
       <section className="admin-surface space-y-6 p-6">
         <EditableList
-          label="Church business"
+          label="Mosque business"
           items={form.agenda_items}
           setItems={(items) => setForm((current) => ({ ...current, agenda_items: items }))}
-          placeholder="To open the Church."
+          placeholder="To open the Mosque."
         />
       </section>
 
@@ -580,7 +580,7 @@ export function NoticeEditorClient({
                 id="master-elect-qualification"
                 value={form.service_lead_role}
                 rows={3}
-                placeholder="Qualified to serve by virtue of holding the office of WM of Example Church 1234 in the year 2024-25."
+                placeholder="Qualified to serve by virtue of holding the office of WM of Example Mosque 1234 in the year 2024-25."
                 onChange={(event) =>
                   setForm((current) => ({
                     ...current,

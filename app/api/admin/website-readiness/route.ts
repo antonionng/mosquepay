@@ -7,7 +7,7 @@ import * as db from "@/lib/db";
 
 const BUCKET = "site-assets";
 
-function countFormSections(site: Awaited<ReturnType<typeof db.getChurchSite>>) {
+function countFormSections(site: Awaited<ReturnType<typeof db.getMosqueSite>>) {
   const sections = [
     ...(site?.sections ?? []),
     ...((site?.custom_pages ?? []).flatMap((page) => page.sections) ?? []),
@@ -23,21 +23,21 @@ export async function GET() {
   if (unauthorized) return unauthorized;
 
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
     return NextResponse.json({
       supabaseConfigured: isSupabaseConfigured(),
       databaseMode: false,
-      selectedChurch: false,
+      selectedMosque: false,
       checks: [],
     });
   }
 
-  const forbidden = await requireAdminApiPermission("website:write", ctx.churchId);
+  const forbidden = await requireAdminApiPermission("website:write", ctx.mosqueId);
   if (forbidden) return forbidden;
 
-  const [church, site] = await Promise.all([
-    db.getChurchById(ctx.churchId),
-    db.getChurchSite(ctx.churchId),
+  const [mosque, site] = await Promise.all([
+    db.getMosqueById(ctx.mosqueId),
+    db.getMosqueSite(ctx.mosqueId),
   ]);
 
   let schemaReady = false;
@@ -49,7 +49,7 @@ export async function GET() {
     try {
       const service = createServiceClient();
       const { error } = await service
-        .from("church_site_pages")
+        .from("mosque_site_pages")
         .select("custom_pages,header_settings,footer_settings")
         .limit(1);
       schemaReady = !error;
@@ -76,8 +76,8 @@ export async function GET() {
     {
       id: "database",
       label: "Supabase database connected",
-      ready: isSupabaseConfigured() && Boolean(church),
-      detail: church ? `Editing ${church.name}.` : "No church is selected.",
+      ready: isSupabaseConfigured() && Boolean(mosque),
+      detail: mosque ? `Editing ${mosque.name}.` : "No mosque is selected.",
     },
     {
       id: "migrations",
@@ -95,9 +95,9 @@ export async function GET() {
     },
     {
       id: "logo",
-      label: "Church logo uploaded",
-      ready: Boolean(church?.logo_url),
-      detail: church?.logo_url
+      label: "Mosque logo uploaded",
+      ready: Boolean(mosque?.logo_url),
+      detail: mosque?.logo_url
         ? "Logo is saved and feeds the site header, footer, member card, and notice."
         : "Upload a logo in Website > Brand.",
     },
@@ -148,7 +148,7 @@ export async function GET() {
   return NextResponse.json({
     supabaseConfigured: isSupabaseConfigured(),
     databaseMode: true,
-    selectedChurch: true,
+    selectedMosque: true,
     checks,
   });
 }

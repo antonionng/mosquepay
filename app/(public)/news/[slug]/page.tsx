@@ -6,16 +6,16 @@ import { isSupabaseConfigured, shouldUseInMemoryMock } from "@/lib/db/with-fallb
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { ArrowLeft, User, Calendar } from "lucide-react";
-import { getDefaultChurchSlug, resolveChurchSlug } from "@/lib/tenant";
+import { getDefaultMosqueSlug, resolveMosqueSlug } from "@/lib/tenant";
 import { socialShareImageUrl, SITE_ORIGIN } from "@/lib/seo";
 
-async function loadPost(slug: string, churchSlug: string) {
+async function loadPost(slug: string, mosqueSlug: string) {
   if (isSupabaseConfigured()) {
-    const churchId = await db.resolveChurchId(churchSlug);
-    return churchId ? await db.getBlogPostBySlug(slug, churchId) : null;
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    return mosqueId ? await db.getBlogPostBySlug(slug, mosqueId) : null;
   }
   if (shouldUseInMemoryMock()) {
-    return mockDb.getBlogPostBySlug(slug, { church_slug: churchSlug });
+    return mockDb.getBlogPostBySlug(slug, { mosque_slug: mosqueSlug });
   }
   return null;
 }
@@ -25,20 +25,20 @@ export async function generateMetadata({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ church?: string }>;
+  searchParams: Promise<{ mosque?: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const { church } = await searchParams;
-  const churchSlug = resolveChurchSlug(church);
-  const post = await loadPost(slug, churchSlug);
+  const { mosque } = await searchParams;
+  const mosqueSlug = resolveMosqueSlug(mosque);
+  const post = await loadPost(slug, mosqueSlug);
   if (!post) return { title: "News not found" };
 
   const canonical = `${SITE_ORIGIN}/news/${slug}${
-    churchSlug !== getDefaultChurchSlug() ? `?church=${encodeURIComponent(churchSlug)}` : ""
+    mosqueSlug !== getDefaultMosqueSlug() ? `?mosque=${encodeURIComponent(mosqueSlug)}` : ""
   }`;
   const description =
     post.excerpt ||
-    `Read ${post.title} and other updates from ChurchPay and church websites.`;
+    `Read ${post.title} and other updates from MosquePay and mosque websites.`;
   const imageUrl = post.featured_image_url || socialShareImageUrl();
 
   return {
@@ -66,16 +66,16 @@ export default async function NewsPostPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ church?: string }>;
+  searchParams: Promise<{ mosque?: string }>;
 }) {
   const { slug } = await params;
-  const { church } = await searchParams;
-  const churchSlug = resolveChurchSlug(church);
-  const defaultSlug = getDefaultChurchSlug();
-  const withChurchQuery = (href: string) =>
-    churchSlug === defaultSlug ? href : `${href}?church=${encodeURIComponent(churchSlug)}`;
+  const { mosque } = await searchParams;
+  const mosqueSlug = resolveMosqueSlug(mosque);
+  const defaultSlug = getDefaultMosqueSlug();
+  const withMosqueQuery = (href: string) =>
+    mosqueSlug === defaultSlug ? href : `${href}?mosque=${encodeURIComponent(mosqueSlug)}`;
 
-  const post = await loadPost(slug, churchSlug);
+  const post = await loadPost(slug, mosqueSlug);
 
   if (!post) notFound();
 
@@ -84,7 +84,7 @@ export default async function NewsPostPage({
       <section className="public-hero">
         <div className="container-full relative z-10 max-w-4xl px-6 pb-16 pt-32 md:pb-20 md:pt-40">
           <Link 
-            href={withChurchQuery("/news")}
+            href={withMosqueQuery("/news")}
             className="mb-8 inline-flex items-center gap-2 text-sm text-white/60 transition-colors hover:text-blue-200"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -132,7 +132,7 @@ export default async function NewsPostPage({
         <div className="container-full max-w-3xl text-center">
           <p className="mb-4 text-slate-700">Want to stay updated?</p>
           <Link 
-            href={withChurchQuery("/news")}
+            href={withMosqueQuery("/news")}
             className="font-medium text-blue-600 hover:underline"
           >
             View all news and updates

@@ -1,7 +1,7 @@
 import { formatDate } from "@/lib/utils";
 
 const brand = {
-  name: "ChurchPay",
+  name: "MosquePay",
   ink: "#111827",
   muted: "#64748b",
   faint: "#94a3b8",
@@ -13,14 +13,14 @@ const brand = {
   border: "#E6EAF2",
 };
 
-export function churchPayFromEmail(value?: string | null) {
-  const fallbackAddress = "noreply@churchpay.co.uk";
+export function mosquePayFromEmail(value?: string | null) {
+  const fallbackAddress = "noreply@mosque-pay.com";
   const from = value?.trim();
-  if (!from) return `ChurchPay <${fallbackAddress}>`;
+  if (!from) return `MosquePay <${fallbackAddress}>`;
 
   const bracketMatch = from.match(/<([^>]+)>/);
   const address = bracketMatch?.[1]?.trim() || from;
-  return `ChurchPay <${address}>`;
+  return `MosquePay <${address}>`;
 }
 
 export function escapeEmailHtml(value: string) {
@@ -68,7 +68,7 @@ function renderShell({
 }) {
   const logoUrl =
     process.env.EMAIL_LOGO_URL ??
-    "https://gjxswrazgoedjkyfhbcn.supabase.co/storage/v1/object/public/email-assets/churchpay-email-logo.png";
+    "https://gjxswrazgoedjkyfhbcn.supabase.co/storage/v1/object/public/email-assets/mosquepay-email-logo.png";
   return `
     <!doctype html>
     <html>
@@ -109,7 +109,7 @@ function renderShell({
                 </tr>
                 <tr>
                   <td style="padding:18px 8px 0;text-align:center;color:${brand.faint};font-size:12px;line-height:1.6;">
-                    Sent securely by ${brand.name}. This message was generated from church records in the platform.
+                    Sent securely by ${brand.name}. This message was generated from mosque records in the platform.
                   </td>
                 </tr>
               </table>
@@ -239,25 +239,25 @@ function listItems(items: string[], ordered = false) {
 export function renderStaffInviteEmail({
   name,
   roleLabel,
-  churchName,
+  mosqueName,
   actionUrl,
   actionLabel,
 }: {
   name: string;
   roleLabel: string;
-  churchName: string;
+  mosqueName: string;
   actionUrl: string;
   actionLabel: string;
 }) {
   return renderShell({
     eyebrow: "Admin invite",
-    title: "Your ChurchPay admin invite",
-    preview: `You have been invited to manage ${churchName}.`,
+    title: "Your MosquePay admin invite",
+    preview: `You have been invited to manage ${mosqueName}.`,
     children: `
-      <h1 style="margin:0;color:${brand.ink};font-size:28px;line-height:1.15;">Welcome to your church admin workspace</h1>
+      <h1 style="margin:0;color:${brand.ink};font-size:28px;line-height:1.15;">Welcome to your mosque admin workspace</h1>
       <p style="margin:18px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;">Hello ${escapeEmailHtml(name)},</p>
       <p style="margin:12px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;">
-        You have been given <strong style="color:${brand.ink};">${escapeEmailHtml(roleLabel)}</strong> access for <strong style="color:${brand.ink};">${escapeEmailHtml(churchName)}</strong>.
+        You have been given <strong style="color:${brand.ink};">${escapeEmailHtml(roleLabel)}</strong> access for <strong style="color:${brand.ink};">${escapeEmailHtml(mosqueName)}</strong>.
       </p>
       <div style="margin:26px 0 24px;">${button(actionLabel, actionUrl)}</div>
       <div style="border-radius:18px;border:1px solid ${brand.border};background:${brand.surfaceSubtle};padding:16px 18px;">
@@ -272,12 +272,12 @@ export function renderPasswordResetEmail({
   name,
   actionUrl,
   audience,
-  churchName,
+  mosqueName,
 }: {
   name: string;
   actionUrl: string;
   audience: "admin" | "member";
-  churchName?: string | null;
+  mosqueName?: string | null;
 }) {
   const eyebrow = audience === "admin" ? "Admin password reset" : "Member password reset";
   const heading =
@@ -286,11 +286,11 @@ export function renderPasswordResetEmail({
       : "Reset your member portal password";
   const intro =
     audience === "admin"
-      ? `We received a request to reset the password for your ChurchPay admin account${
-          churchName ? ` for ${churchName}` : ""
+      ? `We received a request to reset the password for your MosquePay admin account${
+          mosqueName ? ` for ${mosqueName}` : ""
         }.`
-      : `We received a request to reset the password for your ChurchPay member portal${
-          churchName ? ` at ${churchName}` : ""
+      : `We received a request to reset the password for your MosquePay member portal${
+          mosqueName ? ` at ${mosqueName}` : ""
         }.`;
   return renderShell({
     eyebrow,
@@ -313,24 +313,24 @@ export function renderPasswordResetEmail({
 
 export function renderMemberInviteEmail({
   name,
-  churchName,
+  mosqueName,
   actionUrl,
   actionLabel,
 }: {
   name: string;
-  churchName: string;
+  mosqueName: string;
   actionUrl: string;
   actionLabel: string;
 }) {
   return renderShell({
     eyebrow: "Member portal",
-    title: "Your ChurchPay member portal invite",
-    preview: `You have been invited to access the ${churchName} member portal.`,
+    title: "Your MosquePay member portal invite",
+    preview: `You have been invited to access the ${mosqueName} member portal.`,
     children: `
       <h1 style="margin:0;color:${brand.ink};font-size:28px;line-height:1.15;">Welcome to your member portal</h1>
       <p style="margin:18px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;">Hello ${escapeEmailHtml(name)},</p>
       <p style="margin:12px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;">
-        You have been invited to access the member portal for <strong style="color:${brand.ink};">${escapeEmailHtml(churchName)}</strong>.
+        You have been invited to access the member portal for <strong style="color:${brand.ink};">${escapeEmailHtml(mosqueName)}</strong>.
       </p>
       <div style="margin:26px 0 24px;">${button(actionLabel, actionUrl)}</div>
       <div style="border-radius:18px;border:1px solid ${brand.border};background:${brand.surfaceSubtle};padding:16px 18px;">
@@ -343,7 +343,7 @@ export function renderMemberInviteEmail({
 
 export function renderNoticeEmail({
   memberName,
-  churchName,
+  mosqueName,
   eventTitle,
   eventDate,
   venue,
@@ -363,7 +363,7 @@ export function renderNoticeEmail({
   nextServiceNote,
 }: {
   memberName: string;
-  churchName: string;
+  mosqueName: string;
   eventTitle: string;
   eventDate: string;
   venue: string;
@@ -455,9 +455,9 @@ export function renderNoticeEmail({
   return renderShell({
     eyebrow: "Service notice",
     title: eventTitle,
-    preview: `You are invited to ${churchName} on ${formatDate(eventDate)}.`,
+    preview: `You are invited to ${mosqueName} on ${formatDate(eventDate)}.`,
     children: `
-      <p style="margin:0 0 10px;color:${brand.blue};font-size:12px;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;">${escapeEmailHtml(churchName)}</p>
+      <p style="margin:0 0 10px;color:${brand.blue};font-size:12px;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;">${escapeEmailHtml(mosqueName)}</p>
       <h1 style="margin:0;color:${brand.ink};font-size:30px;line-height:1.12;">${escapeEmailHtml(eventTitle)}</h1>
       <p style="margin:18px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;">Dear ${escapeEmailHtml(memberName)},</p>
       <p style="margin:12px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;white-space:pre-line;">
@@ -475,7 +475,7 @@ export function renderNoticeEmail({
         </tr>
       </table>
       <div style="border-top:1px solid ${brand.border};padding-top:22px;">
-        <h2 style="margin:0;color:${brand.ink};font-size:18px;">Church Business</h2>
+        <h2 style="margin:0;color:${brand.ink};font-size:18px;">Mosque Business</h2>
         ${listItems(agendaItems, true)}
         ${serviceLeadBlock}
       </div>
@@ -501,14 +501,14 @@ export function renderNoticeEmail({
 
 export function renderGivingReminderEmail({
   memberName,
-  churchName,
+  mosqueName,
   amountDue,
   dueDate,
   portalUrl,
   reminderNumber,
 }: {
   memberName: string;
-  churchName: string;
+  mosqueName: string;
   amountDue: string;
   dueDate: string;
   portalUrl: string;
@@ -522,14 +522,14 @@ export function renderGivingReminderEmail({
         : "Final reminder";
   return renderShell({
     eyebrow,
-    title: `${churchName} giving reminder`,
-    preview: `Your annual church giving of ${amountDue} are due ${dueDate}.`,
+    title: `${mosqueName} giving reminder`,
+    preview: `Your annual mosque giving of ${amountDue} are due ${dueDate}.`,
     children: `
       <h1 style="margin:0;color:${brand.ink};font-size:28px;line-height:1.15;">Annual giving reminder</h1>
       <p style="margin:18px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;">Dear ${escapeEmailHtml(memberName)},</p>
       <p style="margin:14px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;">
         This is a ${escapeEmailHtml(eyebrow.toLowerCase())} that your annual giving for
-        ${escapeEmailHtml(churchName)} of <strong style="color:${brand.ink};">${escapeEmailHtml(amountDue)}</strong>
+        ${escapeEmailHtml(mosqueName)} of <strong style="color:${brand.ink};">${escapeEmailHtml(amountDue)}</strong>
         are due on <strong style="color:${brand.ink};">${escapeEmailHtml(dueDate)}</strong>.
       </p>
       <p style="margin:14px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;">
@@ -554,16 +554,16 @@ export function renderInitiationGivingEmail({
 }) {
   return renderShell({
     eyebrow: "Member welcome",
-    title: "Welcome to the church",
+    title: "Welcome to the mosque",
     preview: "Your membership fee payment link is ready.",
     children: `
-      <h1 style="margin:0;color:${brand.ink};font-size:30px;line-height:1.12;">Welcome to the church</h1>
+      <h1 style="margin:0;color:${brand.ink};font-size:30px;line-height:1.12;">Welcome to the mosque</h1>
       <p style="margin:18px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;">Congratulations ${escapeEmailHtml(memberName)}. We are delighted to welcome you as a member.</p>
       <p style="margin:12px 0 0;color:${brand.muted};font-size:16px;line-height:1.7;">
         Your annual membership fees of <strong style="color:${brand.ink};">${escapeEmailHtml(givingAmount)}</strong> are now due. You can pay in full or set up instalments securely online.
       </p>
       <div style="margin:26px 0 24px;">${button("Pay Membership Fees", paymentUrl)}</div>
-      <p style="margin:0;color:${brand.muted};font-size:14px;line-height:1.7;">If you have any questions, please contact your church secretary.</p>
+      <p style="margin:0;color:${brand.muted};font-size:14px;line-height:1.7;">If you have any questions, please contact your mosque secretary.</p>
     `,
   });
 }

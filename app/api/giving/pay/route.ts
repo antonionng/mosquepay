@@ -5,8 +5,8 @@
 //   * app/giving/[givingId]/giving-pay-client.tsx   (public email link)
 //
 // Payment surface: 100% Mooov (Mooov Connect -> hosted Stripe Checkout on
-// the church's connected PSP). No direct Stripe SDK, no fallback. The church's
-// merchant must be active in mooov.churches; otherwise we return 503.
+// the mosque's connected PSP). No direct Stripe SDK, no fallback. The mosque's
+// merchant must be active in mooov.mosques; otherwise we return 503.
 //
 // One-off vs subscription:
 //   * mode = "one_off" (default): single hosted Checkout charge against
@@ -20,7 +20,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getDefaultChurchSlug } from "@/lib/tenant";
+import { getDefaultMosqueSlug } from "@/lib/tenant";
 import { createServiceClient } from "@/lib/supabase/server";
 import { callMooovConnect, MooovApiError } from "@/lib/mooov";
 import { givingSubscriptionEnabled } from "@/lib/giving/feature-flags";
@@ -70,13 +70,13 @@ export const dynamic = "force-dynamic";
 
 async function loadMooovMerchant(
   supa: ReturnType<typeof createServiceClient>,
-  churchId: string,
+  mosqueId: string,
 ): Promise<string | null> {
   const { data, error } = await supa
     .schema("mooov")
-    .from("churches")
+    .from("mosques")
     .select("merchant_id, status")
-    .eq("id", churchId)
+    .eq("id", mosqueId)
     .maybeSingle<{ merchant_id: string; status: string }>();
   if (error) throw error;
   if (!data) return null;
@@ -105,14 +105,14 @@ export async function POST(request: NextRequest) {
 
     // Resolve tenant from the giving row itself, not from URL/host/cookie.
     //
-    // Why: a member of church A signed in on church B's host (or on the bare
-    // churchpay.co.uk host) used to land on this route with a
-    // URL-derived church_id that didn't match the giving row's church_id, so
-    // the getMemberGiving(churchId, { memberEmail }) filter returned an empty
+    // Why: a member of mosque A signed in on mosque B's host (or on the bare
+    // mosque-pay.com host) used to land on this route with a
+    // URL-derived mosque_id that didn't match the giving row's mosque_id, so
+    // the getMemberGiving(mosqueId, { memberEmail }) filter returned an empty
     // list and we surfaced "Giving record not found." even though the row
     // existed and the email matched. The giving_id UUID is unguessable, so
     // we treat (giving_id, member_email) as the authorization tuple and
-    // derive churchId from the giving row.
+    // derive mosqueId from the giving row.
     let supa: ReturnType<typeof createServiceClient>;
     try {
       supa = createServiceClient();
@@ -164,13 +164,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Giving already paid." }, { status: 400 });
     }
 
-    const churchId = givingRecord.church_id;
-    const { data: churchRow } = await supa
-      .from("churches")
+    const mosqueId = givingRecord.mosque_id;
+    const { data: mosqueRow } = await supa
+      .from("mosques")
       .select("slug")
-      .eq("id", churchId)
+      .eq("id", mosqueId)
       .maybeSingle<{ slug: string | null }>();
-    const churchSlug = churchRow?.slug ?? getDefaultChurchSlug();
+    const mosqueSlug = mosqueRow?.slug ?? getDefaultMosqueSlug();
 
     if (mode === "subscription") {
       // Feature-gated until Mooov's saved-charge subscription contract
@@ -178,13 +178,13 @@ export async function POST(request: NextRequest) {
       // that aren't on Mooov prod yet (data.payment_method_id +
       // data.stripe_customer_id on payment.captured/succeeded for any
       // payment created with customer_ref). Flipping
-      // CHURCHPAY_GIVING_SUBSCRIPTION_ENABLED=true on the deployment scope
+      // MOSQUEPAY_GIVING_SUBSCRIPTION_ENABLED=true on the deployment scope
       // unlocks this path on or after the cutover.
       if (!givingSubscriptionEnabled()) {
         return NextResponse.json(
           {
             error:
-              "Monthly instalments are coming soon. Please pay in full or contact your church secretary.",
+              "Monthly instalments are coming soon. Please pay in full or contact your mosque secretary.",
             code: "subscription_not_enabled",
           },
           { status: 503 }
@@ -198,8 +198,8 @@ export async function POST(request: NextRequest) {
       // giving_schedules.mooov_payment_method_id + stripe_customer_id when
       // payment.succeeded fires for the enrolment payment_id.
       return await startGivingSubscriptionEnrolment({
-        churchId,
-        churchSlug,
+        mosqueId,
+        mosqueSlug,
         givingRecord,
         memberEmail: member_email,
         memberName: member_name,
@@ -214,14 +214,14 @@ export async function POST(request: NextRequest) {
 
     let merchantId: string | null;
     try {
-      merchantId = await loadMooovMerchant(supa, churchId);
+      merchantId = await loadMooovMerchant(supa, mosqueId);
     } catch (err) {
       console.error("giving/pay: mooov merchant lookup failed", {
-        church_id: churchId,
+        mosque_id: mosqueId,
         message: err instanceof Error ? err.message : String(err),
       });
       return NextResponse.json(
-        { error: "Could not look up payment processor for this church." },
+        { error: "Could not look up payment processor for this mosque." },
         { status: 500 }
       );
     }
@@ -229,8 +229,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "This church has not finished setting up online payments yet. Please contact the church directly.",
-          code: "church_not_connected",
+            "This mosque has not finished setting up online payments yet. Please contact the mosque directly.",
+          code: "mosque_not_connected",
         },
         { status: 503 }
       );
@@ -238,31 +238,31 @@ export async function POST(request: NextRequest) {
 
     const totalMinor = Math.round(givingRecord.amount * 100);
     const currency = (givingRecord.currency ?? "GBP").toUpperCase();
-    const paymentId = `giving_${churchId}_${givingRecord.id}_${Date.now().toString(36)}`;
+    const paymentId = `giving_${mosqueId}_${givingRecord.id}_${Date.now().toString(36)}`;
     const idempotencyKey = `giving_${givingRecord.id}_${Date.now().toString(36)}`;
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-    const churchQuery =
-      churchSlug === getDefaultChurchSlug() ? "" : `&church=${encodeURIComponent(churchSlug)}`;
+    const mosqueQuery =
+      mosqueSlug === getDefaultMosqueSlug() ? "" : `&mosque=${encodeURIComponent(mosqueSlug)}`;
     const successUrl = `${siteUrl}/events/rsvp/success?payment_id=${encodeURIComponent(
       paymentId
-    )}&type=giving${churchQuery}`;
+    )}&type=giving${mosqueQuery}`;
     const cancelUrl = `${siteUrl}/giving/${givingRecord.id}?email=${encodeURIComponent(
       member_email
-    )}${churchQuery ? `&church=${encodeURIComponent(churchSlug)}` : ""}`;
-    const description = `Church Giving: ${givingRecord.period_start} to ${givingRecord.period_end}`;
+    )}${mosqueQuery ? `&mosque=${encodeURIComponent(mosqueSlug)}` : ""}`;
+    const description = `Mosque Giving: ${givingRecord.period_start} to ${givingRecord.period_end}`;
 
     const guestDescriptor: Record<string, unknown> = {
       source: "member_giving",
       giving_id: givingRecord.id,
-      church_slug: churchSlug,
+      mosque_slug: mosqueSlug,
       donor_email: member_email,
       donor_name: member_name ?? givingRecord.member_name ?? null,
       charitable_amount: givingRecord.charitable_amount ?? 0,
     };
     const initialMetadata: Record<string, unknown> = {
-      source: "churchpay_giving_pay",
-      church_slug: churchSlug,
-      church_id: churchId,
+      source: "mosquepay_giving_pay",
+      mosque_slug: mosqueSlug,
+      mosque_id: mosqueId,
       intent: "giving",
       giving_id: givingRecord.id,
     };
@@ -272,7 +272,7 @@ export async function POST(request: NextRequest) {
       .from("payment_attempts")
       .insert({
         payment_id: paymentId,
-        church_id: churchId,
+        mosque_id: mosqueId,
         member_id: null,
         amount: totalMinor,
         currency,
@@ -284,7 +284,7 @@ export async function POST(request: NextRequest) {
       });
     if (insertError) {
       console.error("giving/pay: preflight insert failed", {
-        church_id: churchId,
+        mosque_id: mosqueId,
         payment_id: paymentId,
         code: insertError.code,
         message: insertError.message,
@@ -319,8 +319,8 @@ export async function POST(request: NextRequest) {
           customer_email: member_email,
           metadata: {
             intent: "giving",
-            church_id: churchId,
-            church_slug: churchSlug,
+            mosque_id: mosqueId,
+            mosque_slug: mosqueSlug,
             giving_id: givingRecord.id,
           },
         },
@@ -373,8 +373,8 @@ export async function POST(request: NextRequest) {
           return NextResponse.json(
             {
               error:
-                "This church has not finished setting up online payments yet. Please contact the church directly.",
-              code: "church_setup_incomplete",
+                "This mosque has not finished setting up online payments yet. Please contact the mosque directly.",
+              code: "mosque_setup_incomplete",
               setup_url: err.setupHint.setupUrl,
             },
             { status: 503 }
@@ -410,8 +410,8 @@ export async function POST(request: NextRequest) {
 // ---------------------------------------------------------------------------
 
 type EnrolmentArgs = {
-  churchId: string;
-  churchSlug: string;
+  mosqueId: string;
+  mosqueSlug: string;
   givingRecord: Awaited<ReturnType<typeof db.getMemberGiving>>[number];
   memberEmail: string;
   memberName: string | null | undefined;
@@ -444,13 +444,13 @@ type EnrolmentArgs = {
  * out of a real subscription if we cancelled one mid-activation.
  */
 async function abandonPendingSchedulesForGiving(
-  churchId: string,
+  mosqueId: string,
   memberGivingId: string,
 ): Promise<void> {
   const supa = createServiceClient();
 
   const pending = await db
-    .listGivingSchedules(churchId, { status: "pending" })
+    .listGivingSchedules(mosqueId, { status: "pending" })
     .catch(() => [] as Awaited<ReturnType<typeof db.listGivingSchedules>>);
   const orphans = pending
     .filter((s) => s.member_giving_id === memberGivingId)
@@ -459,7 +459,7 @@ async function abandonPendingSchedulesForGiving(
     );
   for (const orphan of orphans) {
     try {
-      await db.deleteInstalmentsForSchedule(orphan.id, churchId);
+      await db.deleteInstalmentsForSchedule(orphan.id, mosqueId);
     } catch (err) {
       console.error("giving/pay: failed to delete orphan instalments", {
         schedule_id: orphan.id,
@@ -467,7 +467,7 @@ async function abandonPendingSchedulesForGiving(
       });
     }
     try {
-      await db.updateGivingSchedule(orphan.id, churchId, {
+      await db.updateGivingSchedule(orphan.id, mosqueId, {
         status: "cancelled",
         cancelled_at: new Date().toISOString(),
         cancelled_by_actor: "system_enrolment_retry",
@@ -490,7 +490,7 @@ async function abandonPendingSchedulesForGiving(
   const { data: orphanRows, error: selectErr } = await supa
     .from("member_giving_instalments")
     .select("id, schedule_id, status, paid_at")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("member_giving_id", memberGivingId)
     .is("paid_at", null);
   if (selectErr) {
@@ -556,7 +556,7 @@ async function abandonPendingSchedulesForGiving(
 }
 
 async function startGivingSubscriptionEnrolment(args: EnrolmentArgs) {
-  const { churchId, churchSlug, givingRecord, memberEmail } = args;
+  const { mosqueId, mosqueSlug, givingRecord, memberEmail } = args;
 
   // Compute the full plan first. Same helper backs the
   // /api/giving/subscription-preview endpoint so the dialog the member
@@ -568,10 +568,10 @@ async function startGivingSubscriptionEnrolment(args: EnrolmentArgs) {
   // month" while this path silently fell back to the template default
   // (quarterly) and posted a £60 / 3-month subscription to Mooov. The
   // member's chosen cadence is the source of truth on this hop —
-  // computeEnrolmentPlan still validates it against the church's
+  // computeEnrolmentPlan still validates it against the mosque's
   // enabled cadenceOptions, so a stale / invalid value is harmless.
   const planResult = await computeEnrolmentPlan({
-    churchId,
+    mosqueId,
     givingRecord,
     memberEmail,
     strategy: args.strategy,
@@ -592,7 +592,7 @@ async function startGivingSubscriptionEnrolment(args: EnrolmentArgs) {
   const {
     merchantId,
     member,
-    churchYear: currentYear,
+    mosqueYear: currentYear,
     strategy,
     autoRenew,
     customerRef,
@@ -626,13 +626,13 @@ async function startGivingSubscriptionEnrolment(args: EnrolmentArgs) {
   // before creating a fresh one. Otherwise the member portal renders a
   // phantom "Active subscription · 0 of 0 paid" while their balance is
   // still outstanding.
-  await abandonPendingSchedulesForGiving(churchId, givingRecord.id);
+  await abandonPendingSchedulesForGiving(mosqueId, givingRecord.id);
 
   // Mint the schedule + instalment rows BEFORE talking to Mooov so the
   // webhook (which fires after the member completes hosted Checkout)
   // has somewhere to write the saved PM. Status=pending until the
   // enrolment intent succeeds.
-  const schedule = await db.createGivingSchedule(churchId, {
+  const schedule = await db.createGivingSchedule(mosqueId, {
     member_id: member.id,
     member_giving_id: givingRecord.id,
     member_email: memberEmail,
@@ -652,7 +652,7 @@ async function startGivingSubscriptionEnrolment(args: EnrolmentArgs) {
   });
 
   await db.createMemberGivingInstalments(
-    churchId,
+    mosqueId,
     schedulePlan.rows.map((row) => ({
       member_giving_id: givingRecord.id,
       sequence: row.sequence,
@@ -677,15 +677,15 @@ async function startGivingSubscriptionEnrolment(args: EnrolmentArgs) {
   const paymentId = `pay_giving_${schedule.id}_001`;
   const idempotencyKey = `lp:giving:enrol:${schedule.id}`;
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const churchQuery =
-    churchSlug === getDefaultChurchSlug() ? "" : `&church=${encodeURIComponent(churchSlug)}`;
+  const mosqueQuery =
+    mosqueSlug === getDefaultMosqueSlug() ? "" : `&mosque=${encodeURIComponent(mosqueSlug)}`;
   const successUrl = `${siteUrl}/events/rsvp/success?payment_id=${encodeURIComponent(
     paymentId
-  )}&type=giving_subscription${churchQuery}`;
+  )}&type=giving_subscription${mosqueQuery}`;
   const cancelUrl = `${siteUrl}/giving/${givingRecord.id}?email=${encodeURIComponent(
     memberEmail
-  )}${churchQuery ? `&church=${encodeURIComponent(churchSlug)}` : ""}`;
-  const description = `Church Giving subscription — month 1 of ${schedulePlan.cycleCount}`;
+  )}${mosqueQuery ? `&mosque=${encodeURIComponent(mosqueSlug)}` : ""}`;
+  const description = `Mosque Giving subscription — month 1 of ${schedulePlan.cycleCount}`;
 
   const guestDescriptor: Record<string, unknown> = {
     source: "member_giving_subscription_enrol",
@@ -693,7 +693,7 @@ async function startGivingSubscriptionEnrolment(args: EnrolmentArgs) {
     schedule_id: schedule.id,
     customer_ref: customerRef,
     member_id: member.id,
-    church_slug: churchSlug,
+    mosque_slug: mosqueSlug,
     donor_email: memberEmail,
     donor_name: args.memberName ?? givingRecord.member_name ?? null,
     cycles_total: schedulePlan.cycleCount,
@@ -703,9 +703,9 @@ async function startGivingSubscriptionEnrolment(args: EnrolmentArgs) {
   };
 
   const initialMetadata: Record<string, unknown> = {
-    source: "churchpay_giving_subscription_enrol",
-    church_slug: churchSlug,
-    church_id: churchId,
+    source: "mosquepay_giving_subscription_enrol",
+    mosque_slug: mosqueSlug,
+    mosque_id: mosqueId,
     intent: "giving_subscription_enrol",
     giving_id: givingRecord.id,
     schedule_id: schedule.id,
@@ -718,7 +718,7 @@ async function startGivingSubscriptionEnrolment(args: EnrolmentArgs) {
     .from("payment_attempts")
     .insert({
       payment_id: paymentId,
-      church_id: churchId,
+      mosque_id: mosqueId,
       member_id: null,
       amount: firstCycleMinor,
       currency,
@@ -730,7 +730,7 @@ async function startGivingSubscriptionEnrolment(args: EnrolmentArgs) {
     });
   if (insertError) {
     console.error("giving/pay subscription: preflight insert failed", {
-      church_id: churchId,
+      mosque_id: mosqueId,
       payment_id: paymentId,
       schedule_id: schedule.id,
       code: insertError.code,
@@ -777,7 +777,7 @@ async function startGivingSubscriptionEnrolment(args: EnrolmentArgs) {
           schedule_id: schedule.id,
           cycle_number: "1",
           total_cycles: String(schedulePlan.cycleCount),
-          church_slug: churchSlug,
+          mosque_slug: mosqueSlug,
           giving_id: givingRecord.id,
           split_strategy: strategy,
           customer_email: memberEmail,
@@ -816,10 +816,10 @@ async function startGivingSubscriptionEnrolment(args: EnrolmentArgs) {
 
     // Stamp the enrolment payment_id onto instalment #1 so the cycle
     // webhook can find the right child row to mark paid.
-    const instalments = await db.getInstalmentsForGiving(givingRecord.id, churchId);
+    const instalments = await db.getInstalmentsForGiving(givingRecord.id, mosqueId);
     const first = instalments.find((i) => i.sequence === 1);
     if (first) {
-      await db.updateInstalment(first.id, churchId, {
+      await db.updateInstalment(first.id, mosqueId, {
         payment_reference: paymentId,
       });
     }
@@ -849,8 +849,8 @@ async function startGivingSubscriptionEnrolment(args: EnrolmentArgs) {
         return NextResponse.json(
           {
             error:
-              "This church has not finished setting up online payments yet. Please contact the church directly.",
-            code: "church_setup_incomplete",
+              "This mosque has not finished setting up online payments yet. Please contact the mosque directly.",
+            code: "mosque_setup_incomplete",
             setup_url: err.setupHint.setupUrl,
           },
           { status: 503 }
@@ -902,11 +902,11 @@ async function startOpenEndedSubscription({
   args: EnrolmentArgs;
   plan: EnrolmentPlan;
 }) {
-  const { churchId, churchSlug, givingRecord, memberEmail } = args;
+  const { mosqueId, mosqueSlug, givingRecord, memberEmail } = args;
   const {
     merchantId,
     member,
-    churchYear: currentYear,
+    mosqueYear: currentYear,
     strategy,
     autoRenew,
     cadence,
@@ -951,13 +951,13 @@ async function startOpenEndedSubscription({
   // before creating a fresh one. Without this the member portal would
   // render a phantom "Active subscription" card on a giving row whose
   // balance is still outstanding.
-  await abandonPendingSchedulesForGiving(churchId, givingRecord.id);
+  await abandonPendingSchedulesForGiving(mosqueId, givingRecord.id);
 
   // Mint the schedule first so its UUID can drive the deterministic
   // subscription_id we hand to Mooov. Stripe Subscriptions are
   // idempotent on this id — replays of the same enrolment intent
   // resolve to the same subscription rather than creating duplicates.
-  const schedule = await db.createGivingSchedule(churchId, {
+  const schedule = await db.createGivingSchedule(mosqueId, {
     member_id: member.id,
     member_giving_id: givingRecord.id,
     member_email: memberEmail,
@@ -990,10 +990,10 @@ async function startOpenEndedSubscription({
     actor: string,
   ): Promise<void> => {
     await db
-      .deleteInstalmentsForSchedule(schedule.id, churchId)
+      .deleteInstalmentsForSchedule(schedule.id, mosqueId)
       .catch(() => undefined);
     await db
-      .updateGivingSchedule(schedule.id, churchId, {
+      .updateGivingSchedule(schedule.id, mosqueId, {
         status: "cancelled",
         cancelled_at: new Date().toISOString(),
         cancelled_by_actor: actor,
@@ -1005,16 +1005,16 @@ async function startOpenEndedSubscription({
 
   const idempotencyKey = `lp:giving:sub:${schedule.id}`;
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const churchQuery =
-    churchSlug === getDefaultChurchSlug() ? "" : `&church=${encodeURIComponent(churchSlug)}`;
+  const mosqueQuery =
+    mosqueSlug === getDefaultMosqueSlug() ? "" : `&mosque=${encodeURIComponent(mosqueSlug)}`;
   const successUrl = `${siteUrl}/events/rsvp/success?subscription_id=${encodeURIComponent(
     mooovSubscriptionId,
-  )}&type=giving_subscription${churchQuery}`;
+  )}&type=giving_subscription${mosqueQuery}`;
   const cancelUrl = `${siteUrl}/giving/${givingRecord.id}?email=${encodeURIComponent(
     memberEmail,
-  )}${churchQuery ? `&church=${encodeURIComponent(churchSlug)}` : ""}`;
+  )}${mosqueQuery ? `&mosque=${encodeURIComponent(mosqueSlug)}` : ""}`;
   const cadenceLabel = cadence === "quarterly" ? "quarter" : "month";
-  const description = `Church giving — £${monthlyAmount.toFixed(2)} / ${cadenceLabel} (${currentYear.label})`;
+  const description = `Mosque giving — £${monthlyAmount.toFixed(2)} / ${cadenceLabel} (${currentYear.label})`;
 
   // Metadata gets stamped on the Stripe Subscription AND every invoice
   // by Mooov, so our webhook can route subscription.invoice_paid back
@@ -1024,8 +1024,8 @@ async function startOpenEndedSubscription({
     lp_schedule_id: schedule.id,
     lp_giving_id: givingRecord.id,
     lp_member_id: member.id,
-    lp_church_id: churchId,
-    lp_church_slug: churchSlug,
+    lp_mosque_id: mosqueId,
+    lp_mosque_slug: mosqueSlug,
     split_strategy: strategy,
     giving_year_label: currentYear.label,
     customer_email: memberEmail,
@@ -1034,7 +1034,7 @@ async function startOpenEndedSubscription({
   try {
     // Stamp the subscription_id we'll pass to Mooov onto the schedule
     // so the activation webhook can resolve back to this row.
-    await db.updateGivingSchedule(schedule.id, churchId, {
+    await db.updateGivingSchedule(schedule.id, mosqueId, {
       mooov_subscription_id: mooovSubscriptionId,
     });
 
@@ -1043,7 +1043,7 @@ async function startOpenEndedSubscription({
     // events arrive. Open-ended cycles past year-end will be created
     // ad-hoc by the webhook handler.
     await db.createMemberGivingInstalments(
-      churchId,
+      mosqueId,
       schedulePlan.rows.map((row) => ({
         member_giving_id: givingRecord.id,
         sequence: row.sequence,
@@ -1124,8 +1124,8 @@ async function startOpenEndedSubscription({
         return NextResponse.json(
           {
             error:
-              "This church has not finished setting up online payments yet. Please contact the church directly.",
-            code: "church_setup_incomplete",
+              "This mosque has not finished setting up online payments yet. Please contact the mosque directly.",
+            code: "mosque_setup_incomplete",
             setup_url: err.setupHint.setupUrl,
           },
           { status: 503 },

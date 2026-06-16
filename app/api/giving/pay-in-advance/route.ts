@@ -42,23 +42,23 @@ export async function POST(_request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Resolve tenant from the authenticated member's home church, not from
-    // URL/host/cookie. A member of church A on church B's host (or on the
-    // bare churchpay.co.uk host) used to fail "Member not found for
-    // this church" because the URL-derived church_id didn't match the
-    // member row's church_id.
+    // Resolve tenant from the authenticated member's home mosque, not from
+    // URL/host/cookie. A member of mosque A on mosque B's host (or on the
+    // bare mosque-pay.com host) used to fail "Member not found for
+    // this mosque" because the URL-derived mosque_id didn't match the
+    // member row's mosque_id.
     const member =
       (await db.getMemberByAuthUserId(user.id)) ??
-      (await db.getMemberByEmailAcrossChurches(user.email));
+      (await db.getMemberByEmailAcrossMosques(user.email));
     if (!member) {
       return NextResponse.json(
         { error: "Member not found." },
         { status: 403 }
       );
     }
-    const churchId = member.church_id;
+    const mosqueId = member.mosque_id;
 
-    const eligibility = await checkAdvanceEligibility(churchId, member);
+    const eligibility = await checkAdvanceEligibility(mosqueId, member);
     if (!eligibility.ok) {
       return NextResponse.json(
         { error: eligibility.message, code: eligibility.code },
@@ -67,13 +67,13 @@ export async function POST(_request: NextRequest) {
     }
 
     const result = await resolveOrCreateAdvanceGiving({
-      churchId,
+      mosqueId,
       member,
     });
 
     if (!result.already_existed) {
       await writeAuditLog({
-        churchId,
+        mosqueId,
         action: "advance_giving_created",
         entityType: "giving",
         entityId: result.member_giving_id,

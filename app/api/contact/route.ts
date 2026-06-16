@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import { renderSimpleMessageEmail } from "@/lib/email/templates";
 import { sendWebsiteNotification } from "@/lib/email/website-notifications";
 import { sendWithLog } from "@/lib/email/send-with-log";
-import { getChurchAdminNotificationRecipients } from "@/lib/email/website-recipients";
-import type { ChurchSiteSectionStyle } from "@/lib/db/types";
+import { getMosqueAdminNotificationRecipients } from "@/lib/email/website-recipients";
+import type { MosqueSiteSectionStyle } from "@/lib/db/types";
 import {
   parseRecipientList,
   rejectHoneypot,
@@ -22,8 +22,8 @@ function textValue(value: unknown) {
 
 export async function POST(request: NextRequest) {
   try {
-    const churchSlug = getChurchSlugFromRequest(request);
-    const isTenantMode = request.nextUrl.searchParams.has("church");
+    const mosqueSlug = getMosqueSlugFromRequest(request);
+    const isTenantMode = request.nextUrl.searchParams.has("mosque");
     const body = (await request.json()) as Record<string, unknown>;
     const honeypot = rejectHoneypot(body);
     if (honeypot) return honeypot;
@@ -37,16 +37,16 @@ export async function POST(request: NextRequest) {
     const rateLimited = rejectRateLimited(request, "contact", email);
     if (rateLimited) return rateLimited;
 
-    const resolvedChurch = isTenantMode
+    const resolvedMosque = isTenantMode
       ? isSupabaseConfigured()
-        ? await db.getChurchBySlug(churchSlug)
-        : mockDb.getChurchBySlug(churchSlug)
+        ? await db.getMosqueBySlug(mosqueSlug)
+        : mockDb.getMosqueBySlug(mosqueSlug)
       : null;
-    let formStyle: ChurchSiteSectionStyle | null = null;
-    if (isTenantMode && resolvedChurch && sectionId) {
+    let formStyle: MosqueSiteSectionStyle | null = null;
+    if (isTenantMode && resolvedMosque && sectionId) {
       const site = isSupabaseConfigured()
-        ? await db.getChurchSite(resolvedChurch.id)
-        : mockDb.getChurchSite(churchSlug);
+        ? await db.getMosqueSite(resolvedMosque.id)
+        : mockDb.getMosqueSite(mosqueSlug);
       formStyle =
         site?.sections.find((section) => section.id === sectionId)?.style ??
         site?.custom_pages
@@ -78,28 +78,28 @@ export async function POST(request: NextRequest) {
     }
 
     const notificationContext =
-      resolvedChurch ?? {
+      resolvedMosque ?? {
         id: null,
-        name: "ChurchPay",
+        name: "MosquePay",
         support_email: CONTACT_NOTIFICATION_EMAIL,
         secretary_name: null,
       };
-    const responderName = resolvedChurch?.name ?? "ChurchPay";
-    const recipients = await getChurchAdminNotificationRecipients(
-      resolvedChurch,
+    const responderName = resolvedMosque?.name ?? "MosquePay";
+    const recipients = await getMosqueAdminNotificationRecipients(
+      resolvedMosque,
       parseRecipientList(formStyle?.form_notification_recipients)
     );
 
     await sendWebsiteNotification({
-      church: notificationContext,
+      mosque: notificationContext,
       replyTo: email,
-      subject: `[ChurchPay contact] ${subject}`,
-      eyebrow: isTenantMode ? "Church website enquiry" : "ChurchPay enquiry",
+      subject: `[MosquePay contact] ${subject}`,
+      eyebrow: isTenantMode ? "Mosque website enquiry" : "MosquePay enquiry",
       title: subject,
       preview: `New enquiry from ${name}.`,
       intro: isTenantMode
-        ? "A new church website enquiry has been submitted."
-        : "A new ChurchPay website enquiry has been submitted.",
+        ? "A new mosque website enquiry has been submitted."
+        : "A new MosquePay website enquiry has been submitted.",
       rows: [
         { label: "Name", value: name },
         { label: "Email", value: email },
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
 
     if (process.env.RESEND_API_KEY) {
       await sendWithLog({
-        churchId: null,
+        mosqueId: null,
         toEmail: email,
         toName: name,
         emailType: "contact_form_autoresponder",
@@ -124,24 +124,24 @@ export async function POST(request: NextRequest) {
           formStyle?.form_autoresponder_subject ||
           (isTenantMode
             ? `We have received your enquiry for ${responderName}`
-            : "We have received your ChurchPay enquiry"),
+            : "We have received your MosquePay enquiry"),
         html: renderSimpleMessageEmail({
           eyebrow: "Enquiry received",
           title: isTenantMode
             ? "Thanks for getting in touch"
-            : "Thanks for contacting ChurchPay",
+            : "Thanks for contacting MosquePay",
           preview: isTenantMode
-            ? "Your message has reached the church."
-            : "Your message has reached the ChurchPay team.",
+            ? "Your message has reached the mosque."
+            : "Your message has reached the MosquePay team.",
           greeting: `Hello ${name},`,
           paragraphs: [
             formStyle?.form_autoresponder_body ||
               (isTenantMode
                 ? `Thank you for getting in touch. Your message has reached ${responderName} and we will reply as soon as we can.`
-                : "Thank you for getting in touch. Your message has reached the ChurchPay team and we will reply as soon as we can."),
+                : "Thank you for getting in touch. Your message has reached the MosquePay team and we will reply as soon as we can."),
             isTenantMode
-              ? "If your enquiry is about newcomer or membership, please include any dates or context that would help the church respond."
-              : "If your enquiry is about a product walkthrough, we will come back with a practical next step based on your church or group.",
+              ? "If your enquiry is about newcomer or membership, please include any dates or context that would help the mosque respond."
+              : "If your enquiry is about a product walkthrough, we will come back with a practical next step based on your mosque or group.",
           ],
           note: `Your message: ${message}`,
         }),

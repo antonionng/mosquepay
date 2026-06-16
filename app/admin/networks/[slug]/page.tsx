@@ -3,7 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, Download } from "lucide-react";
 import * as db from "@/lib/db";
 import { getCurrentAdminScope } from "@/lib/auth/permissions";
-import { isSupabaseConfigured } from "@/lib/db/with-fallback";
+import { isSupabaseConfigured, shouldUseInMemoryMock } from "@/lib/db/with-fallback";
+import * as mockDb from "@/lib/mock-db";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -13,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { BulkChurchesClient } from "./bulk-churches-client";
+import { BulkMosquesClient } from "./bulk-mosques-client";
 
 export const dynamic = "force-dynamic";
 
@@ -22,20 +23,29 @@ export default async function NetworkDetailPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  if (!isSupabaseConfigured()) redirect("/admin");
+  if (!isSupabaseConfigured() && !shouldUseInMemoryMock()) redirect("/admin");
   const scope = await getCurrentAdminScope();
   if (scope.kind !== "platform" && scope.kind !== "dummy") {
     redirect("/admin");
   }
   const { slug } = await params;
-  const network = await db.getNetworkBySlug(slug);
+  const useMock = shouldUseInMemoryMock();
+  const network = useMock
+    ? mockDb.getNetworkBySlug(slug)
+    : await db.getNetworkBySlug(slug);
   if (!network) notFound();
 
-  const [churches, officers, returns] = await Promise.all([
-    db.listChurchesByNetwork(network.id),
-    db.listNetworkOfficers(network.id),
-    db.listChurchAnnualReturns(network.id),
-  ]);
+  const [mosques, officers, returns] = useMock
+    ? [
+        mockDb.listMosquesByNetwork(network.id),
+        mockDb.listNetworkOfficers(network.id),
+        mockDb.listMosqueAnnualReturns(network.id),
+      ]
+    : await Promise.all([
+        db.listMosquesByNetwork(network.id),
+        db.listNetworkOfficers(network.id),
+        db.listMosqueAnnualReturns(network.id),
+      ]);
 
   const totals = returns.reduce(
     (acc, row) => {
@@ -72,10 +82,10 @@ export default async function NetworkDetailPage({
         </div>
       </div>
 
-      <BulkChurchesClient networkId={network.id} networkName={network.name} />
+      <BulkMosquesClient networkId={network.id} networkName={network.name} />
 
       <div className="grid gap-3 sm:grid-cols-4">
-        <Stat label="Churches" value={churches.length} />
+        <Stat label="Mosques" value={mosques.length} />
         <Stat label="Active members" value={totals.active} />
         <Stat label="Initiations YTD" value={totals.memberships} />
         <Stat
@@ -93,7 +103,7 @@ export default async function NetworkDetailPage({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Church</TableHead>
+              <TableHead>Mosque</TableHead>
               <TableHead>No.</TableHead>
               <TableHead className="text-right">Active</TableHead>
               <TableHead className="text-right">Resigned</TableHead>
@@ -106,17 +116,17 @@ export default async function NetworkDetailPage({
             {returns.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="py-6 text-center text-sm text-slate-500">
-                  No churches in this network yet.
+                  No mosques in this network yet.
                 </TableCell>
               </TableRow>
             ) : (
               returns.map((row) => (
-                <TableRow key={row.church_id}>
+                <TableRow key={row.mosque_id}>
                   <TableCell className="text-sm font-medium text-slate-900">
-                    {row.church_name}
+                    {row.mosque_name}
                   </TableCell>
                   <TableCell className="text-sm text-slate-500">
-                    {row.church_number ?? "—"}
+                    {row.mosque_number ?? "—"}
                   </TableCell>
                   <TableCell className="text-right">{row.active_members}</TableCell>
                   <TableCell className="text-right">{row.resigned_members}</TableCell>
@@ -133,7 +143,7 @@ export default async function NetworkDetailPage({
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-5 py-3">
           <h2 className="text-base font-semibold text-slate-900">
-            Cross-church officer directory
+            Cross-mosque officer directory
           </h2>
         </div>
         <Table>
@@ -141,7 +151,7 @@ export default async function NetworkDetailPage({
             <TableRow>
               <TableHead>Office</TableHead>
               <TableHead>Member</TableHead>
-              <TableHead>Church</TableHead>
+              <TableHead>Mosque</TableHead>
               <TableHead>Email</TableHead>
             </TableRow>
           </TableHeader>
@@ -149,7 +159,7 @@ export default async function NetworkDetailPage({
             {officers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={4} className="py-6 text-center text-sm text-slate-500">
-                  No officers recorded across these churches yet.
+                  No officers recorded across these mosques yet.
                 </TableCell>
               </TableRow>
             ) : (
@@ -160,9 +170,9 @@ export default async function NetworkDetailPage({
                   </TableCell>
                   <TableCell className="text-sm">{officer.full_name}</TableCell>
                   <TableCell className="text-sm text-slate-500">
-                    {officer.church_name}
-                    {officer.church_number && (
-                      <span className="ml-1">#{officer.church_number}</span>
+                    {officer.mosque_name}
+                    {officer.mosque_number && (
+                      <span className="ml-1">#{officer.mosque_number}</span>
                     )}
                   </TableCell>
                   <TableCell className="text-sm text-blue-600">

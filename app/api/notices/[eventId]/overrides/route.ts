@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import { getCurrentAdminContextAny } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit";
 
@@ -33,15 +33,15 @@ export async function GET(request: NextRequest, { params }: Params) {
   }
 
   const { eventId } = await params;
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("notice:write", churchId);
+  const forbidden = await requireAdminApiPermission("notice:write", mosqueId);
   if (forbidden) return forbidden;
 
-  const overrides = await db.listEventFeeOverrides(churchId, eventId);
+  const overrides = await db.listEventFeeOverrides(mosqueId, eventId);
   return NextResponse.json({ overrides });
 }
 
@@ -53,12 +53,12 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   const { eventId } = await params;
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("notice:write", churchId);
+  const forbidden = await requireAdminApiPermission("notice:write", mosqueId);
   if (forbidden) return forbidden;
 
   const body = (await request.json().catch(() => ({}))) as OverrideBody;
@@ -75,11 +75,11 @@ export async function POST(request: NextRequest, { params }: Params) {
     );
   }
 
-  const admin = await getCurrentAdminContextAny(churchId);
+  const admin = await getCurrentAdminContextAny(mosqueId);
   const note =
     typeof body.note === "string" ? body.note.trim().slice(0, 500) || null : null;
 
-  const override = await db.upsertEventFeeOverride(churchId, {
+  const override = await db.upsertEventFeeOverride(mosqueId, {
     event_id: eventId,
     subject_type: body.subject_type,
     subject_id: body.subject_id,
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   });
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "fee_override_set",
     entityType: "event_fee_override",
     entityId: override.id,
@@ -120,12 +120,12 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   }
 
   const { eventId } = await params;
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("notice:write", churchId);
+  const forbidden = await requireAdminApiPermission("notice:write", mosqueId);
   if (forbidden) return forbidden;
 
   const url = new URL(request.url);
@@ -144,10 +144,10 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     );
   }
 
-  await db.deleteEventFeeOverride(churchId, eventId, subjectType, subjectId);
+  await db.deleteEventFeeOverride(mosqueId, eventId, subjectType, subjectId);
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "fee_override_cleared",
     entityType: "event_fee_override",
     entityId: `${eventId}:${subjectType}:${subjectId}`,

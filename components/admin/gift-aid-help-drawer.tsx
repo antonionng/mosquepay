@@ -7,7 +7,7 @@
 // plain English, the whole machine behind the scenes: how declarations are
 // captured and kept audit-proof, the two ways to raise a claim, exactly
 // what lands in the downloadable pack, and an FAQ for the questions that
-// actually come up at church. Pure presentation, no data dependencies, so it
+// actually come up at mosque. Pure presentation, no data dependencies, so it
 // can be dropped onto any surface.
 
 import { useState } from "react";
@@ -52,11 +52,11 @@ type Section = {
 const SECTIONS: Section[] = [
   {
     icon: HeartHandshake,
-    title: "What Gift Aid does for the church",
+    title: "What Gift Aid does for the mosque",
     blocks: [
       {
         kind: "p",
-        text: "Gift Aid lets a charity reclaim the basic-rate tax a UK taxpayer already paid on their donation. For every eligible pound a Member gives, the Gift Aid pack can reclaim 25p from HMRC at no extra cost to the donor. On a £100 charity collection that is an extra £25 toward the church's causes.",
+        text: "Gift Aid lets a charity reclaim the basic-rate tax a UK taxpayer already paid on their donation. For every eligible pound a Member gives, the Gift Aid pack can reclaim 25p from HMRC at no extra cost to the donor. On a £100 charity collection that is an extra £25 toward the mosque's causes.",
       },
       {
         kind: "p",
@@ -80,7 +80,7 @@ const SECTIONS: Section[] = [
         kind: "list",
         items: [
           "Digital: the member ticks the Gift Aid box in the portal or on a donate form. We snapshot exactly what they saw (the wording, the date, their IP address and device) into a printable HTML record.",
-          "Paper: the member signs a physical slip at the service. The church team scans or photographs it and uploads it against the member's profile. This is the route for those who prefer wet ink.",
+          "Paper: the member signs a physical slip at the service. The mosque team scans or photographs it and uploads it against the member's profile. This is the route for those who prefer wet ink.",
         ],
       },
       {
@@ -113,7 +113,7 @@ const SECTIONS: Section[] = [
     blocks: [
       {
         kind: "p",
-        text: "Both routes build the same thing (a claim batch) and both bundle the same declarations. Pick whichever matches how your church works:",
+        text: "Both routes build the same thing (a claim batch) and both bundle the same declarations. Pick whichever matches how your mosque works:",
       },
       {
         kind: "list",
@@ -167,7 +167,7 @@ const SECTIONS: Section[] = [
     blocks: [
       {
         kind: "p",
-        text: "Small anonymous cash donations (the loose alms where no donor is recorded) cannot be Gift Aided because there is no declaration. They may instead qualify under the Gift Aid Small Donations Scheme, which lets the church reclaim a top-up on cash collections up to an annual cap. When you close a service we work out the eligible anonymous cash and track it against that cap for the tax year.",
+        text: "Small anonymous cash donations (the loose alms where no donor is recorded) cannot be Gift Aided because there is no declaration. They may instead qualify under the Gift Aid Small Donations Scheme, which lets the mosque reclaim a top-up on cash collections up to an annual cap. When you close a service we work out the eligible anonymous cash and track it against that cap for the tax year.",
       },
     ],
   },
@@ -245,7 +245,7 @@ export function GiftAidHelpDrawer({
           </SheetTitle>
           <SheetDescription>
             How declarations, claims and packs work end to end, plus answers
-            to the questions that come up at church.
+            to the questions that come up at mosque.
           </SheetDescription>
         </SheetHeader>
 

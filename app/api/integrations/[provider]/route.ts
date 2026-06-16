@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import type { IntegrationProvider } from "@/lib/db/types";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -35,21 +35,21 @@ export async function PATCH(
     return NextResponse.json({ error: "Unknown provider." }, { status: 400 });
   }
   const provider = providerSlug as IntegrationProvider;
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
   // Integrations (Mooov, accounting, calendar, email) are owned by the
-  // church treasurer in addition to the secretary. Gating on payments:write
+  // mosque treasurer in addition to the secretary. Gating on payments:write
   // (which treasurer has, and which admin:all implicitly grants for
   // secretary/super_admin/operator) keeps the API in lockstep with the
   // sidebar visibility gate in components/layout/admin-sidebar.tsx so the
   // treasurer doesn't see the page but get 403s on save.
-  const forbidden = await requireAdminApiPermission("payments:write", churchId);
+  const forbidden = await requireAdminApiPermission("payments:write", mosqueId);
   if (forbidden) return forbidden;
   const body = await request.json();
-  const cred = await db.upsertIntegrationCredentials(churchId, provider, {
+  const cred = await db.upsertIntegrationCredentials(mosqueId, provider, {
     enabled: body.enabled ?? true,
     access_token: body.access_token ?? null,
     refresh_token: body.refresh_token ?? null,
@@ -57,7 +57,7 @@ export async function PATCH(
     metadata: body.metadata ?? {},
   });
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: cred.enabled ? "integration_enabled" : "integration_disabled",
     entityType: "integration",
     entityId: cred.id,
@@ -83,13 +83,13 @@ export async function DELETE(
     return NextResponse.json({ error: "Unknown provider." }, { status: 400 });
   }
   const provider = providerSlug as IntegrationProvider;
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("payments:write", churchId);
+  const forbidden = await requireAdminApiPermission("payments:write", mosqueId);
   if (forbidden) return forbidden;
-  await db.deleteIntegrationCredentials(churchId, provider);
+  await db.deleteIntegrationCredentials(mosqueId, provider);
   return NextResponse.json({ ok: true });
 }

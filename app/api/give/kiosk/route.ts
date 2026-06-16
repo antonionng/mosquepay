@@ -1,14 +1,14 @@
 // POST /api/give/kiosk
 //
 // Public, auth-less mint endpoint for the self-service giving kiosk
-// (/give/<slug>/kiosk). A giver standing at the church tablet enters an
+// (/give/<slug>/kiosk). A giver standing at the mosque tablet enters an
 // amount + purpose, optionally their details and a digital Gift Aid
 // declaration, and this route mints a Mooov payment_intent and returns the
 // hosted_url for the kiosk to render as an on-screen QR code.
 //
 // Auth: none (the kiosk is a public page, like the /give standing-QR flow).
-// Safety rails: active church + active Mooov merchant required, £1-£5,000
-// amount window, per-IP+church rate limit, and Gift Aid requires full donor
+// Safety rails: active mosque + active Mooov merchant required, £1-£5,000
+// amount window, per-IP+mosque rate limit, and Gift Aid requires full donor
 // details so we never mint half-formed declarations.
 //
 // Persistence: preflight mooov.payment_attempts row with intent
@@ -23,11 +23,11 @@ import { callMooovConnect, MooovApiError } from "@/lib/mooov";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const PURPOSES = ["tithe", "offering", "charity", "general"] as const;
+const PURPOSES = ["zakat", "offering", "charity", "general"] as const;
 type KioskPurpose = (typeof PURPOSES)[number];
 
 const PURPOSE_LABELS: Record<KioskPurpose, string> = {
-  tithe: "Tithe",
+  zakat: "Zakat",
   offering: "Offering",
   charity: "Charity gift",
   general: "General giving",
@@ -100,9 +100,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
   }
 
-  const slug = trimOrNull(body.church)?.toLowerCase() ?? null;
+  const slug = trimOrNull(body.mosque)?.toLowerCase() ?? null;
   if (!slug) {
-    return NextResponse.json({ error: "Missing church." }, { status: 400 });
+    return NextResponse.json({ error: "Missing mosque." }, { status: 400 });
   }
 
   const amount = Number(body.amount);
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
   if (amount > MAX_AMOUNT) {
     return NextResponse.json(
       {
-        error: `Amounts above £${MAX_AMOUNT.toLocaleString("en-GB")} cannot be taken on the kiosk. Please speak to the church treasurer.`,
+        error: `Amounts above £${MAX_AMOUNT.toLocaleString("en-GB")} cannot be taken on the kiosk. Please speak to the mosque treasurer.`,
       },
       { status: 400 },
     );
@@ -184,35 +184,35 @@ export async function POST(request: NextRequest) {
 
   const supa = createServiceClient();
 
-  const { data: church, error: churchError } = await supa
-    .from("churches")
+  const { data: mosque, error: mosqueError } = await supa
+    .from("mosques")
     .select("id, slug, name")
     .eq("slug", slug)
     .eq("is_active", true)
     .maybeSingle<{ id: string; slug: string; name: string }>();
-  if (churchError) {
-    console.error("kiosk mint: church lookup failed", {
+  if (mosqueError) {
+    console.error("kiosk mint: mosque lookup failed", {
       slug,
-      message: churchError.message,
+      message: mosqueError.message,
     });
     return NextResponse.json(
-      { error: "Could not look up this church." },
+      { error: "Could not look up this mosque." },
       { status: 500 },
     );
   }
-  if (!church) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  if (!mosque) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
 
   const { data: merchant, error: merchantError } = await supa
     .schema("mooov")
-    .from("churches")
+    .from("mosques")
     .select("merchant_id, status")
-    .eq("id", church.id)
+    .eq("id", mosque.id)
     .maybeSingle<{ merchant_id: string; status: string }>();
   if (merchantError) {
     console.error("kiosk mint: mooov merchant lookup failed", {
-      church_id: church.id,
+      mosque_id: mosque.id,
       message: merchantError.message,
     });
     return NextResponse.json(
@@ -228,8 +228,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error:
-          "This church has not connected its payment processor yet. Please speak to the church team.",
-        code: "church_not_connected",
+          "This mosque has not connected its payment processor yet. Please speak to the mosque team.",
+        code: "mosque_not_connected",
       },
       { status: 503 },
     );
@@ -237,7 +237,7 @@ export async function POST(request: NextRequest) {
 
   const amountMinor = Math.round(amount * 100);
   const currency = "GBP";
-  const paymentId = `kio_${church.id}_${Date.now().toString(36)}_${Math.random()
+  const paymentId = `kio_${mosque.id}_${Date.now().toString(36)}_${Math.random()
     .toString(36)
     .slice(2, 10)}`;
   const idempotencyKey = `kio_${paymentId}`;
@@ -247,12 +247,12 @@ export async function POST(request: NextRequest) {
   // device, not the kiosk. The kiosk learns the outcome via the status poll.
   const successUrl = `${siteUrl}/take-payment/done?payment_id=${encodeURIComponent(paymentId)}`;
   const cancelUrl = `${siteUrl}/take-payment/cancelled?payment_id=${encodeURIComponent(paymentId)}`;
-  const description = `${PURPOSE_LABELS[purpose]} to ${church.name}`;
+  const description = `${PURPOSE_LABELS[purpose]} to ${mosque.name}`;
 
   const initialMetadata: Record<string, unknown> = {
-    source: "churchpay_kiosk",
-    church_slug: church.slug,
-    church_id: church.id,
+    source: "mosquepay_kiosk",
+    mosque_slug: mosque.slug,
+    mosque_id: mosque.id,
     intent: "kiosk_giving",
     category: purpose,
     purpose,
@@ -268,7 +268,7 @@ export async function POST(request: NextRequest) {
     .from("payment_attempts")
     .insert({
       payment_id: paymentId,
-      church_id: church.id,
+      mosque_id: mosque.id,
       member_id: null,
       amount: amountMinor,
       currency,
@@ -278,7 +278,7 @@ export async function POST(request: NextRequest) {
       metadata: initialMetadata,
       guest_descriptor: {
         source: "kiosk_self_service",
-        church_slug: church.slug,
+        mosque_slug: mosque.slug,
         purpose,
         category: purpose,
         payer_name: donor?.full_name ?? null,
@@ -296,7 +296,7 @@ export async function POST(request: NextRequest) {
     });
   if (insertError) {
     console.error("kiosk mint: preflight insert failed", {
-      church_id: church.id,
+      mosque_id: mosque.id,
       payment_id: paymentId,
       code: insertError.code,
       message: insertError.message,
@@ -324,8 +324,8 @@ export async function POST(request: NextRequest) {
           description,
           metadata: {
             intent: "kiosk_giving",
-            church_id: church.id,
-            church_slug: church.slug,
+            mosque_id: mosque.id,
+            mosque_slug: mosque.slug,
             category: purpose,
           },
         },

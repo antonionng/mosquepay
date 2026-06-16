@@ -1,14 +1,14 @@
 import type { MetadataRoute } from "next";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { churchScopedEventPath } from "@/lib/public-links";
+import { mosqueScopedEventPath } from "@/lib/public-links";
 import { isPubliclyVisible } from "@/lib/events/public-visibility";
 
 function siteUrl(): string {
   const url =
     process.env.NEXT_PUBLIC_SITE_URL ??
     process.env.VERCEL_PROJECT_PRODUCTION_URL ??
-    "https://www.churchpay.co.uk";
+    "https://www.mosque-pay.com";
   return url.startsWith("http") ? url : `https://${url}`;
 }
 
@@ -46,15 +46,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const dynamicEntries: MetadataRoute.Sitemap = [];
   try {
-    const churches = await db.listChurches();
-    for (const church of churches) {
-      if (!church.is_active) continue;
-      const events = await db.getEvents(church.id, { published: true });
+    const mosques = await db.listMosques();
+    for (const mosque of mosques) {
+      if (!mosque.is_active) continue;
+      const events = await db.getEvents(mosque.id, { published: true });
       for (const event of events) {
         if (new Date(event.event_date) < now) continue;
         if (!isPubliclyVisible(event)) continue;
         dynamicEntries.push({
-          url: `${base}${churchScopedEventPath(church.slug, event.slug)}`,
+          url: `${base}${mosqueScopedEventPath(mosque.slug, event.slug)}`,
           lastModified: new Date(event.updated_at ?? event.created_at ?? now),
           changeFrequency: "weekly",
           priority: 0.8,

@@ -5,7 +5,8 @@ import { useMemo, useState } from "react";
 import { Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { ChurchSiteHeaderSettings } from "@/lib/db/types";
+import type { MosqueSiteHeaderSettings } from "@/lib/db/types";
+import { DEMO_MOSQUE_NAME } from "@/lib/demo-mosque";
 import { defaultHeaderSettings } from "@/lib/site-section-style";
 import { cn } from "@/lib/utils";
 
@@ -35,14 +36,14 @@ function initialsFromName(name: string) {
 
 function HeaderPreview({
   settings,
-  churchName,
-  churchNumber,
+  mosqueName,
+  mosqueNumber,
   logoUrl,
   primaryColor,
 }: {
-  settings: ChurchSiteHeaderSettings;
-  churchName: string;
-  churchNumber?: string | null;
+  settings: MosqueSiteHeaderSettings;
+  mosqueName: string;
+  mosqueNumber?: string | null;
   logoUrl?: string | null;
   primaryColor: string;
 }) {
@@ -78,24 +79,24 @@ function HeaderPreview({
                 {logoUrl ? (
                   <Image
                     src={logoUrl}
-                    alt={`${churchName} logo`}
+                    alt={`${mosqueName} logo`}
                     width={44}
                     height={44}
                     unoptimized
                     className="h-full w-full bg-white object-contain p-1"
                   />
                 ) : (
-                  initialsFromName(churchName)
+                  initialsFromName(mosqueName)
                 )}
               </div>
             ) : null}
-            {(settings.show_church_name || settings.show_church_number) ? (
+            {(settings.show_mosque_name || settings.show_mosque_number) ? (
               <div className="min-w-0">
-                {settings.show_church_name ? (
-                  <p className="truncate text-sm font-semibold text-slate-950">{churchName}</p>
+                {settings.show_mosque_name ? (
+                  <p className="truncate text-sm font-semibold text-slate-950">{mosqueName}</p>
                 ) : null}
-                {settings.show_church_number && churchNumber ? (
-                  <p className="text-xs text-slate-500">No. {churchNumber}</p>
+                {settings.show_mosque_number && mosqueNumber ? (
+                  <p className="text-xs text-slate-500">No. {mosqueNumber}</p>
                 ) : null}
               </div>
             ) : null}
@@ -136,11 +137,11 @@ function HeaderPreview({
                 className="flex h-8 w-8 items-center justify-center rounded-xl text-[10px] font-bold tracking-[0.16em] text-white"
                 style={{ backgroundColor: primaryColor }}
               >
-                {initialsFromName(churchName)}
+                {initialsFromName(mosqueName)}
               </div>
             ) : null}
             <span className="text-xs font-semibold text-slate-950">
-              {settings.show_church_name ? churchName : "Church website"}
+              {settings.show_mosque_name ? mosqueName : "Mosque website"}
             </span>
           </div>
           <span className="rounded-lg border border-slate-200 px-3 py-1 text-xs text-slate-700">
@@ -153,22 +154,22 @@ function HeaderPreview({
 }
 
 export function HeaderSettingsManager({
-  churchSlug,
+  mosqueSlug,
   initialSettings,
-  churchName,
-  churchNumber,
+  mosqueName,
+  mosqueNumber,
   logoUrl,
   primaryColor = "#3b82f6",
 }: {
-  churchSlug: string;
-  initialSettings?: ChurchSiteHeaderSettings | null;
-  churchName?: string;
-  churchNumber?: string | null;
+  mosqueSlug: string;
+  initialSettings?: MosqueSiteHeaderSettings | null;
+  mosqueName?: string;
+  mosqueNumber?: string | null;
   logoUrl?: string | null;
   primaryColor?: string;
 }) {
-  const previewChurchName = churchName ?? "St Mary's Church";
-  const [settings, setSettings] = useState<ChurchSiteHeaderSettings>(
+  const previewMosqueName = mosqueName ?? DEMO_MOSQUE_NAME;
+  const [settings, setSettings] = useState<MosqueSiteHeaderSettings>(
     initialSettings ?? defaultHeaderSettings()
   );
   const [saving, setSaving] = useState(false);
@@ -232,7 +233,7 @@ export function HeaderSettingsManager({
     setSaving(true);
     setMessage(null);
     try {
-      const response = await fetch(`/api/churches/${churchSlug}/site`, {
+      const response = await fetch(`/api/mosques/${mosqueSlug}/site`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ header_settings: settings }),
@@ -254,7 +255,7 @@ export function HeaderSettingsManager({
         <div>
           <h2 className="text-lg font-semibold text-dash-text">Website header</h2>
           <p className="mt-1 text-sm text-dash-muted">
-            Control what appears in the public church site header.
+            Control what appears in the public mosque site header.
           </p>
         </div>
         <Button type="button" onClick={save} disabled={saving} variant="primary">
@@ -279,28 +280,28 @@ export function HeaderSettingsManager({
             <label className="flex items-center gap-2 rounded-xl border border-dash-border bg-dash-surface-subtle p-3 text-sm text-dash-text">
               <input
                 type="checkbox"
-                checked={settings.show_church_name}
+                checked={settings.show_mosque_name}
                 onChange={(event) =>
                   setSettings((current) => ({
                     ...current,
-                    show_church_name: event.target.checked,
+                    show_mosque_name: event.target.checked,
                   }))
                 }
               />
-              Show church name
+              Show mosque name
             </label>
             <label className="flex items-center gap-2 rounded-xl border border-dash-border bg-dash-surface-subtle p-3 text-sm text-dash-text">
               <input
                 type="checkbox"
-                checked={settings.show_church_number}
+                checked={settings.show_mosque_number}
                 onChange={(event) =>
                   setSettings((current) => ({
                     ...current,
-                    show_church_number: event.target.checked,
+                    show_mosque_number: event.target.checked,
                   }))
                 }
               />
-              Show church number
+              Show mosque number
             </label>
           </div>
 
@@ -440,8 +441,8 @@ export function HeaderSettingsManager({
         </div>
         <HeaderPreview
           settings={settings}
-          churchName={previewChurchName}
-          churchNumber={churchNumber}
+          mosqueName={previewMosqueName}
+          mosqueNumber={mosqueNumber}
           logoUrl={logoUrl}
           primaryColor={primaryColor}
         />

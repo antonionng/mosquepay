@@ -26,7 +26,7 @@ export type BuildScheduleInput = {
   annualAmount: number;
   /** Today's date (yyyy-mm-dd). Drives the first cycle date. */
   today: string;
-  /** Church giving year. */
+  /** Mosque giving year. */
   yearStartDate: string;
   yearEndDate: string;
   /** Number of full elapsed calendar months from year-start to today. */
@@ -227,9 +227,9 @@ export function buildSchedule(input: BuildScheduleInput): BuildScheduleResult {
   }
 }
 
-export function isStrategyEnabledForChurch(
+export function isStrategyEnabledForMosque(
   strategy: GivingSplitStrategy,
-  church: {
+  mosque: {
     enable_strategy_catch_up_lump: boolean;
     enable_strategy_balloon: boolean;
     enable_strategy_reslice: boolean;
@@ -238,12 +238,12 @@ export function isStrategyEnabledForChurch(
   switch (strategy) {
     case "pro_rata":
     case "even_full_year":
-      return true; // Always available; not church-controllable.
+      return true; // Always available; not mosque-controllable.
     case "catch_up_lump_then_monthly":
-      return church.enable_strategy_catch_up_lump;
+      return mosque.enable_strategy_catch_up_lump;
     case "monthly_then_balloon":
-      return church.enable_strategy_balloon;
+      return mosque.enable_strategy_balloon;
     case "reslice_remaining":
-      return church.enable_strategy_reslice;
+      return mosque.enable_strategy_reslice;
   }
 }

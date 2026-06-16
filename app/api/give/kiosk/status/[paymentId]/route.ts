@@ -4,7 +4,7 @@
 // while the QR is on screen so the kiosk can flip to "Thank you" the moment
 // the Mooov payment.succeeded webhook lands.
 //
-// Auth: none. Payment ids are unguessable (kio_<churchId>_<ts>_<rand>) and
+// Auth: none. Payment ids are unguessable (kio_<mosqueId>_<ts>_<rand>) and
 // the response is intentionally minimal: phase + amount only, no payer PII.
 // Only kiosk-minted attempts (kio_ prefix, intent kiosk_giving) resolve here
 // so this can't be used to probe other payment channels.

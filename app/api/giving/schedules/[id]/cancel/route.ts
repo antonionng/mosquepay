@@ -35,25 +35,25 @@ export async function POST(
     actor?: "member" | "treasurer" | "system";
   };
 
-  // Resolve church from the schedule row's church_id, not URL/host/cookie.
+  // Resolve mosque from the schedule row's mosque_id, not URL/host/cookie.
   // Schedule UUIDs are unguessable; derive tenant from the row to avoid
   // cross-tenant 404s when the caller is on a different host than the
-  // schedule's church custom domain.
+  // schedule's mosque custom domain.
   const supa = createServiceClient();
   const { data: scheduleRow } = await supa
     .from("giving_schedules")
-    .select("church_id")
+    .select("mosque_id")
     .eq("id", id)
-    .maybeSingle<{ church_id: string }>();
+    .maybeSingle<{ mosque_id: string }>();
   if (!scheduleRow) {
     return NextResponse.json(
       { error: "Schedule not found." },
       { status: 404 }
     );
   }
-  const churchId = scheduleRow.church_id;
+  const mosqueId = scheduleRow.mosque_id;
 
-  const schedule = await db.getGivingSchedule(id, churchId);
+  const schedule = await db.getGivingSchedule(id, mosqueId);
   if (!schedule) {
     return NextResponse.json(
       { error: "Schedule not found." },
@@ -71,7 +71,7 @@ export async function POST(
     });
   }
 
-  await db.updateGivingSchedule(id, churchId, {
+  await db.updateGivingSchedule(id, mosqueId, {
     status: "cancelled",
     next_charge_at: null,
     cancelled_at: new Date().toISOString(),
@@ -90,7 +90,7 @@ export async function POST(
     .from("member_giving_instalments")
     .delete()
     .eq("schedule_id", id)
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .is("paid_at", null);
   if (deleteErr) {
     console.error("giving/schedules/cancel: failed to delete unpaid instalments", {

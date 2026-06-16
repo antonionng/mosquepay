@@ -61,7 +61,7 @@ export function calculateProRataGiving(input: ProRataInput): ProRataResult {
   };
 }
 
-export function defaultChurchYearBounds(reference = new Date()): {
+export function defaultMosqueYearBounds(reference = new Date()): {
   startDate: string;
   endDate: string;
   label: string;

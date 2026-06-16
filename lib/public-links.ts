@@ -1,4 +1,4 @@
-import { resolveChurchSlug } from "@/lib/tenant";
+import { resolveMosqueSlug } from "@/lib/tenant";
 
 function cleanBaseUrl(baseUrl: string) {
   return baseUrl.replace(/\/$/, "");
@@ -8,28 +8,28 @@ function tokenSegment(token: string) {
   return encodeURIComponent(token);
 }
 
-export function churchScopedEventPath(churchSlug: string, eventSlug: string) {
-  return `/${resolveChurchSlug(churchSlug)}/events/${encodeURIComponent(eventSlug)}`;
+export function mosqueScopedEventPath(mosqueSlug: string, eventSlug: string) {
+  return `/${resolveMosqueSlug(mosqueSlug)}/events/${encodeURIComponent(eventSlug)}`;
 }
 
-export function churchScopedEventsPath(churchSlug: string) {
-  return `/${resolveChurchSlug(churchSlug)}/events`;
+export function mosqueScopedEventsPath(mosqueSlug: string) {
+  return `/${resolveMosqueSlug(mosqueSlug)}/events`;
 }
 
-export function churchScopedGuestPath(churchSlug: string, token: string) {
-  return `/${resolveChurchSlug(churchSlug)}/guest/${tokenSegment(token)}`;
+export function mosqueScopedGuestPath(mosqueSlug: string, token: string) {
+  return `/${resolveMosqueSlug(mosqueSlug)}/guest/${tokenSegment(token)}`;
 }
 
-export function churchScopedGuestSuccessPath(churchSlug: string, token: string) {
-  return `${churchScopedGuestPath(churchSlug, token)}/success`;
+export function mosqueScopedGuestSuccessPath(mosqueSlug: string, token: string) {
+  return `${mosqueScopedGuestPath(mosqueSlug, token)}/success`;
 }
 
-export function churchScopedNewcomerPath(churchSlug: string, token: string) {
-  return `/${resolveChurchSlug(churchSlug)}/newcomers/church/${tokenSegment(token)}`;
+export function mosqueScopedNewcomerPath(mosqueSlug: string, token: string) {
+  return `/${resolveMosqueSlug(mosqueSlug)}/newcomers/mosque/${tokenSegment(token)}`;
 }
 
-export function churchScopedVisitPath(churchSlug: string) {
-  return `/${resolveChurchSlug(churchSlug)}/newcomers`;
+export function mosqueScopedVisitPath(mosqueSlug: string) {
+  return `/${resolveMosqueSlug(mosqueSlug)}/newcomers`;
 }
 
 export function buildPublicUrl(baseUrl: string, path: string) {

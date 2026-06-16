@@ -4,7 +4,7 @@
 //
 // Shown at the bottom of the take-payment page so the duty team can grab the
 // public kiosk URL, open it full-screen on the door tablet, or copy it into
-// the church website. The kiosk itself is public and auth-less, so this card
+// the mosque website. The kiosk itself is public and auth-less, so this card
 // is purely a convenience pointer; nothing here gates access to it.
 
 import { useCallback, useMemo, useState } from "react";
@@ -12,14 +12,14 @@ import { Check, Copy, ExternalLink, TabletSmartphone } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
-export function KioskLinkCard({ churchSlug }: { churchSlug: string }) {
+export function KioskLinkCard({ mosqueSlug }: { mosqueSlug: string }) {
   const kioskUrl = useMemo(() => {
     const origin =
       typeof window !== "undefined"
         ? window.location.origin
         : process.env.NEXT_PUBLIC_SITE_URL ?? "";
-    return `${origin}/give/${encodeURIComponent(churchSlug)}/kiosk`;
-  }, [churchSlug]);
+    return `${origin}/give/${encodeURIComponent(mosqueSlug)}/kiosk`;
+  }, [mosqueSlug]);
 
   const [copied, setCopied] = useState(false);
   const copy = useCallback(async () => {

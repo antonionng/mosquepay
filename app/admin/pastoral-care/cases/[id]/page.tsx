@@ -12,21 +12,21 @@ export default async function PastoralCareCaseDetailPage({
 }) {
   const { id } = await params;
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
     redirect("/admin/pastoral_care");
   }
-  const churchId = ctx.churchId;
+  const mosqueId = ctx.mosqueId;
 
-  const pastoralCase = await db.getPastoralCareCaseById(id, churchId);
+  const pastoralCase = await db.getPastoralCareCaseById(id, mosqueId);
   if (!pastoralCase) notFound();
 
   const [visits, member, auditLogs, alerts] = await Promise.all([
-    db.listPastoralCareVisits(id, churchId),
+    db.listPastoralCareVisits(id, mosqueId),
     pastoralCase.member_id
-      ? db.getMemberById(pastoralCase.member_id, churchId)
+      ? db.getMemberById(pastoralCase.member_id, mosqueId)
       : Promise.resolve(null),
-    db.listAuditLogsByEntity(churchId, "pastoral_case", id),
-    db.listPastoralCareAlerts(churchId, { status: "open" }),
+    db.listAuditLogsByEntity(mosqueId, "pastoral_case", id),
+    db.listPastoralCareAlerts(mosqueId, { status: "open" }),
   ]);
 
   const relatedAlerts = alerts.filter(

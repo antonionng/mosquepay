@@ -4,8 +4,8 @@
 //
 // Built like the TerminalShowcase tablet: a framed product mock that
 // auto-cycles through the core modules (Dashboard, Giving & Gift Aid,
-// Members, Services) inside the real admin shell — ChurchPay sidebar logo,
-// church switcher, grouped nav whose active item tracks the scene. Screens
+// Members, Services) inside the real admin shell — MosquePay sidebar logo,
+// mosque switcher, grouped nav whose active item tracks the scene. Screens
 // swap with AnimatePresence; numbers count up once per visit; reduced
 // motion falls back to simple cross-fades.
 //
@@ -13,6 +13,7 @@
 // it applies min-h-screen, which is what previously stretched this box.
 
 import Image from "next/image";
+import { DEMO_MOSQUE_NAME } from "@/lib/demo-mosque";
 import { useEffect, useRef, useState } from "react";
 import {
   AnimatePresence,
@@ -38,7 +39,7 @@ type Scene = (typeof SCENES)[number];
 const SCENE_DURATION_MS = 4000;
 
 const SCENE_META: Record<Scene, { title: string; caption: string }> = {
-  dashboard: { title: "Dashboard", caption: "One clear picture of your church" },
+  dashboard: { title: "Dashboard", caption: "One clear picture of your mosque" },
   giving: { title: "Giving & Gift Aid", caption: "Every gift counted, every claim ready" },
   members: { title: "Members", caption: "Your whole congregation, one record" },
   services: { title: "Services", caption: "Sundays planned, notices sent" },
@@ -96,8 +97,8 @@ export function HeroDashboard() {
           <aside className="hidden w-[10rem] shrink-0 flex-col border-r border-dash-border bg-dash-surface sm:flex">
             <div className="flex h-12 shrink-0 items-center border-b border-dash-border px-3">
               <Image
-                src="/brand/churchpay-sidebar-logo.png"
-                alt="ChurchPay"
+                src="/brand/mosquepay-sidebar-logo.png"
+                alt="MosquePay"
                 width={1032}
                 height={245}
                 priority
@@ -110,7 +111,7 @@ export function HeroDashboard() {
                   <HandHeart className="h-3 w-3" />
                 </span>
                 <span className="min-w-0 truncate text-[10px] font-semibold">
-                  St Mary&apos;s Church
+                  {DEMO_MOSQUE_NAME}
                 </span>
               </div>
             </div>
@@ -143,7 +144,7 @@ export function HeroDashboard() {
           <div className="min-w-0 flex-1 bg-dash-bg">
             <header className="flex h-12 items-center gap-2.5 border-b border-dash-border bg-dash-surface/95 px-3">
               <Image
-                src="/brand/churchpay-sidebar-logo.png"
+                src="/brand/mosquepay-sidebar-logo.png"
                 alt=""
                 width={1032}
                 height={245}
@@ -152,7 +153,7 @@ export function HeroDashboard() {
               />
               <div className="min-w-0">
                 <p className="text-[8px] font-medium uppercase tracking-[0.14em] text-dash-faint">
-                  Church admin
+                  Mosque admin
                 </p>
                 <AnimatePresence mode="wait">
                   <motion.h2
@@ -258,7 +259,7 @@ function DashboardScene({ reducedMotion }: { reducedMotion: boolean }) {
 
 function GivingScene({ reducedMotion }: { reducedMotion: boolean }) {
   const gifts = [
-    { name: "Sarah Adeyemi", detail: "Tithe · kiosk", amount: "£25.00", giftAid: true },
+    { name: "Sarah Adeyemi", detail: "Zakat · kiosk", amount: "£25.00", giftAid: true },
     { name: "The Okafor family", detail: "Online giving", amount: "£60.00", giftAid: true },
     { name: "Anonymous", detail: "Sunday collection", amount: "£12.50", giftAid: false },
   ];
@@ -395,7 +396,7 @@ function MembersScene({ reducedMotion }: { reducedMotion: boolean }) {
 
 function ServicesScene({ reducedMotion }: { reducedMotion: boolean }) {
   const services = [
-    { name: "Sunday service", date: "Sun 14 Jun · 10:30", rsvps: "118 attending", notice: true },
+    { name: "Friday Jumu'ah", date: "Sun 14 Jun · 10:30", rsvps: "118 attending", notice: true },
     { name: "Midweek prayer", date: "Wed 17 Jun · 19:00", rsvps: "42 attending", notice: true },
     { name: "Youth night", date: "Fri 19 Jun · 18:30", rsvps: "36 attending", notice: false },
   ];

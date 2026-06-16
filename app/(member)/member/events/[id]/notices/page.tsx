@@ -6,7 +6,7 @@ import * as db from "@/lib/db";
 import { formatDate } from "@/lib/utils";
 import { defaultAgendaItems, renderDefaultNoticeOpening } from "@/lib/notices/defaults";
 import type { Member } from "@/lib/db/types";
-import { churchTitleFor } from "@/lib/members/rank";
+import { mosqueTitleFor } from "@/lib/members/rank";
 
 type DirectoryMember = Pick<
   Member,
@@ -68,17 +68,17 @@ export default async function MemberServiceNoticePage({
 
   const member =
     (await db.getMemberByAuthUserId(user.id)) ??
-    (user.email ? await db.getMemberByEmailAcrossChurches(user.email) : null);
+    (user.email ? await db.getMemberByEmailAcrossMosques(user.email) : null);
 
   if (!member || member.membership_status !== "active") notFound();
 
-  const event = await db.getEventById(id, member.church_id);
+  const event = await db.getEventById(id, member.mosque_id);
   if (!event) notFound();
 
-  const [church, notice, members] = await Promise.all([
-    db.getChurchById(member.church_id),
-    db.getServiceNotice(id, member.church_id),
-    db.getMembers(member.church_id, { status: "active" }),
+  const [mosque, notice, members] = await Promise.all([
+    db.getMosqueById(member.mosque_id),
+    db.getServiceNotice(id, member.mosque_id),
+    db.getMembers(member.mosque_id, { status: "active" }),
   ]);
 
   const officers = members
@@ -99,17 +99,17 @@ export default async function MemberServiceNoticePage({
     .filter((m) => m.honorary)
     .sort((a, b) => a.full_name.localeCompare(b.full_name));
   const agendaItems = notice?.agenda_items?.length ? notice.agenda_items : defaultAgendaItems();
-  const openingText = notice?.opening_text ?? renderDefaultNoticeOpening(event, church);
+  const openingText = notice?.opening_text ?? renderDefaultNoticeOpening(event, mosque);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <article className="rounded-2xl border border-slate-200 bg-white p-8 text-slate-950 shadow-sm">
         <header className="border-b border-slate-300 pb-6 text-center">
-          {church?.logo_url ? (
+          {mosque?.logo_url ? (
             <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <Image
-                src={church.logo_url}
-                alt={`${church.name} logo`}
+                src={mosque.logo_url}
+                alt={`${mosque.name} logo`}
                 width={96}
                 height={96}
                 className="h-full w-full object-contain p-2"
@@ -120,7 +120,7 @@ export default async function MemberServiceNoticePage({
             Notice
           </p>
           <h1 className="mt-3 text-3xl font-bold uppercase tracking-tight">
-            {church?.name ?? "Church Service"}
+            {mosque?.name ?? "Jumu'ah Prayer"}
           </h1>
           <p className="mt-4 text-lg font-semibold">{event.title}</p>
         </header>
@@ -133,7 +133,7 @@ export default async function MemberServiceNoticePage({
           <p className="mt-4 whitespace-pre-line">
             {openingText}
           </p>
-          <p className="mt-4 font-semibold">{church?.secretary_name ?? "Secretary"}</p>
+          <p className="mt-4 font-semibold">{mosque?.secretary_name ?? "Secretary"}</p>
           <p>Secretary</p>
         </section>
 
@@ -147,8 +147,8 @@ export default async function MemberServiceNoticePage({
                   className="flex justify-between gap-4 border-b border-slate-100 pb-1"
                 >
                   <span>
-                    {churchTitleFor(officer.rank)
-                      ? `${churchTitleFor(officer.rank)} `
+                    {mosqueTitleFor(officer.rank)
+                      ? `${mosqueTitleFor(officer.rank)} `
                       : ""}
                     {officer.full_name}
                     {memberSuffix(officer) ? ` ${memberSuffix(officer)}` : ""}
@@ -161,7 +161,7 @@ export default async function MemberServiceNoticePage({
         )}
 
         <section className="border-b border-slate-300 py-6">
-          <h2 className="text-lg font-semibold uppercase">Church Business</h2>
+          <h2 className="text-lg font-semibold uppercase">Mosque Business</h2>
           <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-700">
             {agendaItems.map((item) => (
               <li key={item}>{item}</li>
@@ -196,7 +196,7 @@ export default async function MemberServiceNoticePage({
         {notice?.include_member_directory !== false && (
           <section className="py-6">
             <h2 className="text-center text-lg font-bold uppercase">
-              {church?.name ?? "Church"} Members
+              {mosque?.name ?? "Mosque"} Members
             </h2>
             <div className="mt-4 space-y-1 text-xs leading-5">
               {directoryMembers.map((m) => {
@@ -204,8 +204,8 @@ export default async function MemberServiceNoticePage({
                 return (
                   <div key={m.id} className="grid gap-2 sm:grid-cols-[1fr_2fr_auto]">
                     <span className="font-medium">
-                      {churchTitleFor(m.rank)
-                        ? `${churchTitleFor(m.rank)} `
+                      {mosqueTitleFor(m.rank)
+                        ? `${mosqueTitleFor(m.rank)} `
                         : ""}
                       {m.full_name}
                       {suffix ? ` ${suffix}` : ""}

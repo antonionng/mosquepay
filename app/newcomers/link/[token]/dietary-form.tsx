@@ -35,7 +35,7 @@ export function NewcomerDetailsForm({ token, initial }: Props) {
     setPending(true);
     setError(null);
     try {
-      const res = await fetch(`/api/newcomers/church/${encodeURIComponent(token)}`, {
+      const res = await fetch(`/api/newcomers/mosque/${encodeURIComponent(token)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),

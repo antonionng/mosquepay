@@ -10,30 +10,30 @@ import {
   MarketingKicker,
   MarketingCtaBand,
 } from "@/components/marketing/marketing-shell";
-import { resolveChurchSlug } from "@/lib/tenant";
+import { resolveMosqueSlug } from "@/lib/tenant";
 import { marketingMetadata } from "@/lib/seo";
 
 export const metadata = marketingMetadata({
-  title: "Get Started with ChurchPay | Church Onboarding",
+  title: "Get Started with MosquePay | Mosque Onboarding",
   description:
-    "Bring your church onto ChurchPay. Onboarding covers data import, giving and Gift Aid setup, website configuration, member portal rollout, and training for your team.",
+    "Bring your mosque onto MosquePay. Onboarding covers data import, giving and Gift Aid setup, website configuration, member portal rollout, and training for your team.",
   path: "/join",
   keywords: [
-    "church onboarding",
-    "church software setup",
-    "switch church management software",
-    "church giving setup",
+    "mosque onboarding",
+    "mosque software setup",
+    "switch mosque management software",
+    "mosque giving setup",
   ],
 });
 
 const ONBOARDING_STEPS = [
   {
     title: "Discovery call",
-    body: "We learn how your church runs today, covering giving, records, services, and who does what, and agree the right plan.",
+    body: "We learn how your mosque runs today, covering giving, records, services, and who does what, and agree the right plan.",
   },
   {
     title: "Guided import and setup",
-    body: "A step-by-step setup wizard imports your members, giving history, and Gift Aid declarations, connects payments, and brands your church site. We help wherever you want it.",
+    body: "A step-by-step setup wizard imports your members, giving history, and Gift Aid declarations, connects payments, and brands your mosque site. We help wherever you want it.",
   },
   {
     title: "Team training",
@@ -48,14 +48,14 @@ const ONBOARDING_STEPS = [
 const INCLUDED = [
   "Data import from spreadsheets or your previous system",
   "Giving, Gift Aid, and GASDS configuration",
-  "Church website setup with your branding",
+  "Mosque website setup with your branding",
   "Member portal invitations",
   "Role-based permissions for your team",
   "Ongoing support from real people",
 ];
 
 const TENANT_BENEFITS = [
-  "A church family that knows your name",
+  "A mosque family that knows your name",
   "Spiritual growth through teaching and community",
   "Opportunities to serve and use your gifts",
   "Practical and pastoral support in every season",
@@ -64,11 +64,11 @@ const TENANT_BENEFITS = [
 export default async function JoinPage({
   searchParams,
 }: {
-  searchParams: Promise<{ church?: string }>;
+  searchParams: Promise<{ mosque?: string }>;
 }) {
-  const { church } = await searchParams;
-  const isTenantMode = Boolean(church);
-  const churchSlug = resolveChurchSlug(church);
+  const { mosque } = await searchParams;
+  const isTenantMode = Boolean(mosque);
+  const mosqueSlug = resolveMosqueSlug(mosque);
 
   if (!isTenantMode) {
     return (
@@ -78,10 +78,10 @@ export default async function JoinPage({
             <div className="max-w-3xl">
               <MarketingKicker>Get started</MarketingKicker>
               <h1 className="mt-4 font-heading text-4xl font-bold leading-tight tracking-tight text-slate-900 sm:text-5xl">
-                Bring your church onto ChurchPay.
+                Bring your mosque onto MosquePay.
               </h1>
               <p className="mt-6 text-lg leading-8 text-slate-600">
-                Onboarding is included in every plan, and most churches are live within days. Here
+                Onboarding is included in every plan, and most mosques are live within days. Here
                 is exactly what happens after you say yes.
               </p>
               <div className="mt-9 flex flex-wrap gap-3">
@@ -150,7 +150,7 @@ export default async function JoinPage({
           <section className="public-hero">
             <div className="public-hero-shell">
               <div className="public-hero-copy">
-                <p className="public-kicker">Join our church family</p>
+                <p className="public-kicker">Join our mosque family</p>
                 <h1 className="public-hero-title">A clear and welcoming path to belonging.</h1>
                 <p className="public-hero-body">
                   Whoever you are and wherever you&apos;re starting from, you are welcome here.
@@ -185,7 +185,7 @@ export default async function JoinPage({
               <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(380px,0.9fr)] lg:gap-16">
                 <div>
                   <p className="section-label">Why join?</p>
-                  <h2 className="section-title">Church is better together.</h2>
+                  <h2 className="section-title">Mosque is better together.</h2>
                   <p className="section-description">
                     Membership is about worship, friendship, service, and belonging. Being known,
                     supported, and part of something bigger than Sunday mornings.
@@ -220,7 +220,7 @@ export default async function JoinPage({
                     Fill in the form below and we&apos;ll get back to you. Your details are
                     handled in confidence.
                   </p>
-                  <ExpressionOfInterestForm churchSlug={churchSlug} />
+                  <ExpressionOfInterestForm mosqueSlug={mosqueSlug} />
                 </div>
               </div>
             </div>

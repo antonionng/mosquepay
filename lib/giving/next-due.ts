@@ -1,4 +1,4 @@
-import type { ChurchGivingYear, MemberGiving } from "@/lib/db/types";
+import type { MosqueGivingYear, MemberGiving } from "@/lib/db/types";
 
 export type NextGivingStatus =
   | "owed_current_year"
@@ -33,7 +33,7 @@ function addOneDay(value: string): string {
 
 /**
  * Work out when a member's next annual giving bill should fall due, given the
- * church's current giving year and any giving records already on file.
+ * mosque's current giving year and any giving records already on file.
  *
  * Rules (simple and predictable for treasurers):
  * 1. No giving year configured → status "no_giving_year".
@@ -43,7 +43,7 @@ function addOneDay(value: string): string {
  *    the day after the current year ends, i.e. the start of next year.
  */
 export function computeNextGivingForMember(args: {
-  currentYear: ChurchGivingYear | null;
+  currentYear: MosqueGivingYear | null;
   memberGiving: MemberGiving[];
   defaultAnnualAmount?: number | null;
   /** When true the member has a permanent profile-level giving waiver. */

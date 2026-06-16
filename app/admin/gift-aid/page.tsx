@@ -11,17 +11,17 @@ export const dynamic = "force-dynamic";
 export default async function GiftAidPage() {
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
-  const churchId = ctx.mode === "database" ? ctx.churchId : null;
+  const mosqueId = ctx.mode === "database" ? ctx.mosqueId : null;
 
   const declarations = useMock
     ? mockDb.getGiftAidDeclarations()
-    : churchId
-      ? await db.getGiftAidDeclarations(churchId)
+    : mosqueId
+      ? await db.getGiftAidDeclarations(mosqueId)
       : [];
-  const donations = useMock || !churchId ? [] : await db.getDonations(churchId);
-  const claims = useMock || !churchId
+  const donations = useMock || !mosqueId ? [] : await db.getDonations(mosqueId);
+  const claims = useMock || !mosqueId
     ? []
-    : await db.getGiftAidClaimBatches(churchId).catch(() => []);
+    : await db.getGiftAidClaimBatches(mosqueId).catch(() => []);
   const declarationsByEmail = new Map(
     declarations
       .filter((d) => !("donor_address" in d))

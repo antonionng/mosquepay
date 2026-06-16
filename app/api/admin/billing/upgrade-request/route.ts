@@ -5,7 +5,7 @@ import { PLAN_DEFINITIONS, isPlanCode } from "@/lib/billing/plans";
 import { writeAuditLog } from "@/lib/audit";
 import * as db from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 
 export async function POST(request: NextRequest) {
   const unauthorized = await requireAdminApiAuth();
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const churchSlug = getChurchSlugFromRequest(request);
+  const mosqueSlug = getMosqueSlugFromRequest(request);
   const scope = await getCurrentAdminScope();
 
   if (!isSupabaseConfigured()) {
@@ -32,29 +32,29 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
 
-  const forbidden = await requireAdminApiPermission("admin:all", churchId);
+  const forbidden = await requireAdminApiPermission("admin:all", mosqueId);
   if (forbidden) return forbidden;
 
-  const subscription = await db.getChurchSubscription(churchId);
+  const subscription = await db.getMosqueSubscription(mosqueId);
   const target = PLAN_DEFINITIONS[targetPlan];
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "upgrade_requested",
-    entityType: "church_subscription",
-    entityId: subscription?.id ?? churchId,
+    entityType: "mosque_subscription",
+    entityId: subscription?.id ?? mosqueId,
     summary: `Requested upgrade to ${target.name}`,
     metadata: {
       current_plan: subscription?.plan_code ?? null,
       target_plan: targetPlan,
       reason,
       requested_by:
-        scope.kind === "dummy" || scope.kind === "platform" || scope.kind === "church"
+        scope.kind === "dummy" || scope.kind === "platform" || scope.kind === "mosque"
           ? scope.email
           : null,
     },

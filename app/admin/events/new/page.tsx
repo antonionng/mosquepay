@@ -11,7 +11,7 @@ export default function NewEventPage() {
         </Button>
       </div>
       <h1 className="mb-2 text-3xl font-semibold tracking-tight text-dash-text">New calendar item</h1>
-      <p className="mb-8 text-dash-muted">Create a new church service or public calendar item.</p>
+      <p className="mb-8 text-dash-muted">Create a new mosque service or public calendar item.</p>
       <EventForm />
     </div>
   );

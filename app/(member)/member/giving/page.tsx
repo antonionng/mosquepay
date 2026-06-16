@@ -160,7 +160,7 @@ export default function MemberGivingPage() {
   async function handlePay(mode: "payment" | "subscription") {
     if (!giving?.givingId || !giving?.memberEmail) {
       setError(
-        "We couldn't load your giving record. Please refresh the page, or contact your church secretary if this persists."
+        "We couldn't load your giving record. Please refresh the page, or contact your mosque secretary if this persists."
       );
       setPayMode(null);
       setSubscriptionPreviewOpen(false);
@@ -211,7 +211,7 @@ export default function MemberGivingPage() {
   async function openSubscriptionPreview(cadence?: Cadence) {
     if (!giving?.givingId || !giving?.memberEmail) {
       setError(
-        "We couldn't load your giving record. Please refresh the page, or contact your church secretary if this persists.",
+        "We couldn't load your giving record. Please refresh the page, or contact your mosque secretary if this persists.",
       );
       return;
     }
@@ -334,7 +334,7 @@ export default function MemberGivingPage() {
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Giving</h1>
-        <p className="text-slate-500 mt-1">Manage your annual church giving</p>
+        <p className="text-slate-500 mt-1">Manage your annual mosque giving</p>
       </div>
 
       {loading ? (
@@ -357,7 +357,7 @@ export default function MemberGivingPage() {
               No giving record found
             </p>
             <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-              We couldn&apos;t find a giving record for your account. If you believe this is wrong, please contact your church secretary.
+              We couldn&apos;t find a giving record for your account. If you believe this is wrong, please contact your mosque secretary.
             </p>
           </div>
         </>
@@ -776,7 +776,7 @@ function ScheduleStatusCard({
             <p className="mt-1">
               We&apos;ll automatically try again on{" "}
               {formatNextChargeDate(schedule.nextChargeAt)}. If your card is
-              expiring or has changed, please contact your church secretary.
+              expiring or has changed, please contact your mosque secretary.
             </p>
           </div>
         ) : null}

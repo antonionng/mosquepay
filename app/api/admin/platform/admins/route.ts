@@ -41,20 +41,20 @@ async function upsertAdminMembership({
   email,
   fullName,
   role,
-  churchId,
+  mosqueId,
 }: {
   email: string;
   fullName: string;
   role: string;
-  churchId: string | null;
+  mosqueId: string | null;
 }) {
-  const existing = await db.getAdminUserForScope(email, churchId);
+  const existing = await db.getAdminUserForScope(email, mosqueId);
   if (existing) {
     return db.updateAdminUser(existing.id, {
       full_name: fullName,
       role,
       active: true,
-      church_id: churchId,
+      mosque_id: mosqueId,
       permissions: existing.permissions ?? [],
     });
   }
@@ -63,7 +63,7 @@ async function upsertAdminMembership({
     full_name: fullName,
     role,
     active: true,
-    church_id: churchId,
+    mosque_id: mosqueId,
     permissions: [],
   });
 }
@@ -101,9 +101,9 @@ export async function POST(request: NextRequest) {
   const scopeType =
     body.scope_type === "platform" ||
     body.scope_type === "network" ||
-    body.scope_type === "church"
+    body.scope_type === "mosque"
       ? body.scope_type
-      : "church";
+      : "mosque";
 
   const guard =
     scopeType === "platform"
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
       email,
       fullName,
       role,
-      churchId: null,
+      mosqueId: null,
     });
     if (!staff) {
       return NextResponse.json(
@@ -139,11 +139,11 @@ export async function POST(request: NextRequest) {
       ? await sendStaffInvite({
           request,
           staff,
-          churchName: "ChurchPay platform",
+          mosqueName: "MosquePay platform",
         })
       : { sent: false, error: null as string | null };
     await writeAuditLog({
-      churchId: null,
+      mosqueId: null,
       action: sendInvite ? "platform_admin_invited" : "platform_admin_created",
       entityType: "admin_user",
       entityId: staff.id,
@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
   }
 
   const role = roleFrom(body.role, TENANT_ROLES, "super_admin");
-  let churches: db.Church[] = [];
+  let mosques: db.Mosque[] = [];
 
   if (scopeType === "network") {
     const networkId = typeof body.network_id === "string" ? body.network_id : "";
@@ -166,31 +166,31 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    churches = await db.listChurchesByNetwork(networkId);
+    mosques = await db.listMosquesByNetwork(networkId);
   } else {
-    const churchId = typeof body.church_id === "string" ? body.church_id : "";
-    if (!churchId) {
-      return NextResponse.json({ error: "Church is required." }, { status: 400 });
+    const mosqueId = typeof body.mosque_id === "string" ? body.mosque_id : "";
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Mosque is required." }, { status: 400 });
     }
-    const church = await db.getChurchById(churchId);
-    churches = church ? [church] : [];
+    const mosque = await db.getMosqueById(mosqueId);
+    mosques = mosque ? [mosque] : [];
   }
 
-  if (churches.length === 0) {
+  if (mosques.length === 0) {
     return NextResponse.json(
-      { error: "No churches found for that selection." },
+      { error: "No mosques found for that selection." },
       { status: 404 }
     );
   }
 
   const staff = (
     await Promise.all(
-      churches.map((church) =>
+      mosques.map((mosque) =>
         upsertAdminMembership({
           email,
           fullName,
           role,
-          churchId: church.id,
+          mosqueId: mosque.id,
         })
       )
     )
@@ -200,25 +200,25 @@ export async function POST(request: NextRequest) {
     ? await sendStaffInvite({
         request,
         staff: staff[0],
-        churchName:
+        mosqueName:
           scopeType === "network"
-            ? `${churches.length} churches on ChurchPay`
-            : churches[0].name,
+            ? `${mosques.length} mosques on MosquePay`
+            : mosques[0].name,
       })
     : { sent: false, error: null as string | null };
 
   await writeAuditLog({
-    churchId: scopeType === "church" ? churches[0].id : null,
+    mosqueId: scopeType === "mosque" ? mosques[0].id : null,
     action: sendInvite ? "tenant_admin_invited" : "tenant_admin_created",
     entityType: "admin_user",
     entityId: staff[0]?.id ?? null,
     summary: sendInvite
-      ? `${scopeEmail(guard.scope)} invited ${email} to ${churches.length} tenant(s)`
-      : `${scopeEmail(guard.scope)} assigned ${email} to ${churches.length} tenant(s) (no invite email)`,
+      ? `${scopeEmail(guard.scope)} invited ${email} to ${mosques.length} tenant(s)`
+      : `${scopeEmail(guard.scope)} assigned ${email} to ${mosques.length} tenant(s) (no invite email)`,
     metadata: {
       role,
       scope_type: scopeType,
-      church_ids: churches.map((church) => church.id),
+      mosque_ids: mosques.map((mosque) => mosque.id),
       invite_sent: invite.sent,
       invite_error: invite.error,
     },
@@ -266,20 +266,20 @@ export async function PATCH(request: NextRequest) {
   }
 
   if (action === "send_password_reset") {
-    let churchName = target.church_id ? "your church" : "ChurchPay platform";
-    if (target.church_id) {
+    let mosqueName = target.mosque_id ? "your mosque" : "MosquePay platform";
+    if (target.mosque_id) {
       try {
-        const church = await db.getChurchById(target.church_id);
-        if (church?.name) churchName = church.name;
+        const mosque = await db.getMosqueById(target.mosque_id);
+        if (mosque?.name) mosqueName = mosque.name;
       } catch {
-        // Non-fatal: stick with the generic church label.
+        // Non-fatal: stick with the generic mosque label.
       }
     }
 
     const reset = await sendStaffPasswordReset({
       request,
       staff: target,
-      churchName,
+      mosqueName,
     });
     if (!reset.sent) {
       return NextResponse.json(
@@ -289,8 +289,8 @@ export async function PATCH(request: NextRequest) {
     }
 
     await writeAuditLog({
-      churchId: target.church_id,
-      action: target.church_id
+      mosqueId: target.mosque_id,
+      action: target.mosque_id
         ? "tenant_admin_password_reset_sent"
         : "platform_admin_password_reset_sent",
       entityType: "admin_user",

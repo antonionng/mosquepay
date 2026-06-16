@@ -9,24 +9,24 @@ export const dynamic = "force-dynamic";
 export default async function AdminServicesPage() {
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
-  const churchId = ctx.mode === "database" ? ctx.churchId : null;
+  const mosqueId = ctx.mode === "database" ? ctx.mosqueId : null;
 
   const allEvents = useMock
     ? mockDb.getEvents()
-    : churchId
-      ? await db.getEvents(churchId)
+    : mosqueId
+      ? await db.getEvents(mosqueId)
       : [];
 
-  const serviceTypes = ["regular_service", "church_service", "special_service", "church_of_instruction", "committee", "emergency"];
+  const serviceTypes = ["regular_service", "mosque_service", "special_service", "mosque_of_instruction", "committee", "emergency"];
   const services = allEvents.filter((e) => serviceTypes.includes(e.event_type));
 
-  const churchDefaults = churchId ? await db.getChurchFeeDefaults(churchId) : null;
+  const mosqueDefaults = mosqueId ? await db.getMosqueFeeDefaults(mosqueId) : null;
 
-  // Fetch every payment for the church once and bucket by event_id so each
+  // Fetch every payment for the mosque once and bucket by event_id so each
   // service row can show "£X raised". Pulling once is cheap (payments are
-  // a small table per church) and saves N round trips on the list page.
+  // a small table per mosque) and saves N round trips on the list page.
   const allPayments =
-    churchId && !useMock ? await db.getPayments(churchId) : [];
+    mosqueId && !useMock ? await db.getPayments(mosqueId) : [];
   const SUCCEEDED_STATUS = new Set([
     "succeeded",
     "completed",
@@ -75,8 +75,8 @@ export default async function AdminServicesPage() {
   for (const m of services) {
     const rsvps = useMock
       ? mockDb.getRsvpsByEventId(m.id)
-      : churchId
-        ? await db.getRsvpsByEventId(m.id, churchId)
+      : mosqueId
+        ? await db.getRsvpsByEventId(m.id, mosqueId)
         : [];
     rsvpMap[m.id] = rsvps.map((r) => ({
       id: r.id,
@@ -101,10 +101,10 @@ export default async function AdminServicesPage() {
 
     let hasNotice = false;
     let noticeSentCount = 0;
-    if (churchId) {
-      const notice = await db.getServiceNotice(m.id, churchId);
+    if (mosqueId) {
+      const notice = await db.getServiceNotice(m.id, mosqueId);
       hasNotice = Boolean(notice);
-      const sends = await db.listServiceNoticeSends(churchId, m.id, 10);
+      const sends = await db.listServiceNoticeSends(mosqueId, m.id, 10);
       noticeSentCount = sends.reduce((a, s) => a + s.sent_count, 0);
     }
 
@@ -129,7 +129,7 @@ export default async function AdminServicesPage() {
         | "approved"
         | "sent"
         | undefined,
-      churchDefaults,
+      mosqueDefaults,
     });
   }
 

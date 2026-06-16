@@ -68,7 +68,7 @@ export function MemberSidebar() {
           // Anchored to the safe-area inset on iOS so the trigger sits
           // inside the new MemberTopBar's leading slot, never overlapping
           // the notch / status bar. The bottom tabs handle primary nav on
-          // phone; this hamburger gives one-tap access to church context,
+          // phone; this hamburger gives one-tap access to mosque context,
           // user info, and logout for secondary actions.
           "fixed left-3 top-[calc(env(safe-area-inset-top)+0.625rem)] z-50 h-10 w-10 border border-dash-border bg-dash-surface text-dash-text shadow-sm lg:hidden",
           "hover:bg-dash-surface-subtle hover:text-dash-text"
@@ -92,11 +92,11 @@ export function MemberSidebar() {
             href="/member"
             className="flex min-w-0 items-center"
             onClick={() => setMobileOpen(false)}
-            aria-label="ChurchPay member portal"
+            aria-label="MosquePay member portal"
           >
             <Image
-              src="/brand/churchpay-sidebar-logo.png"
-              alt="ChurchPay"
+              src="/brand/mosquepay-sidebar-logo.png"
+              alt="MosquePay"
               width={1032}
               height={245}
               priority

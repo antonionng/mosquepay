@@ -40,8 +40,8 @@ export default async function AdminGuestProfilePage({
   const guest =
     ctx.mode === "mock"
       ? mockDb.getGuestById(id) ?? null
-      : ctx.churchId
-        ? await db.getGuestById(id, ctx.churchId)
+      : ctx.mosqueId
+        ? await db.getGuestById(id, ctx.mosqueId)
         : null;
 
   if (!guest) {
@@ -50,9 +50,9 @@ export default async function AdminGuestProfilePage({
 
   const eventGuests =
     ctx.mode === "mock"
-      ? mockDb.listEventGuestsForChurch({ guestId: id })
-      : ctx.churchId
-        ? await db.listEventGuestsForChurch(ctx.churchId, { guestId: id })
+      ? mockDb.listEventGuestsForMosque({ guestId: id })
+      : ctx.mosqueId
+        ? await db.listEventGuestsForMosque(ctx.mosqueId, { guestId: id })
         : [];
 
   const eventIds = Array.from(
@@ -74,10 +74,10 @@ export default async function AdminGuestProfilePage({
         });
       }
     }
-  } else if (ctx.churchId) {
+  } else if (ctx.mosqueId) {
     await Promise.all(
       eventIds.map(async (eid) => {
-        const event = await db.getEventById(eid, ctx.churchId!);
+        const event = await db.getEventById(eid, ctx.mosqueId!);
         if (event) {
           eventMap.set(eid, {
             id: event.id,
@@ -115,10 +115,10 @@ export default async function AdminGuestProfilePage({
               : guest.guest_dining_amount != null
                 ? ` · dining £${guest.guest_dining_amount}`
                 : ""}
-            {guest.mother_church_name
-              ? ` - ${guest.mother_church_name}${
-                  guest.mother_church_number
-                    ? ` No. ${guest.mother_church_number}`
+            {guest.mother_mosque_name
+              ? ` - ${guest.mother_mosque_name}${
+                  guest.mother_mosque_number
+                    ? ` No. ${guest.mother_mosque_number}`
                     : ""
                 }`
               : ""}
@@ -136,8 +136,8 @@ export default async function AdminGuestProfilePage({
             full_name: guest.full_name,
             email: guest.email ?? "",
             phone: guest.phone ?? "",
-            mother_church_name: guest.mother_church_name ?? "",
-            mother_church_number: guest.mother_church_number ?? "",
+            mother_mosque_name: guest.mother_mosque_name ?? "",
+            mother_mosque_number: guest.mother_mosque_number ?? "",
             constitution: guest.constitution ?? "",
             rank: guest.rank ?? "",
             dietary_requirements: guest.dietary_requirements ?? "",
@@ -182,12 +182,12 @@ export default async function AdminGuestProfilePage({
               <Building2 className="mt-0.5 h-4 w-4 text-dash-muted" />
               <div>
                 <dt className="text-xs uppercase tracking-wider text-dash-muted">
-                  Mother church
+                  Mother mosque
                 </dt>
                 <dd className="text-dash-text">
-                  {guest.mother_church_name ?? "-"}
-                  {guest.mother_church_number
-                    ? ` No. ${guest.mother_church_number}`
+                  {guest.mother_mosque_name ?? "-"}
+                  {guest.mother_mosque_number
+                    ? ` No. ${guest.mother_mosque_number}`
                     : ""}
                 </dd>
                 {guest.constitution ? (

@@ -443,7 +443,7 @@ export function CashTab({
           members={members}
           payer={payer}
           setPayer={setPayer}
-          hint="Tap Guest to attach a guest record (add a new one if needed). Tap Member for Churchpay members. Receipts go automatically to whichever email we have on file."
+          hint="Tap Guest to attach a guest record (add a new one if needed). Tap Member for Mosquepay members. Receipts go automatically to whichever email we have on file."
         />
         <ServiceLinkField
           events={events}
@@ -524,9 +524,9 @@ export function CashTab({
         ) : null}
         <p
           className="hidden text-center text-xs text-muted-foreground sm:block"
-          title="Cash payments are recorded on the church ledger immediately. You can undo within 5 minutes here, or void any time from the Recent tab."
+          title="Cash payments are recorded on the mosque ledger immediately. You can undo within 5 minutes here, or void any time from the Recent tab."
         >
-          Cash payments are recorded on the church ledger immediately. You can
+          Cash payments are recorded on the mosque ledger immediately. You can
           undo within 5 minutes here, or void any time from the Recent tab.
         </p>
         <p

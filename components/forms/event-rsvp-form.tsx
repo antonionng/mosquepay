@@ -55,7 +55,7 @@ type GuestEntry = { guest_name: string; dietary_requirements?: string };
 
 type EventRsvpFormProps = {
   eventId: string;
-  churchSlug?: string;
+  mosqueSlug?: string;
   enableDining: boolean;
   diningPrice: number | null;
   diningDescription: string | null;
@@ -77,7 +77,7 @@ type EventRsvpFormProps = {
 
 export function EventRsvpForm({
   eventId,
-  churchSlug,
+  mosqueSlug,
   enableDining,
   diningPrice,
   diningDescription,
@@ -100,9 +100,9 @@ export function EventRsvpForm({
   const [error, setError] = useState<string | null>(null);
   const [guests, setGuests] = useState<GuestEntry[]>([]);
   const searchParams = useSearchParams();
-  const churchFromQuery = searchParams.get("church");
-  const effectiveChurch = churchSlug ?? churchFromQuery ?? undefined;
-  const churchQuery = effectiveChurch ? `?church=${encodeURIComponent(effectiveChurch)}` : "";
+  const mosqueFromQuery = searchParams.get("mosque");
+  const effectiveMosque = mosqueSlug ?? mosqueFromQuery ?? undefined;
+  const mosqueQuery = effectiveMosque ? `?mosque=${encodeURIComponent(effectiveMosque)}` : "";
 
   const {
     register,
@@ -171,7 +171,7 @@ export function EventRsvpForm({
 
     try {
       if (hasPayments && total > 0) {
-        const res = await fetch(`/api/payments/create-checkout-session${churchQuery}`, {
+        const res = await fetch(`/api/payments/create-checkout-session${mosqueQuery}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -200,7 +200,7 @@ export function EventRsvpForm({
         return;
       }
 
-      const res = await fetch(`/api/rsvps${churchQuery}`, {
+      const res = await fetch(`/api/rsvps${mosqueQuery}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

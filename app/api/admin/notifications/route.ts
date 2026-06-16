@@ -4,28 +4,28 @@ import { getAdminReadContext } from "@/lib/admin/read-context";
 import {
   ADMIN_NOTIFICATION_EVENTS,
   ADMIN_NOTIFICATION_ROLES,
-  listChurchNotificationSettings,
-  setChurchNotificationSetting,
+  listMosqueNotificationSettings,
+  setMosqueNotificationSetting,
 } from "@/lib/email/preferences";
 import { writeAuditLog } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
-async function selectedChurchId() {
+async function selectedMosqueId() {
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) return null;
-  return ctx.churchId;
+  if (ctx.mode !== "database" || !ctx.mosqueId) return null;
+  return ctx.mosqueId;
 }
 
 export async function GET() {
-  const churchId = await selectedChurchId();
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueId = await selectedMosqueId();
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("admin:all", churchId);
+  const forbidden = await requireAdminApiPermission("admin:all", mosqueId);
   if (forbidden) return forbidden;
 
-  const map = await listChurchNotificationSettings(churchId);
+  const map = await listMosqueNotificationSettings(mosqueId);
 
   // Render the matrix the UI expects: for each event x role, true
   // unless an explicit row says otherwise.
@@ -47,11 +47,11 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const churchId = await selectedChurchId();
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueId = await selectedMosqueId();
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("admin:all", churchId);
+  const forbidden = await requireAdminApiPermission("admin:all", mosqueId);
   if (forbidden) return forbidden;
 
   let body: { role?: unknown; event_type?: unknown; enabled?: unknown } = {};
@@ -76,11 +76,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  await setChurchNotificationSetting(churchId, role, eventType, enabled);
+  await setMosqueNotificationSetting(mosqueId, role, eventType, enabled);
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: enabled ? "notification_enable" : "notification_disable",
-    entityType: "church_notification_setting",
+    entityType: "mosque_notification_setting",
     entityId: `${role}::${eventType}`,
     summary: `Set ${role} notification for ${eventType} to ${enabled ? "on" : "off"}`,
     metadata: { role, event_type: eventType, enabled },

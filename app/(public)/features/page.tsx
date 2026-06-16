@@ -20,14 +20,14 @@ import {
 import { marketingMetadata } from "@/lib/seo";
 
 export const metadata = marketingMetadata({
-  title: "Church Management Features | ChurchPay",
+  title: "Mosque Management Features | MosquePay",
   description:
-    "Explore ChurchPay features for churches and networks: online giving, Gift Aid and GASDS, church websites, member portals, service notices, event RSVPs, newcomer CRM, pastoral care, and treasurer reporting.",
+    "Explore MosquePay features for mosques and networks: online giving, Gift Aid and GASDS, mosque websites, member portals, service notices, event RSVPs, newcomer CRM, welfare, and treasurer reporting.",
   path: "/features",
   keywords: [
-    "church management features",
-    "church giving software",
-    "church member portal",
+    "mosque management features",
+    "mosque giving software",
+    "mosque member portal",
     "service notice software",
     "newcomer management",
   ],
@@ -58,12 +58,12 @@ const MODULES = [
       "Role-based access for sensitive information",
       "Bulk import from your existing spreadsheets",
     ],
-    image: "/marketing/placeholder-church-dashboard.png",
+    image: "/marketing/placeholder-mosque-dashboard.png",
   },
   {
     Icon: CalendarDays,
     kicker: "Services & events",
-    title: "From Sunday services to special events, organised.",
+    title: "From Friday Jumu'ah to special events, organised.",
     body: "Plan your service calendar, send service notices by email with secure member links, take RSVPs with hospitality and dietary tracking, and collect event payments. All from one workflow your admin team will actually enjoy.",
     points: [
       "Service planning with repeating sequences",
@@ -71,7 +71,7 @@ const MODULES = [
       "RSVPs, hospitality lists, and dietary needs",
       "Event tickets and payment collection",
     ],
-    image: "/marketing/placeholder-church-dashboard.png",
+    image: "/marketing/placeholder-mosque-dashboard.png",
   },
   {
     Icon: Sparkles,
@@ -80,7 +80,7 @@ const MODULES = [
     body: "Every enquiry and first-time visit gets an owner and a next step. Move people through visit, follow-up, membership class, and welcome with a visible pipeline, so your welcome team always knows who needs a call.",
     points: [
       "Newcomer pipeline with owners and next actions",
-      "Public newcomer forms on your church website",
+      "Public newcomer forms on your mosque website",
       "Guest invitations with secure links",
       "Conversion to full member records in one click",
     ],
@@ -88,7 +88,7 @@ const MODULES = [
   },
   {
     Icon: HeartHandshake,
-    kicker: "Pastoral care",
+    kicker: "Welfare",
     title: "Care for your people, with privacy built in.",
     body: "Track pastoral cases, visits, bereavements, and follow-ups in a module only your pastoral team can see. Gentle signals like missed services and lapsed giving help you reach out before someone drifts away.",
     points: [
@@ -101,16 +101,16 @@ const MODULES = [
   },
   {
     Icon: Globe,
-    kicker: "Church website",
+    kicker: "Mosque website",
     title: "A beautiful public site, without another login.",
     body: "Publish service times, events, giving pages, news, and newcomer forms on a fast, branded website managed from the same admin. AI-assisted drafting helps you get started; section-based editing keeps it easy to maintain.",
     points: [
       "Section-based visual editor with AI drafts",
       "Service times, events, and online giving pages",
       "News and announcement publishing",
-      "Custom domain and your church branding",
+      "Custom domain and your mosque branding",
     ],
-    image: "/marketing/placeholder-church-dashboard.png",
+    image: "/marketing/placeholder-mosque-dashboard.png",
   },
   {
     Icon: BarChart3,
@@ -127,12 +127,12 @@ const MODULES = [
   },
   {
     Icon: Building2,
-    kicker: "Networks & multi-church",
-    title: "Many churches, one platform, local identity intact.",
-    body: "Run a group, circuit, or network with per-church sites, records, and branding while central teams keep billing, reporting, and rollout support in one console. See which churches need help before problems grow.",
+    kicker: "Networks & multi-mosque",
+    title: "Many mosques, one platform, local identity intact.",
+    body: "Run a group, circuit, or network with per-mosque sites, records, and branding while central teams keep billing, reporting, and rollout support in one console. See which mosques need help before problems grow.",
     points: [
-      "Per-church branding, data, and websites",
-      "Cross-church reporting and dashboards",
+      "Per-mosque branding, data, and websites",
+      "Cross-mosque reporting and dashboards",
       "Central billing on one invoice",
       "Network rollout and migration support",
     ],
@@ -149,7 +149,7 @@ const EXTRAS = [
   {
     Icon: Sparkles,
     title: "AI assistant",
-    body: "Draft notices, website copy, and follow-up messages with AI that understands church context.",
+    body: "Draft notices, website copy, and follow-up messages with AI that understands mosque context.",
   },
   {
     Icon: Check,
@@ -166,7 +166,7 @@ export default function FeaturesPage() {
           <div className="max-w-3xl">
             <MarketingKicker>Features</MarketingKicker>
             <h1 className="mt-4 font-heading text-4xl font-bold leading-tight tracking-tight text-slate-900 sm:text-5xl">
-              Built around real church life, not generic admin.
+              Built around real mosque life, not generic admin.
             </h1>
             <p className="mt-6 text-lg leading-8 text-slate-600">
               Every module, from giving and people to services, care, website, and reporting,
@@ -239,7 +239,7 @@ export default function FeaturesPage() {
 
       <MarketingCtaBand
         title="See every feature live, with your data."
-        body="Book a walkthrough and we'll demo the modules that matter most to your church. Giving and Gift Aid first, if you like."
+        body="Book a walkthrough and we'll demo the modules that matter most to your mosque. Giving and Gift Aid first, if you like."
         secondaryLabel="See pricing"
         secondaryHref="/pricing"
       />

@@ -94,7 +94,7 @@ function methodDescription(method: GivingPaymentMethod | null): string {
     case "paid_in_full":
       return "Paid in full offline (cash, cheque, transfer). Status recorded as paid for the year.";
     case "fee_waived":
-      return "Church has waived giving for this year for this member.";
+      return "Mosque has waived giving for this year for this member.";
     default:
       return "No payment method tagged yet. Tag this member so the treasurer dashboard counts them in the right bucket.";
   }
@@ -241,12 +241,12 @@ export function GivingMethodPanel({
 
   const mailtoHref = state.subscriptionLink
     ? `mailto:${memberEmail}?subject=${encodeURIComponent(
-        `Church giving – set up your payment plan`,
+        `Mosque giving – set up your payment plan`,
       )}&body=${encodeURIComponent(
         `Hi ${memberName.split(" ")[0] ?? memberName},\n\n` +
-          `You can set up your church giving here:\n\n${state.subscriptionLink}\n\n` +
+          `You can set up your mosque giving here:\n\n${state.subscriptionLink}\n\n` +
           `Pay in full or split it into monthly / quarterly instalments — whatever works for you.\n\n` +
-          `With every blessing,\nThe Church`,
+          `With every blessing,\nThe Mosque`,
       )}`
     : "#";
 
@@ -661,7 +661,7 @@ export function GivingMethodPanel({
           <DialogHeader>
             <DialogTitle>Waive giving for this member</DialogTitle>
             <DialogDescription>
-              The church has agreed to waive {memberName}&apos;s giving for
+              The mosque has agreed to waive {memberName}&apos;s giving for
               {initial.yearLabel ? ` ${initial.yearLabel}` : " this year"}.
               Status flips to <strong>waived</strong> and the reason is
               kept on the record.

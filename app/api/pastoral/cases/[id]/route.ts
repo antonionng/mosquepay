@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -21,19 +21,19 @@ export async function GET(
     );
   }
   const { id } = await params;
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("pastoral:read", churchId);
+  const forbidden = await requireAdminApiPermission("pastoral:read", mosqueId);
   if (forbidden) return forbidden;
 
-  const pastoralCase = await db.getPastoralCareCaseById(id, churchId);
+  const pastoralCase = await db.getPastoralCareCaseById(id, mosqueId);
   if (!pastoralCase) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
-  const visits = await db.listPastoralCareVisits(id, churchId);
+  const visits = await db.listPastoralCareVisits(id, mosqueId);
   return NextResponse.json({ case: pastoralCase, visits });
 }
 
@@ -50,12 +50,12 @@ export async function PATCH(
     );
   }
   const { id } = await params;
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("pastoral:write", churchId);
+  const forbidden = await requireAdminApiPermission("pastoral:write", mosqueId);
   if (forbidden) return forbidden;
 
   const body = await request.json();
@@ -78,13 +78,13 @@ export async function PATCH(
     updates.closed_at = null;
   }
 
-  const updated = await db.updatePastoralCareCase(id, churchId, updates);
+  const updated = await db.updatePastoralCareCase(id, mosqueId, updates);
   if (!updated) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "pastoral_case_updated",
     entityType: "pastoral_case",
     entityId: id,

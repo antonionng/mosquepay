@@ -3,7 +3,7 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
 import { calculateProRataGiving } from "@/lib/giving/pro-rata";
@@ -28,7 +28,7 @@ export async function POST(
     const unauthorized = await requireAdminApiAuth();
     if (unauthorized) return unauthorized;
 
-    const churchSlug = getChurchSlugFromRequest(request);
+    const mosqueSlug = getMosqueSlugFromRequest(request);
     const body = await request.json().catch(() => ({}));
 
     if (
@@ -45,14 +45,14 @@ export async function POST(
     }
 
     if (isSupabaseConfigured()) {
-      const churchId = await db.resolveChurchId(churchSlug);
-      if (!churchId) {
-        return NextResponse.json({ error: "Church not found." }, { status: 404 });
+      const mosqueId = await db.resolveMosqueId(mosqueSlug);
+      if (!mosqueId) {
+        return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
       }
-      const forbidden = await requireAdminApiPermission("members:write", churchId);
+      const forbidden = await requireAdminApiPermission("members:write", mosqueId);
       if (forbidden) return forbidden;
 
-      const newcomer = await db.getNewcomerById(id, churchId);
+      const newcomer = await db.getNewcomerById(id, mosqueId);
       if (!newcomer) {
         return NextResponse.json({ error: "Newcomer not found." }, { status: 404 });
       }
@@ -64,9 +64,9 @@ export async function POST(
       }
 
       const email = (body.email ?? newcomer.email).trim().toLowerCase();
-      const existing = await db.getMemberByEmail(email, churchId);
+      const existing = await db.getMemberByEmail(email, mosqueId);
       if (existing) {
-        await db.updateNewcomer(id, churchId, {
+        await db.updateNewcomer(id, mosqueId, {
           converted_member_id: existing.id,
           converted_at: new Date().toISOString(),
           stage: "welcomed",
@@ -78,7 +78,7 @@ export async function POST(
       }
 
       const fullName = body.full_name ?? `${newcomer.first_name} ${newcomer.last_name}`.trim();
-      const member = await db.createMember(churchId, {
+      const member = await db.createMember(mosqueId, {
         auth_user_id: null,
         email,
         full_name: fullName,
@@ -114,21 +114,21 @@ export async function POST(
           ? body.annual_giving_waiver_reason.trim().slice(0, 500) || null
           : null;
       if (annualGivingWaived) {
-        await db.updateMember(member.id, churchId, {
+        await db.updateMember(member.id, mosqueId, {
           annual_giving_waived: true,
           annual_giving_waiver_reason: annualGivingWaiverReason,
         });
       }
 
       if (!waiveGiving && !annualGivingWaived) {
-        const [activeGiving, churchYear] = await Promise.all([
-          db.getChurchGiving(churchId),
-          db.getCurrentChurchYear(churchId),
+        const [activeGiving, mosqueYear] = await Promise.all([
+          db.getMosqueGiving(mosqueId),
+          db.getCurrentMosqueYear(mosqueId),
         ]);
 
         const givingTemplate = activeGiving[0] ?? null;
         const fullAmount =
-          churchYear?.annual_giving_amount ?? givingTemplate?.amount ?? null;
+          mosqueYear?.annual_giving_amount ?? givingTemplate?.amount ?? null;
 
         if (fullAmount != null && fullAmount > 0) {
           const membershipDate =
@@ -139,20 +139,20 @@ export async function POST(
           let periodEnd: string;
           let isProRata = false;
 
-          if (churchYear && !billFullYear) {
+          if (mosqueYear && !billFullYear) {
             const proRata = calculateProRataGiving({
               fullYearAmount: fullAmount,
-              yearStartDate: churchYear.start_date,
-              yearEndDate: churchYear.end_date,
+              yearStartDate: mosqueYear.start_date,
+              yearEndDate: mosqueYear.end_date,
               joinDate: membershipDate,
             });
             amount = proRata.amount;
             periodStart = proRata.periodStart;
             periodEnd = proRata.periodEnd;
             isProRata = amount < fullAmount;
-          } else if (churchYear) {
-            periodStart = churchYear.start_date;
-            periodEnd = churchYear.end_date;
+          } else if (mosqueYear) {
+            periodStart = mosqueYear.start_date;
+            periodEnd = mosqueYear.end_date;
           } else {
             periodEnd = new Date(
               new Date(periodStart).getTime() + 365 * 86400000
@@ -161,7 +161,7 @@ export async function POST(
               .split("T")[0];
           }
 
-          await db.createMemberGiving(churchId, {
+          await db.createMemberGiving(mosqueId, {
             member_email: member.email,
             member_name: member.full_name,
             member_id: member.id,
@@ -185,14 +185,14 @@ export async function POST(
         }
       }
 
-      const updatedNewcomer = await db.updateNewcomer(id, churchId, {
+      const updatedNewcomer = await db.updateNewcomer(id, mosqueId, {
         converted_member_id: member.id,
         converted_at: new Date().toISOString(),
         stage: body.set_welcomed === false ? newcomer.stage : "welcomed",
       });
 
       // Carry newcomer notes / interactions over as a member-creation breadcrumb
-      await db.addNewcomerActivity(churchId, {
+      await db.addNewcomerActivity(mosqueId, {
         newcomer_id: id,
         activity_type: "note",
         title: "Converted to member",
@@ -205,7 +205,7 @@ export async function POST(
       });
 
       await writeAuditLog({
-        churchId,
+        mosqueId,
         action: "newcomer_converted",
         entityType: "newcomer",
         entityId: id,
@@ -213,7 +213,7 @@ export async function POST(
         metadata: { member_id: member.id, email: member.email },
       });
       await writeAuditLog({
-        churchId,
+        mosqueId,
         action: "created",
         entityType: "member",
         entityId: member.id,
@@ -225,7 +225,7 @@ export async function POST(
     }
 
     // Mock-db path
-    const newcomer = mockDb.getNewcomerById(id, { church_slug: churchSlug });
+    const newcomer = mockDb.getNewcomerById(id, { mosque_slug: mosqueSlug });
     if (!newcomer) {
       return NextResponse.json({ error: "Newcomer not found." }, { status: 404 });
     }
@@ -236,7 +236,7 @@ export async function POST(
       );
     }
     const email = (body.email ?? newcomer.email).trim().toLowerCase();
-    const existing = mockDb.getMemberByEmail(email, { church_slug: churchSlug });
+    const existing = mockDb.getMemberByEmail(email, { mosque_slug: mosqueSlug });
     if (existing) {
       mockDb.updateNewcomer(
         id,
@@ -245,7 +245,7 @@ export async function POST(
           converted_at: new Date().toISOString(),
           stage: "welcomed",
         },
-        { church_slug: churchSlug }
+        { mosque_slug: mosqueSlug }
       );
       return NextResponse.json(
         { error: "A member with this email already exists.", member: existing },
@@ -254,7 +254,7 @@ export async function POST(
     }
     const fullName = body.full_name ?? `${newcomer.first_name} ${newcomer.last_name}`.trim();
     const member = mockDb.createMember({
-      church_slug: churchSlug,
+      mosque_slug: mosqueSlug,
       auth_user_id: null,
       email,
       full_name: fullName,
@@ -285,10 +285,10 @@ export async function POST(
         converted_at: new Date().toISOString(),
         stage: body.set_welcomed === false ? newcomer.stage : "welcomed",
       },
-      { church_slug: churchSlug }
+      { mosque_slug: mosqueSlug }
     );
     mockDb.addNewcomerActivity({
-      church_slug: churchSlug,
+      mosque_slug: mosqueSlug,
       newcomer_id: id,
       activity_type: "note",
       title: "Converted to member",

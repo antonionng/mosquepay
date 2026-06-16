@@ -66,12 +66,12 @@ export async function GET(request: NextRequest) {
     );
 
     const supa = createServiceClient();
-    const church = await db.getChurchById(verifiedState.churchId);
-    const { error } = await supa.schema("mooov").from("churches").upsert(
+    const mosque = await db.getMosqueById(verifiedState.mosqueId);
+    const { error } = await supa.schema("mooov").from("mosques").upsert(
       {
-        id: verifiedState.churchId,
+        id: verifiedState.mosqueId,
         merchant_id: token.merchant_id,
-        display_name: church?.name ?? verifiedState.churchSlug,
+        display_name: mosque?.name ?? verifiedState.mosqueSlug,
         currency: "GBP",
         status: "active",
         metadata: {
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
           granted_scopes: token.granted_scopes,
           granted_at: token.granted_at,
           platform_id: token.platform_id,
-          church_slug: verifiedState.churchSlug,
+          mosque_slug: verifiedState.mosqueSlug,
         },
       },
       { onConflict: "id" }

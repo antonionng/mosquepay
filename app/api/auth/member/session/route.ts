@@ -19,18 +19,18 @@ export async function GET() {
 
     const member =
       (await db.getMemberByAuthUserId(user.id)) ??
-      (user.email ? await db.getMemberByEmailAcrossChurches(user.email) : null);
+      (user.email ? await db.getMemberByEmailAcrossMosques(user.email) : null);
 
-    // Resolve the church slug for the member's home church so the member
+    // Resolve the mosque slug for the member's home mosque so the member
     // portal can scope tenant-aware fetches without falling back to the
-    // hardcoded st-marys-demo default.
-    let churchSlug: string | null = null;
-    if (member?.church_id) {
+    // hardcoded central-jamia-demo default.
+    let mosqueSlug: string | null = null;
+    if (member?.mosque_id) {
       try {
-        const church = await db.getChurchById(member.church_id);
-        churchSlug = church?.slug ?? null;
-      } catch (churchErr) {
-        console.error("member session: church slug lookup failed", churchErr);
+        const mosque = await db.getMosqueById(member.mosque_id);
+        mosqueSlug = mosque?.slug ?? null;
+      } catch (mosqueErr) {
+        console.error("member session: mosque slug lookup failed", mosqueErr);
       }
     }
 
@@ -41,8 +41,8 @@ export async function GET() {
         full_name: member?.full_name ?? user.user_metadata?.full_name ?? null,
         phone: member?.phone ?? null,
         dietary_requirements: member?.dietary_requirements ?? null,
-        church_id: member?.church_id ?? null,
-        church_slug: churchSlug,
+        mosque_id: member?.mosque_id ?? null,
+        mosque_slug: mosqueSlug,
         rank: member?.rank ?? null,
         membership_status: member?.membership_status ?? null,
       },
@@ -70,7 +70,7 @@ export async function PATCH(request: Request) {
     const body = await request.json().catch(() => ({}));
     const member =
       (await db.getMemberByAuthUserId(user.id)) ??
-      (await db.getMemberByEmailAcrossChurches(user.email));
+      (await db.getMemberByEmailAcrossMosques(user.email));
 
     if (!member) {
       return NextResponse.json(
@@ -134,7 +134,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "No fields to update." }, { status: 400 });
     }
 
-    const updated = await db.updateMember(member.id, member.church_id, updates);
+    const updated = await db.updateMember(member.id, member.mosque_id, updates);
     if (!updated) {
       return NextResponse.json({ error: "Member not found." }, { status: 404 });
     }
@@ -146,7 +146,7 @@ export async function PATCH(request: Request) {
     }
 
     if (!member.auth_user_id) {
-      await db.updateMember(member.id, member.church_id, { auth_user_id: user.id });
+      await db.updateMember(member.id, member.mosque_id, { auth_user_id: user.id });
     }
 
     return NextResponse.json({
@@ -156,7 +156,7 @@ export async function PATCH(request: Request) {
         full_name: updated.full_name,
         phone: updated.phone,
         dietary_requirements: updated.dietary_requirements,
-        church_id: updated.church_id,
+        mosque_id: updated.mosque_id,
         rank: updated.rank,
         membership_status: updated.membership_status,
       },

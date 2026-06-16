@@ -48,7 +48,7 @@ import {
   slugify,
   type ServiceForm,
 } from "./service-form";
-import type { ChurchFeeDefaults } from "@/lib/fees/resolve";
+import type { MosqueFeeDefaults } from "@/lib/fees/resolve";
 
 type ServiceEvent = {
   id: string;
@@ -149,7 +149,7 @@ export function AdminServicesClient({
   const [serviceForm, setServiceForm] = useState<ServiceForm>(() => emptyServiceForm());
   const [formError, setFormError] = useState<string | null>(null);
   const [formSaving, setFormSaving] = useState(false);
-  const [churchDefaults, setChurchDefaults] = useState<ChurchFeeDefaults | null>(
+  const [mosqueDefaults, setMosqueDefaults] = useState<MosqueFeeDefaults | null>(
     null
   );
   const [calendarMonth, setCalendarMonth] = useState(() => {
@@ -207,18 +207,18 @@ export function AdminServicesClient({
     setView(tab === "calendar" ? "calendar" : "list");
   }
 
-  // Cache the church defaults across opens of the drawer. They are tiny and
+  // Cache the mosque defaults across opens of the drawer. They are tiny and
   // don't change while the user is sitting on this page; revalidate each time
   // the drawer opens so a treasurer who just edited the defaults in another
   // tab sees the latest values.
-  async function fetchChurchDefaults(): Promise<ChurchFeeDefaults | null> {
+  async function fetchMosqueDefaults(): Promise<MosqueFeeDefaults | null> {
     try {
-      const res = await fetch("/api/settings/church-fees");
+      const res = await fetch("/api/settings/mosque-fees");
       if (!res.ok) return null;
       const data = await res.json();
       const fees = data.fees ?? null;
       if (!fees) return null;
-      const defaults: ChurchFeeDefaults = {
+      const defaults: MosqueFeeDefaults = {
         default_member_levy_amount:
           fees.default_member_levy_amount ?? null,
         default_member_dining_amount:
@@ -227,7 +227,7 @@ export function AdminServicesClient({
           fees.default_guest_dining_amount ?? null,
         currency: fees.currency ?? "gbp",
       };
-      setChurchDefaults(defaults);
+      setMosqueDefaults(defaults);
       return defaults;
     } catch {
       return null;
@@ -239,14 +239,14 @@ export function AdminServicesClient({
     setFormError(null);
     setFormOpen(true);
     // Start with a sensible default: service levy ON (since most services
-    // charge one and a church default will be filled in), dining and guests
+    // charge one and a mosque default will be filled in), dining and guests
     // opt-in by the user. Prices are left blank so the resolver falls through
-    // to the church defaults at runtime.
+    // to the mosque defaults at runtime.
     setServiceForm({
       ...emptyServiceForm(),
       enable_service_fee: true,
     });
-    void fetchChurchDefaults();
+    void fetchMosqueDefaults();
   }
 
   function openEditServiceForm(service: ServiceEvent) {
@@ -254,7 +254,7 @@ export function AdminServicesClient({
     setServiceForm(formFromService(service));
     setFormError(null);
     setFormOpen(true);
-    void fetchChurchDefaults();
+    void fetchMosqueDefaults();
   }
 
   function updateServiceForm(updates: Partial<ServiceForm>) {
@@ -388,9 +388,9 @@ export function AdminServicesClient({
 
   const typeColor: Record<string, string> = {
     regular_service: "bg-blue-500",
-    church_service: "bg-blue-500",
+    mosque_service: "bg-blue-500",
     special_service: "bg-purple-500",
-    church_of_instruction: "bg-cyan-500",
+    mosque_of_instruction: "bg-cyan-500",
     committee: "bg-amber-500",
     emergency: "bg-rose-500",
   };
@@ -440,7 +440,7 @@ export function AdminServicesClient({
         <div>
           <h1 className="admin-page-title">Services</h1>
           <p className="admin-page-copy">
-            Calendar, church services, notice, and attendance in one place.
+            Calendar, mosque services, notice, and attendance in one place.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -752,7 +752,7 @@ export function AdminServicesClient({
         updateForm={updateServiceForm}
         onClose={() => setFormOpen(false)}
         onSubmit={handleServiceSubmit}
-        churchDefaults={churchDefaults}
+        mosqueDefaults={mosqueDefaults}
       />
     </div>
   );

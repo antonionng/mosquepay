@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
 import { getAdminReadContext } from "@/lib/admin/read-context";
-import { getDefaultChurchSlug } from "@/lib/tenant";
+import { getDefaultMosqueSlug } from "@/lib/tenant";
 import { EventPageContent } from "@/app/(public)/events/[slug]/page";
 
 export const dynamic = "force-dynamic";
@@ -22,21 +22,21 @@ export default async function AdminServicePreviewPage({
   // admin, so this route is implicitly gated.
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
-  const churchId = ctx.mode === "database" ? ctx.churchId : null;
-  const churchSlug =
-    ctx.mode === "database" ? ctx.churchSlug : getDefaultChurchSlug();
+  const mosqueId = ctx.mode === "database" ? ctx.mosqueId : null;
+  const mosqueSlug =
+    ctx.mode === "database" ? ctx.mosqueSlug : getDefaultMosqueSlug();
 
   const event = useMock
     ? mockDb.getEventById(id)
-    : churchId
-      ? await db.getEventById(id, churchId)
+    : mosqueId
+      ? await db.getEventById(id, mosqueId)
       : null;
   if (!event) notFound();
 
   return (
     <EventPageContent
       slug={event.slug}
-      church={churchSlug}
+      mosque={mosqueSlug}
       linkMode="scoped"
       bypassVisibility
       adminPreviewBackHref={`/admin/services/${id}`}

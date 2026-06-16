@@ -6,8 +6,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { reopenCookieConsent } from "@/lib/cookie-consent";
 import { COMPANY_NAME } from "@/lib/legal";
-import { resolveChurchSlug } from "@/lib/tenant";
-import type { ChurchSiteFooterSettings } from "@/lib/db/types";
+import { DEMO_MOSQUE_NAME } from "@/lib/demo-mosque";
+import { resolveMosqueSlug } from "@/lib/tenant";
+import type { MosqueSiteFooterSettings } from "@/lib/db/types";
 import { defaultFooterSettings } from "@/lib/site-section-style";
 
 const marketingLinks = {
@@ -23,13 +24,13 @@ const marketingLinks = {
   ],
 };
 
-type ChurchBranding = {
+type MosqueBranding = {
   slug: string;
   name: string;
   city: string | null;
   tagline: string | null;
   logo_url: string | null;
-  church_number: string | null;
+  mosque_number: string | null;
   support_email: string | null;
   support_phone: string | null;
 };
@@ -49,22 +50,22 @@ export function PublicFooter({
   initialFooterSettings = null,
   initialTenantSlug = null,
 }: {
-  initialBranding?: ChurchBranding | null;
-  initialFooterSettings?: ChurchSiteFooterSettings | null;
+  initialBranding?: MosqueBranding | null;
+  initialFooterSettings?: MosqueSiteFooterSettings | null;
   initialTenantSlug?: string | null;
 }) {
   const searchParams = useSearchParams();
-  const [branding, setBranding] = useState<ChurchBranding | null>(initialBranding);
+  const [branding, setBranding] = useState<MosqueBranding | null>(initialBranding);
   const [hostTenantSlug, setHostTenantSlug] = useState<string | null>(initialTenantSlug);
-  const [footerSettings, setFooterSettings] = useState<ChurchSiteFooterSettings | null>(
+  const [footerSettings, setFooterSettings] = useState<MosqueSiteFooterSettings | null>(
     initialFooterSettings
   );
-  const rawChurchQuery = searchParams.get("church");
-  const queryTenantMode = Boolean(rawChurchQuery);
+  const rawMosqueQuery = searchParams.get("mosque");
+  const queryTenantMode = Boolean(rawMosqueQuery);
   const isTenantMode = queryTenantMode || Boolean(hostTenantSlug);
-  const churchSlug = useMemo(
-    () => hostTenantSlug ?? resolveChurchSlug(rawChurchQuery),
-    [hostTenantSlug, rawChurchQuery]
+  const mosqueSlug = useMemo(
+    () => hostTenantSlug ?? resolveMosqueSlug(rawMosqueQuery),
+    [hostTenantSlug, rawMosqueQuery]
   );
   const settings = footerSettings ?? defaultFooterSettings();
   const tenantFooterGroups = settings.link_groups
@@ -85,31 +86,31 @@ export function PublicFooter({
   const footerGroups = isTenantMode ? tenantFooterGroups : marketingFooterGroups;
   const withTenantQuery = (href: string) =>
     isTenantMode && href.startsWith("/")
-      ? `${href}${href.includes("?") ? "&" : "?"}church=${encodeURIComponent(churchSlug)}`
+      ? `${href}${href.includes("?") ? "&" : "?"}mosque=${encodeURIComponent(mosqueSlug)}`
       : href;
 
   useEffect(() => {
-    if (initialBranding && initialTenantSlug === churchSlug) return;
+    if (initialBranding && initialTenantSlug === mosqueSlug) return;
 
     let active = true;
     async function loadBranding() {
       try {
         const res = await fetch(
           queryTenantMode
-            ? `/api/churches/${churchSlug}/site`
-            : "/api/churches/current/site"
+            ? `/api/mosques/${mosqueSlug}/site`
+            : "/api/mosques/current/site"
         );
         if (!res.ok) return;
         const data = await res.json();
         if (!active) return;
-        const church = data.church as ChurchBranding | null;
+        const mosque = data.mosque as MosqueBranding | null;
         const siteFooterSettings = data.site?.footer_settings as
-          | ChurchSiteFooterSettings
+          | MosqueSiteFooterSettings
           | null
           | undefined;
-        if (church) {
-          setBranding(church);
-          if (!queryTenantMode) setHostTenantSlug(church.slug);
+        if (mosque) {
+          setBranding(mosque);
+          if (!queryTenantMode) setHostTenantSlug(mosque.slug);
         }
         setFooterSettings(siteFooterSettings ?? null);
       } catch {
@@ -120,7 +121,7 @@ export function PublicFooter({
     return () => {
       active = false;
     };
-  }, [initialBranding, initialTenantSlug, churchSlug, queryTenantMode]);
+  }, [initialBranding, initialTenantSlug, mosqueSlug, queryTenantMode]);
 
   return (
     <footer
@@ -148,20 +149,20 @@ export function PublicFooter({
                     </div>
                   ) : settings.show_logo ? (
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-[11px] font-semibold tracking-[0.2em]">
-                      {initialsFromName(branding?.name ?? "St Mary's Church")}
+                      {initialsFromName(branding?.name ?? "DEMO_MOSQUE_NAME")}
                     </div>
                   ) : null}
-                  {(settings.show_church_name || settings.show_church_number) ? (
+                  {(settings.show_mosque_name || settings.show_mosque_number) ? (
                     <div>
-                      {settings.show_church_name ? (
+                      {settings.show_mosque_name ? (
                         <p className="text-base font-semibold tracking-tight">
-                          {branding?.name ?? "St Mary's Church"}
+                          {branding?.name ?? "DEMO_MOSQUE_NAME"}
                         </p>
                       ) : null}
                       <p className="text-sm text-slate-400">
                         {[
-                          settings.show_church_number && branding?.church_number
-                            ? `No. ${branding.church_number}`
+                          settings.show_mosque_number && branding?.mosque_number
+                            ? `No. ${branding.mosque_number}`
                             : null,
                           branding?.city ?? "Mayfair, London",
                         ]
@@ -173,8 +174,8 @@ export function PublicFooter({
                 </>
               ) : (
                 <Image
-                  src="/brand/churchpay-sidebar-logo.png"
-                  alt="ChurchPay"
+                  src="/brand/mosquepay-sidebar-logo.png"
+                  alt="MosquePay"
                   width={1032}
                   height={245}
                   className="h-9 w-auto max-w-[10rem] object-contain opacity-90"
@@ -191,8 +192,8 @@ export function PublicFooter({
               {isTenantMode
                 ? settings.tagline ??
                   branding?.tagline ??
-                  "A complete church website with newcomer information, services, charity, membership enquiries, and church contact details."
-                : "Websites, services, notices, giving, charity, Gift Aid, member portal, digital card, newcomer CRM, pastoral care, communications, treasurer reconciliation, and reporting for churches."}
+                  "A complete mosque website with newcomer information, services, charity, membership enquiries, and mosque contact details."
+                : "Websites, services, notices, giving, charity, Gift Aid, member portal, digital card, newcomer CRM, welfare, communications, treasurer reconciliation, and reporting for mosques."}
             </p>
             {isTenantMode && (settings.badge_text || settings.show_contact_details) ? (
               <div className="mt-6 flex flex-wrap gap-3 text-xs text-slate-400">
@@ -262,18 +263,18 @@ export function PublicFooter({
             <p className={isTenantMode ? "text-xs text-slate-500" : "text-xs text-dash-faint"}>
               © {new Date().getFullYear()}{" "}
               {isTenantMode
-                ? `${branding?.name ?? "St Mary's Church"}.`
-                : `ChurchPay, operated by ${COMPANY_NAME}.`}{" "}
+                ? `${branding?.name ?? "DEMO_MOSQUE_NAME"}.`
+                : `MosquePay, operated by ${COMPANY_NAME}.`}{" "}
               All rights reserved.
             </p>
             <div className={isTenantMode ? "flex flex-wrap gap-5 text-xs text-slate-500" : "flex flex-wrap gap-5 text-xs text-dash-faint"}>
               {isTenantMode ? (
                 settings.show_powered_by !== false ? (
                   <Link
-                    href="https://churchpay.co.uk"
+                    href="https://mosque-pay.com"
                     className="transition-colors hover:text-slate-300"
                   >
-                    Powered by ChurchPay
+                    Powered by MosquePay
                   </Link>
                 ) : null
               ) : (

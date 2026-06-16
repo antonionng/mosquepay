@@ -12,17 +12,17 @@ export default async function GiftAidDetailPage({
 }) {
   const { id } = await params;
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
     redirect("/admin/gift-aid");
   }
-  const churchId = ctx.churchId;
+  const mosqueId = ctx.mosqueId;
 
-  const declaration = await db.getGiftAidDeclarationById(id, churchId);
+  const declaration = await db.getGiftAidDeclarationById(id, mosqueId);
   if (!declaration) notFound();
 
   const [donations, auditLogs] = await Promise.all([
-    db.getDonationsByGiftAidDeclaration(id, churchId),
-    db.listAuditLogsByEntity(churchId, "gift_aid_declaration", id),
+    db.getDonationsByGiftAidDeclaration(id, mosqueId),
+    db.listAuditLogsByEntity(mosqueId, "gift_aid_declaration", id),
   ]);
 
   return (

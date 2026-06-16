@@ -4,7 +4,7 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
 import * as mockDb from "@/lib/mock-db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import { requireAdminApiAuth, requireAdminApiPermission } from "@/lib/auth/api";
 import { writeAuditLog } from "@/lib/audit";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -23,35 +23,35 @@ export async function GET(request: NextRequest, { params }: Params) {
     if (unauthorized) return unauthorized;
 
     const { id } = await params;
-    const churchSlug = getChurchSlugFromRequest(request);
+    const mosqueSlug = getMosqueSlugFromRequest(request);
 
     if (isSupabaseConfigured()) {
-      const churchId = await db.resolveChurchId(churchSlug);
-      if (!churchId) {
-        return NextResponse.json({ error: "Church not found." }, { status: 404 });
+      const mosqueId = await db.resolveMosqueId(mosqueSlug);
+      if (!mosqueId) {
+        return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
       }
 
-      const member = await db.getMemberById(id, churchId);
+      const member = await db.getMemberById(id, mosqueId);
       if (!member) {
         return NextResponse.json({ error: "Member not found." }, { status: 404 });
       }
 
       const [dietaryHistory, paymentHistory, givingRecords] = await Promise.all([
-        db.getRsvpDietaryByEmail(member.email, churchId),
-        db.getPaymentsByEmail(member.email, churchId),
-        db.getMemberGiving(churchId, { memberEmail: member.email }),
+        db.getRsvpDietaryByEmail(member.email, mosqueId),
+        db.getPaymentsByEmail(member.email, mosqueId),
+        db.getMemberGiving(mosqueId, { memberEmail: member.email }),
       ]);
 
       return NextResponse.json({ member, dietaryHistory, paymentHistory, givingRecords });
     }
 
-    const member = mockDb.getMemberById(id, { church_slug: churchSlug });
+    const member = mockDb.getMemberById(id, { mosque_slug: mosqueSlug });
     if (!member) {
       return NextResponse.json({ error: "Member not found." }, { status: 404 });
     }
 
-    const dietaryHistory = mockDb.getRsvpDietaryByEmail(member.email, { church_slug: churchSlug });
-    const paymentHistory = mockDb.getPaymentsByEmail(member.email, { church_slug: churchSlug });
+    const dietaryHistory = mockDb.getRsvpDietaryByEmail(member.email, { mosque_slug: mosqueSlug });
+    const paymentHistory = mockDb.getPaymentsByEmail(member.email, { mosque_slug: mosqueSlug });
 
     return NextResponse.json({ member, dietaryHistory, paymentHistory, givingRecords: [] });
   } catch (e) {
@@ -69,7 +69,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (unauthorized) return unauthorized;
 
     const { id } = await params;
-    const churchSlug = getChurchSlugFromRequest(request);
+    const mosqueSlug = getMosqueSlugFromRequest(request);
     const body = await request.json();
 
     if (
@@ -87,17 +87,17 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
 
     if (isSupabaseConfigured()) {
-      const churchId = await db.resolveChurchId(churchSlug);
-      if (!churchId) {
-        return NextResponse.json({ error: "Church not found." }, { status: 404 });
+      const mosqueId = await db.resolveMosqueId(mosqueSlug);
+      if (!mosqueId) {
+        return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
       }
-      const forbidden = await requireAdminApiPermission("members:write", churchId);
+      const forbidden = await requireAdminApiPermission("members:write", mosqueId);
       if (forbidden) return forbidden;
 
       const { email: rawEmail, ...otherFields } = body as Record<string, unknown>;
       const emailChange = await applyMemberEmailChange({
         memberId: id,
-        churchId,
+        mosqueId,
         rawEmail,
       });
       if (emailChange.kind === "error") {
@@ -109,7 +109,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
       let updated: db.Member | null = emailChange.member;
       if (Object.keys(otherFields).length > 0) {
-        updated = await db.updateMember(id, churchId, otherFields);
+        updated = await db.updateMember(id, mosqueId, otherFields);
       }
 
       if (!updated) {
@@ -117,7 +117,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       }
 
       await writeAuditLog({
-        churchId,
+        mosqueId,
         action: "updated",
         entityType: "member",
         entityId: updated.id,
@@ -159,7 +159,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       });
     }
 
-    const updated = mockDb.updateMember(id, body, { church_slug: churchSlug });
+    const updated = mockDb.updateMember(id, body, { mosque_slug: mosqueSlug });
     if (!updated) {
       return NextResponse.json({ error: "Member not found." }, { status: 404 });
     }
@@ -198,15 +198,15 @@ type EmailChangeResult =
  */
 async function applyMemberEmailChange({
   memberId,
-  churchId,
+  mosqueId,
   rawEmail,
 }: {
   memberId: string;
-  churchId: string;
+  mosqueId: string;
   rawEmail: unknown;
 }): Promise<EmailChangeResult> {
   if (rawEmail === undefined) {
-    const current = await db.getMemberById(memberId, churchId);
+    const current = await db.getMemberById(memberId, mosqueId);
     if (!current) {
       return { kind: "error", status: 404, message: "Member not found." };
     }
@@ -226,7 +226,7 @@ async function applyMemberEmailChange({
     };
   }
 
-  const current = await db.getMemberById(memberId, churchId);
+  const current = await db.getMemberById(memberId, mosqueId);
   if (!current) {
     return { kind: "error", status: 404, message: "Member not found." };
   }
@@ -235,12 +235,12 @@ async function applyMemberEmailChange({
     return { kind: "noop", member: current };
   }
 
-  const collision = await db.getMemberByEmail(normalised, churchId);
+  const collision = await db.getMemberByEmail(normalised, mosqueId);
   if (collision && collision.id !== memberId) {
     return {
       kind: "error",
       status: 409,
-      message: "Another member in this church already has that email.",
+      message: "Another member in this mosque already has that email.",
     };
   }
 
@@ -291,7 +291,7 @@ async function applyMemberEmailChange({
     }
   }
 
-  const change = await db.changeMemberEmail(memberId, churchId, normalised);
+  const change = await db.changeMemberEmail(memberId, mosqueId, normalised);
   if (!change.member) {
     return { kind: "error", status: 404, message: "Member not found." };
   }
@@ -319,22 +319,22 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     if (unauthorized) return unauthorized;
 
     const { id } = await params;
-    const churchSlug = getChurchSlugFromRequest(request);
+    const mosqueSlug = getMosqueSlugFromRequest(request);
 
     if (isSupabaseConfigured()) {
-      const churchId = await db.resolveChurchId(churchSlug);
-      if (!churchId) {
-        return NextResponse.json({ error: "Church not found." }, { status: 404 });
+      const mosqueId = await db.resolveMosqueId(mosqueSlug);
+      if (!mosqueId) {
+        return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
       }
-      const forbidden = await requireAdminApiPermission("members:write", churchId);
+      const forbidden = await requireAdminApiPermission("members:write", mosqueId);
       if (forbidden) return forbidden;
 
-      const updated = await db.updateMember(id, churchId, { membership_status: "excluded" });
+      const updated = await db.updateMember(id, mosqueId, { membership_status: "excluded" });
       if (!updated) {
         return NextResponse.json({ error: "Member not found." }, { status: 404 });
       }
       await writeAuditLog({
-        churchId,
+        mosqueId,
         action: "excluded",
         entityType: "member",
         entityId: updated.id,
@@ -343,7 +343,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       return NextResponse.json({ member: updated });
     }
 
-    const updated = mockDb.updateMember(id, { membership_status: "excluded" }, { church_slug: churchSlug });
+    const updated = mockDb.updateMember(id, { membership_status: "excluded" }, { mosque_slug: mosqueSlug });
     if (!updated) {
       return NextResponse.json({ error: "Member not found." }, { status: 404 });
     }

@@ -6,7 +6,7 @@ import type { AdminUser } from "@/lib/db/types";
 
 function profileFromMemberships(email: string, memberships: AdminUser[]) {
   const primary =
-    memberships.find((membership) => membership.church_id) ?? memberships[0];
+    memberships.find((membership) => membership.mosque_id) ?? memberships[0];
 
   return {
     email,

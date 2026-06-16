@@ -41,7 +41,7 @@ export async function requireOperatorApiAuth() {
 
 export async function requireAdminApiPermission(
   permission: AdminPermission,
-  churchId?: string | null
+  mosqueId?: string | null
 ) {
-  return requireAdminPermission(permission, churchId);
+  return requireAdminPermission(permission, mosqueId);
 }

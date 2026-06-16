@@ -173,7 +173,7 @@ export function ChargeTab({
             "error" in body ? body.error : "Could not mint payment.";
           setError(message);
           setMinting(false);
-          if ("code" in body && body.code === "church_not_connected") {
+          if ("code" in body && body.code === "mosque_not_connected") {
             onRequireConnected?.();
           }
           return;
@@ -251,7 +251,7 @@ export function ChargeTab({
           members={members}
           payer={payer}
           setPayer={setPayer}
-          hint="Tap Guest to attach a guest record (or add a new one). Tap Member to attribute to a Churchpay member and auto-attach Gift Aid."
+          hint="Tap Guest to attach a guest record (or add a new one). Tap Member to attribute to a Mosquepay member and auto-attach Gift Aid."
         />
         <ServiceLinkField
           events={events}

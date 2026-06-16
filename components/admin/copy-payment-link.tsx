@@ -3,19 +3,19 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Link2, Check } from "lucide-react";
-import { churchScopedEventPath } from "@/lib/public-links";
+import { mosqueScopedEventPath } from "@/lib/public-links";
 
 export function CopyPaymentLink({
-  churchSlug,
+  mosqueSlug,
   slug,
 }: {
-  churchSlug: string;
+  mosqueSlug: string;
   slug: string;
 }) {
   const [copied, setCopied] = useState(false);
 
   function copy() {
-    const url = `${window.location.origin}${churchScopedEventPath(churchSlug, slug)}/pay`;
+    const url = `${window.location.origin}${mosqueScopedEventPath(mosqueSlug, slug)}/pay`;
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);

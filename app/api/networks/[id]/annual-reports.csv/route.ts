@@ -37,10 +37,10 @@ export async function GET(
   if (!network) {
     return NextResponse.json({ error: "Network not found." }, { status: 404 });
   }
-  const rows = await db.listChurchAnnualReturns(id);
+  const rows = await db.listMosqueAnnualReturns(id);
   const headers = [
-    "church_name",
-    "church_number",
+    "mosque_name",
+    "mosque_number",
     "active_members",
     "resigned_members",
     "excluded_members",
@@ -52,8 +52,8 @@ export async function GET(
     headers.join(","),
     ...rows.map((r) =>
       [
-        r.church_name,
-        r.church_number,
+        r.mosque_name,
+        r.mosque_number,
         r.active_members,
         r.resigned_members,
         r.excluded_members,

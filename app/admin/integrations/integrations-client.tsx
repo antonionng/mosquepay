@@ -90,7 +90,7 @@ const PROVIDER_META: Record<Provider, ProviderMeta> = {
     comingSoon: true,
     logo: "/brand/integrations/google-calendar.svg",
     blurb:
-      "Push church services to a shared Google Calendar. Paste an OAuth refresh token plus the target calendar ID.",
+      "Push mosque services to a shared Google Calendar. Paste an OAuth refresh token plus the target calendar ID.",
     fields: [
       {
         key: "refresh",
@@ -104,7 +104,7 @@ const PROVIDER_META: Record<Provider, ProviderMeta> = {
         label: "Calendar ID",
         type: "text",
         storage: "metadata",
-        hint: "Usually looks like church@example.com or a long calendar id.",
+        hint: "Usually looks like mosque@example.com or a long calendar id.",
       },
     ],
   },
@@ -263,15 +263,15 @@ function fieldValue(
 }
 
 export function IntegrationsClient({
-  churchSlug,
-  churchName,
+  mosqueSlug,
+  mosqueName,
   credentials,
   jobs,
   mooovConnection,
   initialFeedback,
 }: {
-  churchSlug: string;
-  churchName: string;
+  mosqueSlug: string;
+  mosqueName: string;
   credentials: Credential[];
   jobs: Job[];
   mooovConnection: MooovConnection;
@@ -423,7 +423,7 @@ export function IntegrationsClient({
     setFeedback("Copied to clipboard.");
   }
 
-  const calendarFeedUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/api/calendar/church/${churchSlug}`;
+  const calendarFeedUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/api/calendar/mosque/${mosqueSlug}`;
 
   const grouped: Record<string, Provider[]> = {
     Calendar: [],
@@ -439,7 +439,7 @@ export function IntegrationsClient({
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Integrations &amp; jobs</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Connect calendar, email, and accounting tools to {churchName}, and
+          Connect calendar, email, and accounting tools to {mosqueName}, and
           monitor background jobs (emails, giving runs, exports, reconciliation).
         </p>
       </div>
@@ -495,8 +495,8 @@ export function IntegrationsClient({
                     )}
                   </div>
                   <p className="mt-1 text-xs text-slate-500">
-                    Connect this church to Mooov for giving and payment processing.
-                    ChurchPay uses the platform credential, while each church grants
+                    Connect this mosque to Mooov for giving and payment processing.
+                    MosquePay uses the platform credential, while each mosque grants
                     its own merchant access.
                   </p>
                   {mooovConnection?.merchantId ? (
@@ -701,7 +701,7 @@ export function IntegrationsClient({
         <TabsContent value="exports" className="space-y-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="text-base font-semibold text-slate-900">
-              Public church calendar feed
+              Public mosque calendar feed
             </h2>
             <p className="mt-1 text-xs text-slate-500">
               Subscribe to this URL from Google, Apple, or Outlook Calendar to
@@ -815,7 +815,7 @@ export function IntegrationsClient({
         onOpenChange={(open) => !open && setConfirmMooovDisconnect(false)}
         title="Disconnect Mooov?"
         description={
-          "This revokes the church's Mooov grant. New giving, donations, and event payments will fail until you reconnect. " +
+          "This revokes the mosque's Mooov grant. New giving, donations, and event payments will fail until you reconnect. " +
           "Existing payments, refunds, and historical reports are unaffected. " +
           "You can reconnect any time -- the same merchant account is reused on reconnect."
         }

@@ -38,10 +38,10 @@ function isUsable(invitation: {
 
 export default async function GuestInvitationPage({
   params,
-  expectedChurchSlug,
+  expectedMosqueSlug,
 }: {
   params: Promise<{ token: string }>;
-  expectedChurchSlug?: string;
+  expectedMosqueSlug?: string;
 }) {
   const { token } = await params;
   const tokenHash = hashToken(token);
@@ -49,8 +49,8 @@ export default async function GuestInvitationPage({
   let invitation:
     | {
         id: string;
-        church_id: string | null;
-        church_slug: string;
+        mosque_id: string | null;
+        mosque_slug: string;
         event_id: string;
         inviter_member_id: string | null;
         recipient_email: string | null;
@@ -66,11 +66,11 @@ export default async function GuestInvitationPage({
   if (isSupabaseConfigured()) {
     const inv = await db.getGuestInvitationByTokenHash(tokenHash);
     if (inv) {
-      const church = await db.getChurchById(inv.church_id);
+      const mosque = await db.getMosqueById(inv.mosque_id);
       invitation = {
         id: inv.id,
-        church_id: inv.church_id,
-        church_slug: church?.slug ?? expectedChurchSlug ?? "",
+        mosque_id: inv.mosque_id,
+        mosque_slug: mosque?.slug ?? expectedMosqueSlug ?? "",
         event_id: inv.event_id,
         inviter_member_id: inv.inviter_member_id,
         recipient_email: inv.recipient_email,
@@ -87,8 +87,8 @@ export default async function GuestInvitationPage({
     if (inv) {
       invitation = {
         id: inv.id,
-        church_id: null,
-        church_slug: inv.church_slug,
+        mosque_id: null,
+        mosque_slug: inv.mosque_slug,
         event_id: inv.event_id,
         inviter_member_id: inv.inviter_member_id,
         recipient_email: inv.recipient_email,
@@ -103,7 +103,7 @@ export default async function GuestInvitationPage({
   }
 
   if (!invitation) notFound();
-  if (expectedChurchSlug && invitation.church_slug !== expectedChurchSlug) {
+  if (expectedMosqueSlug && invitation.mosque_slug !== expectedMosqueSlug) {
     notFound();
   }
   if (!isUsable(invitation)) {
@@ -134,14 +134,14 @@ export default async function GuestInvitationPage({
   };
 
   let event: EventLike | null = null;
-  let churchName: string | null = null;
-  let churchLogo: string | null = null;
+  let mosqueName: string | null = null;
+  let mosqueLogo: string | null = null;
   let inviterName: string | null = null;
 
-  if (isSupabaseConfigured() && invitation.church_id) {
-    const [e, church] = await Promise.all([
-      db.getEventById(invitation.event_id, invitation.church_id),
-      db.getChurchById(invitation.church_id),
+  if (isSupabaseConfigured() && invitation.mosque_id) {
+    const [e, mosque] = await Promise.all([
+      db.getEventById(invitation.event_id, invitation.mosque_id),
+      db.getMosqueById(invitation.mosque_id),
     ]);
     if (e) {
       event = {
@@ -167,18 +167,18 @@ export default async function GuestInvitationPage({
         guest_policy: e.guest_policy,
       };
     }
-    churchName = church?.name ?? null;
-    churchLogo = church?.logo_url ?? null;
+    mosqueName = mosque?.name ?? null;
+    mosqueLogo = mosque?.logo_url ?? null;
     if (invitation.inviter_member_id) {
       const member = await db.getMemberById(
         invitation.inviter_member_id,
-        invitation.church_id
+        invitation.mosque_id
       );
       inviterName = member?.full_name ?? null;
     }
   } else if (shouldUseInMemoryMock()) {
     const e = mockDb.getEventById(invitation.event_id, {
-      church_slug: invitation.church_slug,
+      mosque_slug: invitation.mosque_slug,
     });
     if (e) {
       event = {
@@ -204,9 +204,9 @@ export default async function GuestInvitationPage({
         guest_policy: e.guest_policy,
       };
     }
-    const church = mockDb.getChurchBySlug(invitation.church_slug);
-    churchName = church?.name ?? null;
-    churchLogo = church?.logo_url ?? null;
+    const mosque = mockDb.getMosqueBySlug(invitation.mosque_slug);
+    mosqueName = mosque?.name ?? null;
+    mosqueLogo = mosque?.logo_url ?? null;
   }
 
   if (!event) notFound();
@@ -217,11 +217,11 @@ export default async function GuestInvitationPage({
       <article className="mx-auto max-w-3xl space-y-8">
         <header className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
           <div className="flex items-center gap-4">
-            {churchLogo ? (
+            {mosqueLogo ? (
               <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
                 <Image
-                  src={churchLogo}
-                  alt={`${churchName ?? "Church"} logo`}
+                  src={mosqueLogo}
+                  alt={`${mosqueName ?? "Mosque"} logo`}
                   width={56}
                   height={56}
                   className="h-full w-full object-contain p-1.5"
@@ -234,7 +234,7 @@ export default async function GuestInvitationPage({
                   ? "Newcomer members welcome"
                   : "You're invited"}
               </p>
-              <p className="text-sm text-slate-500">{churchName}</p>
+              <p className="text-sm text-slate-500">{mosqueName}</p>
             </div>
           </div>
           <h1 className="mt-6 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">

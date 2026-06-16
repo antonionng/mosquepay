@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     );
   }
   const scope = await getCurrentAdminScope();
-  if (scope.kind !== "platform" && scope.kind !== "church") {
+  if (scope.kind !== "platform" && scope.kind !== "mosque") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const admin = await db.getAdminUserByEmail(scope.email);
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     mfa_enrolled_at: new Date().toISOString(),
   });
   await writeAuditLog({
-    churchId: scope.kind === "church" ? scope.churchId : null,
+    mosqueId: scope.kind === "mosque" ? scope.mosqueId : null,
     action: "mfa_enabled",
     entityType: "admin_user",
     entityId: admin.id,
@@ -47,7 +47,7 @@ export async function DELETE() {
     );
   }
   const scope = await getCurrentAdminScope();
-  if (scope.kind !== "platform" && scope.kind !== "church") {
+  if (scope.kind !== "platform" && scope.kind !== "mosque") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const admin = await db.getAdminUserByEmail(scope.email);
@@ -61,7 +61,7 @@ export async function DELETE() {
     mfa_enrolled_at: null,
   });
   await writeAuditLog({
-    churchId: scope.kind === "church" ? scope.churchId : null,
+    mosqueId: scope.kind === "mosque" ? scope.mosqueId : null,
     action: "mfa_disabled",
     entityType: "admin_user",
     entityId: admin.id,

@@ -34,10 +34,10 @@ function safeName(name: string) {
     .slice(0, 48);
 }
 
-function isSafeAssetPath(path: unknown, churchId: string): path is string {
+function isSafeAssetPath(path: unknown, mosqueId: string): path is string {
   return (
     typeof path === "string" &&
-    path.startsWith(`${churchId}/`) &&
+    path.startsWith(`${mosqueId}/`) &&
     !path.includes("..") &&
     !path.includes("//") &&
     path.length <= 512
@@ -65,16 +65,16 @@ async function getAuthorizedAssetContext() {
   if (unauthorized) return { error: unauthorized };
 
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
     return {
       error: NextResponse.json(
-        { error: "Choose a church before managing website images." },
+        { error: "Choose a mosque before managing website images." },
         { status: 400 }
       ),
     };
   }
 
-  const forbidden = await requireAdminApiPermission("website:write", ctx.churchId);
+  const forbidden = await requireAdminApiPermission("website:write", ctx.mosqueId);
   if (forbidden) return { error: forbidden };
 
   return { ctx };
@@ -84,9 +84,9 @@ export async function GET() {
   try {
     const auth = await getAuthorizedAssetContext();
     if ("error" in auth) return auth.error;
-    const churchId = auth.ctx.churchId;
-    if (!churchId) {
-      return NextResponse.json({ error: "Choose a church first." }, { status: 400 });
+    const mosqueId = auth.ctx.mosqueId;
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Choose a mosque first." }, { status: 400 });
     }
 
     if (!isSupabaseConfigured()) {
@@ -97,7 +97,7 @@ export async function GET() {
     }
 
     const supabase = await ensureBucket();
-    const { data, error } = await supabase.storage.from(BUCKET).list(churchId, {
+    const { data, error } = await supabase.storage.from(BUCKET).list(mosqueId, {
       limit: 100,
       offset: 0,
       sortBy: { column: "created_at", order: "desc" },
@@ -107,7 +107,7 @@ export async function GET() {
     const assets = (data ?? [])
       .filter((item) => item.name && item.id !== null)
       .map((item) => {
-        const path = `${churchId}/${item.name}`;
+        const path = `${mosqueId}/${item.name}`;
         const { data: publicData } = supabase.storage.from(BUCKET).getPublicUrl(path);
         return {
           id: item.id,
@@ -132,9 +132,9 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await getAuthorizedAssetContext();
     if ("error" in auth) return auth.error;
-    const churchId = auth.ctx.churchId;
-    if (!churchId) {
-      return NextResponse.json({ error: "Choose a church first." }, { status: 400 });
+    const mosqueId = auth.ctx.mosqueId;
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Choose a mosque first." }, { status: 400 });
     }
 
     const form = await request.formData();
@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
     const supabase = await ensureBucket();
     const ext = extensionFor(file.type, file.name.split(".").pop() ?? "jpg");
     const stem = safeName(file.name) || "site-image";
-    const path = `${churchId}/${Date.now()}-${crypto.randomUUID()}-${stem}.${ext}`;
+    const path = `${mosqueId}/${Date.now()}-${crypto.randomUUID()}-${stem}.${ext}`;
     const bytes = Buffer.from(await file.arrayBuffer());
 
     const { error } = await supabase.storage.from(BUCKET).upload(path, bytes, {
@@ -188,9 +188,9 @@ export async function DELETE(request: NextRequest) {
   try {
     const auth = await getAuthorizedAssetContext();
     if ("error" in auth) return auth.error;
-    const churchId = auth.ctx.churchId;
-    if (!churchId) {
-      return NextResponse.json({ error: "Choose a church first." }, { status: 400 });
+    const mosqueId = auth.ctx.mosqueId;
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Choose a mosque first." }, { status: 400 });
     }
 
     if (!isSupabaseConfigured()) {
@@ -202,7 +202,7 @@ export async function DELETE(request: NextRequest) {
 
     const body = await request.json();
     const path = body.path;
-    if (!isSafeAssetPath(path, churchId)) {
+    if (!isSafeAssetPath(path, mosqueId)) {
       return NextResponse.json({ error: "Invalid asset path." }, { status: 400 });
     }
 

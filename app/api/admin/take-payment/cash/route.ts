@@ -16,7 +16,7 @@
 //      they have an email but no declaration yet, 'unknown' for anonymous
 //      cash) so the per-service Gift Aid close can reclaim it later.
 //
-// Auth: admin with payments:write on the active church.
+// Auth: admin with payments:write on the active mosque.
 
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
@@ -58,8 +58,8 @@ function parseGuestInline(value: unknown): GuestInlineInput | null {
     full_name,
     email: trimOrNull(v.email),
     phone: trimOrNull(v.phone),
-    mother_church_name: trimOrNull(v.mother_church_name),
-    mother_church_number: trimOrNull(v.mother_church_number),
+    mother_mosque_name: trimOrNull(v.mother_mosque_name),
+    mother_mosque_number: trimOrNull(v.mother_mosque_number),
   };
 }
 
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
       : null;
   // Optional service attribution. When set, the projected public.payments
   // row sets event_id so per-service "Money raised" totals see it. The
-  // event itself is validated below (must belong to the active church).
+  // event itself is validated below (must belong to the active mosque).
   const eventIdInput =
     typeof body.event_id === "string" && body.event_id.trim()
       ? body.event_id.trim()
@@ -145,57 +145,57 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Anchor on the admin's scoped church (same logic as the page) so a
-  // church-scoped treasurer whose ADMIN_CHURCH_COOKIE has not been set
-  // doesn't fall through to the platform default church and 401 here while
+  // Anchor on the admin's scoped mosque (same logic as the page) so a
+  // mosque-scoped treasurer whose ADMIN_MOSQUE_COOKIE has not been set
+  // doesn't fall through to the platform default mosque and 401 here while
   // the page renders fine.
   const ctx = await getAdminReadContext();
-  if (ctx.mode !== "database" || !ctx.churchId) {
-    return NextResponse.json({ error: "Church not selected." }, { status: 404 });
+  if (ctx.mode !== "database" || !ctx.mosqueId) {
+    return NextResponse.json({ error: "Mosque not selected." }, { status: 404 });
   }
-  const churchId = ctx.churchId;
-  const churchSlug = ctx.churchSlug;
+  const mosqueId = ctx.mosqueId;
+  const mosqueSlug = ctx.mosqueSlug;
 
-  const forbidden = await requireAdminApiPermission("payments:write", churchId);
+  const forbidden = await requireAdminApiPermission("payments:write", mosqueId);
   if (forbidden) return forbidden;
 
-  // Validate any provided event_id is for this church before we accept it on
+  // Validate any provided event_id is for this mosque before we accept it on
   // the projection. Anonymous payments (no event picked) are still fine.
   let resolvedEventId: string | null = null;
   if (eventIdInput) {
     try {
-      const eventRow = await db.getEventById(eventIdInput, churchId);
+      const eventRow = await db.getEventById(eventIdInput, mosqueId);
       if (eventRow) {
         resolvedEventId = eventRow.id;
       } else {
         return NextResponse.json(
-          { error: "Selected service not found in this church." },
+          { error: "Selected service not found in this mosque." },
           { status: 400 },
         );
       }
     } catch (err) {
       console.warn("Cash payment POST: event lookup failed (non-fatal)", {
-        church_id: churchId,
+        mosque_id: mosqueId,
         event_id: eventIdInput,
         message: err instanceof Error ? err.message : String(err),
       });
     }
   }
-  // No service chosen: auto-attribute to today's service when there's exactly
+  // No service chosen: auto-attribute to today's Jumu'ah when there's exactly
   // one, so cash logged during a live service rolls up without manual picking.
   if (!resolvedEventId) {
-    resolvedEventId = await resolveTodaysServiceId(churchId);
+    resolvedEventId = await resolveTodaysServiceId(mosqueId);
   }
 
   let createdByEmail: string | null = null;
   let createdByRole: string | null = null;
   try {
-    const admin = await getCurrentAdminContextAny(churchId);
+    const admin = await getCurrentAdminContextAny(mosqueId);
     createdByEmail = admin?.email ?? null;
     createdByRole = admin?.role ?? null;
   } catch (err) {
     console.warn("Cash payment POST: could not resolve admin identity", {
-      church_id: churchId,
+      mosque_id: mosqueId,
       message: err instanceof Error ? err.message : String(err),
     });
   }
@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Idempotency: same admin retrying with the same client_token returns the
-  // already-recorded row. payment_attempts has a (church_id, idempotency_key)
+  // already-recorded row. payment_attempts has a (mosque_id, idempotency_key)
   // unique constraint so this is safe to call concurrently — at most one
   // attempt row exists per token.
   const idempotencyKey = `cash_${clientToken}`;
@@ -223,7 +223,7 @@ export async function POST(request: NextRequest) {
     .schema("mooov")
     .from("payment_attempts")
     .select("payment_id, status, amount, currency")
-    .eq("church_id", churchId)
+    .eq("mosque_id", mosqueId)
     .eq("idempotency_key", idempotencyKey)
     .maybeSingle<{
       payment_id: string;
@@ -243,7 +243,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const attribution = await resolveTakePaymentAttribution(churchId, {
+  const attribution = await resolveTakePaymentAttribution(mosqueId, {
     memberId,
     guestId,
     guestInline,
@@ -260,18 +260,18 @@ export async function POST(request: NextRequest) {
 
   const amountMinor = Math.round(amount * 100);
   const currency = "GBP";
-  const paymentId = `cash_${churchId}_${Date.now().toString(36)}_${Math.random()
+  const paymentId = `cash_${mosqueId}_${Date.now().toString(36)}_${Math.random()
     .toString(36)
     .slice(2, 10)}`;
 
   // Build a metadata block that mirrors the QR mint route so the history
   // endpoint can render cash rows with the same shape.
   const intentDescription =
-    description || `Cash payment to church (${reference || "in-person"})`;
+    description || `Cash payment to mosque (${reference || "in-person"})`;
   const metadata: Record<string, unknown> = {
-    source: "churchpay_take_payment_cash",
-    church_slug: churchSlug,
-    church_id: churchId,
+    source: "mosquepay_take_payment_cash",
+    mosque_slug: mosqueSlug,
+    mosque_id: mosqueId,
     intent: "take_payment_cash",
     category,
     line_items: itemised ? lineItems : null,
@@ -300,7 +300,7 @@ export async function POST(request: NextRequest) {
     .from("payment_attempts")
     .insert({
       payment_id: paymentId,
-      church_id: churchId,
+      mosque_id: mosqueId,
       member_id: null,
       amount: amountMinor,
       currency,
@@ -311,7 +311,7 @@ export async function POST(request: NextRequest) {
       metadata,
       guest_descriptor: {
         source: "in_person_take_payment_cash",
-        church_slug: churchSlug,
+        mosque_slug: mosqueSlug,
         reference: reference || null,
         category,
         line_items: itemised ? lineItems : null,
@@ -327,14 +327,14 @@ export async function POST(request: NextRequest) {
     });
   if (insertError) {
     // Race against another concurrent submit with the same client_token. The
-    // unique constraint on (church_id, idempotency_key) lets us recover by
+    // unique constraint on (mosque_id, idempotency_key) lets us recover by
     // returning the row that won.
     if (insertError.code === "23505") {
       const { data: existing } = await supa
         .schema("mooov")
         .from("payment_attempts")
         .select("payment_id, amount, currency")
-        .eq("church_id", churchId)
+        .eq("mosque_id", mosqueId)
         .eq("idempotency_key", idempotencyKey)
         .maybeSingle<{
           payment_id: string;
@@ -351,7 +351,7 @@ export async function POST(request: NextRequest) {
       }
     }
     console.error("Cash payment POST: attempt insert failed", {
-      church_id: churchId,
+      mosque_id: mosqueId,
       payment_id: paymentId,
       code: insertError.code,
       message: insertError.message,
@@ -368,7 +368,7 @@ export async function POST(request: NextRequest) {
   // the same client_token and re-uses the existing attempt row).
   try {
     const projection = await projectTakePaymentCaptured({
-      churchId,
+      mosqueId,
       mooovPaymentId: paymentId,
       amountMajor: amount,
       currency,
@@ -401,7 +401,7 @@ export async function POST(request: NextRequest) {
       try {
         await sendTakePaymentReceipt({
           toEmail: payerEmail,
-          toName: payerName ?? "Friend of the church",
+          toName: payerName ?? "Friend of the mosque",
           amountMajor: amount,
           currency,
           category,
@@ -410,7 +410,7 @@ export async function POST(request: NextRequest) {
           paymentMethod: "cash",
           recordedByEmail: createdByEmail,
           giftAidEligible,
-          churchId,
+          mosqueId,
           paymentId,
           lineItems: itemised ? lineItems : null,
         });
@@ -434,7 +434,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     console.error("Cash payment POST: projection failed", {
-      church_id: churchId,
+      mosque_id: mosqueId,
       payment_id: paymentId,
       message: err instanceof Error ? err.message : String(err),
     });

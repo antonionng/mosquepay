@@ -7,7 +7,7 @@ import { formatDate } from "@/lib/utils";
 import { defaultAgendaItems, renderDefaultNoticeOpening } from "@/lib/notices/defaults";
 import type { Member } from "@/lib/db/types";
 import { NoticeRsvpForm } from "./rsvp-form";
-import { churchTitleFor } from "@/lib/members/rank";
+import { mosqueTitleFor } from "@/lib/members/rank";
 
 type DirectoryMember = Pick<
   Member,
@@ -69,12 +69,12 @@ export default async function PublicNoticePage({
     notFound();
   }
 
-  const [event, church, notice, members, feeDefaults] = await Promise.all([
-    db.getEventById(accessLink.event_id, accessLink.church_id),
-    db.getChurchById(accessLink.church_id),
-    db.getServiceNotice(accessLink.event_id, accessLink.church_id),
-    db.getMembers(accessLink.church_id, { status: "active" }),
-    db.getChurchFeeDefaults(accessLink.church_id),
+  const [event, mosque, notice, members, feeDefaults] = await Promise.all([
+    db.getEventById(accessLink.event_id, accessLink.mosque_id),
+    db.getMosqueById(accessLink.mosque_id),
+    db.getServiceNotice(accessLink.event_id, accessLink.mosque_id),
+    db.getMembers(accessLink.mosque_id, { status: "active" }),
+    db.getMosqueFeeDefaults(accessLink.mosque_id),
     db.recordServiceNoticeAccess(accessLink.id, accessLink.access_count),
   ]);
 
@@ -83,7 +83,7 @@ export default async function PublicNoticePage({
   const existingRsvp = await db.getRsvpByEventAndEmail(
     event.id,
     accessLink.recipient_email,
-    accessLink.church_id
+    accessLink.mosque_id
   );
 
   const memberProfile = members.find(
@@ -108,17 +108,17 @@ export default async function PublicNoticePage({
     .filter((member) => member.honorary)
     .sort((a, b) => a.full_name.localeCompare(b.full_name));
   const agendaItems = notice?.agenda_items?.length ? notice.agenda_items : defaultAgendaItems();
-  const openingText = notice?.opening_text ?? renderDefaultNoticeOpening(event, church);
+  const openingText = notice?.opening_text ?? renderDefaultNoticeOpening(event, mosque);
 
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-8">
       <article className="mx-auto max-w-5xl rounded-2xl border border-slate-200 bg-white p-8 text-slate-950 shadow-sm">
         <header className="border-b border-slate-300 pb-6 text-center">
-          {church?.logo_url ? (
+          {mosque?.logo_url ? (
             <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <Image
-                src={church.logo_url}
-                alt={`${church.name} logo`}
+                src={mosque.logo_url}
+                alt={`${mosque.name} logo`}
                 width={96}
                 height={96}
                 className="h-full w-full object-contain p-2"
@@ -129,7 +129,7 @@ export default async function PublicNoticePage({
             Notice
           </p>
           <h1 className="mt-3 text-3xl font-bold uppercase tracking-tight">
-            {church?.name ?? "Church Service"}
+            {mosque?.name ?? "Jumu'ah Prayer"}
           </h1>
           <p className="mt-4 text-lg font-semibold">{event.title}</p>
         </header>
@@ -142,7 +142,7 @@ export default async function PublicNoticePage({
           <p className="mt-4 whitespace-pre-line">
             {openingText}
           </p>
-          <p className="mt-4 font-semibold">{church?.secretary_name ?? "Secretary"}</p>
+          <p className="mt-4 font-semibold">{mosque?.secretary_name ?? "Secretary"}</p>
           <p>Secretary</p>
         </section>
 
@@ -159,8 +159,8 @@ export default async function PublicNoticePage({
                     {member.office_title}
                   </span>
                   <span className="text-right text-slate-700">
-                    {churchTitleFor(member.rank)
-                      ? `${churchTitleFor(member.rank)} `
+                    {mosqueTitleFor(member.rank)
+                      ? `${mosqueTitleFor(member.rank)} `
                       : ""}
                     {member.full_name}
                     {memberSuffix(member) ? ` ${memberSuffix(member)}` : ""}
@@ -172,7 +172,7 @@ export default async function PublicNoticePage({
         )}
 
         <section className="border-b border-slate-300 py-6">
-          <h2 className="text-lg font-semibold uppercase">Church Business</h2>
+          <h2 className="text-lg font-semibold uppercase">Mosque Business</h2>
           <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-700">
             {agendaItems.map((item) => (
               <li key={item}>{item}</li>
@@ -221,7 +221,7 @@ export default async function PublicNoticePage({
                 <NoticeRsvpForm
                   token={token}
                   eventId={event.id}
-                  churchSlug={church?.slug ?? ""}
+                  mosqueSlug={mosque?.slug ?? ""}
                   recipientName={
                     accessLink.recipient_name ?? accessLink.recipient_email
                   }
@@ -280,7 +280,7 @@ export default async function PublicNoticePage({
         {notice?.include_member_directory !== false && (
           <section className="py-6">
             <h2 className="text-center text-lg font-bold uppercase">
-              {church?.name ?? "Church"} Members
+              {mosque?.name ?? "Mosque"} Members
             </h2>
             <div className="mt-4 space-y-1 text-xs leading-5">
               {directoryMembers.map((member) => {
@@ -288,8 +288,8 @@ export default async function PublicNoticePage({
                 return (
                   <div key={member.id} className="grid gap-2 sm:grid-cols-[1fr_2fr_auto]">
                     <span className="font-medium">
-                      {churchTitleFor(member.rank)
-                        ? `${churchTitleFor(member.rank)} `
+                      {mosqueTitleFor(member.rank)
+                        ? `${mosqueTitleFor(member.rank)} `
                         : ""}
                       {member.full_name}
                       {suffix ? ` ${suffix}` : ""}

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -18,20 +18,20 @@ export async function POST(request: NextRequest) {
       { status: 503 }
     );
   }
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("pastoral:write", churchId);
+  const forbidden = await requireAdminApiPermission("pastoral:write", mosqueId);
   if (forbidden) return forbidden;
 
-  const result = await generatePastoralCareAlerts(churchId);
+  const result = await generatePastoralCareAlerts(mosqueId);
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "pastoral_alerts_regenerated",
     entityType: "pastoral_alerts",
-    entityId: churchId,
+    entityId: mosqueId,
     summary: `Regenerated ${result.upserted.length} pastoral alerts`,
     metadata: { count: result.upserted.length },
   });

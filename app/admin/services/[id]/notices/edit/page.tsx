@@ -37,24 +37,24 @@ export default async function EditServiceNoticePage({
   const { id } = await params;
   const ctx = await getAdminReadContext();
   const useMock = ctx.mode === "mock";
-  const churchId = ctx.mode === "database" ? ctx.churchId : null;
+  const mosqueId = ctx.mode === "database" ? ctx.mosqueId : null;
 
   const event = useMock
     ? mockDb.getEventById(id)
-    : churchId
-      ? await db.getEventById(id, churchId)
+    : mosqueId
+      ? await db.getEventById(id, mosqueId)
       : null;
   if (!event) notFound();
 
-  const [notice, sends, church] =
-    !useMock && churchId
+  const [notice, sends, mosque] =
+    !useMock && mosqueId
       ? await Promise.all([
-          db.getServiceNotice(id, churchId),
-          db.listServiceNoticeSends(churchId, id),
-          db.getChurchById(churchId),
+          db.getServiceNotice(id, mosqueId),
+          db.listServiceNoticeSends(mosqueId, id),
+          db.getMosqueById(mosqueId),
         ])
-      : [null, [], useMock ? mockDb.listChurches()[0] ?? null : null];
-  const defaultOpeningText = renderDefaultNoticeOpening(event, church);
+      : [null, [], useMock ? mockDb.listMosques()[0] ?? null : null];
+  const defaultOpeningText = renderDefaultNoticeOpening(event, mosque);
 
   const noticeStatus = (event.notice_status ?? "none") as
     | "none"

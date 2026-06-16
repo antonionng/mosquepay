@@ -63,13 +63,13 @@ function firstNonEmptyEnv(...keys: string[]): string | undefined {
   return undefined;
 }
 
-async function findChurchIdForMerchant(
+async function findMosqueIdForMerchant(
   supa: ReturnType<typeof createServiceClient>,
   merchantId: string
 ): Promise<string | null> {
   const { data, error } = await supa
     .schema("mooov")
-    .from("churches")
+    .from("mosques")
     .select("id")
     .eq("merchant_id", merchantId)
     .maybeSingle<{ id: string }>();
@@ -78,16 +78,16 @@ async function findChurchIdForMerchant(
 
   const demoMerchant =
     process.env.MOOOV_DEMO_MERCHANT_ID ??
-    process.env.MOOOV_DEMO_CHURCH_ID ??
-    process.env.MOOOV_CHURCH_PILOT_MERCHANT_ID;
+    process.env.MOOOV_DEMO_MOSQUE_ID ??
+    process.env.MOOOV_MOSQUE_PILOT_MERCHANT_ID;
   if (merchantId !== demoMerchant) return null;
 
-  const demoChurchId = process.env.MOOOV_DEMO_CHURCH_ID ?? "merch_churchpay_demo";
-  const { error: upsertError } = await supa.schema("mooov").from("churches").upsert(
+  const demoMosqueId = process.env.MOOOV_DEMO_MOSQUE_ID ?? "merch_mosquepay_demo";
+  const { error: upsertError } = await supa.schema("mooov").from("mosques").upsert(
     {
-      id: demoChurchId,
+      id: demoMosqueId,
       merchant_id: merchantId,
-      display_name: "ChurchPay demo merchant",
+      display_name: "MosquePay demo merchant",
       currency: "GBP",
       status: "active",
       metadata: { source: "mooov_connect_staging_webhook" },
@@ -95,7 +95,7 @@ async function findChurchIdForMerchant(
     { onConflict: "id" }
   );
   if (upsertError) throw upsertError;
-  return demoChurchId;
+  return demoMosqueId;
 }
 
 export async function POST(request: NextRequest) {
@@ -155,8 +155,8 @@ export async function POST(request: NextRequest) {
   // a body-less Vercel 500. Mooov's outbox can safely retry on 500.
   try {
     const supa = createServiceClient();
-    const churchId = await findChurchIdForMerchant(supa, event.merchant.id);
-    if (!churchId) {
+    const mosqueId = await findMosqueIdForMerchant(supa, event.merchant.id);
+    if (!mosqueId) {
       console.warn("Mooov webhook for unknown merchant", {
         event_id: event.id,
         event_type: event.type,
@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
       .schema("mooov")
       .from("mooov_webhook_events")
       .insert({
-        church_id: churchId,
+        mosque_id: mosqueId,
         event_id: event.id,
         event_type: event.type,
         payment_id: paymentId,
@@ -200,7 +200,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await projectConnectEvent(supa, churchId, event);
+    await projectConnectEvent(supa, mosqueId, event);
     return NextResponse.json({ ok: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -234,7 +234,7 @@ export async function POST(request: NextRequest) {
 
 async function projectConnectEvent(
   supa: ReturnType<typeof createServiceClient>,
-  churchId: string,
+  mosqueId: string,
   event: MooovConnectEvent
 ) {
   const paymentId = event.data?.payment_id;
@@ -260,7 +260,7 @@ async function projectConnectEvent(
         status: "captured",
         captured_at: new Date().toISOString(),
       })
-      .eq("church_id", churchId)
+      .eq("mosque_id", mosqueId)
       .eq("payment_id", paymentId)
       .is("captured_at", null);
     // Now project to LP-side tables based on the recorded intent. We read
@@ -273,7 +273,7 @@ async function projectConnectEvent(
       .select(
         "payment_id, intent, amount, currency, guest_descriptor, metadata, member_id"
       )
-      .eq("church_id", churchId)
+      .eq("mosque_id", mosqueId)
       .eq("payment_id", paymentId)
       .maybeSingle<{
         payment_id: string;
@@ -295,18 +295,18 @@ async function projectConnectEvent(
     }
     if (!attempt) return;
     if (attempt.intent === "donation") {
-      await projectDonationCaptured(churchId, attempt);
+      await projectDonationCaptured(mosqueId, attempt);
     } else if (attempt.intent === "event") {
-      await projectEventCaptured(churchId, attempt);
+      await projectEventCaptured(mosqueId, attempt);
     } else if (attempt.intent === "giving") {
-      await projectGivingCaptured(churchId, attempt);
+      await projectGivingCaptured(mosqueId, attempt);
     } else if (attempt.intent === "giving_subscription_enrol") {
-      await projectGivingSubscriptionEnrolCaptured(churchId, attempt, event);
+      await projectGivingSubscriptionEnrolCaptured(mosqueId, attempt, event);
     } else if (attempt.intent === "giving_subscription_cycle") {
-      await projectGivingSubscriptionCycleCaptured(churchId, attempt, event);
+      await projectGivingSubscriptionCycleCaptured(mosqueId, attempt, event);
     } else if (
       attempt.intent === "take_payment" ||
-      attempt.intent === "church_generic_standing_qr" ||
+      attempt.intent === "mosque_generic_standing_qr" ||
       attempt.intent === "charity_donation_standing_qr" ||
       attempt.intent === "event_dining_standing_qr" ||
       attempt.intent === "event_raffle_standing_qr"
@@ -315,12 +315,12 @@ async function projectConnectEvent(
       // public.payments with the right dining/charity/raffle split based on
       // intent so the Treasurer's existing rollups (admin/payments,
       // admin/treasurer, admin/reports) include these without any new code.
-      await projectStandingOrTakePaymentCaptured(churchId, attempt);
+      await projectStandingOrTakePaymentCaptured(mosqueId, attempt);
     } else if (attempt.intent === "kiosk_giving") {
       // Self-service giving kiosk (/give/<slug>/kiosk). Same projection
       // shape as take-payment plus an optional digital Gift Aid declaration
       // captured on the kiosk itself.
-      await projectKioskGivingCaptured(churchId, attempt);
+      await projectKioskGivingCaptured(mosqueId, attempt);
     }
     return;
   }
@@ -350,7 +350,7 @@ async function projectConnectEvent(
         .schema("mooov")
         .from("payment_attempts")
         .select("guest_descriptor, intent")
-        .eq("church_id", churchId)
+        .eq("mosque_id", mosqueId)
         .eq("payment_id", paymentId)
         .maybeSingle<{
           guest_descriptor: Record<string, unknown> | null;
@@ -364,7 +364,7 @@ async function projectConnectEvent(
           status: "failed",
           failure_reason: failureReason,
         })
-        .eq("church_id", churchId)
+        .eq("mosque_id", mosqueId)
         .eq("payment_id", paymentId);
 
       // Reverse the speculative event RSVP, if any. We only do this for
@@ -378,10 +378,10 @@ async function projectConnectEvent(
         typeof descriptor.rsvp_id === "string" ? descriptor.rsvp_id : null;
       if (rsvpIdFromAttempt && (attemptRow?.intent === "event" || !attemptRow?.intent)) {
         try {
-          await db.updateRsvp(rsvpIdFromAttempt, churchId, {
+          await db.updateRsvp(rsvpIdFromAttempt, mosqueId, {
             status: "cancelled",
           });
-          await db.deleteEventGuestsByRsvp(rsvpIdFromAttempt, churchId);
+          await db.deleteEventGuestsByRsvp(rsvpIdFromAttempt, mosqueId);
         } catch (cancelErr) {
           console.error("mooov webhook: failed to cancel abandoned RSVP", {
             event_id: event.id,
@@ -404,7 +404,7 @@ async function projectConnectEvent(
         (attemptRow.intent === "giving_subscription_enrol" ||
           attemptRow.intent === "giving_subscription_cycle")
       ) {
-        await handleGivingSubscriptionFailure(churchId, {
+        await handleGivingSubscriptionFailure(mosqueId, {
           intent: attemptRow.intent,
           guest_descriptor: descriptor,
         }, {
@@ -440,10 +440,10 @@ async function projectConnectEvent(
             : paymentId.slice("sub_giving_".length);
         try {
           const sched = await db
-            .getGivingSchedule(scheduleId, churchId)
+            .getGivingSchedule(scheduleId, mosqueId)
             .catch(() => null);
           if (sched && sched.status === "pending") {
-            await db.updateGivingSchedule(scheduleId, churchId, {
+            await db.updateGivingSchedule(scheduleId, mosqueId, {
               status: "cancelled",
               cancelled_at: new Date().toISOString(),
               cancelled_by_actor: "system_abandoned_checkout",
@@ -473,20 +473,20 @@ async function projectConnectEvent(
         }
       }
 
-      // account_invalid means the church's underlying PSP connection got
-      // severed (typically: the church clicked "Disconnect" from inside
+      // account_invalid means the mosque's underlying PSP connection got
+      // severed (typically: the mosque clicked "Disconnect" from inside
       // their Stripe dashboard, or Stripe's risk team paused the
-      // connection). Mooov can't fix this server-side -- the church admin
-      // has to walk through Mooov's portal repair flow. Flip the church
+      // connection). Mooov can't fix this server-side -- the mosque admin
+      // has to walk through Mooov's portal repair flow. Flip the mosque
       // row to needs_repair so /admin/integrations renders the deep-link
       // banner. Other failure codes (checkout_abandoned, etc.) are
       // expected wear-and-tear and don't change the connection state.
       if (failureCode === "account_invalid") {
         const { data: existing } = await supa
           .schema("mooov")
-          .from("churches")
+          .from("mosques")
           .select("metadata")
-          .eq("id", churchId)
+          .eq("id", mosqueId)
           .maybeSingle<{ metadata: Record<string, unknown> | null }>();
         const mergedMetadata: Record<string, unknown> = {
           ...(existing?.metadata ?? {}),
@@ -498,13 +498,13 @@ async function projectConnectEvent(
         };
         const { error: updateErr } = await supa
           .schema("mooov")
-          .from("churches")
+          .from("mosques")
           .update({ status: "needs_repair", metadata: mergedMetadata })
-          .eq("id", churchId);
+          .eq("id", mosqueId);
         if (updateErr) {
-          console.error("mooov webhook: account_invalid church update failed", {
+          console.error("mooov webhook: account_invalid mosque update failed", {
             event_id: event.id,
-            church_id: churchId,
+            mosque_id: mosqueId,
             message: updateErr.message,
           });
         }
@@ -520,7 +520,7 @@ async function projectConnectEvent(
           status: "refunded",
           refunded_at: new Date().toISOString(),
         })
-        .eq("church_id", churchId)
+        .eq("mosque_id", mosqueId)
         .eq("payment_id", paymentId);
       return;
     case "payment.disputed":
@@ -531,13 +531,13 @@ async function projectConnectEvent(
         .update({
           status: "disputed",
         })
-        .eq("church_id", churchId)
+        .eq("mosque_id", mosqueId)
         .eq("payment_id", paymentId);
       return;
     case "grant.revoked":
       await supa
         .schema("mooov")
-        .from("churches")
+        .from("mosques")
         .update({
           status: "revoked",
           metadata: {
@@ -545,7 +545,7 @@ async function projectConnectEvent(
             revoked_event_id: event.id,
           },
         })
-        .eq("id", churchId);
+        .eq("id", mosqueId);
       return;
     case "subscription.activated":
     case "subscription.updated":
@@ -562,7 +562,7 @@ async function projectConnectEvent(
       // donation, giving_subscription_enrol, etc.). Subscription
       // invoices are owned by Mooov server-side, so the linkage is
       // here, on the subscription lane.
-      await handleSubscriptionEvent(churchId, event);
+      await handleSubscriptionEvent(mosqueId, event);
       return;
     }
   }
@@ -577,7 +577,7 @@ async function projectConnectEvent(
 // webhook delivery (same payment_id) lands here twice; the second call
 // short-circuits.
 async function projectDonationCaptured(
-  churchId: string,
+  mosqueId: string,
   attempt: {
     payment_id: string;
     amount: number;
@@ -606,7 +606,7 @@ async function projectDonationCaptured(
   const currencyMajor = (attempt.currency ?? "GBP").toUpperCase();
   const completedAt = new Date().toISOString();
 
-  const payment = await db.addPayment(churchId, {
+  const payment = await db.addPayment(mosqueId, {
     rsvp_id: null,
     event_id: null,
     user_email: donorEmail,
@@ -631,7 +631,7 @@ async function projectDonationCaptured(
 
   let giftAidDeclarationId: string | null = null;
   if (giftAid) {
-    const declaration = await db.addGiftAidDeclaration(churchId, {
+    const declaration = await db.addGiftAidDeclaration(mosqueId, {
       donor_name: donorName ?? "",
       donor_email: donorEmail,
       donor_address_line_1:
@@ -658,7 +658,7 @@ async function projectDonationCaptured(
     giftAidDeclarationId = declaration.id;
   }
 
-  await db.addDonation(churchId, {
+  await db.addDonation(mosqueId, {
     event_id: null,
     payment_id: payment.id,
     donor_name: donorName,
@@ -674,13 +674,13 @@ async function projectDonationCaptured(
   // Mooov payment_id.
   if (donorEmail) {
     try {
-      const church = await db.getChurchById(churchId).catch(() => null);
+      const mosque = await db.getMosqueById(mosqueId).catch(() => null);
       const { sendOnlinePaymentReceipt } = await import(
         "@/lib/email/payment-receipts"
       );
       await sendOnlinePaymentReceipt({
-        churchId,
-        church,
+        mosqueId,
+        mosque,
         toEmail: donorEmail,
         toName: donorName,
         memberId: null,
@@ -710,7 +710,7 @@ async function projectDonationCaptured(
 // Idempotent on payments.mooov_payment_id; a duplicate Mooov webhook
 // delivery for the same payment_id short-circuits.
 async function projectEventCaptured(
-  churchId: string,
+  mosqueId: string,
   attempt: {
     payment_id: string;
     amount: number;
@@ -756,7 +756,7 @@ async function projectEventCaptured(
   const currencyMajor = (attempt.currency ?? "GBP").toUpperCase();
   const completedAt = new Date().toISOString();
 
-  const payment = await db.addPayment(churchId, {
+  const payment = await db.addPayment(mosqueId, {
     rsvp_id: rsvpId,
     event_id: eventId,
     user_email: donorEmail,
@@ -780,7 +780,7 @@ async function projectEventCaptured(
   });
 
   if (rsvpId) {
-    await db.updateRsvp(rsvpId, churchId, {
+    await db.updateRsvp(rsvpId, mosqueId, {
       payment_id: payment.id,
       payment_completed: true,
       status: "confirmed",
@@ -793,9 +793,9 @@ async function projectEventCaptured(
   // (idempotency on payments.mooov_payment_id keeps replays safe).
   if (donorEmail) {
     try {
-      const [event, church] = await Promise.all([
-        db.getEventById(eventId, churchId),
-        db.getChurchById(churchId),
+      const [event, mosque] = await Promise.all([
+        db.getEventById(eventId, mosqueId),
+        db.getMosqueById(mosqueId),
       ]);
       if (event) {
         const totalPaid =
@@ -803,7 +803,7 @@ async function projectEventCaptured(
         await sendGuestWelcomeEmail({
           toEmail: donorEmail,
           toName: donorName ?? donorEmail,
-          churchName: church?.name ?? "the church",
+          mosqueName: mosque?.name ?? "the mosque",
           eventTitle: event.title,
           eventDate: event.event_date,
           eventTime: event.event_time,
@@ -830,7 +830,7 @@ async function projectEventCaptured(
   let giftAidDeclarationId: string | null = null;
   if (giftAid === true || giftAid === "true") {
     const g = attempt.guest_descriptor as Record<string, unknown>;
-    const declaration = await db.addGiftAidDeclaration(churchId, {
+    const declaration = await db.addGiftAidDeclaration(mosqueId, {
       donor_name:
         typeof g.gift_aid_donor_name === "string"
           ? g.gift_aid_donor_name
@@ -875,7 +875,7 @@ async function projectEventCaptured(
         ? "eligible"
         : "unknown";
     try {
-      await db.addDonation(churchId, {
+      await db.addDonation(mosqueId, {
         event_id: eventId,
         payment_id: payment.id,
         donor_name: donorName,
@@ -905,7 +905,7 @@ async function projectEventCaptured(
 //
 // Idempotent on payments.mooov_payment_id (same gate the other intents use).
 async function projectGivingCaptured(
-  churchId: string,
+  mosqueId: string,
   attempt: {
     payment_id: string;
     amount: number;
@@ -936,7 +936,7 @@ async function projectGivingCaptured(
   // route captured at preflight time (could be hours/days ago if the
   // member opened the hosted Checkout page in a browser tab and paid
   // later).
-  const allGiving = await db.getMemberGiving(churchId);
+  const allGiving = await db.getMemberGiving(mosqueId);
   const givingRecord = allGiving.find((d) => d.id === givingId);
   if (!givingRecord) {
     console.error("mooov webhook: giving record not found for captured payment", {
@@ -959,7 +959,7 @@ async function projectGivingCaptured(
   const charitableAmount = givingRecord.charitable_amount ?? 0;
   const completedAt = new Date().toISOString();
 
-  const payment = await db.addPayment(churchId, {
+  const payment = await db.addPayment(mosqueId, {
     rsvp_id: null,
     event_id: null,
     user_email: donorEmail,
@@ -984,7 +984,7 @@ async function projectGivingCaptured(
 
   const declaration =
     charitableAmount > 0
-      ? await db.getActiveGiftAidDeclarationByEmail(churchId, donorEmail)
+      ? await db.getActiveGiftAidDeclarationByEmail(mosqueId, donorEmail)
       : null;
   const giftAidStatus = declaration
     ? "declared"
@@ -992,7 +992,7 @@ async function projectGivingCaptured(
     ? "eligible"
     : "unknown";
 
-  await db.updateMemberGivingStatus(givingId, churchId, {
+  await db.updateMemberGivingStatus(givingId, mosqueId, {
     status: "paid",
     payment_id: payment.id,
     gift_aid_declaration_id: declaration?.id ?? null,
@@ -1002,7 +1002,7 @@ async function projectGivingCaptured(
   });
 
   if (charitableAmount > 0) {
-    await db.addDonation(churchId, {
+    await db.addDonation(mosqueId, {
       event_id: null,
       payment_id: payment.id,
       donor_name: donorName,
@@ -1019,23 +1019,23 @@ async function projectGivingCaptured(
 
   // Receipt to the payer. Best-effort; idempotent on Mooov payment_id.
   try {
-    const church = await db.getChurchById(churchId).catch(() => null);
+    const mosque = await db.getMosqueById(mosqueId).catch(() => null);
     const member = givingRecord.member_id
-      ? await db.getMemberById(givingRecord.member_id, churchId).catch(() => null)
+      ? await db.getMemberById(givingRecord.member_id, mosqueId).catch(() => null)
       : null;
     const { sendOnlinePaymentReceipt } = await import(
       "@/lib/email/payment-receipts"
     );
     await sendOnlinePaymentReceipt({
-      churchId,
-      church,
+      mosqueId,
+      mosque,
       toEmail: donorEmail,
       toName: donorName,
       memberId: member?.id ?? null,
       amountMajor: totalMajor,
       currency: currencyMajor,
       kind: "giving_full",
-      description: `This receipt covers your full annual giving for the ${church?.name ?? "church"}.`,
+      description: `This receipt covers your full annual giving for the ${mosque?.name ?? "mosque"}.`,
       mooovPaymentId: attempt.payment_id,
       metadata: { giving_id: givingId },
     });
@@ -1081,7 +1081,7 @@ function readLineItems(
 }
 
 async function projectStandingOrTakePaymentCaptured(
-  churchId: string,
+  mosqueId: string,
   attempt: {
     payment_id: string;
     intent: string;
@@ -1159,14 +1159,14 @@ async function projectStandingOrTakePaymentCaptured(
     case "take_payment":
       // category already set from metadata above.
       break;
-    case "church_generic_standing_qr":
+    case "mosque_generic_standing_qr":
     default:
       category = null;
       break;
   }
 
   const result = await projectTakePaymentCaptured({
-    churchId,
+    mosqueId,
     mooovPaymentId: attempt.payment_id,
     amountMajor,
     currency: attempt.currency ?? "GBP",
@@ -1214,7 +1214,7 @@ async function projectStandingOrTakePaymentCaptured(
     try {
       await sendTakePaymentReceipt({
         toEmail: payerEmail,
-        toName: payerName ?? "Friend of the church",
+        toName: payerName ?? "Friend of the mosque",
         amountMajor,
         currency: attempt.currency ?? "GBP",
         category,
@@ -1223,7 +1223,7 @@ async function projectStandingOrTakePaymentCaptured(
         paymentMethod: "card_qr",
         recordedByEmail,
         giftAidEligible,
-        churchId,
+        mosqueId,
         paymentId: attempt.payment_id,
         lineItems,
       });
@@ -1243,7 +1243,7 @@ async function projectStandingOrTakePaymentCaptured(
 //     (address + taxpayer confirmation captured pre-payment and stashed on
 //     the guest_descriptor). We create the gift_aid_declarations row here,
 //     once payment actually captures, mirroring projectDonationCaptured.
-//   * Tithes / offerings / general gifts are donations to the church charity
+//   * Zakat / offerings / general gifts are donations to the mosque charity
 //     too, so when a declaration (or at least a donor email) is present we
 //     log a donations row for the FULL amount even when the purpose isn't
 //     "charity" — that's what the Gift Aid claim batcher reclaims against.
@@ -1251,7 +1251,7 @@ async function projectStandingOrTakePaymentCaptured(
 // Idempotent on payments.mooov_payment_id: the early-exit below also guards
 // the declaration + donation inserts against webhook redelivery.
 async function projectKioskGivingCaptured(
-  churchId: string,
+  mosqueId: string,
   attempt: {
     payment_id: string;
     intent: string;
@@ -1292,7 +1292,7 @@ async function projectKioskGivingCaptured(
   let giftAidDeclarationId: string | null = null;
   if (wantsGiftAid && payerEmail && payerName) {
     try {
-      const declaration = await db.addGiftAidDeclaration(churchId, {
+      const declaration = await db.addGiftAidDeclaration(mosqueId, {
         donor_name: payerName,
         donor_email: payerEmail,
         donor_address_line_1:
@@ -1326,7 +1326,7 @@ async function projectKioskGivingCaptured(
   }
 
   const result = await projectTakePaymentCaptured({
-    churchId,
+    mosqueId,
     mooovPaymentId: attempt.payment_id,
     amountMajor,
     currency: currencyMajor,
@@ -1346,13 +1346,13 @@ async function projectKioskGivingCaptured(
   if (result.alreadyExisted) return;
 
   // The shared projector only logs a donation when charity_amount > 0, i.e.
-  // when the kiosk purpose was "charity". Tithes, offerings, and general
+  // when the kiosk purpose was "charity". Zakat, offerings, and general
   // gifts with an identified donor are reclaimable donations too, so log
   // them here for the Gift Aid pipeline. Anonymous non-charity gifts stay
   // ledger-only (no GASDS on card payments, nothing to reclaim).
   if (category !== "charity" && result.donationId === null && payerEmail) {
     try {
-      await db.addDonation(churchId, {
+      await db.addDonation(mosqueId, {
         event_id: null,
         payment_id: result.paymentId,
         donor_name: payerName,
@@ -1383,7 +1383,7 @@ async function projectKioskGivingCaptured(
     try {
       await sendTakePaymentReceipt({
         toEmail: payerEmail,
-        toName: payerName ?? "Friend of the church",
+        toName: payerName ?? "Friend of the mosque",
         amountMajor,
         currency: currencyMajor,
         category,
@@ -1392,7 +1392,7 @@ async function projectKioskGivingCaptured(
         paymentMethod: "card_qr",
         recordedByEmail: null,
         giftAidEligible: Boolean(giftAidDeclarationId),
-        churchId,
+        mosqueId,
         paymentId: attempt.payment_id,
       });
     } catch (err) {
@@ -1423,7 +1423,7 @@ async function projectKioskGivingCaptured(
 // duplicate payments insert) and on giving_schedules.status (only the
 // first transition writes the saved PM + customer).
 async function projectGivingSubscriptionEnrolCaptured(
-  churchId: string,
+  mosqueId: string,
   attempt: {
     payment_id: string;
     amount: number;
@@ -1454,7 +1454,7 @@ async function projectGivingSubscriptionEnrolCaptured(
     return;
   }
 
-  const schedule = await db.getGivingSchedule(scheduleId, churchId);
+  const schedule = await db.getGivingSchedule(scheduleId, mosqueId);
   if (!schedule) {
     console.error("mooov webhook: giving schedule not found", {
       payment_id: attempt.payment_id,
@@ -1463,7 +1463,7 @@ async function projectGivingSubscriptionEnrolCaptured(
     return;
   }
 
-  const allGiving = await db.getMemberGiving(churchId);
+  const allGiving = await db.getMemberGiving(mosqueId);
   const givingRecord = allGiving.find((d) => d.id === givingId);
   if (!givingRecord) {
     console.error("mooov webhook: giving record not found for enrolment capture", {
@@ -1498,12 +1498,12 @@ async function projectGivingSubscriptionEnrolCaptured(
     return;
   }
 
-  const instalments = await db.getInstalmentsForGiving(givingId, churchId);
+  const instalments = await db.getInstalmentsForGiving(givingId, mosqueId);
   const firstInstalment = instalments.find((i) => i.sequence === 1);
   const secondInstalment = instalments.find((i) => i.sequence === 2);
 
   // 1. Stamp saved PM + customer + status active on the schedule.
-  await db.updateGivingSchedule(scheduleId, churchId, {
+  await db.updateGivingSchedule(scheduleId, mosqueId, {
     mooov_payment_method_id: paymentMethodId,
     stripe_customer_id: stripeCustomerId,
     status: "active",
@@ -1527,7 +1527,7 @@ async function projectGivingSubscriptionEnrolCaptured(
   );
   const completedAt = new Date().toISOString();
 
-  const payment = await db.addPayment(churchId, {
+  const payment = await db.addPayment(mosqueId, {
     rsvp_id: null,
     event_id: null,
     user_email: givingRecord.member_email,
@@ -1551,7 +1551,7 @@ async function projectGivingSubscriptionEnrolCaptured(
   });
 
   if (firstInstalment) {
-    await db.updateInstalment(firstInstalment.id, churchId, {
+    await db.updateInstalment(firstInstalment.id, mosqueId, {
       status: "paid",
       paid_at: completedAt,
       payment_reference: attempt.payment_id,
@@ -1562,12 +1562,12 @@ async function projectGivingSubscriptionEnrolCaptured(
   //    enrolled with 1 month remaining), flip the parent member_giving to
   //    paid right now and mark the schedule completed.
   if (instalments.length <= 1) {
-    await db.updateMemberGivingStatus(givingId, churchId, {
+    await db.updateMemberGivingStatus(givingId, mosqueId, {
       status: "paid",
       payment_id: payment.id,
       paid_at: completedAt,
     });
-    await db.updateGivingSchedule(scheduleId, churchId, {
+    await db.updateGivingSchedule(scheduleId, mosqueId, {
       status: "completed",
     });
   }
@@ -1577,10 +1577,10 @@ async function projectGivingSubscriptionEnrolCaptured(
   //    batcher's date alignment correct (gift made on charge date).
   if (charitablePerCycle > 0) {
     const declaration = await db.getActiveGiftAidDeclarationByEmail(
-      churchId,
+      mosqueId,
       givingRecord.member_email
     );
-    await db.addDonation(churchId, {
+    await db.addDonation(mosqueId, {
       event_id: null,
       payment_id: payment.id,
       donor_name: givingRecord.member_name,
@@ -1607,7 +1607,7 @@ async function projectGivingSubscriptionEnrolCaptured(
 // When the last outstanding instalment is paid we flip the parent
 // member_giving to paid and the schedule to completed.
 async function projectGivingSubscriptionCycleCaptured(
-  churchId: string,
+  mosqueId: string,
   attempt: {
     payment_id: string;
     amount: number;
@@ -1640,7 +1640,7 @@ async function projectGivingSubscriptionCycleCaptured(
     return;
   }
 
-  const schedule = await db.getGivingSchedule(scheduleId, churchId);
+  const schedule = await db.getGivingSchedule(scheduleId, mosqueId);
   if (!schedule) {
     console.error("mooov webhook: giving schedule not found for cycle capture", {
       payment_id: attempt.payment_id,
@@ -1649,7 +1649,7 @@ async function projectGivingSubscriptionCycleCaptured(
     return;
   }
 
-  const allGiving = await db.getMemberGiving(churchId);
+  const allGiving = await db.getMemberGiving(mosqueId);
   const givingRecord = allGiving.find((d) => d.id === givingId);
   if (!givingRecord) {
     console.error("mooov webhook: giving record not found for cycle capture", {
@@ -1662,13 +1662,13 @@ async function projectGivingSubscriptionCycleCaptured(
   const totalMajor = (attempt.amount ?? 0) / 100;
   const currencyMajor = (attempt.currency ?? "GBP").toUpperCase();
   const completedAt = new Date().toISOString();
-  const allInstalments = await db.getInstalmentsForGiving(givingId, churchId);
+  const allInstalments = await db.getInstalmentsForGiving(givingId, mosqueId);
   const charitablePerCycle = computeCyclicalCharitable(
     givingRecord.charitable_amount,
     allInstalments.length
   );
 
-  const payment = await db.addPayment(churchId, {
+  const payment = await db.addPayment(mosqueId, {
     rsvp_id: null,
     event_id: null,
     user_email: givingRecord.member_email,
@@ -1706,7 +1706,7 @@ async function projectGivingSubscriptionCycleCaptured(
       .sort((a, b) => a.sequence - b.sequence)[0];
   }
   if (target) {
-    await db.updateInstalment(target.id, churchId, {
+    await db.updateInstalment(target.id, mosqueId, {
       status: "paid",
       paid_at: completedAt,
       payment_reference: attempt.payment_id,
@@ -1725,7 +1725,7 @@ async function projectGivingSubscriptionCycleCaptured(
     .sort((a, b) => a.sequence - b.sequence);
 
   if (remaining.length === 0) {
-    await db.updateGivingSchedule(scheduleId, churchId, {
+    await db.updateGivingSchedule(scheduleId, mosqueId, {
       status: "completed",
       next_charge_at: null,
       last_charged_at: completedAt,
@@ -1734,13 +1734,13 @@ async function projectGivingSubscriptionCycleCaptured(
       last_failure_category: null,
       last_failure_at: null,
     });
-    await db.updateMemberGivingStatus(givingId, churchId, {
+    await db.updateMemberGivingStatus(givingId, mosqueId, {
       status: "paid",
       payment_id: payment.id,
       paid_at: completedAt,
     });
   } else {
-    await db.updateGivingSchedule(scheduleId, churchId, {
+    await db.updateGivingSchedule(scheduleId, mosqueId, {
       status: "active",
       next_charge_at: remaining[0].due_date,
       last_charged_at: completedAt,
@@ -1756,10 +1756,10 @@ async function projectGivingSubscriptionCycleCaptured(
 
   if (charitablePerCycle > 0) {
     const declaration = await db.getActiveGiftAidDeclarationByEmail(
-      churchId,
+      mosqueId,
       givingRecord.member_email
     );
-    await db.addDonation(churchId, {
+    await db.addDonation(mosqueId, {
       event_id: null,
       payment_id: payment.id,
       donor_name: givingRecord.member_name,
@@ -1779,7 +1779,7 @@ async function projectGivingSubscriptionCycleCaptured(
 // cycle (or the enrolment intent) fails. The cron retries on its next
 // tick and Mooov's idempotency replay protects against double-charge.
 async function handleGivingSubscriptionFailure(
-  churchId: string,
+  mosqueId: string,
   attempt: {
     intent: string;
     guest_descriptor: Record<string, unknown> | null;
@@ -1795,7 +1795,7 @@ async function handleGivingSubscriptionFailure(
     typeof guest.schedule_id === "string" ? guest.schedule_id : null;
   if (!scheduleId) return;
 
-  const schedule = await db.getGivingSchedule(scheduleId, churchId);
+  const schedule = await db.getGivingSchedule(scheduleId, mosqueId);
   if (!schedule) return;
 
   const nextFailures = (schedule.consecutive_failures ?? 0) + 1;
@@ -1805,7 +1805,7 @@ async function handleGivingSubscriptionFailure(
   const status: "past_due" | "paused" =
     nextFailures >= 5 ? "paused" : "past_due";
 
-  await db.updateGivingSchedule(scheduleId, churchId, {
+  await db.updateGivingSchedule(scheduleId, mosqueId, {
     status,
     consecutive_failures: nextFailures,
     last_failure_code: failure.failureCode,
@@ -1862,7 +1862,7 @@ function computeCyclicalCharitable(
 //     (verbatim from the Stripe Subscription metadata we set on
 //     /v1/subscription_checkouts) and falls back to subscription_id ->
 //     giving_schedules.mooov_subscription_id. Cross-tenant safe because
-//     the resolved schedule's church_id MUST match the webhook's church.
+//     the resolved schedule's mosque_id MUST match the webhook's mosque.
 //   * subscription.activated is idempotent on schedule.status (already
 //     active_stripe = noop). Redeliveries are common around the
 //     incomplete -> active transition.
@@ -1922,7 +1922,7 @@ function readSubscriptionEvent(event: MooovConnectEvent): MooovSubscriptionEvent
 }
 
 async function resolveSubscriptionSchedule(
-  churchId: string,
+  mosqueId: string,
   parsed: MooovSubscriptionEventData,
   eventId: string,
 ) {
@@ -1933,23 +1933,23 @@ async function resolveSubscriptionSchedule(
 
   let schedule =
     lpScheduleId != null
-      ? await db.getGivingSchedule(lpScheduleId, churchId).catch(() => null)
+      ? await db.getGivingSchedule(lpScheduleId, mosqueId).catch(() => null)
       : null;
 
   if (!schedule && parsed.subscriptionId) {
     const bySubId = await db
       .getGivingScheduleByMooovSubscriptionId(parsed.subscriptionId)
       .catch(() => null);
-    if (bySubId && bySubId.church_id === churchId) {
+    if (bySubId && bySubId.mosque_id === mosqueId) {
       schedule = bySubId;
-    } else if (bySubId && bySubId.church_id !== churchId) {
+    } else if (bySubId && bySubId.mosque_id !== mosqueId) {
       console.error(
-        "mooov webhook subscription: schedule church mismatch — refusing to project",
+        "mooov webhook subscription: schedule mosque mismatch — refusing to project",
         {
           event_id: eventId,
           subscription_id: parsed.subscriptionId,
-          schedule_church_id: bySubId.church_id,
-          webhook_church_id: churchId,
+          schedule_mosque_id: bySubId.mosque_id,
+          webhook_mosque_id: mosqueId,
         },
       );
       return null;
@@ -1969,11 +1969,11 @@ async function resolveSubscriptionSchedule(
 }
 
 async function handleSubscriptionEvent(
-  churchId: string,
+  mosqueId: string,
   event: MooovConnectEvent,
 ): Promise<void> {
   const parsed = readSubscriptionEvent(event);
-  let schedule = await resolveSubscriptionSchedule(churchId, parsed, event.id);
+  let schedule = await resolveSubscriptionSchedule(mosqueId, parsed, event.id);
   if (!schedule) return;
 
   // Terminal-state guard. Once a schedule has been cancelled or completed,
@@ -2019,7 +2019,7 @@ async function handleSubscriptionEvent(
           prior_cancelled_by_actor: schedule.cancelled_by_actor,
         },
       );
-      await db.updateGivingSchedule(schedule.id, churchId, {
+      await db.updateGivingSchedule(schedule.id, mosqueId, {
         status: "pending",
         cancelled_at: null,
         cancelled_by_actor: null,
@@ -2048,16 +2048,16 @@ async function handleSubscriptionEvent(
 
   switch (event.type) {
     case "subscription.activated":
-      await handleSubscriptionActivated(churchId, schedule, parsed, event.id);
+      await handleSubscriptionActivated(mosqueId, schedule, parsed, event.id);
       return;
     case "subscription.invoice_paid":
-      await handleSubscriptionInvoicePaid(churchId, schedule, parsed, event.id);
+      await handleSubscriptionInvoicePaid(mosqueId, schedule, parsed, event.id);
       return;
     case "subscription.invoice_failed":
-      await handleSubscriptionInvoiceFailed(churchId, schedule, parsed, event.id);
+      await handleSubscriptionInvoiceFailed(mosqueId, schedule, parsed, event.id);
       return;
     case "subscription.canceled":
-      await handleSubscriptionCanceled(churchId, schedule, parsed, event.id);
+      await handleSubscriptionCanceled(mosqueId, schedule, parsed, event.id);
       return;
     case "subscription.updated":
       console.log("mooov webhook: subscription.updated (log-only)", {
@@ -2070,7 +2070,7 @@ async function handleSubscriptionEvent(
 }
 
 async function handleSubscriptionActivated(
-  churchId: string,
+  mosqueId: string,
   schedule: db.GivingSchedule,
   parsed: MooovSubscriptionEventData,
   eventId: string,
@@ -2083,7 +2083,7 @@ async function handleSubscriptionActivated(
     return;
   }
 
-  await db.updateGivingSchedule(schedule.id, churchId, {
+  await db.updateGivingSchedule(schedule.id, mosqueId, {
     status: "active_stripe",
     mooov_payment_method_id:
       parsed.paymentMethodId ?? schedule.mooov_payment_method_id,
@@ -2105,14 +2105,14 @@ async function handleSubscriptionActivated(
   try {
     givingRecord = await db.getMemberGivingById(
       schedule.member_giving_id,
-      churchId,
+      mosqueId,
     );
     if (
       givingRecord &&
       (givingRecord.giving_payment_method == null ||
         givingRecord.giving_payment_method === "online_subscription")
     ) {
-      await db.setMemberGivingPaymentMethod(givingRecord.id, churchId, {
+      await db.setMemberGivingPaymentMethod(givingRecord.id, mosqueId, {
         method: "online_subscription",
         setBy: "mooov_webhook_subscription_activated",
       });
@@ -2130,11 +2130,11 @@ async function handleSubscriptionActivated(
   try {
     const member =
       givingRecord?.member_id != null
-        ? await db.getMemberById(givingRecord.member_id, churchId).catch(() => null)
+        ? await db.getMemberById(givingRecord.member_id, mosqueId).catch(() => null)
         : await db
-            .getMemberByEmail(schedule.member_email, churchId)
+            .getMemberByEmail(schedule.member_email, mosqueId)
             .catch(() => null);
-    const church = await db.getChurchById(churchId).catch(() => null);
+    const mosque = await db.getMosqueById(mosqueId).catch(() => null);
     if (member && givingRecord) {
       const cycleAmount =
         typeof parsed.amount === "number" && parsed.amount > 0
@@ -2151,8 +2151,8 @@ async function handleSubscriptionActivated(
         "@/lib/email/giving-notifications"
       );
       await notifyGivingSubscriptionActivated({
-        churchId,
-        church,
+        mosqueId,
+        mosque,
         member: {
           id: member.id,
           email: member.email,
@@ -2181,7 +2181,7 @@ async function handleSubscriptionActivated(
 }
 
 async function handleSubscriptionInvoicePaid(
-  churchId: string,
+  mosqueId: string,
   schedule: db.GivingSchedule,
   parsed: MooovSubscriptionEventData,
   eventId: string,
@@ -2206,7 +2206,7 @@ async function handleSubscriptionInvoicePaid(
     return;
   }
 
-  const givingRecord = await db.getMemberGivingById(schedule.member_giving_id, churchId);
+  const givingRecord = await db.getMemberGivingById(schedule.member_giving_id, mosqueId);
   if (!givingRecord) {
     console.error(
       "mooov webhook: subscription.invoice_paid giving record missing",
@@ -2218,13 +2218,13 @@ async function handleSubscriptionInvoicePaid(
   const totalMajor = (parsed.amount ?? 0) / 100;
   const currencyMajor = parsed.currency || "GBP";
   const completedAt = new Date().toISOString();
-  const allInstalments = await db.getInstalmentsForGiving(givingRecord.id, churchId);
+  const allInstalments = await db.getInstalmentsForGiving(givingRecord.id, mosqueId);
   const charitablePerCycle = computeCyclicalCharitable(
     givingRecord.charitable_amount,
     Math.max(allInstalments.length, 1),
   );
 
-  const payment = await db.addPayment(churchId, {
+  const payment = await db.addPayment(mosqueId, {
     rsvp_id: null,
     event_id: null,
     user_email: givingRecord.member_email,
@@ -2254,7 +2254,7 @@ async function handleSubscriptionInvoicePaid(
   // the per-cycle accounting record (giving_schedules.metadata.cycles_paid
   // is the authoritative count for the UI). No new instalment is
   // forged for renewal cycles -- those will be re-baselined when the
-  // next giving year is configured by the church admin.
+  // next giving year is configured by the mosque admin.
   const nextOutstanding = allInstalments
     .filter(
       (i) =>
@@ -2264,7 +2264,7 @@ async function handleSubscriptionInvoicePaid(
     .sort((a, b) => a.sequence - b.sequence)[0];
 
   if (nextOutstanding) {
-    await db.updateInstalment(nextOutstanding.id, churchId, {
+    await db.updateInstalment(nextOutstanding.id, mosqueId, {
       status: "paid",
       paid_at: completedAt,
       payment_reference: syntheticPaymentId,
@@ -2287,7 +2287,7 @@ async function handleSubscriptionInvoicePaid(
   const priorCyclesPaid =
     typeof metadata.cycles_paid === "number" ? metadata.cycles_paid : 0;
 
-  await db.updateGivingSchedule(schedule.id, churchId, {
+  await db.updateGivingSchedule(schedule.id, mosqueId, {
     status: "active_stripe",
     next_charge_at: remainingAfter[0]?.due_date ?? null,
     last_charged_at: completedAt,
@@ -2306,10 +2306,10 @@ async function handleSubscriptionInvoicePaid(
   // Flip the parent member_giving to paid once we've covered the in-year
   // total. For open-ended subscriptions this is when the last
   // pre-created instalment is consumed; subsequent invoices belong to
-  // the NEXT giving year (a church admin will spin up the next year's
+  // the NEXT giving year (a mosque admin will spin up the next year's
   // member_giving row separately, or we'll auto-roll it later).
   if (remainingAfter.length === 0) {
-    await db.updateMemberGivingStatus(givingRecord.id, churchId, {
+    await db.updateMemberGivingStatus(givingRecord.id, mosqueId, {
       status: "paid",
       payment_id: payment.id,
       paid_at: completedAt,
@@ -2321,10 +2321,10 @@ async function handleSubscriptionInvoicePaid(
   // donation row dated to the charge.
   if (charitablePerCycle > 0) {
     const declaration = await db.getActiveGiftAidDeclarationByEmail(
-      churchId,
+      mosqueId,
       givingRecord.member_email,
     );
-    await db.addDonation(churchId, {
+    await db.addDonation(mosqueId, {
       event_id: null,
       payment_id: payment.id,
       donor_name: givingRecord.member_name,
@@ -2346,11 +2346,11 @@ async function handleSubscriptionInvoicePaid(
   try {
     const member =
       givingRecord.member_id != null
-        ? await db.getMemberById(givingRecord.member_id, churchId).catch(() => null)
+        ? await db.getMemberById(givingRecord.member_id, mosqueId).catch(() => null)
         : await db
-            .getMemberByEmail(givingRecord.member_email, churchId)
+            .getMemberByEmail(givingRecord.member_email, mosqueId)
             .catch(() => null);
-    const church = await db.getChurchById(churchId).catch(() => null);
+    const mosque = await db.getMosqueById(mosqueId).catch(() => null);
     if (member) {
       const meta = (schedule.metadata ?? {}) as Record<string, unknown>;
       const cyclesTotal =
@@ -2363,8 +2363,8 @@ async function handleSubscriptionInvoicePaid(
         "@/lib/email/giving-notifications"
       );
       await notifyGivingCyclePaid({
-        churchId,
-        church,
+        mosqueId,
+        mosque,
         member: {
           id: member.id,
           email: member.email,
@@ -2388,7 +2388,7 @@ async function handleSubscriptionInvoicePaid(
 }
 
 async function handleSubscriptionInvoiceFailed(
-  churchId: string,
+  mosqueId: string,
   schedule: db.GivingSchedule,
   parsed: MooovSubscriptionEventData,
   eventId: string,
@@ -2403,7 +2403,7 @@ async function handleSubscriptionInvoiceFailed(
       : null;
 
   const nextFailures = schedule.consecutive_failures + 1;
-  await db.updateGivingSchedule(schedule.id, churchId, {
+  await db.updateGivingSchedule(schedule.id, mosqueId, {
     status: "past_due",
     consecutive_failures: nextFailures,
     last_failure_code: failureCode,
@@ -2421,15 +2421,15 @@ async function handleSubscriptionInvoiceFailed(
   // Member nudge on every fail; treasurer escalation at 1, 3, 5.
   try {
     const givingRecord = await db
-      .getMemberGivingById(schedule.member_giving_id, churchId)
+      .getMemberGivingById(schedule.member_giving_id, mosqueId)
       .catch(() => null);
     const member =
       givingRecord?.member_id != null
-        ? await db.getMemberById(givingRecord.member_id, churchId).catch(() => null)
+        ? await db.getMemberById(givingRecord.member_id, mosqueId).catch(() => null)
         : await db
-            .getMemberByEmail(schedule.member_email, churchId)
+            .getMemberByEmail(schedule.member_email, mosqueId)
             .catch(() => null);
-    const church = await db.getChurchById(churchId).catch(() => null);
+    const mosque = await db.getMosqueById(mosqueId).catch(() => null);
     if (member) {
       const invoiceDedupeKey =
         parsed.invoiceId ?? `sub_evt_${eventId}_failed`;
@@ -2437,8 +2437,8 @@ async function handleSubscriptionInvoiceFailed(
         "@/lib/email/giving-notifications"
       );
       await notifyGivingCycleFailed({
-        churchId,
-        church,
+        mosqueId,
+        mosque,
         member: {
           id: member.id,
           email: member.email,
@@ -2464,7 +2464,7 @@ async function handleSubscriptionInvoiceFailed(
 }
 
 async function handleSubscriptionCanceled(
-  churchId: string,
+  mosqueId: string,
   schedule: db.GivingSchedule,
   parsed: MooovSubscriptionEventData,
   eventId: string,
@@ -2477,7 +2477,7 @@ async function handleSubscriptionCanceled(
     return;
   }
 
-  await db.updateGivingSchedule(schedule.id, churchId, {
+  await db.updateGivingSchedule(schedule.id, mosqueId, {
     status: "cancelled",
     cancelled_at: new Date().toISOString(),
     cancelled_by_actor: parsed.cancelReason ?? "stripe_subscription_canceled",
@@ -2486,16 +2486,16 @@ async function handleSubscriptionCanceled(
 
   try {
     const member = await db
-      .getMemberByEmail(schedule.member_email, churchId)
+      .getMemberByEmail(schedule.member_email, mosqueId)
       .catch(() => null);
-    const church = await db.getChurchById(churchId).catch(() => null);
+    const mosque = await db.getMosqueById(mosqueId).catch(() => null);
     if (member) {
       const { notifyGivingSubscriptionCanceled } = await import(
         "@/lib/email/giving-notifications"
       );
       await notifyGivingSubscriptionCanceled({
-        churchId,
-        church,
+        mosqueId,
+        mosque,
         member: {
           id: member.id,
           email: member.email,

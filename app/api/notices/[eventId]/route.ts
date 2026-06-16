@@ -62,27 +62,27 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   const { eventId } = await params;
   const adminCtx = await getAdminReadContext();
-  if (adminCtx.mode !== "database" || !adminCtx.churchId) {
-    return NextResponse.json({ error: "Church not selected." }, { status: 404 });
+  if (adminCtx.mode !== "database" || !adminCtx.mosqueId) {
+    return NextResponse.json({ error: "Mosque not selected." }, { status: 404 });
   }
-  const churchId = adminCtx.churchId;
+  const mosqueId = adminCtx.mosqueId;
 
-  const [event, church] = await Promise.all([
-    db.getEventById(eventId, churchId),
-    db.getChurchById(churchId),
+  const [event, mosque] = await Promise.all([
+    db.getEventById(eventId, mosqueId),
+    db.getMosqueById(mosqueId),
   ]);
   if (!event) {
     return NextResponse.json({ error: "Service not found." }, { status: 404 });
   }
 
-  const notice = await db.getServiceNotice(eventId, churchId);
-  const sends = await db.listServiceNoticeSends(churchId, eventId);
+  const notice = await db.getServiceNotice(eventId, mosqueId);
+  const sends = await db.listServiceNoticeSends(mosqueId, eventId);
   return NextResponse.json({
     event,
     sends,
     notice: notice ?? {
       issue_date: new Date().toISOString().slice(0, 10),
-      opening_text: renderDefaultNoticeOpening(event, church),
+      opening_text: renderDefaultNoticeOpening(event, mosque),
       agenda_items: defaultAgendaItems(),
       menu_items: [],
       dining_time: event.event_time ?? null,
@@ -111,14 +111,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const { eventId } = await params;
     const adminCtx = await getAdminReadContext();
-    if (adminCtx.mode !== "database" || !adminCtx.churchId) {
-      return NextResponse.json({ error: "Church not selected." }, { status: 404 });
+    if (adminCtx.mode !== "database" || !adminCtx.mosqueId) {
+      return NextResponse.json({ error: "Mosque not selected." }, { status: 404 });
     }
-    const churchId = adminCtx.churchId;
-    const forbidden = await requireAdminApiPermission("notice:write", churchId);
+    const mosqueId = adminCtx.mosqueId;
+    const forbidden = await requireAdminApiPermission("notice:write", mosqueId);
     if (forbidden) return forbidden;
 
-    const event = await db.getEventById(eventId, churchId);
+    const event = await db.getEventById(eventId, mosqueId);
     if (!event) {
       return NextResponse.json({ error: "Service not found." }, { status: 404 });
     }
@@ -126,7 +126,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const body = await request.json();
     const newcomerContacts = cleanNewcomerOfficers(body.newcomer_contacts);
     const primaryNewcomerOfficer = newcomerContacts[0];
-    const notice = await db.upsertServiceNotice(churchId, eventId, {
+    const notice = await db.upsertServiceNotice(mosqueId, eventId, {
       issue_date: body.issue_date || new Date().toISOString().slice(0, 10),
       opening_text: body.opening_text?.trim() || null,
       agenda_items: cleanList(body.agenda_items),
@@ -148,14 +148,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     // Editing a notice reverts it back to draft so an approval is required
     // again before sending. This keeps the human gate honest after any edit.
     if (event.notice_status !== "sent") {
-      await db.setServiceNoticeStatus(event.id, churchId, "draft", {
+      await db.setServiceNoticeStatus(event.id, mosqueId, "draft", {
         notice_approved_at: null,
         notice_approved_by_email: null,
       });
     }
 
     await writeAuditLog({
-      churchId,
+      mosqueId,
       action: "updated",
       entityType: "notice",
       entityId: notice.id,

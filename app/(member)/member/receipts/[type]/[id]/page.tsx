@@ -20,7 +20,7 @@ export default async function ReceiptPage({
 
   const member =
     (await db.getMemberByAuthUserId(user.id)) ??
-    (await db.getMemberByEmailAcrossChurches(user.email));
+    (await db.getMemberByEmailAcrossMosques(user.email));
   if (!member) redirect("/member");
 
   const { type, id } = await params;
@@ -28,10 +28,10 @@ export default async function ReceiptPage({
     notFound();
   }
 
-  const church = await db.getChurchById(member.church_id);
+  const mosque = await db.getMosqueById(member.mosque_id);
 
   if (type === "payment") {
-    const payment = await db.getPaymentById(id, member.church_id);
+    const payment = await db.getPaymentById(id, member.mosque_id);
     if (!payment || payment.user_email.toLowerCase() !== member.email.toLowerCase()) {
       notFound();
     }
@@ -55,13 +55,13 @@ export default async function ReceiptPage({
           reference: payment.stripe_payment_intent_id ?? payment.id,
         }}
         member={{ full_name: member.full_name, email: member.email }}
-        church={church ? { name: church.name, church_number: church.church_number, support_email: church.support_email } : null}
+        mosque={mosque ? { name: mosque.name, mosque_number: mosque.mosque_number, support_email: mosque.support_email } : null}
       />
     );
   }
 
   if (type === "donation") {
-    const donation = await db.getDonationById(id, member.church_id);
+    const donation = await db.getDonationById(id, member.mosque_id);
     if (!donation || donation.donor_email.toLowerCase() !== member.email.toLowerCase()) {
       notFound();
     }
@@ -82,13 +82,13 @@ export default async function ReceiptPage({
           reference: donation.id,
         }}
         member={{ full_name: member.full_name, email: member.email }}
-        church={church ? { name: church.name, church_number: church.church_number, support_email: church.support_email } : null}
+        mosque={mosque ? { name: mosque.name, mosque_number: mosque.mosque_number, support_email: mosque.support_email } : null}
       />
     );
   }
 
   // giving
-  const givingRecords = await db.getMemberGiving(member.church_id, {
+  const givingRecords = await db.getMemberGiving(member.mosque_id, {
     memberEmail: member.email,
   });
   const giving = givingRecords.find((d) => d.id === id);
@@ -107,7 +107,7 @@ export default async function ReceiptPage({
         reference: giving.id,
       }}
       member={{ full_name: member.full_name, email: member.email }}
-      church={church ? { name: church.name, church_number: church.church_number, support_email: church.support_email } : null}
+      mosque={mosque ? { name: mosque.name, mosque_number: mosque.mosque_number, support_email: mosque.support_email } : null}
     />
   );
 }

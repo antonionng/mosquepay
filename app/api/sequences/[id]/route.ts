@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import { rejectIfMockDisabled } from "@/lib/db/reject-mock";
 import * as db from "@/lib/db";
-import { getChurchSlugFromRequest } from "@/lib/tenant";
+import { getMosqueSlugFromRequest } from "@/lib/tenant";
 import {
   requireAdminApiAuth,
   requireAdminApiPermission,
@@ -106,16 +106,16 @@ export async function GET(request: NextRequest, { params }: Params) {
   }
 
   const { id } = await params;
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const sequence = await db.getServiceSequenceById(id, churchId);
+  const sequence = await db.getServiceSequenceById(id, mosqueId);
   if (!sequence) {
     return NextResponse.json({ error: "Sequence not found." }, { status: 404 });
   }
-  const events = await db.getEventsBySequenceId(id, churchId);
+  const events = await db.getEventsBySequenceId(id, mosqueId);
   return NextResponse.json({ sequence, events });
 }
 
@@ -135,12 +135,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   try {
     const { id } = await params;
-    const churchSlug = getChurchSlugFromRequest(request);
-    const churchId = await db.resolveChurchId(churchSlug);
-    if (!churchId) {
-      return NextResponse.json({ error: "Church not found." }, { status: 404 });
+    const mosqueSlug = getMosqueSlugFromRequest(request);
+    const mosqueId = await db.resolveMosqueId(mosqueSlug);
+    if (!mosqueId) {
+      return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
     }
-    const forbidden = await requireAdminApiPermission("services:write", churchId);
+    const forbidden = await requireAdminApiPermission("services:write", mosqueId);
     if (forbidden) return forbidden;
 
     const body = await request.json();
@@ -171,7 +171,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       // dropped and never persisted.
       let effectiveMonths = months;
       if (effectiveMonths === undefined) {
-        const existing = await db.getServiceSequenceById(id, churchId);
+        const existing = await db.getServiceSequenceById(id, mosqueId);
         if (!existing) {
           return NextResponse.json(
             { error: "Sequence not found." },
@@ -223,13 +223,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       updates.auto_draft_notice = body.auto_draft_notice;
     if (typeof body.active === "boolean") updates.active = body.active;
 
-    const sequence = await db.updateServiceSequence(id, churchId, updates);
+    const sequence = await db.updateServiceSequence(id, mosqueId, updates);
     if (!sequence) {
       return NextResponse.json({ error: "Sequence not found." }, { status: 404 });
     }
 
     await writeAuditLog({
-      churchId,
+      mosqueId,
       action: "updated",
       entityType: "service_sequence",
       entityId: sequence.id,
@@ -262,22 +262,22 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   }
 
   const { id } = await params;
-  const churchSlug = getChurchSlugFromRequest(request);
-  const churchId = await db.resolveChurchId(churchSlug);
-  if (!churchId) {
-    return NextResponse.json({ error: "Church not found." }, { status: 404 });
+  const mosqueSlug = getMosqueSlugFromRequest(request);
+  const mosqueId = await db.resolveMosqueId(mosqueSlug);
+  if (!mosqueId) {
+    return NextResponse.json({ error: "Mosque not found." }, { status: 404 });
   }
-  const forbidden = await requireAdminApiPermission("services:write", churchId);
+  const forbidden = await requireAdminApiPermission("services:write", mosqueId);
   if (forbidden) return forbidden;
 
-  const sequence = await db.getServiceSequenceById(id, churchId);
+  const sequence = await db.getServiceSequenceById(id, mosqueId);
   if (!sequence) {
     return NextResponse.json({ error: "Sequence not found." }, { status: 404 });
   }
 
-  await db.deleteServiceSequence(id, churchId);
+  await db.deleteServiceSequence(id, mosqueId);
   await writeAuditLog({
-    churchId,
+    mosqueId,
     action: "deleted",
     entityType: "service_sequence",
     entityId: id,
