@@ -557,29 +557,38 @@ export default function GiftAidMosqueTreasurersGuidePage() {
             <P>
               This page does not write new fiqh. It does not tell you that
               Gift Aid on Zakat is allowed, and it does not tell you that it
-              is forbidden. It does not offer a local mosque page as a ruling
-              you can copy. It does not show Gift Aid topping up a Zakat line
-              as a default example. Public MosquePay marketing has used
-              conflicting illustrations on that point. Ignore those
-              illustrations. They are not a policy.
+              is forbidden. It does not show Gift Aid topping up a Zakat
+              line as a default example, and it does not reproduce the
+              homepage giving mock that treats a Zakat amount as Gift Aid
+              eligible. That mock is not a policy.
+            </P>
+            <P>
+              One public MosquePay page,{" "}
+              <InternalLink href="/charity">/charity</InternalLink>, says Gift
+              Aid is not claimed on Zakat paid as an obligation. That is a
+              sentence on a demo mosque donation page, not a ruling this
+              guide adopts, and not a reason to leave the congregation
+              guessing. The live marketing site is not consistent on this
+              point. Your written policy is what the giver and the auditor
+              can trust.
             </P>
             <P>
               Write the mosque&apos;s Gift Aid-on-Zakat policy down where the
               treasurer, the imam, and the accountant can all find it. Show
               that policy on the donate flow so a giver can see how the
-              mosque will treat their gift before they give. Keep Zakat,
-              Sadaqah, and Lillah tagged from the moment of giving through to
-              the banked amount and any later claim line.
+              mosque will treat their gift before they give. Confirm the
+              religious treatment with your imam and the tax treatment with
+              your accountant before any Zakat line appears in a Gift Aid
+              export.
             </P>
             <P>
               Software behaviour, and only software behaviour, is this.
               MosquePay&apos;s public features page says Zakat, Sadaqah,
               Lillah, and appeal funds are kept separate, and that Gift Aid
-              declarations can be captured at the point of giving. Capture a
-              declaration where the mosque&apos;s written policy allows it.
-              Do not let a tick-box invent a ruling. Confirm the religious
-              treatment with your imam and the tax treatment with your
-              accountant before any Zakat line appears in a Gift Aid export.
+              declarations can be captured at the point of giving. Keep the
+              funds tagged. Capture a declaration where the mosque&apos;s
+              written policy allows it. Do not let a tick-box invent a
+              ruling.
             </P>
 
             <ArticleH2>
@@ -681,7 +690,9 @@ export default function GiftAidMosqueTreasurersGuidePage() {
               <li>
                 Can a Friday gift be split across Zakat, Sadaqah, Lillah, and
                 a general or building fund so the claim line matches the
-                restriction?
+                restriction? Does the product Gift Aid a Zakat line by
+                default, or does it follow a written mosque policy that you
+                can also show on the donate flow?
               </li>
               <li>
                 Does GASDS exclude gifts that already have a declaration, or
