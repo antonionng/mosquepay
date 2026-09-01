@@ -45,6 +45,13 @@ export default function GuidesIndexPage() {
               These are not the product changelog on /news, and they are not
               the demo mosque pages on /charity or /donate.
             </p>
+            <p className="mt-5 text-base leading-7 text-slate-700">
+              mosque-pay.com is operations software for a mosque&apos;s own
+              giving, Gift Aid, and treasurer records. It is not the UK donor
+              directory at mosquepay.co.uk. These guides do not describe that
+              directory, do not use its mosque count, and do not claim its fee
+              model.
+            </p>
           </div>
         </div>
       </section>

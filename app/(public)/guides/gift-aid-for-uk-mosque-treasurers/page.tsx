@@ -216,6 +216,9 @@ export default function GiftAidMosqueTreasurersGuidePage() {
               evidence at Jumu&apos;ah without rebuilding the HMRC claim in a
               spreadsheet.
             </h1>
+            <p className="mt-4 text-sm font-medium text-slate-500">
+              Published September 2026
+            </p>
             <p className="mt-6 text-lg leading-8 text-slate-600">
               This is a field guide for the person who counts Friday cash,
               reconciles contactless taps, and still has a paper Gift Aid file
@@ -223,6 +226,13 @@ export default function GiftAidMosqueTreasurersGuidePage() {
               GOV.UK pages on {CHECKED_ON}. Re-open those pages before you file.
               MosquePay product claims are taken only from public pages on
               mosque-pay.com.
+            </p>
+            <p className="mt-5 text-base leading-7 text-slate-700">
+              mosque-pay.com is operations software for a mosque&apos;s own
+              giving, Gift Aid, and treasurer records. It is not the UK donor
+              directory at mosquepay.co.uk. This guide does not describe that
+              directory, does not use its mosque count, and does not claim its
+              fee model.
             </p>
           </div>
         </section>
