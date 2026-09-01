@@ -245,6 +245,13 @@ export default function GiftAidMosqueTreasurersGuidePage() {
               GOV.UK rules, and tells you honestly what MosquePay exports and
               what it does not submit.
             </P>
+            <P>
+              Use it as a single-scroll field guide. Read the job split
+              first, then the GOV.UK requirements, then the Friday failure
+              modes, then the comparison of approaches. The product section
+              comes late on purpose. If a demo cannot answer the puncture
+              questions, you do not need a longer demo.
+            </P>
 
             <ArticleH2>
               This page is for the treasurer or finance lead in England or
@@ -270,6 +277,29 @@ export default function GiftAidMosqueTreasurersGuidePage() {
                 recognition from HMRC
               </GovLink>{" "}
               before you can claim.
+            </P>
+            <P>
+              <GovLink href={GOV.hmrcRecognition}>
+                The HMRC recognition page
+              </GovLink>{" "}
+              asks for bank account details and financial accounts, officials
+              including dates of birth and National Insurance numbers, a
+              regulator number if you have one, charitable objectives, and
+              the governing document. That pack is how a mosque that is
+              already a Charity Commission charity, or is applying, becomes
+              able to claim tax. Until HMRC recognises you, a Friday
+              declaration file is evidence you cannot yet turn into a
+              repayment.
+            </P>
+            <P>
+              This page does not cover donors asking whether they personally
+              should tick Gift Aid. It does not cover Scotland or Northern
+              Ireland regulator differences beyond the obvious point that
+              HMRC recognition is still the tax gate. If you are a network
+              treasurer looking after several mosques, treat each HMRC
+              charity reference as its own claim, and do not merge
+              declarations across legal entities because the software can
+              print one export.
             </P>
 
             <ArticleH2>
@@ -331,6 +361,21 @@ export default function GiftAidMosqueTreasurersGuidePage() {
                 ],
               ]}
             />
+            <P>
+              A worked Friday, without inventing recoveries, looks like this.
+              Cash in the tin is mostly anonymous, so those pounds are a
+              GASDS candidate only if each gift is at or under the live
+              GOV.UK small-donation limit and nobody signed a declaration.
+              Contactless taps that collected a full name, home address, and
+              postcode are ordinary Gift Aid candidates. Taps that collected
+              only an amount are GASDS candidates if they meet the same
+              small-donation tests. Standing orders from members who already
+              have a valid declaration on file are ordinary Gift Aid, not
+              GASDS. Zakat envelopes stay in the Zakat fund whether or not a
+              declaration exists. Software can tag the fund and, where the
+              mosque&apos;s written policy allows, capture a declaration. It
+              cannot decide the policy for you.
+            </P>
 
             <ArticleH2>
               What HMRC actually requires is on GOV.UK, and recognition for
@@ -346,7 +391,23 @@ export default function GiftAidMosqueTreasurersGuidePage() {
               online account. You will be asked to attach a schedule
               spreadsheet. GOV.UK says you can claim for up to 1,000 donations
               on each spreadsheet, and that you can also claim through
-              eligible software.
+              eligible software. Eligible software, on that page, is a way to
+              claim. MosquePay&apos;s public pages do not say it is that
+              software. They say HMRC-ready export. You still open Charities
+              Online.
+            </P>
+            <P>
+              If you do not yet have an HMRC online account,{" "}
+              <GovLink href={GOV.claimOnline}>claim Gift Aid online</GovLink>{" "}
+              says you register and enrol by selecting Charities as a new
+              user. You will need the charity&apos;s postcode, the HMRC
+              reference (up to five numbers, starting with one or two
+              letters), and the customer account number or the last four
+              digits of the bank account. Enrolment sends an activation code
+              by post. GOV.UK says it can take a week and is valid for 28
+              days. The person who holds that login is the person who
+              submits. Ask who that is before you buy any product that
+              promises to &quot;do Gift Aid&quot;.
             </P>
             <P>
               A Charity Commission number is not the same thing.{" "}
@@ -409,6 +470,17 @@ export default function GiftAidMosqueTreasurersGuidePage() {
               says you cannot claim for donations that come with a valid Gift
               Aid declaration, for membership fees, or for a £30 portion of a
               larger gift.
+            </P>
+            <P>
+              Other Friday failures are quieter. A declaration with a first
+              name only will not survive an HMRC check that asks for a full
+              name. A declaration with a town and no postcode is missing the
+              postal code GOV.UK lists as required. A building-fund standing
+              order posted into the general column will make the claim look
+              right and the restricted pot look wrong. A GASDS sheet that
+              uses the week&apos;s card total, including declared taps, will
+              over-claim. None of those problems is a 25p arithmetic error.
+              They are a match error.
             </P>
 
             <ArticleH2>
@@ -485,25 +557,29 @@ export default function GiftAidMosqueTreasurersGuidePage() {
             <P>
               This page does not write new fiqh. It does not tell you that
               Gift Aid on Zakat is allowed, and it does not tell you that it
-              is forbidden. It does not offer a local mosque&apos;s page as a
-              ruling you can copy.
+              is forbidden. It does not offer a local mosque page as a ruling
+              you can copy. It does not show Gift Aid topping up a Zakat line
+              as a default example. Public MosquePay marketing has used
+              conflicting illustrations on that point. Ignore those
+              illustrations. They are not a policy.
             </P>
             <P>
-              Write the mosque&apos;s policy down where the treasurer, the
-              imam, and the accountant can all find it. Keep Zakat, Sadaqah,
-              and Lillah tagged from the moment of giving through to the
-              banked amount and the claim line. If the policy says a Gift Aid
-              top-up on a Zakat gift is treated as general Sadaqah, record
-              that split in the books so the congregation can see it. Confirm
-              the religious treatment with your imam and the tax treatment
-              with your accountant before the claim goes to HMRC.
+              Write the mosque&apos;s Gift Aid-on-Zakat policy down where the
+              treasurer, the imam, and the accountant can all find it. Show
+              that policy on the donate flow so a giver can see how the
+              mosque will treat their gift before they give. Keep Zakat,
+              Sadaqah, and Lillah tagged from the moment of giving through to
+              the banked amount and any later claim line.
             </P>
             <P>
-              GiftAider&apos;s public Gift Aid and Zakat page tells Islamic
-              charities to track and separate Zakat from Gift Aid eligible
-              donations. That is a public reminder that the split is your job.
-              It is not MosquePay&apos;s ruling, and it is not a substitute
-              for your own written policy.
+              Software behaviour, and only software behaviour, is this.
+              MosquePay&apos;s public features page says Zakat, Sadaqah,
+              Lillah, and appeal funds are kept separate, and that Gift Aid
+              declarations can be captured at the point of giving. Capture a
+              declaration where the mosque&apos;s written policy allows it.
+              Do not let a tick-box invent a ruling. Confirm the religious
+              treatment with your imam and the tax treatment with your
+              accountant before any Zakat line appears in a Gift Aid export.
             </P>
 
             <ArticleH2>
@@ -519,6 +595,20 @@ export default function GiftAidMosqueTreasurersGuidePage() {
               buildings. If your mosque meets the community-building tests,
               read that chapter for the collection and record rules that go
               with it.
+            </P>
+            <P>
+              Chapter 8 says a community building is a building, or part of
+              one, that the charity uses to run charitable activities, and
+              that those activities must reach a group of at least ten
+              beneficiaries at the same time without charging for access to
+              that part of the building.{" "}
+              <GovLink href={GOV.gasds}>
+                The small-donations scheme page
+              </GovLink>{" "}
+              says you need to have hosted at least six charity events there,
+              each attended by at least ten people. Jumu&apos;ah in a mosque
+              is the obvious candidate. Confirm both pages rather than
+              assuming every prayer space qualifies in every tax year.
             </P>
             <P>
               On {CHECKED_ON},{" "}
@@ -665,7 +755,8 @@ export default function GiftAidMosqueTreasurersGuidePage() {
               <InternalLink href="/pricing">live pricing page</InternalLink>.
               It does not treat /news as a home for this guide. /news is the
               product changelog. It does not use /charity or /donate, which
-              are demo mosque pages.
+              are demo mosque pages. It does not reproduce any marketing mock
+              that Gift Aids a Zakat line.
             </P>
 
             <ArticleH2>

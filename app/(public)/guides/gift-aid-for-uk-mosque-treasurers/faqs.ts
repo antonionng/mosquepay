@@ -32,7 +32,7 @@ export const GIFT_AID_GUIDE_FAQS: GuideFaq[] = [
   {
     question: "Can Gift Aid be claimed on Zakat?",
     answer:
-      "This page does not give a fiqh ruling and does not set a MosquePay default. Write the mosque's policy down, tag Zakat, Sadaqah, and Lillah so they cannot be mixed in the books, and confirm the tax and the religious treatment with your imam and your accountant before you include any Zakat line in a Gift Aid claim.",
+      "This page does not give a fiqh ruling and does not set a MosquePay default. Do not treat a Gift Aid top-up on Zakat as a software example you can copy. Write the mosque's Gift Aid-on-Zakat policy down, show it on the donate flow, keep Zakat tagged separately from Sadaqah and Lillah, and confirm the religious and tax treatment with your imam and accountant before any Zakat line appears in a claim.",
   },
   {
     question: "Does MosquePay submit the claim?",
