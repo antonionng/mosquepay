@@ -3,6 +3,7 @@ import { isSupabaseConfigured } from "@/lib/db/with-fallback";
 import * as db from "@/lib/db";
 import { mosqueScopedEventPath } from "@/lib/public-links";
 import { isPubliclyVisible } from "@/lib/events/public-visibility";
+import { MARKETING_GUIDES } from "@/lib/marketing/guides";
 
 function siteUrl(): string {
   const url =
@@ -23,12 +24,13 @@ const STATIC_PATHS = [
   "/privacy",
   "/terms",
   "/gdpr",
+  "/cookies",
   "/join",
   "/charity",
   "/donate",
-  "/about",
   "/faq",
   "/news",
+  "/guides",
 ] as const;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -38,11 +40,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticEntries: MetadataRoute.Sitemap = STATIC_PATHS.map((path) => ({
     url: `${base}${path}`,
     lastModified: now,
-    changeFrequency: path === "/" ? "weekly" : "monthly",
-    priority: path === "/" ? 1.0 : 0.7,
+    changeFrequency: path === "/" ? "weekly" : path === "/guides" ? "weekly" : "monthly",
+    priority: path === "/" ? 1.0 : path === "/guides" ? 0.8 : 0.7,
   }));
 
-  if (!isSupabaseConfigured()) return staticEntries;
+  const guideEntries: MetadataRoute.Sitemap = MARKETING_GUIDES.map((guide) => ({
+    url: `${base}${guide.path}`,
+    lastModified: new Date(`${guide.lastModified}T00:00:00.000Z`),
+    changeFrequency: "monthly",
+    priority: 0.8,
+  }));
+
+  if (!isSupabaseConfigured()) return [...staticEntries, ...guideEntries];
 
   const dynamicEntries: MetadataRoute.Sitemap = [];
   try {
@@ -65,5 +74,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // tolerate db errors at sitemap build time
   }
 
-  return [...staticEntries, ...dynamicEntries];
+  return [...staticEntries, ...guideEntries, ...dynamicEntries];
 }

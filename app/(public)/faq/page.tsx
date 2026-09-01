@@ -126,7 +126,14 @@ export default async function FAQPage({
               </h1>
               <p className="mt-6 text-lg leading-8 text-slate-600">
                 Straight answers about giving, Gift Aid, data, security, and getting started. If
-                yours isn&apos;t here, just ask.
+                you are the treasurer working through Gift Aid or GASDS, read the{" "}
+                <Link
+                  href="/guides/gift-aid-for-uk-mosque-treasurers"
+                  className="font-semibold text-brand underline decoration-brand/25 underline-offset-2 hover:decoration-brand"
+                >
+                  Gift Aid guide for UK mosque treasurers
+                </Link>
+                . If yours isn&apos;t here, just ask.
               </p>
             </div>
           </div>
@@ -144,6 +151,18 @@ export default async function FAQPage({
                   <AccordionTrigger className="py-5 text-left font-heading font-semibold text-slate-900 hover:text-brand hover:no-underline">
                     {faq.q}
                   </AccordionTrigger>
+                  {faq.q === "How does Gift Aid work in MosquePay?" ? (
+                    <p className="pb-3 text-sm leading-6 text-slate-600">
+                      Full treasurer guide:{" "}
+                      <Link
+                        href="/guides/gift-aid-for-uk-mosque-treasurers"
+                        className="font-semibold text-brand underline decoration-brand/25 underline-offset-2 hover:decoration-brand"
+                      >
+                        Gift Aid for UK mosque treasurers
+                      </Link>
+                      .
+                    </p>
+                  ) : null}
                   <AccordionContent className="pb-5 leading-relaxed text-slate-600">
                     {faq.a}
                   </AccordionContent>

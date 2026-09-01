@@ -22,6 +22,8 @@ export default function PublicLayout({
     pathname === "/contact" ||
     pathname === "/book-demo" ||
     pathname === "/news" ||
+    pathname === "/guides" ||
+    pathname.startsWith("/guides/") ||
     pathname === "/join" ||
     pathname === "/login" ||
     pathname === "/terms" ||
