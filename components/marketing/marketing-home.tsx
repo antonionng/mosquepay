@@ -34,6 +34,8 @@ const PILLARS = [
     Icon: PoundSterling,
     title: "Giving & Gift Aid",
     body: "Online giving, one-off donations, service collections, and event payments, with Gift Aid declarations and GASDS evidence captured at the moment of giving.",
+    href: "/guides/gift-aid-for-uk-mosque-treasurers",
+    linkLabel: "Gift Aid guide for UK mosque treasurers",
   },
   {
     Icon: Users,
@@ -261,16 +263,25 @@ export function MarketingHome() {
           </p>
         </div>
         <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {PILLARS.map(({ Icon, title, body }) => (
+          {PILLARS.map((pillar) => (
             <article
-              key={title}
+              key={pillar.title}
               className="group rounded-3xl border border-[#e9e2d4] bg-white p-7 shadow-sm transition-shadow hover:shadow-[0_16px_40px_-16px_rgba(30,41,59,0.18)]"
             >
               <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-brand/8 text-brand">
-                <Icon className="h-5 w-5" />
+                <pillar.Icon className="h-5 w-5" />
               </span>
-              <h3 className="mt-5 font-heading text-lg font-semibold text-slate-900">{title}</h3>
-              <p className="mt-3 text-sm leading-6 text-slate-600">{body}</p>
+              <h3 className="mt-5 font-heading text-lg font-semibold text-slate-900">{pillar.title}</h3>
+              <p className="mt-3 text-sm leading-6 text-slate-600">{pillar.body}</p>
+              {"href" in pillar && pillar.href ? (
+                <Link
+                  href={pillar.href}
+                  className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-brand hover:text-brand-dark"
+                >
+                  {pillar.linkLabel}
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              ) : null}
             </article>
           ))}
         </div>

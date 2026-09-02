@@ -23,6 +23,7 @@ const FOOTER_COLUMNS = [
       { href: "/networks", label: "For networks & networks" },
       { href: "/pricing", label: "Pricing" },
       { href: "/book-demo", label: "Book a demo" },
+      { href: "/guides", label: "Guides" },
       { href: "/news", label: "Product news" },
     ],
   },
