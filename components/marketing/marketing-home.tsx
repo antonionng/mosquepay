@@ -307,13 +307,22 @@ export function MarketingHome() {
               named campaign with its own giving link, so designated gifts stay designated
               from the moment of giving through to the treasurer&apos;s report.
             </p>
-            <Link
-              href="/charity"
-              className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-brand transition-colors hover:text-brand-dark"
-            >
-              See how charity giving works
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+            <div className="mt-8 flex flex-col gap-3">
+              <Link
+                href="/guides/collect-zakat-online-uk-mosque"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-brand transition-colors hover:text-brand-dark"
+              >
+                Collect Zakat online UK mosque
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link
+                href="/charity"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-brand transition-colors hover:text-brand-dark"
+              >
+                See how charity giving works
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
           <div className="grid gap-5 sm:grid-cols-2">
             {CHARITY_POINTS.map(({ Icon, title, body }) => (

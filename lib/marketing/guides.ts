@@ -14,6 +14,22 @@ export type MarketingGuide = {
  */
 export const MARKETING_GUIDES: readonly MarketingGuide[] = [
   {
+    slug: "collect-zakat-online-uk-mosque",
+    path: "/guides/collect-zakat-online-uk-mosque",
+    listingTitle: "Collect Zakat online UK mosque",
+    description:
+      "UK mosque treasurers need a collection path that takes Zakat online, keeps it apart from Sadaqah and Lillah, and shows the committee the restricted fund without rebuilding Ramadan in Excel. A field guide to mosque-side Zakat collection.",
+    publishedAt: "2026-09-10",
+    lastModified: "2026-09-10",
+    keywords: [
+      "collect Zakat online UK mosque",
+      "Zakat collection UK mosque",
+      "collect Zakat online",
+      "mosque Zakat online",
+      "Zakat collection mosque UK",
+    ],
+  },
+  {
     slug: "mosque-treasurer-software-uk",
     path: "/guides/mosque-treasurer-software-uk",
     listingTitle: "Mosque treasurer software UK",
