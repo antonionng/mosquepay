@@ -14,6 +14,22 @@ export type MarketingGuide = {
  */
 export const MARKETING_GUIDES: readonly MarketingGuide[] = [
   {
+    slug: "contactless-qr-donations-uk-mosque",
+    path: "/guides/contactless-qr-donations-uk-mosque",
+    listingTitle: "Contactless donations mosque UK",
+    description:
+      "UK mosque treasurers need contactless and QR giving that tags the fund on the spot, captures Gift Aid when it applies, and still leaves a Friday record the committee can trust. A treasurer field guide after Jumu'ah, not a hardware splash.",
+    publishedAt: "2026-09-10",
+    lastModified: "2026-09-10",
+    keywords: [
+      "contactless donations mosque UK",
+      "QR code donations mosque UK",
+      "contactless QR donations UK mosque",
+      "replace cash collection mosque contactless UK Jumuah",
+      "contactless giving mosque UK",
+    ],
+  },
+  {
     slug: "collect-zakat-online-uk-mosque",
     path: "/guides/collect-zakat-online-uk-mosque",
     listingTitle: "Collect Zakat online UK mosque",

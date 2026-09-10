@@ -115,6 +115,12 @@ export function TerminalShowcase() {
             >
               Explore features
             </Link>
+            <Link
+              href="/guides/contactless-qr-donations-uk-mosque"
+              className="inline-flex items-center rounded-xl border border-[#ddd5c4] bg-white px-7 py-3.5 text-sm font-semibold text-slate-800 shadow-sm transition-colors hover:border-brand/30 hover:text-brand"
+            >
+              Contactless donations guide
+            </Link>
           </div>
         </div>
 
