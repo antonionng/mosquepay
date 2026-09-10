@@ -133,7 +133,15 @@ export default async function FAQPage({
                 >
                   Gift Aid guide for UK mosque treasurers
                 </Link>
-                . If yours isn&apos;t here, just ask.
+                . If you are choosing software for funds, Gift Aid evidence, and the committee
+                pack, read the{" "}
+                <Link
+                  href="/guides/mosque-treasurer-software-uk"
+                  className="font-semibold text-brand underline decoration-brand/25 underline-offset-2 hover:decoration-brand"
+                >
+                  mosque treasurer software UK
+                </Link>{" "}
+                field guide. If yours isn&apos;t here, just ask.
               </p>
             </div>
           </div>
