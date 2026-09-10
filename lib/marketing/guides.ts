@@ -14,6 +14,22 @@ export type MarketingGuide = {
  */
 export const MARKETING_GUIDES: readonly MarketingGuide[] = [
   {
+    slug: "mosque-treasurer-software-uk",
+    path: "/guides/mosque-treasurer-software-uk",
+    listingTitle: "Mosque treasurer software UK",
+    description:
+      "UK mosque treasurers need one stack that tags Zakat separately, captures Gift Aid evidence, and builds the committee pack without rebuilding Friday in Excel. A category field guide to the jobs behind mosque software.",
+    publishedAt: "2026-09-10",
+    lastModified: "2026-09-10",
+    keywords: [
+      "mosque treasurer software UK",
+      "mosque accounts donations",
+      "software for mosque treasurers",
+      "mosque software UK",
+      "mosque treasurer stack",
+    ],
+  },
+  {
     slug: "gift-aid-for-uk-mosque-treasurers",
     path: "/guides/gift-aid-for-uk-mosque-treasurers",
     listingTitle: "Gift Aid for UK mosque treasurers",

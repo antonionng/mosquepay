@@ -61,6 +61,8 @@ const PILLARS = [
     Icon: BarChart3,
     title: "Treasurer reporting",
     body: "Bank import, reconciliation, giving statements, and HMRC-ready Gift Aid claims. Evidence, not archaeology, at year end.",
+    href: "/guides/mosque-treasurer-software-uk",
+    linkLabel: "Mosque treasurer software UK",
   },
 ];
 
