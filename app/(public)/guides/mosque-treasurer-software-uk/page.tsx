@@ -275,8 +275,13 @@ export default function MosqueTreasurerSoftwareUkGuidePage() {
                 collect Zakat online UK mosque
               </InternalLink>{" "}
               field guide when the job is mosque-side intake and
-              ring-fencing. Read this one when you are deciding what has
-              to sit in the stack before the claim exists.
+              ring-fencing. Read the{" "}
+              <InternalLink href="/guides/contactless-qr-donations-uk-mosque">
+                contactless donations mosque UK
+              </InternalLink>{" "}
+              field guide when the job is Friday taps and QR that still
+              have to become a record. Read this one when you are deciding
+              what has to sit in the stack before the claim exists.
             </P>
             <P>
               Use it as a single-scroll field guide. Read the job split

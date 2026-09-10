@@ -260,7 +260,13 @@ export default function GiftAidMosqueTreasurersGuidePage() {
               first, then the GOV.UK requirements, then the Friday failure
               modes, then the comparison of approaches. The product section
               comes late on purpose. If a demo cannot answer the puncture
-              questions, you do not need a longer demo.
+              questions, you do not need a longer demo. If the job is the
+              tap, the QR poster, and the Friday record rather than the
+              reclaim tests, read the{" "}
+              <InternalLink href="/guides/contactless-qr-donations-uk-mosque">
+                contactless donations mosque UK
+              </InternalLink>{" "}
+              field guide.
             </P>
 
             <ArticleH2>

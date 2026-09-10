@@ -149,6 +149,14 @@ export default async function FAQPage({
                 >
                   collect Zakat online UK mosque
                 </Link>{" "}
+                field guide. If Friday still leaves you a cash tin, a
+                nameless tap, and a QR that dumps into one pot, read the{" "}
+                <Link
+                  href="/guides/contactless-qr-donations-uk-mosque"
+                  className="font-semibold text-brand underline decoration-brand/25 underline-offset-2 hover:decoration-brand"
+                >
+                  contactless donations mosque UK
+                </Link>{" "}
                 field guide. If yours isn&apos;t here, just ask.
               </p>
             </div>

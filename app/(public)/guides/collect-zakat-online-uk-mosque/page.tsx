@@ -280,9 +280,13 @@ export default function CollectZakatOnlineUkMosqueGuidePage() {
               <InternalLink href="/guides/mosque-treasurer-software-uk">
                 mosque treasurer software UK
               </InternalLink>{" "}
-              field guide. Read those when the job is reclaim or the whole
-              stack. Read this one when the job is taking Zakat in and
-              keeping it tagged.
+              field guide. Read the{" "}
+              <InternalLink href="/guides/contactless-qr-donations-uk-mosque">
+                contactless donations mosque UK
+              </InternalLink>{" "}
+              field guide when the job is Friday taps and QR that still
+              have to become a record. Read this one when the job is
+              taking Zakat in and keeping it tagged.
             </P>
             <P>
               Use it as a single-scroll field guide. Read the job first,
