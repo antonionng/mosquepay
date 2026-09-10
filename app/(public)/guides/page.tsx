@@ -12,10 +12,12 @@ import { MARKETING_GUIDES } from "@/lib/marketing/guides";
 export const metadata = marketingMetadata({
   title: "Guides for UK mosque treasurers | MosquePay",
   description:
-    "Field guides for UK mosque treasurers on Gift Aid, GASDS, and the software stack that has to tag funds and build the committee pack. Organic reference pages, not product news.",
+    "Field guides for UK mosque treasurers on collecting Zakat online, Gift Aid, GASDS, and the software stack that has to tag funds and build the committee pack. Organic reference pages, not product news.",
   path: "/guides",
   keywords: [
     "mosque treasurer guides",
+    "collect Zakat online UK mosque",
+    "Zakat collection UK mosque",
     "mosque treasurer software UK",
     "mosque accounts donations",
     "Gift Aid mosque UK",

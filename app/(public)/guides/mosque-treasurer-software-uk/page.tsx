@@ -270,9 +270,13 @@ export default function MosqueTreasurerSoftwareUkGuidePage() {
               <InternalLink href="/guides/gift-aid-for-uk-mosque-treasurers">
                 Gift Aid field guide for UK mosque treasurers
               </InternalLink>
-              . Read that guide when you are assembling a claim. Read this
-              one when you are deciding what has to sit in the stack before
-              the claim exists.
+              . Read that guide when you are assembling a claim. Read the{" "}
+              <InternalLink href="/guides/collect-zakat-online-uk-mosque">
+                collect Zakat online UK mosque
+              </InternalLink>{" "}
+              field guide when the job is mosque-side intake and
+              ring-fencing. Read this one when you are deciding what has
+              to sit in the stack before the claim exists.
             </P>
             <P>
               Use it as a single-scroll field guide. Read the job split

@@ -141,6 +141,14 @@ export default async function FAQPage({
                 >
                   mosque treasurer software UK
                 </Link>{" "}
+                field guide. If you are collecting Zakat online and keeping it
+                apart from Sadaqah and Lillah, read the{" "}
+                <Link
+                  href="/guides/collect-zakat-online-uk-mosque"
+                  className="font-semibold text-brand underline decoration-brand/25 underline-offset-2 hover:decoration-brand"
+                >
+                  collect Zakat online UK mosque
+                </Link>{" "}
                 field guide. If yours isn&apos;t here, just ask.
               </p>
             </div>

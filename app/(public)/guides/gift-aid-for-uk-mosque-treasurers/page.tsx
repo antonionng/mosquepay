@@ -589,7 +589,12 @@ export default function GiftAidMosqueTreasurersGuidePage() {
               mosque will treat their gift before they give. Confirm the
               religious treatment with your imam and the tax treatment with
               your accountant before any Zakat line appears in a Gift Aid
-              export.
+              export. The mosque-side collection path, including envelopes,
+              transfers, QR, and the restricted pack, is in the{" "}
+              <InternalLink href="/guides/collect-zakat-online-uk-mosque">
+                collect Zakat online UK mosque
+              </InternalLink>{" "}
+              field guide.
             </P>
             <P>
               Software behaviour, and only software behaviour, is this.
