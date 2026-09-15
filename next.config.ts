@@ -34,6 +34,11 @@ const nextConfig: NextConfig = {
         destination: "/:slug/newcomers",
         permanent: false,
       },
+      {
+        source: "/gift-aid",
+        destination: "/guides/gift-aid-for-uk-mosque-treasurers",
+        permanent: true,
+      },
     ];
   },
   async headers() {
